@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:kenney.nl)",
+      "Bash(find \"F:/Users/weixin/xwechat_files/\" -type f \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \\\\\\) -newer \"F:/Users/weixin/xwechat_files/wxid_gb6y1xa6u57s22_9143/temp/RWTemp/2026-06/ff697a5bb122c3a44443ee3e741b23d5/MIY_副本\\(1\\).txt\" 2>/dev/null | head -30)",
+      "Bash(find \"F:/Users/weixin/xwechat_files/\" -type d -name \"InputTemp\" 2>/dev/null | head -10)",
+      "Bash(xargs -I{} stat -c \"%Y %s %n\" \"{}\")",
+      "Bash(mkdir -p \"F:/Users/claude code/public\" && cp \"F:/Users/weixin/xwechat_files/wxid_gb6y1xa6u57s22_9143/temp/RWTemp/2026-06/ec6594c0da96deba23368e88fe79ef92.png\" \"F:/Users/claude code/public/office-bg.png\" && ls -la \"F:/Users/claude code/public/\")",
+      "Bash(curl -s -m 5 \"http://127.0.0.1:5173/\")",
+      "Bash(netstat -ano)",
+      "Bash(find /Users -type f -name \"*.json\" -o -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.css\" 2>/dev/null | head -20)",
+      "mcp__visualize__read_me",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=dev@lobster.local -c user.name=dev commit -m \"v4 baseline: dark cyberpunk shell + enterprise office \\(pre-v5\\)\")"
+    ]
+  }
+}

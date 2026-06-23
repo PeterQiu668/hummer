@@ -1,0 +1,65 @@
+import type { HermesBadCase } from '../lib/types';
+
+export const hermesBadCases: HermesBadCase[] = [
+  {
+    id: 'bc-1',
+    title: '资金调拨触发风控',
+    agent: '砚·财务官',
+    cause: 'SOP 未强制生成审批单，直接调用 ERP 调拨接口',
+    stage: 'sandbox',
+    improvement: '改写 SOP v4：> 50w 必须生成审批单 + 飞书审批',
+    delta: '阻断率 0% → 100%',
+    cost: '$2.41',
+  },
+  {
+    id: 'bc-2',
+    title: 'BD 邮件被识别为模板',
+    agent: '雪·销售官',
+    cause: 'Prompt 中"客户问候"段落过于通用',
+    stage: 'shipped',
+    improvement: '改写 Skill「BD 邮件 v3.2」：引入客户互动史前 3 件事',
+    delta: '回复率 8.2% → 26.6%',
+    cost: '$3.18',
+  },
+  {
+    id: 'bc-3',
+    title: '合同条款漏标',
+    agent: '律·法务官',
+    cause: '知识图谱中「数据出境」相关条款未关联到合同模板',
+    stage: 'review',
+    improvement: '扩充 KG 边类型「合同-法规-行业」3 类',
+    delta: '召回率 81% → 94%',
+    cost: '$5.62',
+  },
+  {
+    id: 'bc-4',
+    title: '客服情绪误判',
+    agent: '苓·客服官',
+    cause: '中文混合英文场景下情绪分类失效',
+    stage: 'optimizing',
+    improvement: 'GEPA 自动补样本 220 条，重训分类器',
+    delta: '准确率 78% → 91%（评测中）',
+    cost: '$1.92',
+  },
+  {
+    id: 'bc-5',
+    title: '复盘报告漏指标',
+    agent: '岚·运营官',
+    cause: 'SOP「618 复盘」未覆盖跨渠道归因',
+    stage: 'detected',
+    improvement: '新增「跨渠道归因」步骤 + 强制 BI 校验',
+    delta: '待评测',
+    cost: '—',
+  },
+];
+
+export const evolutionStats = {
+  totalRuns: 184,
+  shipped: 47,
+  reviewing: 6,
+  sandbox: 9,
+  optimizing: 12,
+  detected: 23,
+  costToDate: '$487.20',
+  avgGain: '+18.4%',
+};
