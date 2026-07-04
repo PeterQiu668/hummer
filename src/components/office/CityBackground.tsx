@@ -9,15 +9,15 @@ import * as THREE from 'three';
 
 interface SilhouetteSpec { position: [number, number, number]; scale: number; seed: number }
 
+/** 拉近到幕墙外 12-20 个单位，隔窗可见的城市天际线 */
 const SILHOUETTES: SilhouetteSpec[] = [
-  { position: [-40, -2, -45], scale: 1.1, seed: 1 },
-  { position: [0, -2, -55],   scale: 1.3, seed: 2 },
-  { position: [40, -2, -45],  scale: 1.0, seed: 3 },
-  { position: [55, -2, 0],    scale: 0.9, seed: 4 },
-  { position: [40, -2, 45],   scale: 1.0, seed: 5 },
-  { position: [-40, -2, 45],  scale: 1.1, seed: 6 },
-  { position: [-55, -2, 0],   scale: 1.0, seed: 7 },
-  { position: [0, -2, 55],    scale: 0.9, seed: 8 },
+  { position: [-26, -3, -30], scale: 1.05, seed: 1 },
+  { position: [0, -3, -34],   scale: 1.25, seed: 2 },
+  { position: [26, -3, -30],  scale: 1.0,  seed: 3 },
+  { position: [34, -3, -6],   scale: 0.9,  seed: 4 },
+  { position: [30, -3, 24],   scale: 0.95, seed: 5 },
+  { position: [-30, -3, 24],  scale: 1.05, seed: 6 },
+  { position: [-34, -3, -6],  scale: 0.95, seed: 7 },
 ];
 
 interface BuildingInst { pos: [number, number, number]; scl: [number, number, number] }
@@ -46,7 +46,7 @@ function buildCity() {
       let wi = 0;
       for (let r = 1; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (rng(i * 100 + r * 7 + c) > 0.6) {
+          if (rng(i * 100 + r * 7 + c) > 0.62) {
             const wx = (c / cols - 0.5) * w;
             const wy = r * 1.1 - h / 2;
             windows.push({
@@ -74,12 +74,13 @@ export default function CityBackground() {
   return (
     <>
       <color attach="background" args={['#0a0f1e']} />
-      <fog attach="fog" args={['#0a0f1e', 35, 90]} />
+      {/* fog 拉远：室内不受影响，幕墙外城市夜景可见 */}
+      <fog attach="fog" args={['#0a0f1e', 70, 160]} />
 
       {/* 楼栋 · 单位盒实例化（1 draw call） */}
       <Instances limit={buildings.length} frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#070b1a" roughness={1} metalness={0} />
+        <meshStandardMaterial color="#0D1424" roughness={1} metalness={0} />
         {buildings.map((b, i) => (
           <Instance key={i} position={b.pos} scale={b.scl} />
         ))}
@@ -94,7 +95,7 @@ export default function CityBackground() {
             key={i}
             position={w.pos}
             scale={[w.scl, w.scl, 1]}
-            color={w.purple ? '#A855F7' : '#3B82F6'}
+            color={w.purple ? '#9B7FDB' : '#6E8FD6'}
           />
         ))}
       </Instances>

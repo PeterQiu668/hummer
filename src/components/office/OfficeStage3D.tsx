@@ -63,7 +63,7 @@ const BASE_LAYER_INFO: Record<BaseLayerId, { title: string; zh: string; accent: 
 
 /**
  * v10 · Agent Workforce 立体总部
- *  顶层场景 · Agent Workforce（六大分区 + 数字员工 + 工作路径）
+ *  顶层场景 · 真实现代科技办公室（幕墙 + 桌阵 + 玻璃隔断房 + 工作路径）
  *  基座双层 · Agent OS / Data OS（3D 基座，可点击展开引擎模块）
  */
 export default function OfficeStage3D() {
@@ -93,17 +93,17 @@ export default function OfficeStage3D() {
       <Canvas
         dpr={[1, 1.6]}
         shadows={false}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.32 }}
         style={{ background: '#1A1B1E' }}
       >
-        <PerspectiveCamera makeDefault position={[0, 28, 50]} fov={48} near={0.5} far={260} />
+        <PerspectiveCamera makeDefault position={[0, 24, 42]} fov={44} near={0.5} far={260} />
         <OrbitControls
           makeDefault enablePan={false}
-          minDistance={12} maxDistance={75}
+          minDistance={10} maxDistance={75}
           minPolarAngle={Math.PI * 0.12}
           maxPolarAngle={Math.PI * 0.46}
           enableDamping dampingFactor={0.08}
-          target={[0, -1.2, 0]}
+          target={[0, -0.8, 0]}
         />
         <CameraRig3D />
         <Suspense fallback={null}>
@@ -115,9 +115,15 @@ export default function OfficeStage3D() {
           {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
           <Workstations />
           <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
-          <FloatingParticles count={130} color="#3B82F6" />
+          <FloatingParticles count={90} color="#7FA8DF" />
         </Suspense>
       </Canvas>
+
+      {/* 暗角景深（纯 CSS，增强空间感） */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 75% 68% at 50% 42%, transparent 55%, rgba(4,8,18,0.55) 100%)' }}
+      />
 
       {/* 基座层详情面板（点击 Agent OS / Data OS 基座展开） */}
       {layerInfo && (

@@ -33,7 +33,7 @@ const STATUS_LIFT: Record<string, number> = {
   blocked: 0.8, in_progress: 1.0, waiting_approval: 1.2, pending: 1.4, completed: 1.4, failed: 0.8, overdue: 0.9,
 };
 
-const ANCHOR_Y = 1.6; // 头顶高度出发/到达
+const ANCHOR_Y = 2.15; // 头顶上方出发/到达（高于名牌）
 
 export interface PathEdge {
   key: string;
@@ -73,7 +73,7 @@ function buildEdges(): PathEdge[] {
       if (!toArr) return;
       const to = new THREE.Vector3(toArr[0], toArr[1] + ANCHOR_Y, toArr[2]);
       const dist = from.distanceTo(to);
-      const lift = THREE.MathUtils.clamp(dist * 0.28, 1.0, 3.5) * (STATUS_LIFT[task.status] ?? 1) + lane * 0.45;
+      const lift = THREE.MathUtils.clamp(dist * 0.22, 0.7, 2.4) * (STATUS_LIFT[task.status] ?? 1) + lane * 0.4;
       const mid = from.clone().lerp(to, 0.5);
       mid.y += lift;
       // 平行边横向错开
@@ -182,7 +182,7 @@ export default function TaskPaths({
       {edges.map((e) => {
         const em = emphasis(e);
         if (em === 0) return null;
-        const opacity = em === 1 ? 0.95 : em < 0.2 ? 0.06 : 0.4;
+        const opacity = em === 1 ? 0.92 : em < 0.2 ? 0.05 : 0.3;
         return (
           <group key={e.key}>
             <mesh
