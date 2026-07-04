@@ -9,6 +9,8 @@ import { Text, useCursor } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ZoneId } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
+import { getCarpetTexture } from './textures';
+import { useAutoShadows } from './useAutoShadows';
 
 export interface ZoneSpec {
   id: ZoneId;
@@ -177,6 +179,8 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
   const [w, d] = spec.size;
   const trimMat = useRef<THREE.MeshBasicMaterial>(null);
   const zoneIndex = ZONE_SPECS.findIndex((s) => s.id === spec.id);
+  const rootRef = useAutoShadows();
+  const rugTex = useMemo(() => getCarpetTexture('#3A445A', `rug-${spec.id}`), [spec.id]);
 
   // 地毯区块（圆角）
   const geometry = useMemo(() => {
@@ -206,7 +210,7 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
   });
 
   return (
-    <group position={[cx, 0, cz]}>
+    <group ref={rootRef} position={[cx, 0, cz]}>
       {/* 包边缝光（区域色的唯一大面积表达） */}
       <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w + 0.16, d + 0.16]} />
@@ -222,8 +226,9 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
         onClick={(e) => { e.stopPropagation(); setActiveZone(isActive ? null : spec.id); }}
       >
         <meshStandardMaterial
-          color={isActive ? '#3A4459' : '#323B4E'}
-          roughness={0.85}
+          map={rugTex}
+          color={isActive ? '#C4CEE4' : '#AEB9D2'}
+          roughness={0.88}
           metalness={0.05}
           emissive={spec.color}
           emissiveIntensity={isActive ? 0.07 : 0.02}

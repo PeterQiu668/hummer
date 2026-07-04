@@ -6,7 +6,7 @@
  * - 名牌仅在选中或分区聚焦时显示（降噪）
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Text } from '@react-three/drei';
+import { RoundedBox, Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { workstations } from '../../data/workstations';
@@ -15,6 +15,8 @@ import { marketEmployees } from '../../data/marketplace';
 import { useAppStore } from '../../store/useAppStore';
 import { resolveSlot, type SlotVariant } from './scenePositions';
 import VoxelHuman, { AGENT_LOOKS, TRAINEE_LOOK, STATUS_COLOR, hashCode, type FigureLook } from './VoxelHuman';
+import { getWoodTexture } from './textures';
+import { useAutoShadows } from './useAutoShadows';
 import type { Employee } from '../../lib/types';
 
 export const HIRES_CHANGED_EVENT = 'hummer-hires-changed';
@@ -37,11 +39,10 @@ function ModernDesk({ statusColor, screenMatRef, dim }: {
 }) {
   return (
     <group>
-      {/* 桌面 */}
-      <mesh position={[0, 0.72, 0.75]}>
-        <boxGeometry args={[1.5, 0.05, 0.7]} />
-        <meshStandardMaterial color={dim ? '#9B8666' : WOOD} roughness={0.6} metalness={0.05} />
-      </mesh>
+      {/* 桌面（木纹 + 圆角） */}
+      <RoundedBox args={[1.5, 0.05, 0.7]} radius={0.018} smoothness={2} position={[0, 0.72, 0.75]}>
+        <meshStandardMaterial map={getWoodTexture()} color={dim ? '#B09C7E' : '#E8D4B2'} roughness={0.55} metalness={0.05} />
+      </RoundedBox>
       {/* 侧板腿 */}
       <mesh position={[-0.68, 0.36, 0.75]}>
         <boxGeometry args={[0.05, 0.7, 0.6]} />
@@ -103,13 +104,20 @@ function ModernDesk({ statusColor, screenMatRef, dim }: {
 function OfficeChair({ z = -0.28 }: { z?: number }) {
   return (
     <group position={[0, 0, z]}>
-      <mesh position={[0, 0.5, 0]}>
-        <boxGeometry args={[0.48, 0.07, 0.46]} />
-        <meshStandardMaterial color="#2E333D" roughness={0.6} />
+      <RoundedBox args={[0.48, 0.09, 0.46]} radius={0.03} smoothness={2} position={[0, 0.5, 0]}>
+        <meshStandardMaterial color="#353B47" roughness={0.75} />
+      </RoundedBox>
+      <RoundedBox args={[0.46, 0.62, 0.07]} radius={0.03} smoothness={2} position={[0, 0.88, -0.22]} rotation={[-0.08, 0, 0]}>
+        <meshStandardMaterial color="#353B47" roughness={0.75} />
+      </RoundedBox>
+      {/* 扶手 */}
+      <mesh position={[-0.24, 0.65, -0.04]}>
+        <boxGeometry args={[0.04, 0.05, 0.3]} />
+        <meshStandardMaterial color="#2A2F38" roughness={0.5} metalness={0.3} />
       </mesh>
-      <mesh position={[0, 0.88, -0.22]} rotation={[-0.08, 0, 0]}>
-        <boxGeometry args={[0.46, 0.62, 0.06]} />
-        <meshStandardMaterial color="#2E333D" roughness={0.6} />
+      <mesh position={[0.24, 0.65, -0.04]}>
+        <boxGeometry args={[0.04, 0.05, 0.3]} />
+        <meshStandardMaterial color="#2A2F38" roughness={0.5} metalness={0.3} />
       </mesh>
       <mesh position={[0, 0.32, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 0.36, 6]} />
@@ -135,15 +143,14 @@ function ExecDesk({ statusColor, screenMatRef }: {
         <planeGeometry args={[3.4, 2.6]} />
         <meshStandardMaterial color="#2B3040" roughness={0.95} />
       </mesh>
-      {/* 桌面 */}
-      <mesh position={[0, 0.74, 0.8]}>
-        <boxGeometry args={[2.3, 0.07, 0.95]} />
-        <meshStandardMaterial color={WOOD_DARK} roughness={0.5} metalness={0.08} />
-      </mesh>
+      {/* 桌面（深色胡桃木纹 + 圆角） */}
+      <RoundedBox args={[2.3, 0.07, 0.95]} radius={0.02} smoothness={2} position={[0, 0.74, 0.8]}>
+        <meshStandardMaterial map={getWoodTexture('#96754F', '#6E5236', 'walnut')} color="#C9A87E" roughness={0.45} metalness={0.08} />
+      </RoundedBox>
       {/* 前挡板 */}
       <mesh position={[0, 0.42, 1.1]}>
         <boxGeometry args={[2.3, 0.6, 0.05]} />
-        <meshStandardMaterial color="#6E5236" roughness={0.55} />
+        <meshStandardMaterial map={getWoodTexture('#96754F', '#6E5236', 'walnut')} color="#A88B62" roughness={0.55} />
       </mesh>
       {/* 腿 */}
       <mesh position={[-1.05, 0.36, 0.8]}>
@@ -198,8 +205,8 @@ function MeetingTable() {
   return (
     <group>
       <mesh position={[0, 0.72, 0]}>
-        <cylinderGeometry args={[1.15, 1.15, 0.06, 24]} />
-        <meshStandardMaterial color={WOOD} roughness={0.55} metalness={0.05} />
+        <cylinderGeometry args={[1.15, 1.15, 0.06, 32]} />
+        <meshStandardMaterial map={getWoodTexture()} color="#E8D4B2" roughness={0.5} metalness={0.05} />
       </mesh>
       <mesh position={[0, 0.38, 0]}>
         <cylinderGeometry args={[0.08, 0.08, 0.66, 8]} />
@@ -240,24 +247,25 @@ function LoungeSofa() {
         <circleGeometry args={[1.7, 24]} />
         <meshStandardMaterial color="#31281F" roughness={0.95} />
       </mesh>
-      {/* 沙发 */}
+      {/* 沙发（圆角软包 + 坐垫分块） */}
       <group position={[0, 0, -0.5]}>
-        <mesh position={[0, 0.32, 0]}>
-          <boxGeometry args={[1.7, 0.3, 0.65]} />
-          <meshStandardMaterial color={FABRIC} roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0.62, -0.26]}>
-          <boxGeometry args={[1.7, 0.45, 0.14]} />
-          <meshStandardMaterial color={FABRIC} roughness={0.9} />
-        </mesh>
-        <mesh position={[-0.82, 0.5, 0]}>
-          <boxGeometry args={[0.14, 0.42, 0.65]} />
-          <meshStandardMaterial color={FABRIC} roughness={0.9} />
-        </mesh>
-        <mesh position={[0.82, 0.5, 0]}>
-          <boxGeometry args={[0.14, 0.42, 0.65]} />
-          <meshStandardMaterial color={FABRIC} roughness={0.9} />
-        </mesh>
+        <RoundedBox args={[1.7, 0.32, 0.68]} radius={0.06} smoothness={3} position={[0, 0.3, 0]}>
+          <meshStandardMaterial color={FABRIC} roughness={0.95} />
+        </RoundedBox>
+        {[-0.42, 0.42].map((x) => (
+          <RoundedBox key={x} args={[0.78, 0.1, 0.6]} radius={0.04} smoothness={3} position={[x, 0.49, 0.02]}>
+            <meshStandardMaterial color="#677185" roughness={0.95} />
+          </RoundedBox>
+        ))}
+        <RoundedBox args={[1.7, 0.5, 0.16]} radius={0.06} smoothness={3} position={[0, 0.62, -0.28]}>
+          <meshStandardMaterial color={FABRIC} roughness={0.95} />
+        </RoundedBox>
+        <RoundedBox args={[0.16, 0.44, 0.68]} radius={0.05} smoothness={3} position={[-0.84, 0.48, 0]}>
+          <meshStandardMaterial color={FABRIC} roughness={0.95} />
+        </RoundedBox>
+        <RoundedBox args={[0.16, 0.44, 0.68]} radius={0.05} smoothness={3} position={[0.84, 0.48, 0]}>
+          <meshStandardMaterial color={FABRIC} roughness={0.95} />
+        </RoundedBox>
       </group>
       {/* 茶几 */}
       <mesh position={[0, 0.3, 0.6]}>
@@ -446,8 +454,11 @@ export default function Workstations() {
     };
   }, []);
 
+  // 全树自动阴影（招聘变化后重新标记）
+  const rootRef = useAutoShadows([hiredIds]);
+
   return (
-    <group>
+    <group ref={rootRef}>
       {slots.map(({ ws, slot }) => {
         const emp = ws.employeeId ? empById[ws.employeeId] : null;
         if (emp) {

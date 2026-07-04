@@ -92,8 +92,8 @@ export default function OfficeStage3D() {
 
       <Canvas
         dpr={[1, 1.6]}
-        shadows={false}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.32 }}
+        shadows
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.28 }}
         style={{ background: '#1A1B1E' }}
       >
         <PerspectiveCamera makeDefault position={[0, 21, 37]} fov={43} near={0.5} far={260} />
@@ -116,10 +116,12 @@ export default function OfficeStage3D() {
           <Workstations />
           <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
           <FloatingParticles count={90} color="#7FA8DF" />
+
+          {/* 注：EffectComposer 在部分 GPU 上卡死渲染循环，质感由实时阴影 + 纹理 + 环境反射承担 */}
         </Suspense>
       </Canvas>
 
-      {/* 暗角景深（纯 CSS，增强空间感） */}
+      {/* 暗角景深（纯 CSS） */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse 75% 68% at 50% 42%, transparent 55%, rgba(4,8,18,0.55) 100%)' }}

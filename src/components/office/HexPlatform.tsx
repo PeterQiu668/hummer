@@ -7,6 +7,8 @@
 import { useMemo } from 'react';
 import { Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
+import { getCarpetTexture, getWoodTexture } from './textures';
+import { useAutoShadows } from './useAutoShadows';
 
 const FLOOR_W = 33;
 const FLOOR_D = 25.5;
@@ -148,6 +150,9 @@ function Plant({ position, scale = 1 }: { position: [number, number, number]; sc
 
 export default function HexPlatform() {
   const floorGeo = useMemo(() => roundedRectGeo(FLOOR_W, FLOOR_D, 0.16), []);
+  const rootRef = useAutoShadows();
+  const carpetTex = useMemo(() => getCarpetTexture('#333D50'), []);
+  const walkwayTex = useMemo(() => getWoodTexture('#7E6044', '#5C4630', 'walkway'), []);
 
   // 地毯拼块网格线（实例化细条）
   const gridLines = useMemo(() => {
@@ -162,10 +167,10 @@ export default function HexPlatform() {
   }, []);
 
   return (
-    <group>
-      {/* 楼板（地毯面） */}
+    <group ref={rootRef}>
+      {/* 楼板（地毯面 · 程序化地毯纹理） */}
       <mesh geometry={floorGeo} position={[0, 0, 0]}>
-        <meshStandardMaterial color="#333D50" roughness={0.9} metalness={0.02} />
+        <meshStandardMaterial map={carpetTex} color="#B9C4DA" roughness={0.92} metalness={0.02} />
       </mesh>
       {/* 楼板侧沿 LED 缝光 */}
       <mesh position={[0, -0.17, 0]}>
@@ -185,7 +190,7 @@ export default function HexPlatform() {
       {/* 木纹主走道（横贯业务区与休闲区之间） */}
       <mesh position={[0.5, 0.012, 2.65]}>
         <boxGeometry args={[25, 0.02, 1.5]} />
-        <meshStandardMaterial color="#7E6044" roughness={0.75} metalness={0.05} />
+        <meshStandardMaterial map={walkwayTex} color="#D8C0A0" roughness={0.7} metalness={0.05} />
       </mesh>
       {/* 走道拼板缝 */}
       <Instances limit={17}>
