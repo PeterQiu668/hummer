@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAppStore, type PageKey } from '../../store/useAppStore';
 import type { RoleKey } from '../../lib/types';
-import { channels } from '../../data/feishu';
+import { channels, CHANNEL_GROUPS, ROLE_CHANNEL_ACCESS } from '../../data/feishu';
 
 type NavItem = {
   key: PageKey | string;
@@ -35,7 +35,7 @@ const IT: Record<string, NavItem> = {
   roi:       { key: 'roi',       label: 'ROI 经营',    icon: TrendingUp },
   kg:        { key: 'kg',        label: '知识中枢',    icon: BookOpen, badge: '9.6k' },
   governance:{ key: 'governance',label: '审计与治理',  icon: ShieldCheck, highlight: 'governance' },
-  hermes:    { key: 'hermes',    label: '质量与复盘',  icon: Sparkles, badge: '47', highlight: 'hermes' },
+  hermes:    { key: 'evolution', label: '进化中心',    icon: Sparkles, badge: '47' },
   audit:     { key: 'audit',     label: '审计链',      icon: ScrollText },
   execws:    { key: 'execws',    label: '高管工作台',  icon: LayoutDashboard },
   myagents:  { key: 'myagents',  label: '我的 AI 同事', icon: Bot },
@@ -65,10 +65,7 @@ const ROLE_SECTIONS: Record<RoleKey, NavSection[]> = {
   ],
 };
 
-// 频道列表只对企业内角色展示
-const ROLE_SHOW_CHANNELS: Record<RoleKey, boolean> = {
-  boss: true, exec: true, staff: true, expert: false, auditor: false,
-};
+const channelById = new Map(channels.map((c) => [c.id, c]));
 
 export default function LeftNav() {
   const activePage = useAppStore((s) => s.activePage);
@@ -149,43 +146,77 @@ export default function LeftNav() {
           </div>
         ))}
 
-        {/* Active project channels */}
-        {ROLE_SHOW_CHANNELS[currentRole] && (
-          <div>
-            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-              活跃频道
+        {/* Active channels — 按 CHANNEL_GROUPS 顺序 + 角色权限过滤 */}
+        {(() => {
+          const access = ROLE_CHANNEL_ACCESS[currentRole] ?? {};
+          const visibleGroups = CHANNEL_GROUPS
+            .map((g) => ({
+              title: g.title,
+              items: g.ids
+                .filter((id) => access[id])
+                .map((id) => channelById.get(id))
+                .filter((c): c is NonNullable<typeof c> => Boolean(c)),
+            }))
+            .filter((g) => g.items.length > 0);
+          if (visibleGroups.length === 0) return null;
+          return (
+            <div>
+              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                活跃频道
+              </div>
+              <div className="space-y-2">
+                {visibleGroups.map((g) => (
+                  <div key={g.title}>
+                    <div className="px-2 pb-0.5 text-[9.5px] text-neutral-400 tracking-wide">{g.title}</div>
+                    <div className="space-y-0.5">
+                      {g.items.map((c) => {
+                        const acc = access[c.id];
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              setActiveChannel(c.id);
+                              setActivePage('chat');
+                              setLeftNav('chat');
+                            }}
+                            className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 transition"
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{
+                                background:
+                                  c.type === 'incident' ? 'var(--error)' :
+                                  c.type === 'system' ? '#7E22CE' :
+                                  c.type === 'boss' || c.type === 'exec' ? 'var(--primary-600, #0F70B7)' :
+                                  'var(--success)',
+                              }}
+                            />
+                            <span className="flex-1 text-left text-[12px] text-neutral-700 truncate">{c.name}</span>
+                            {acc && !acc.write && (
+                              <span className="text-[9px] px-1 rounded bg-neutral-100 text-neutral-500 border border-neutral-200 shrink-0">
+                                只读
+                              </span>
+                            )}
+                            {acc?.note && acc.note !== '只读' && (
+                              <span className="text-[9px] px-1 rounded bg-warning-soft text-warning shrink-0" title={acc.note}>
+                                {acc.note}
+                              </span>
+                            )}
+                            {c.unread > 0 && (
+                              <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-1 rounded shrink-0">
+                                {c.unread}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-0.5">
-              {channels.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveChannel(c.id);
-                    setActivePage('chat');
-                    setLeftNav('chat');
-                  }}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 transition"
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{
-                      background:
-                        c.type === 'incident' ? 'var(--error)' :
-                        c.type === 'system' ? '#7E22CE' :
-                        'var(--success)',
-                    }}
-                  />
-                  <span className="flex-1 text-left text-[12px] text-neutral-700 truncate">{c.name}</span>
-                  {c.unread > 0 && (
-                    <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-1 rounded">
-                      {c.unread}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </nav>
 
       {/* Footer status */}

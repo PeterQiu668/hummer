@@ -1,26 +1,21 @@
-import { Hash, AlertOctagon, Megaphone, Users } from 'lucide-react';
-import { channels, feishuMessages } from '../../data/feishu';
+import type { ReactNode } from 'react';
+import { Hash, AlertOctagon, Megaphone, Crown, MessagesSquare } from 'lucide-react';
+import { channels, feishuMessages, collabExtraMessages, CHANNEL_GROUPS } from '../../data/feishu';
 
-type ChannelKind = 'project' | 'department' | 'dm' | 'system' | 'incident';
+type ChannelItem = { id: string; name: string; unread: number; type: string; members?: number };
 
-const kindMeta: Record<ChannelKind, { dot: string; icon: React.ReactNode; label: string }> = {
-  project:    { dot: 'bg-primary-500',  icon: <Hash size={11} />,        label: '项目群' },
-  department: { dot: 'bg-secondary-500', icon: <Users size={11} />,      label: '部门群' },
-  dm:         { dot: 'bg-neutral-400',   icon: <Users size={11} />,      label: '1v1' },
-  system:     { dot: 'bg-tertiary-500',  icon: <Megaphone size={11} />,  label: '系统通告' },
-  incident:   { dot: 'bg-error animate-pulse', icon: <AlertOctagon size={11} />, label: '风险阻断' },
+// 分组视觉：责任链群用皇冠区分，分身管理用 dm 图标，其余沿用原有小圆点/图标风格
+const GROUP_META: Record<string, { dot: string; icon: ReactNode }> = {
+  '责任链群':   { dot: 'bg-secondary-500',        icon: <Crown size={11} /> },
+  '分身管理':   { dot: 'bg-warning',              icon: <MessagesSquare size={11} /> },
+  '业务作战群': { dot: 'bg-primary-500',          icon: <Hash size={11} /> },
+  '风险通道':   { dot: 'bg-error animate-pulse',  icon: <AlertOctagon size={11} /> },
+  '系统通告':   { dot: 'bg-tertiary-500',         icon: <Megaphone size={11} /> },
 };
-
-const groups: { kind: ChannelKind; label: string }[] = [
-  { kind: 'incident',   label: '风险阻断' },
-  { kind: 'project',    label: '项目群' },
-  { kind: 'department', label: '部门群' },
-  { kind: 'system',     label: '系统通告' },
-  { kind: 'dm',         label: '1v1' },
-];
+const FALLBACK_META = { dot: 'bg-neutral-400', icon: <Hash size={11} /> };
 
 function latestSnippet(channelId: string) {
-  const msgs = feishuMessages.filter((m) => m.channel === channelId);
+  const msgs = [...feishuMessages, ...collabExtraMessages].filter((m) => m.channel === channelId);
   const last = msgs[msgs.length - 1];
   return last ? last.content.slice(0, 26) : '暂无消息';
 }
@@ -32,39 +27,41 @@ export default function ChannelList({
 }: {
   activeChannel: string;
   onSelect: (id: string) => void;
-  extraChannels?: { id: string; name: string; unread: number; type: string; members?: number }[];
+  extraChannels?: ChannelItem[];
 }) {
-  const all = [...channels, ...extraChannels];
+  const byId = new Map<string, ChannelItem>(channels.map((c) => [c.id, c]));
+  const groupedIds = new Set(CHANNEL_GROUPS.flatMap((g) => g.ids));
 
-  // Coerce data type to known kinds (fallback to project)
-  const withKind = all.map((c) => ({
-    ...c,
-    kind: ((['project', 'department', 'dm', 'system', 'incident'] as const).includes(
-      c.type as ChannelKind,
-    )
-      ? c.type
-      : 'project') as ChannelKind,
-  }));
+  // 按 CHANNEL_GROUPS 渲染；extraChannels（未在任何分组中的）归入「业务作战群」尾部
+  const groups = CHANNEL_GROUPS.map((g) => {
+    const items = g.ids
+      .map((id) => byId.get(id))
+      .filter((c): c is ChannelItem => Boolean(c));
+    if (g.title === '业务作战群') {
+      items.push(...extraChannels.filter((c) => !groupedIds.has(c.id)));
+    }
+    return { title: g.title, items };
+  }).filter((g) => g.items.length > 0);
+
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
 
   return (
     <div className="h-full w-full flex flex-col bg-white border-r border-neutral-200">
       <div className="px-3 py-2 border-b border-neutral-200 flex items-center justify-between">
         <span className="font-display text-xs font-semibold text-neutral-800">协作频道</span>
-        <span className="text-[10px] font-mono text-neutral-400">{withKind.length}</span>
+        <span className="text-[10px] font-mono text-neutral-400">{total}</span>
       </div>
       <div className="flex-1 overflow-y-auto py-1">
         {groups.map((g) => {
-          const items = withKind.filter((c) => c.kind === g.kind);
-          if (items.length === 0) return null;
+          const meta = GROUP_META[g.title] ?? FALLBACK_META;
           return (
-            <div key={g.kind} className="mb-1">
+            <div key={g.title} className="mb-1">
               <div className="px-3 py-1 text-[9px] font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                {kindMeta[g.kind].icon}
-                {g.label}
+                {meta.icon}
+                {g.title}
               </div>
-              {items.map((c) => {
+              {g.items.map((c) => {
                 const active = c.id === activeChannel;
-                const meta = kindMeta[c.kind];
                 return (
                   <button
                     key={c.id}

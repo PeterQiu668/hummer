@@ -11,7 +11,9 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { executiveTwins, BOSS_TWIN, HUMAN_BOSS } from '../../data/executives';
+import { setFocusEmployeeId } from '../../data/evolution';
 import AgentAvatar from '../ui/AgentAvatar';
+import EvolutionProfile from '../evolution/EvolutionProfile';
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   working:  { label: '工作中',     color: '#0F70B7', bg: 'var(--brand-soft)' },
@@ -27,7 +29,7 @@ const tabs = [
   { id: 'skills',      label: '技能',   icon: Brain },
   { id: 'permissions', label: '权限',   icon: Shield },
   { id: 'audit',       label: '审计',   icon: FileText },
-  { id: 'evolution',   label: '进化',   icon: Sparkles },
+  { id: 'evolution',   label: '进化档案', icon: Sparkles },
 ];
 
 export default function EmployeeDrawer() {
@@ -347,20 +349,16 @@ export default function EmployeeDrawer() {
                 <KV label="待审" value={String(e.evolution.pending)} />
               </div>
             </Panel>
-            <Panel title="近期进化记录">
-              <div className="space-y-1.5">
-                {[
-                  { t: '今日 13:40', e: 'SOP「资金调拨」v3 → v4 沙箱评测' },
-                  { t: '昨日 17:22', e: 'Skill「邮件草稿」描述精简 12 行' },
-                  { t: '06.19',     e: '工具路由策略：preferring Opus 4.7' },
-                ].map((r, i) => (
-                  <div key={i} className="text-[11.5px] flex items-baseline gap-2">
-                    <span className="hum-faint font-mono w-16 shrink-0">{r.t}</span>
-                    <span className="text-neutral-700">{r.e}</span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
+            {/* 进化档案（与进化中心 Tab2 同源组件 · 紧凑模式） */}
+            <EvolutionProfile
+              employeeId={e.id}
+              compact
+              onOpenCenter={() => {
+                setFocusEmployeeId(e.id);
+                setActivePage('evolution');
+                setSelectedEmployee(null);
+              }}
+            />
           </>
         )}
       </div>

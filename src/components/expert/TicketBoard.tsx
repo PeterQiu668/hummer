@@ -1,12 +1,16 @@
 /**
  * 专家门户 · 介入工单 — SLA 倒计时 / 处置时间线 / 响应闭环
- * 动作：开始响应 → 填写处置结论并关闭（通报协作频道 + 写审计）
+ * 两阶段接单（决策②）：接单前只见脱敏摘要 → 签临时保密与责任协议 → 可见完整信息 + 上下文切片；
+ * 关单即撤销访问权，信息重新脱敏，处置记录归档留痕。
  */
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, CheckCircle2, PlayCircle, Send, Bot, Link2 } from 'lucide-react';
+import {
+  AlertTriangle, Clock, CheckCircle2, PlayCircle, Send, Bot, Link2,
+  ShieldCheck, Lock, EyeOff, MessagesSquare, Archive,
+} from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import type { ExpertTicket } from '../../lib/types';
-import { seedExpertTickets, ticketChannels } from '../../data/expertops';
+import { seedExpertTickets, ticketChannels, ticketContextExt } from '../../data/expertops';
 
 const nowHHMM = () => new Date().toLocaleTimeString('zh-CN', { hour12: false }).slice(0, 5);
 
@@ -41,6 +45,7 @@ export default function TicketBoard() {
 
   const [closingId, setClosingId] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [ndaTicket, setNdaTicket] = useState<ExpertTicket | null>(null);
 
   // 挂载注入 seed（store 为空才注入，getState 防 StrictMode 重复）
   useEffect(() => {
@@ -55,13 +60,18 @@ export default function TicketBoard() {
   const slaOk = tickets.filter((t) => t.status === 'resolved' || remainingMs(t) > 0).length;
   const slaRate = tickets.length > 0 ? Math.round((slaOk / tickets.length) * 100) : 100;
 
-  const startResponse = (t: ExpertTicket) => {
+  /** 阶段二：同意临时保密与责任协议 → 才接单并解锁完整上下文 */
+  const signAndStart = (t: ExpertTicket) => {
     updateExpertTicket(t.id, {
       status: 'responding',
-      timeline: [...t.timeline, { ts: nowHHMM(), actor: '林知远', note: '专家已接入，开始排查根因' }],
+      timeline: [
+        ...t.timeline,
+        { ts: nowHHMM(), actor: '林知远', note: '已签署临时保密与责任协议，接单并解锁工单上下文切片' },
+      ],
     });
-    pushAudit({ actor: '林知远（专家）', action: '开始响应介入工单', target: t.title, result: 'ok', tags: ['expert', 'sla'] });
-    pushToast({ kind: 'info', title: '已开始响应', detail: t.title });
+    pushAudit({ actor: '林知远（专家）', action: '签署临时保密与责任协议 · 接单开始响应', target: t.title, result: 'ok', tags: ['expert', 'sla', 'expert-nda'] });
+    pushToast({ kind: 'info', title: '已接单', detail: `协议已留痕 · 已解锁「${t.title}」完整上下文` });
+    setNdaTicket(null);
   };
 
   const closeTicket = (t: ExpertTicket) => {
@@ -85,7 +95,8 @@ export default function TicketBoard() {
       type: 'msg',
     });
     pushAudit({ actor: '林知远（专家）', action: '关闭介入工单', target: t.title, result: 'ok', tags: ['expert', 'sla', 'resolve'] });
-    pushToast({ kind: 'success', title: '工单已关闭', detail: '处置通报已同步至相关协作频道' });
+    pushAudit({ actor: '系统', action: '关单撤销专家上下文访问权 · 处置记录归档', target: t.title, result: 'ok', tags: ['expert', 'access-revoked'] });
+    pushToast({ kind: 'success', title: '工单已关闭', detail: '通报已同步协作频道 · 上下文访问权已自动撤销' });
     setClosingId(null);
     setNote('');
   };
@@ -104,6 +115,8 @@ export default function TicketBoard() {
         const rem = remainingMs(t);
         const overdue = rem <= 0 && t.status !== 'resolved';
         const sev = SEVERITY[t.severity];
+        const ext = ticketContextExt[t.id];
+        const unlocked = t.status === 'responding'; // 仅处置中可见完整信息；关单后重新脱敏
         return (
           <div key={t.id} className="hum-card p-4 hum-elev-1">
             <div className="flex items-start gap-3">
@@ -115,8 +128,31 @@ export default function TicketBoard() {
                   </span>
                   <span className="hum-chip"><Bot size={11} /> {t.agentName}</span>
                   {t.taskId && <span className="hum-chip is-muted font-mono"><Link2 size={11} /> {t.taskId}</span>}
+                  {t.status === 'resolved' && (
+                    <span className="hum-chip is-muted"><Archive size={11} /> 访问权已撤销 · 处置记录已归档</span>
+                  )}
                 </div>
                 <div className="mt-2 text-[14px] font-semibold text-neutral-900">{t.title}</div>
+                {/* 脱敏摘要 / 完整上下文（决策②） */}
+                {ext && (
+                  <div className="mt-2 flex items-center gap-2 flex-wrap text-[11.5px]">
+                    <span className="hum-chip is-warning">{ext.errorType}</span>
+                    <span className="hum-chip is-muted">涉及 · {ext.sopRef}</span>
+                    <span className="hum-chip is-muted">影响面 · {ext.impact}</span>
+                    <span className="hum-chip">{unlocked ? ext.clientFull : ext.clientMasked}</span>
+                    <span className="hum-chip is-muted">{unlocked ? ext.detailFull : ext.detailMasked}</span>
+                  </div>
+                )}
+                {ext && t.status === 'open' && (
+                  <div className="mt-1.5 flex items-center gap-1 text-[11px] hum-faint">
+                    <Lock size={11} /> 脱敏摘要 · 接单后可见完整上下文（客户与业务细节已打码）
+                  </div>
+                )}
+                {ext && t.status === 'resolved' && (
+                  <div className="mt-1.5 flex items-center gap-1 text-[11px] hum-faint">
+                    <EyeOff size={11} /> 关单后信息已重新脱敏 · 完整记录仅存于工单归档
+                  </div>
+                )}
               </div>
               {/* SLA 倒计时 */}
               {t.status !== 'resolved' ? (
@@ -140,6 +176,26 @@ export default function TicketBoard() {
               )}
             </div>
 
+            {/* 上下文切片（仅接单后可见） */}
+            {ext && unlocked && (
+              <div className="mt-3 hum-card-soft p-3">
+                <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-neutral-700">
+                  <MessagesSquare size={12} className="text-primary-600" /> 上下文切片
+                  <span className="hum-chip is-muted">切片范围：工单创建时点起 · {ext.sliceChannel}</span>
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {ext.contextSlices.map((s, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[12px]">
+                      <span className="font-mono hum-faint shrink-0 hum-tabular">{s.ts}</span>
+                      <span className="font-medium text-neutral-700 shrink-0">{s.sender}</span>
+                      <span className="hum-muted">{s.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10.5px] hum-faint">仅可见与本工单相关的消息切片 · 关单后访问权自动撤销</div>
+              </div>
+            )}
+
             {/* 处置时间线 */}
             <div className="mt-3 pt-3 space-y-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
               {t.timeline.map((ev, i) => (
@@ -155,7 +211,7 @@ export default function TicketBoard() {
             {/* 动作区 */}
             {t.status === 'open' && (
               <div className="mt-3">
-                <button className="hum-btn is-primary is-sm" onClick={() => startResponse(t)}>
+                <button className="hum-btn is-primary is-sm" onClick={() => setNdaTicket(t)}>
                   <PlayCircle size={13} /> 开始响应
                 </button>
               </div>
@@ -188,6 +244,48 @@ export default function TicketBoard() {
           </div>
         );
       })}
+
+      {/* 两步确认弹层：临时保密与责任协议 */}
+      {ndaTicket && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm"
+          onClick={() => setNdaTicket(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-[480px] max-w-[92vw] bg-white rounded-lg shadow-large border border-neutral-200 overflow-hidden"
+          >
+            <div className="h-1" style={{ background: 'var(--brand)' }} />
+            <div className="px-5 pt-4 pb-2 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--brand-soft)' }}>
+                <ShieldCheck size={20} className="text-primary-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[14px] font-semibold text-neutral-900">签署临时保密与责任协议</div>
+                <div className="text-[12px] hum-muted mt-0.5 truncate">{ndaTicket.title}</div>
+              </div>
+            </div>
+            <div className="px-5 pb-3 space-y-2">
+              {[
+                '接单后仅可见与本工单相关的上下文切片（工单创建时点起 + 关联任务消息），不开放全群历史',
+                '您在处置过程中的每一步操作均写入企业审计链，处置记录留存于工单',
+                '工单关闭即自动退群并撤销全部历史访问权，客户数据不可再次查看',
+              ].map((line, i) => (
+                <div key={i} className="flex items-start gap-2 text-[12.5px] text-neutral-700">
+                  <CheckCircle2 size={13} className="text-primary-600 mt-0.5 shrink-0" />
+                  <span>{line}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 flex items-center justify-end gap-2" style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-subtle)' }}>
+              <button className="hum-btn is-ghost is-sm" onClick={() => setNdaTicket(null)}>取消</button>
+              <button className="hum-btn is-primary is-sm" onClick={() => signAndStart(ndaTicket)}>
+                <ShieldCheck size={13} /> 同意并开始响应
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

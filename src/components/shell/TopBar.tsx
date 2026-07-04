@@ -26,6 +26,7 @@ const PAGE_LABEL: Record<string, { title: string; sub: string }> = {
   execws:    { title: '高管工作台',         sub: '分身拆解确认 · 部门验收 · 团队绩效' },
   myagents:  { title: '我的 AI 同事',       sub: '派活 · 催办 · 验收' },
   expertportal: { title: '专家门户',        sub: '介入工单 · SOP 共创 · 收入分成' },
+  evolution: { title: '进化中心',           sub: '组织总览 · 个体进化档案 · 飞轮机制' },
 };
 
 const ROLES: { key: RoleKey; name: string; title: string; avatar: string; home: PageKey }[] = [

@@ -5,7 +5,7 @@
  * 转正走授权仪式（AuthorizationCeremony），完成信任闭环。
  */
 import { useMemo, useState } from 'react';
-import { Users, AlertTriangle, BadgeCheck, Clock3, Undo2 } from 'lucide-react';
+import { Users, AlertTriangle, BadgeCheck, Clock3, Undo2, GitBranch } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import {
   buildCandidateViews, STAGE_META, STAGE_ORDER, TRIAL_DAYS,
@@ -52,7 +52,12 @@ function DecisionBadge({ v }: { v: CandidateView }) {
     return <span className="hum-chip is-warning" style={{ padding: '1px 6px', fontSize: 10 }}><Clock3 size={10} /> 试岗延长 +3 天</span>;
   }
   if (v.decision?.decision === 'return') {
-    return <span className="hum-chip is-error" style={{ padding: '1px 6px', fontSize: 10 }}><Undo2 size={10} /> 已退回市场</span>;
+    // 进化失败候选的退回 = 进化机制的输出，而非末位/低分淘汰
+    return (
+      <span className="hum-chip is-error" style={{ padding: '1px 6px', fontSize: 10 }}>
+        <Undo2 size={10} /> {v.evolution ? '进化失败 · 已退回市场' : '已退回市场'}
+      </span>
+    );
   }
   return null;
 }
@@ -102,14 +107,28 @@ function CandidateCard({ v, onOpen }: { v: CandidateView; onOpen: () => void }) 
             <AlertTriangle size={9} /> 风险 {m.risks}
           </span>
         )}
+        {/* 进化失败语义：改进轮次 N · 连续 M 轮未达标（替代末位/低分退回） */}
+        {v.evolution && !v.decision && (
+          <span className="hum-chip is-error" style={{ padding: '1px 6px', fontSize: 10 }}>
+            <GitBranch size={9} /> {v.evolution.verdictLabel}
+          </span>
+        )}
         <span className="flex-1" />
         <DecisionBadge v={v} />
         {!v.decision && v.stage === 'authorizing' && (
           <span className="hum-chip is-brand" style={{ padding: '1px 6px', fontSize: 10 }}>授权待签署</span>
         )}
         {needDecision && (
-          <span className="hum-chip is-warning hum-pulse" style={{ padding: '1px 6px', fontSize: 10 }}>
-            第 7 天 · 待决策
+          <span
+            className={`hum-chip hum-pulse ${v.promotion.allMet ? 'is-success' : 'is-warning'}`}
+            style={{ padding: '1px 6px', fontSize: 10 }}
+          >
+            {v.promotion.allMet ? '第 7 天 · 双达标可转正' : '第 7 天 · 待决策'}
+          </span>
+        )}
+        {!v.decision && !needDecision && v.stage === 'trial' && !v.promotion.allMet && (
+          <span className="hum-chip" style={{ padding: '1px 6px', fontSize: 10 }}>
+            转正缺口 {v.promotion.gaps.length} 项
           </span>
         )}
       </div>
@@ -157,7 +176,7 @@ export default function LifecycleBoard({ installed }: { installed: Record<string
     <div className="flex-1 overflow-y-auto p-6 space-y-6 relative">
       <div className="hum-card-soft px-4 py-2.5 flex items-center gap-2 text-[12px] text-neutral-700">
         <Clock3 size={13} className="text-warning shrink-0" />
-        招聘 → 沙箱试岗 7 天 → 评分 → <span className="font-medium">第 7 天强制决策</span>（转正并授权 / 延长 3 天 / 退回市场）→ 授权仪式签署后入工区
+        招聘 → 沙箱试岗 7 天 → 评分 → <span className="font-medium">转正需双达标</span>（试岗满 {TRIAL_DAYS} 天 且 任务量 / 验收通过率达标）→ 授权仪式签署后入工区 · 连续 2 轮 SOP 改进仍未达标将建议退回市场
       </div>
 
       {grouped.map((g) => (

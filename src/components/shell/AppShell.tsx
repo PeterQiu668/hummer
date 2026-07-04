@@ -26,6 +26,7 @@ import RoiPage from '../pages/RoiPage';
 import ExecWorkspacePage from '../pages/ExecWorkspacePage';
 import StaffWorkspacePage from '../pages/StaffWorkspacePage';
 import ExpertPortalPage from '../pages/ExpertPortalPage';
+import EvolutionCenterPage from '../pages/EvolutionCenterPage';
 import ExecutiveDetail from '../exec/ExecutiveDetail';
 import CommandPalette from '../global/CommandPalette';
 import ToastContainer from '../global/ToastContainer';
@@ -86,6 +87,7 @@ export default function AppShell() {
         {activePage === 'execws' && <ExecWorkspacePage />}
         {activePage === 'myagents' && <StaffWorkspacePage />}
         {activePage === 'expertportal' && <ExpertPortalPage />}
+        {activePage === 'evolution' && <EvolutionCenterPage />}
       </div>
 
       {/* Modals (full-screen overlays) */}

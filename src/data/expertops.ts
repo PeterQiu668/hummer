@@ -13,8 +13,71 @@ const hhmm = (d: Date) => d.toLocaleTimeString('zh-CN', { hour12: false }).slice
 export const ticketChannels: Record<string, string> = {
   'et-1': 'ch-q3',
   'et-2': 'ch-q3',
-  'et-3': 'ch-incident',
+  'et-3': 'ch-risk',
   'et-4': 'ch-q3',
+};
+
+/* ============ 两阶段接单：脱敏摘要 / 完整上下文（决策②） ============ */
+
+export interface TicketContextExt {
+  errorType: string;                 // 错误类型（接单前即可见）
+  sopRef: string;                    // 涉及 SOP
+  impact: string;                    // 影响面数字（接单前即可见）
+  clientMasked: string;              // 脱敏客户名，如「客户 K***」
+  clientFull: string;                // 签协议后可见
+  detailMasked: string;              // 打码业务细节，如「金额 **w」
+  detailFull: string;                // 签协议后可见
+  sliceChannel: string;              // 上下文切片来源频道
+  contextSlices: { ts: string; sender: string; text: string }[];
+}
+
+/** 按工单 id 提供脱敏 / 完整两套字段 + 上下文切片（仅签署临时保密协议后可见完整侧） */
+export const ticketContextExt: Record<string, TicketContextExt> = {
+  'et-1': {
+    errorType: '报价数据错误', sopRef: 'BD 邮件 SOP v3.2', impact: '已外发 3 封 · 涉及 3 家客户',
+    clientMasked: '客户 K***（华东 A 级）', clientFull: '鲲鹏制造（华东 A 级）',
+    detailMasked: '错误报价金额 **w · 折扣 *%', detailFull: '错误报价金额 42w（应为 46w）· 折扣 8%',
+    sliceChannel: 'ch-q3',
+    contextSlices: [
+      { ts: '13:58', sender: '雪·销售官', text: '已按价格表生成 Q3 报价单并随 BD 邮件外发（3 家 A 级客户）' },
+      { ts: '14:12', sender: 'HiClaw 治理舱', text: '检测到报价引用价格表 v2026Q2（已废止），与 v2026Q3 差异 -8.7%' },
+      { ts: '14:15', sender: '吴·销售 VP 分身', text: '相关外发任务已冻结，待专家判定是否需向客户发更正函' },
+    ],
+  },
+  'et-2': {
+    errorType: 'SOP 检查项遗漏', sopRef: '合同审查 SOP v4.0', impact: '漏检 2 处高风险条款 · 1 份主合同',
+    clientMasked: '客户 K***（主合同 v4）', clientFull: '鲲鹏制造（主合同 v4）',
+    detailMasked: '合同金额 ***w · 付款周期 ** 天', detailFull: '合同金额 380w · 付款周期 90 天（超公司上限 60 天）',
+    sliceChannel: 'ch-q3',
+    contextSlices: [
+      { ts: '11:40', sender: '律·法务官', text: '主合同 v4 审查完成，标记风险条款 5 处，送人审抽检' },
+      { ts: '12:05', sender: '人审抽检', text: '复核发现付款周期 / 违约金 2 处高风险条款未标记，判定 bad case' },
+      { ts: '12:18', sender: 'Hermes', text: '归因：模板 v4 新增条款未纳入 SOP 检查清单，建议修订 SOP' },
+    ],
+  },
+  'et-3': {
+    errorType: '模型能力衰减（情绪识别）', sopRef: '客服应答 SOP v2.7', impact: '误判率 31% · 3 起客诉升级',
+    clientMasked: '客户 Y***、Z*** 等 3 家', clientFull: '云启科技、泽达物流、恒信商贸',
+    detailMasked: '涉诉订单 ** 单 · 金额 **w', detailFull: '涉诉订单 14 单 · 金额 23w',
+    sliceChannel: 'ch-risk',
+    contextSlices: [
+      { ts: '08:52', sender: 'HiClaw 治理舱', text: '苓·客服官情绪误判率 1 小时内 12% → 31%，触发熔断阈值' },
+      { ts: '08:55', sender: '系统', text: '相关会话已切换人工兜底，涉事会话快照已封存待查' },
+      { ts: '09:10', sender: '苓·客服官', text: '自检报告：新版情绪词典灰度后负向样本召回下降，疑似词典冲突' },
+      { ts: '09:22', sender: 'Guardian', text: '客诉升级 3 起已同步风险通道，等待专家根因判定' },
+    ],
+  },
+  'et-4': {
+    errorType: '数据口径不一致', sopRef: 'BI 取数 SOP v2.3', impact: 'GMV 差异 3.2% · 影响 618 复盘结论',
+    clientMasked: '内部复盘 · 涉 ERP 数据 ***', clientFull: '内部复盘 · 金蝶 ERP 618 全量订单数据',
+    detailMasked: 'GMV 差异 **w（*.２%）', detailFull: 'GMV 差异 96w（3.2%）· 根因为跨月冲正单未剔除',
+    sliceChannel: 'ch-q3',
+    contextSlices: [
+      { ts: '前日 16:20', sender: '岚·运营官', text: '618 复盘报告 v1 产出，GMV 口径取 BI 宽表 dws_trade_d' },
+      { ts: '前日 17:05', sender: '吴帆（销售 VP）', text: '复盘 GMV 与金蝶 ERP 对不上，差 3.2%，发起专家介入' },
+      { ts: '前日 17:30', sender: 'Hermes', text: '初步比对：差异集中在 6/30-7/2 跨月订单，疑似冲正口径' },
+    ],
+  },
 };
 
 /** 每次调用基于当前时间生成，保证 SLA 倒计时演示效果稳定 */

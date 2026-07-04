@@ -36,7 +36,8 @@ export type PageKey =
   | 'roi'         // ROI 经营报告 + 账单（Phase 0）
   | 'execws'      // 高管工作台（Phase 0）
   | 'myagents'    // 一线员工「我的 AI 同事」（Phase 0）
-  | 'expertportal'; // 专家门户（Phase 0）
+  | 'expertportal' // 专家门户（Phase 0）
+  | 'evolution';   // 进化中心（成长闭环 × 质量飞轮合并，grills/01）
 
 export interface ToastItem {
   id: string;
@@ -201,13 +202,22 @@ const seedAudit: AuditEntry[] = [
   { id: 'au-8', ts: '14:18:00', actor: '律·法务官',    action: '调用 KG',          target: 'contract.risk_v3',  result: 'ok',      hash: '0x33ca', tags: ['kg'] },
 ];
 
+// 当前视角角色 → 发言/审批身份（UI 与 store 动作统一使用，不再写死昆仑）
+export const ROLE_ACTORS: Record<RoleKey, { name: string; avatar: string; senderRole: 'human' | 'expert' }> = {
+  boss:    { name: '昆仑（您）',   avatar: '昆', senderRole: 'human' },
+  exec:    { name: '吴帆·销售VP',  avatar: '吴', senderRole: 'human' },
+  staff:   { name: '小周',         avatar: '周', senderRole: 'human' },
+  expert:  { name: '林知远·专家',  avatar: '林', senderRole: 'expert' },
+  auditor: { name: '审计员',       avatar: '审', senderRole: 'human' },
+};
+
 const makeHash = () => '0x' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(4, '0');
 const nowHHMM = () => new Date().toLocaleTimeString('zh-CN', { hour12: false }).slice(0, 5);
 const nowHHMMSS = () => new Date().toLocaleTimeString('zh-CN', { hour12: false });
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       screen: 'boot',
       setScreen: (screen) => set({ screen }),
       bootDone: false,
@@ -251,31 +261,47 @@ export const useAppStore = create<AppState>()(
         }),
       approveAlert: (id, decision, note) =>
         set((state) => {
+          const actor = ROLE_ACTORS[get().currentRole];
           const target = state.riskAlerts.find((a) => a.id === id);
           const nextAlerts = state.riskAlerts.map((a) =>
             a.id === id
               ? { ...a, status: decision === 'approve' ? ('approved' as const) : ('rejected' as const) }
               : a,
           );
-          const followup: CollabFeedItem | null = target
-            ? {
-                id: `rx-${id}-${Date.now()}`,
-                ts: nowHHMM(),
-                channel: target.channel,
-                sender: '昆仑（您）',
-                avatar: '昆',
-                senderRole: 'human',
-                content:
-                  decision === 'approve'
-                    ? `[OK] 昆仑批准了 · ${target.action}${note ? ` · ${note}` : ''}`
-                    : `[X] 昆仑拒绝了 · ${target.action}${note ? ` · ${note}` : ' · 改为更安全方式'}`,
+          const ts = nowHHMM();
+          const followups: CollabFeedItem[] = [];
+          if (target) {
+            followups.push({
+              id: `rx-${id}-${Date.now()}`,
+              ts,
+              channel: target.channel,
+              sender: actor.name,
+              avatar: actor.avatar,
+              senderRole: actor.senderRole,
+              content:
+                decision === 'approve'
+                  ? `[OK] ${actor.name}批准了 · ${target.action}${note ? ` · ${note}` : ''}`
+                  : `[X] ${actor.name}拒绝了 · ${target.action}${note ? ` · ${note}` : ' · 改为更安全方式'}`,
+              type: 'approval',
+            });
+            // 风险双投：决策记录同步推送到风险专用通道 ch-risk
+            if (target.channel !== 'ch-risk') {
+              followups.push({
+                id: `rxr-${id}-${Date.now()}`,
+                ts,
+                channel: 'ch-risk',
+                sender: actor.name,
+                avatar: actor.avatar,
+                senderRole: actor.senderRole,
+                content: `【决策记录】${target.action} · 决策：${decision === 'approve' ? '批准' : '拒绝'} · 决策人：${actor.name}${note ? ` · 备注：${note}` : ''} · 源频道：${target.channel}`,
                 type: 'approval',
-              }
-            : null;
+              });
+            }
+          }
           const auditEntry: AuditEntry = {
             id: `au-${Date.now()}`,
             ts: nowHHMMSS(),
-            actor: '昆仑（您）',
+            actor: actor.name,
             action: decision === 'approve' ? '审批通过' : '拒绝',
             target: target?.action ?? '未知',
             result: decision === 'approve' ? 'ok' : 'blocked',
@@ -285,7 +311,7 @@ export const useAppStore = create<AppState>()(
           return {
             riskAlerts: nextAlerts,
             pendingApprovals: nextAlerts.filter((a) => a.status === 'pending').length,
-            collabFeed: followup ? [...state.collabFeed, followup] : state.collabFeed,
+            collabFeed: followups.length ? [...state.collabFeed, ...followups] : state.collabFeed,
             auditLog: [auditEntry, ...state.auditLog].slice(0, 500),
           };
         }),
@@ -466,8 +492,9 @@ if (typeof window !== 'undefined') {
     { sender: '雪·销售官',    avatar: '雪', senderRole: 'worker',   content: '已起草 1 封 BD 邮件，等待法务模板核验。', channel: 'ch-q3',      type: 'msg' },
     { sender: '岚·运营官',    avatar: '岚', senderRole: 'worker',   content: '618 复盘报告 v4.1 数据已回收，进入图表生成。', channel: 'ch-618',     type: 'msg' },
     { sender: 'Hermes',       avatar: '⟁', senderRole: 'hermes',   content: '检测到「合同审阅」回归测试通过，召回率 81% → 94%。', channel: 'ch-hermes', type: 'evolution' },
-    { sender: '苓·客服官',    avatar: '苓', senderRole: 'worker',   content: '本小时已处理工单 28 条，升级 4 条至人工。', channel: 'ch-q3',      type: 'msg' },
+    { sender: '苓·客服官',    avatar: '苓', senderRole: 'worker',   content: '云海制药验收单已回签，交付里程碑 M2 关闭。', channel: 'ch-delivery', type: 'msg' },
     { sender: '炅·研发官',    avatar: '炅', senderRole: 'worker',   content: 'fix/order-p1 完成单测，等待主干合并审批。', channel: 'ch-q3',      type: 'task' },
+    { sender: '岚·运营官',    avatar: '岚', senderRole: 'worker',   content: '视频号素材 A/B 组投放中，2 小时后回收首批 CTR。', channel: 'ch-mkt',   type: 'msg' },
   ];
   const auditPool: { actor: string; action: string; target: string; result: 'ok' | 'blocked' | 'pending' | 'warning'; tags: string[] }[] = [
     { actor: '雪·销售官', action: '调用 BD 邮件 v3.2',   target: '云海制药',          result: 'ok',      tags: ['skill', 'mcp:crm.salesforce'] },

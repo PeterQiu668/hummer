@@ -2,10 +2,10 @@
  * 高管工作台 — 吴帆·销售 VP（真人高管）视角
  * 区块：分身拆解待确认 / 部门验收队列 / 团队绩效 / 待我处理的风险
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   GitBranch, CheckCircle2, RotateCcw, Inbox, ShieldAlert, Users2,
-  ThumbsUp, ThumbsDown, AlertTriangle, FileText,
+  ThumbsUp, ThumbsDown, AlertTriangle, FileText, Timer, ScrollText, X,
 } from 'lucide-react';
 import WorkspacePage, { EmptyState } from './WorkspacePage';
 import { useAppStore } from '../../store/useAppStore';
@@ -17,14 +17,20 @@ const EXEC_NAME = '吴帆·销售 VP';
 const SALES_TWIN = executiveTwins.find((e) => e.id === 'exec-sales');
 
 // ── 区块 1：分身拆解待确认（吴·销售 VP 分身把老板目标拆成的部门动作）──
+// 决策①：分级超时 + 默许记账 —— 低风险超时自动放行记「默许」，中高风险超时升级老板收件箱
 interface DecompItem {
   id: string;
   title: string;
   detail: string;
   assignee: string;   // 拟派给的数字员工
   source: string;     // 上游老板目标
-  status: 'pending' | 'confirmed' | 'rejected';
+  status: 'pending' | 'confirmed' | 'rejected' | 'tacit' | 'escalated';
+  risk: 'low' | 'medium' | 'high';
+  deadline: string;   // mock 静态倒计时展示
+  overdueSeed?: boolean; // 初始即超时（挂载时按 risk 转 tacit / escalated 并写审计）
 }
+
+const RISK_LABEL: Record<DecompItem['risk'], string> = { low: '低风险', medium: '中风险', high: '高风险' };
 
 const DECOMP_SEED: DecompItem[] = [
   {
@@ -33,7 +39,7 @@ const DECOMP_SEED: DecompItem[] = [
     detail: '基于 CRM 分层，按行业 × 客单价筛选 tier-A 客户，双周节奏外发 BD 邮件 + 报价单',
     assignee: '雪·销售官',
     source: '昆仑：Q3 华东大客户增长 30%',
-    status: 'pending',
+    status: 'pending', risk: 'low', deadline: '剩余 42 分钟',
   },
   {
     id: 'dc-2',
@@ -41,7 +47,7 @@ const DECOMP_SEED: DecompItem[] = [
     detail: '为 Top 8 客户排真人高管拜访，分身生成拜访简报 + 谈判要点卡',
     assignee: '雪·销售官',
     source: '昆仑：Q3 华东大客户增长 30%',
-    status: 'pending',
+    status: 'pending', risk: 'low', deadline: '已超时 26 分钟', overdueSeed: true,
   },
   {
     id: 'dc-3',
@@ -49,7 +55,7 @@ const DECOMP_SEED: DecompItem[] = [
     detail: '对 A 级客户临时上调折扣权限，超 8% 部分需财务会签，季度末回收',
     assignee: '雪·销售官（财务会签）',
     source: '昆仑：Q3 回收率目标 ≥ 22%',
-    status: 'pending',
+    status: 'pending', risk: 'high', deadline: '已超时 1 小时 05 分', overdueSeed: true,
   },
   {
     id: 'dc-4',
@@ -57,8 +63,15 @@ const DECOMP_SEED: DecompItem[] = [
     detail: '将专家认证的 BD 邮件技能装配到部门全部销售 Agent，一周内完成灰度',
     assignee: '部门全体销售 Agent',
     source: '昆仑：能力沉淀为组织资产',
-    status: 'pending',
+    status: 'pending', risk: 'medium', deadline: '剩余 3 小时 10 分',
   },
+];
+
+// 预授权规则（授权仪式的高管版 · mock）
+interface PreauthRule { id: string; rule: string; scope: string }
+const PREAUTH_SEED: PreauthRule[] = [
+  { id: 'pa-1', rule: '单笔 <5w 的部门内资源调配免确认', scope: '销售增长部门 · 低风险拆解' },
+  { id: 'pa-2', rule: 'SOP 灰度推广（已认证版本）免确认', scope: '部门全体销售 Agent · 低风险拆解' },
 ];
 
 // ── 区块 2：部门验收队列（映射 data/tasks.ts 销售相关任务）──
@@ -91,6 +104,27 @@ export default function ExecWorkspacePage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const [verdicts, setVerdicts] = useState<Record<string, 'passed' | 'returned'>>({});
+  const [preauthOpen, setPreauthOpen] = useState(false);
+  const [preauthRules, setPreauthRules] = useState<PreauthRule[]>(PREAUTH_SEED);
+  const [preauthDraft, setPreauthDraft] = useState('');
+  const timeoutSettled = useRef(false); // 超时结算只做一次（防 StrictMode 重复写审计）
+
+  // 挂载结算已超时项：低风险 → 默许放行记账；中高风险 → 升级老板收件箱
+  useEffect(() => {
+    if (timeoutSettled.current) return;
+    timeoutSettled.current = true;
+    setDecomps((list) =>
+      list.map((d) => {
+        if (!d.overdueSeed || d.status !== 'pending') return d;
+        if (d.risk === 'low') {
+          pushAudit({ actor: '系统（超时策略）', action: '默许放行（超时未审）', target: d.title, result: 'warning', tags: ['exec', 'tacit', 'decompose'] });
+          return { ...d, status: 'tacit' as const };
+        }
+        pushAudit({ actor: '系统（超时策略）', action: `${RISK_LABEL[d.risk]}拆解超时未审 · 升级老板收件箱`, target: d.title, result: 'warning', tags: ['exec', 'escalate', 'decompose'] });
+        return { ...d, status: 'escalated' as const };
+      }),
+    );
+  }, [pushAudit]);
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), []);
   const taskMap = useMemo(() => new Map(collabTasks.map((t) => [t.id, t])), []);
@@ -100,6 +134,11 @@ export default function ExecWorkspacePage() {
   );
 
   const pendingDecomps = decomps.filter((d) => d.status === 'pending').length;
+  const tacitCount = decomps.filter((d) => d.status === 'tacit').length;
+  const confirmedCount = decomps.filter((d) => d.status === 'confirmed').length;
+  const tacitRate = tacitCount + confirmedCount > 0
+    ? Math.round((tacitCount / (tacitCount + confirmedCount)) * 100)
+    : 0;
   const pendingDeliveries = DELIVERY_SEED.filter((d) => !verdicts[d.id]).length;
   const pendingRisks = riskAlerts.filter((a) => a.status === 'pending');
   const weeklyBadCases = teamMembers.reduce((sum, e) => sum + e.evolution.badCases, 0);
@@ -117,6 +156,33 @@ export default function ExecWorkspacePage() {
     setRejectNote('');
     pushAudit({ actor: EXEC_NAME, action: `打回重拆 · ${note}`, target: item.title, result: 'warning', tags: ['exec', 'decompose', 'reject'] });
     pushToast({ kind: 'warning', title: '已打回重拆', detail: `意见已回传分身：${note}` });
+  };
+
+  // 默许项 → 补确认（转正式确认，冲销默许记账）
+  const lateConfirm = (item: DecompItem) => {
+    setDecomps((list) => list.map((d) => (d.id === item.id ? { ...d, status: 'confirmed' } : d)));
+    pushAudit({ actor: EXEC_NAME, action: '补确认（默许转正式确认）', target: item.title, result: 'ok', tags: ['exec', 'tacit', 'confirm'] });
+    pushToast({ kind: 'success', title: '已补确认', detail: `「${item.title}」默许记账已转正式确认` });
+  };
+
+  // 默许项 → 撤回（等同打回重拆，执行中动作回滚）
+  const revokeTacit = (item: DecompItem) => {
+    setDecomps((list) => list.map((d) => (d.id === item.id ? { ...d, status: 'rejected' } : d)));
+    pushAudit({ actor: EXEC_NAME, action: '撤回默许放行 · 打回重拆', target: item.title, result: 'warning', tags: ['exec', 'tacit', 'revoke'] });
+    pushToast({ kind: 'warning', title: '已撤回', detail: `「${item.title}」已打回分身重拆，执行中动作回滚` });
+  };
+
+  // 新增预授权规则（mock）
+  const addPreauth = () => {
+    const rule = preauthDraft.trim();
+    if (!rule) {
+      pushToast({ kind: 'warning', title: '请先填写规则内容', detail: '例如「单份合同 <10w 的标准报价免确认」' });
+      return;
+    }
+    setPreauthRules((list) => [...list, { id: `pa-${Date.now()}`, rule, scope: '销售增长部门 · 低风险拆解' }]);
+    setPreauthDraft('');
+    pushAudit({ actor: EXEC_NAME, action: '配置预授权规则', target: rule, result: 'ok', tags: ['exec', 'preauth'] });
+    pushToast({ kind: 'success', title: '预授权规则已生效', detail: `命中该规则的低风险拆解将免确认：${rule}` });
   };
 
   const acceptDelivery = (d: DeptDelivery, passed: boolean) => {
@@ -152,11 +218,24 @@ export default function ExecWorkspacePage() {
     >
       <div className="p-6 space-y-6 max-w-[1080px]">
         {/* 概览 */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           <Stat label="拆解待确认" value={pendingDecomps.toString()} color="warning" />
           <Stat label="待验收交付" value={pendingDeliveries.toString()} color="brand" />
           <Stat label="待处理风险" value={pendingRisks.length.toString()} color={pendingRisks.length > 0 ? 'error' : undefined} />
           <Stat label="本周 bad case" value={weeklyBadCases.toString()} />
+          {/* 决策①：默许率进治理指标 */}
+          <div className="hum-card p-3">
+            <div className="flex items-center justify-between gap-1">
+              <div className="hum-eyebrow">默许率</div>
+              <button onClick={() => setPreauthOpen(true)} className="flex items-center gap-0.5 text-[10.5px] text-primary-600 hover:underline shrink-0">
+                <ScrollText size={10} /> 预授权规则
+              </button>
+            </div>
+            <div className={`text-[22px] font-semibold mt-1 hum-tabular ${tacitRate > 0 ? 'text-warning' : 'text-neutral-900'}`}>
+              {tacitRate}%
+            </div>
+            <div className="text-[10px] hum-faint mt-0.5">默许 {tacitCount} / 总确认 {tacitCount + confirmedCount} · 默许率进入您的治理指标</div>
+          </div>
         </div>
 
         {/* 区块 1：分身拆解待确认 */}
@@ -164,28 +243,48 @@ export default function ExecWorkspacePage() {
           <SectionHead icon={<GitBranch size={13} className="text-primary-600" />} title="分身拆解待确认" sub="吴·销售 VP 分身把老板目标拆成的部门动作 · 您确认后才会下发执行" />
           <div className="space-y-2">
             {decomps.map((d) => (
-              <div key={d.id} className={`hum-card p-4 ${d.status !== 'pending' ? 'opacity-70' : ''}`}>
+              <div key={d.id} className={`hum-card p-4 ${d.status === 'confirmed' || d.status === 'rejected' ? 'opacity-70' : ''}`}>
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[13px] font-semibold text-neutral-900">{d.title}</span>
                       {d.status === 'confirmed' && <span className="hum-chip is-success">已确认授权</span>}
                       {d.status === 'rejected' && <span className="hum-chip is-warning">已打回重拆</span>}
+                      {d.status === 'tacit' && (
+                        <span className="hum-chip" style={{ background: '#f2eddc', color: '#7d6b2e', borderColor: '#dfd5b4' }}>
+                          已默许（超时未审）
+                        </span>
+                      )}
+                      {d.status === 'escalated' && <span className="hum-chip is-error">已升级收件箱</span>}
                     </div>
                     <div className="text-[12px] text-neutral-600 mt-1">{d.detail}</div>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={`hum-chip ${d.risk === 'high' ? 'is-error' : d.risk === 'medium' ? 'is-warning' : 'is-muted'}`}>
+                        {RISK_LABEL[d.risk]}
+                      </span>
+                      <span className={`hum-chip ${d.deadline.startsWith('已超时') ? 'is-warning' : 'is-muted'}`}>
+                        <Timer size={10} /> {d.deadline}
+                      </span>
                       <span className="hum-chip">拟派：{d.assignee}</span>
                       <span className="hum-chip is-muted">来源 · {d.source}</span>
                     </div>
+                    {d.risk !== 'low' && (d.status === 'pending' || d.status === 'escalated') && (
+                      <div className="text-[10.5px] hum-faint mt-1.5">{RISK_LABEL[d.risk]}拆解不自动确认 · 超时将升级老板收件箱</div>
+                    )}
+                    {d.status === 'tacit' && (
+                      <div className="text-[10.5px] hum-faint mt-1.5">低风险超时已自动放行并计入默许记账 · 您仍可补确认或撤回</div>
+                    )}
                   </div>
                   {d.status === 'pending' && (
                     <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => confirmDecomp(d)} className="hum-btn is-sm is-primary">
-                        <CheckCircle2 size={11} /> 确认授权
-                      </button>
-                      <button onClick={() => { setRejectingId(rejectingId === d.id ? null : d.id); setRejectNote(''); }} className="hum-btn is-sm">
-                        <RotateCcw size={11} /> 打回重拆
-                      </button>
+                      <button onClick={() => confirmDecomp(d)} className="hum-btn is-sm is-primary"><CheckCircle2 size={11} /> 确认授权</button>
+                      <button onClick={() => { setRejectingId(rejectingId === d.id ? null : d.id); setRejectNote(''); }} className="hum-btn is-sm"><RotateCcw size={11} /> 打回重拆</button>
+                    </div>
+                  )}
+                  {d.status === 'tacit' && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => lateConfirm(d)} className="hum-btn is-sm is-primary"><CheckCircle2 size={11} /> 补确认</button>
+                      <button onClick={() => revokeTacit(d)} className="hum-btn is-sm is-danger"><RotateCcw size={11} /> 撤回</button>
                     </div>
                   )}
                 </div>
@@ -302,6 +401,54 @@ export default function ExecWorkspacePage() {
             </div>
           )}
         </section>
+
+        {/* 预授权规则 modal（授权仪式的高管版 · 决策①） */}
+        {preauthOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm"
+            onClick={() => setPreauthOpen(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-[520px] max-w-[92vw] bg-white rounded-lg shadow-large border border-neutral-200 overflow-hidden"
+            >
+              <div className="h-1" style={{ background: 'var(--brand)' }} />
+              <div className="px-5 pt-4 pb-2 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--brand-soft)' }}>
+                  <ScrollText size={20} className="text-primary-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] font-semibold text-neutral-900">预授权规则</div>
+                  <div className="text-[12px] hum-muted mt-0.5">命中规则的低风险拆解免确认 · 不计默许 · 全部写入审计链</div>
+                </div>
+                <button onClick={() => setPreauthOpen(false)} className="hum-btn is-ghost is-sm shrink-0"><X size={13} /></button>
+              </div>
+              <div className="px-5 pb-3 space-y-2">
+                {preauthRules.map((r) => (
+                  <div key={r.id} className="hum-card-soft p-3 flex items-start gap-2.5">
+                    <CheckCircle2 size={14} className="text-success mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] font-medium text-neutral-900">{r.rule}</div>
+                      <div className="text-[11px] hum-faint mt-0.5">适用范围：{r.scope} · 已生效</div>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    value={preauthDraft}
+                    onChange={(e) => setPreauthDraft(e.target.value)}
+                    placeholder="新增规则 · 例如「单份合同 <10w 的标准报价免确认」"
+                    className="hum-input flex-1"
+                  />
+                  <button onClick={addPreauth} className="hum-btn is-sm is-primary shrink-0">新增预授权</button>
+                </div>
+              </div>
+              <div className="px-5 py-3 text-[11px] hum-faint" style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-subtle)' }}>
+                预授权是显式、有记录、可计量的授权形态 —— 免确认 ≠ 免责任，命中记录仍可追溯到本规则与您的签署。
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </WorkspacePage>
   );
