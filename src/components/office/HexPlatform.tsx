@@ -5,7 +5,7 @@ import { Edges } from '@react-three/drei';
 
 /**
  * 六边形悬浮平台：ExtrudeGeometry · 半径 16 · 高 0.8
- * 底部加体积光 cylinder（additive blending）
+ * 下方由 BasePedestal（Agent OS / Data OS 双层基座）支撑
  */
 export default function HexPlatform() {
   const geometry = useMemo(() => {
@@ -32,15 +32,10 @@ export default function HexPlatform() {
   }, []);
 
   const glowMat = useRef<THREE.MeshBasicMaterial>(null);
-  const beamMats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
 
-  // 中心光晕 + 体积光呼吸
+  // 中心光晕呼吸
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    if (glowMat.current) glowMat.current.opacity = 0.18 + 0.06 * Math.sin(t * 0.6);
-    beamMats.current.forEach((m, i) => {
-      if (m) m.opacity = 0.12 + 0.04 * Math.sin(t * 0.5 + i * 2.1);
-    });
+    if (glowMat.current) glowMat.current.opacity = 0.18 + 0.06 * Math.sin(clock.elapsedTime * 0.6);
   });
 
   return (
@@ -62,26 +57,6 @@ export default function HexPlatform() {
         <ringGeometry args={[8, 15.5, 6, 1]} />
         <meshBasicMaterial color="#3B82F6" transparent opacity={0.08} side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
-
-      {/* 底部体积光 · 3 根 cylinder additive */}
-      {[0, 1, 2].map((i) => {
-        const a = (Math.PI * 2 * i) / 3;
-        return (
-          <mesh key={i} position={[Math.cos(a) * 6, -6, Math.sin(a) * 6]}>
-            <cylinderGeometry args={[0.8, 2.4, 11, 16, 1, true]} />
-            <meshBasicMaterial
-              ref={(m) => { beamMats.current[i] = m; }}
-              color={i === 1 ? '#A855F7' : '#3B82F6'}
-              transparent
-              opacity={0.12}
-              blending={THREE.AdditiveBlending}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </mesh>
-        );
-      })}
 
       {/* 中心光晕（呼吸） */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>

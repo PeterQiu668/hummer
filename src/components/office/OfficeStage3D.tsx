@@ -4,10 +4,11 @@ import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Database, Cpu, Users2, Shuffle, Network as NetIcon, Wrench, Shield, Activity,
-  GitBranch, Key, BookOpen, AlertCircle, Route,
+  GitBranch, Key, BookOpen, AlertCircle, Route, X, Layers,
 } from 'lucide-react';
 import CityBackground from './CityBackground';
 import HexPlatform from './HexPlatform';
+import BasePedestal, { HQSign, type BaseLayerId } from './BasePedestal';
 import ZonePlatform, { ZONE_SPECS } from './ZonePlatform';
 import Workstations from './Workstations';
 import CameraRig3D from './CameraRig3D';
@@ -27,15 +28,48 @@ const PATH_STATUS_META: { status: TaskStatus; label: string }[] = [
 
 const DEFAULT_VISIBLE: TaskStatus[] = ['in_progress', 'blocked', 'waiting_approval'];
 
+interface LayerModule { icon: any; label: string; sub: string; }
+
+const BASE_LAYER_INFO: Record<BaseLayerId, { title: string; zh: string; accent: string; tagline: string; modules: LayerModule[] }> = {
+  agentos: {
+    title: 'Agent OS',
+    zh: '智能体操作系统',
+    accent: '#A855F7',
+    tagline: '任务调度 · 模型路由 · 权限策略 · A2A 委派 · 工具网关 · 风险审批',
+    modules: [
+      { icon: Shuffle,     label: '任务调度',  sub: '186 / 5min' },
+      { icon: Cpu,         label: '模型路由',  sub: '5 模型分层' },
+      { icon: NetIcon,     label: 'A2A 委派',  sub: '6 高管分身' },
+      { icon: Wrench,      label: 'MCP 工具',  sub: '12 已连接' },
+      { icon: Shield,      label: '审批策略',  sub: '四眼原则' },
+      { icon: AlertCircle, label: '风险阻断',  sub: '2 高危挂起' },
+    ],
+  },
+  dataos: {
+    title: 'Data OS',
+    zh: '数据操作系统',
+    accent: '#14B8A6',
+    tagline: '企业知识图谱 · 业务数据 · 流程定义 · 权限身份 · 审计账本 · 凭证保险柜',
+    modules: [
+      { icon: BookOpen,  label: '知识图谱',   sub: '9.6k 边' },
+      { icon: Database,  label: '业务数据',   sub: 'CRM · ERP · BI' },
+      { icon: GitBranch, label: '流程',       sub: '24 SOP' },
+      { icon: Users2,    label: '权限身份',   sub: 'RBAC + ABAC' },
+      { icon: Activity,  label: '审计账本',   sub: 'Append-only' },
+      { icon: Key,       label: '凭证保险柜', sub: '工牌令牌托管' },
+    ],
+  },
+};
+
 /**
- * v8 · 三层立体办公室
- *  L3 顶层 · Agent Workforce (3D 场景，视觉重点)
- *  L2 中层 · Agent OS  (调度 / 路由 / A2A / MCP / 审批 / 风险) — 透视斜面
- *  L1 底层 · Data OS   (知识图谱 / 业务数据 / 流程 / 权限 / 审计 / 凭证) — 更深透视
+ * v10 · Agent Workforce 立体总部
+ *  顶层场景 · Agent Workforce（六大分区 + 数字员工 + 工作路径）
+ *  基座双层 · Agent OS / Data OS（3D 基座，可点击展开引擎模块）
  */
 export default function OfficeStage3D() {
   const [visibleStatuses, setVisibleStatuses] = useState<TaskStatus[]>(DEFAULT_VISIBLE);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const [baseLayer, setBaseLayer] = useState<BaseLayerId | null>(null);
 
   const edgeCount = collabTasks
     .filter((t) => visibleStatuses.includes(t.status))
@@ -44,157 +78,144 @@ export default function OfficeStage3D() {
   const toggleStatus = (s: TaskStatus) =>
     setVisibleStatuses((list) => (list.includes(s) ? list.filter((x) => x !== s) : [...list, s]));
 
+  const layerInfo = baseLayer ? BASE_LAYER_INFO[baseLayer] : null;
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-neutral-50 flex flex-col">
-      {/* ─── L3 顶层 · 3D 场景区 ─── */}
-      <div className="relative flex-1 min-h-0">
-        {/* Top label */}
-        <div className="absolute top-3 left-3 right-3 z-10 pointer-events-none flex items-start justify-between gap-3">
-          <Layer3Label />
-          <div className="hidden md:block text-right text-[10.5px] text-white/70 font-mono">
-            拖拽旋转 · 滚轮缩放 · 双击工位
-          </div>
-        </div>
-
-        <Canvas
-          dpr={[1, 1.6]}
-          shadows={false}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-          style={{ background: '#1A1B1E' }}
-        >
-          <PerspectiveCamera makeDefault position={[0, 22, 28]} fov={38} near={0.5} far={200} />
-          <OrbitControls
-            makeDefault enablePan={false}
-            minDistance={12} maxDistance={45}
-            minPolarAngle={Math.PI * 0.15}
-            maxPolarAngle={Math.PI * 0.45}
-            enableDamping dampingFactor={0.08}
-            target={[0, 0, 0]}
-          />
-          <CameraRig3D />
-          <Suspense fallback={null}>
-            <CityBackground />
-            <Lighting />
-            <HexPlatform />
-            {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
-            <Workstations />
-            <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
-            <FloatingParticles count={130} color="#3B82F6" />
-          </Suspense>
-        </Canvas>
-
-        {/* 工作路径图例 · 状态筛选（点击 chip 开关对应状态的路径） */}
-        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5">
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-md backdrop-blur-md"
-            style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(59,130,246,0.35)' }}
-          >
-            <Route size={12} className="text-primary-300 shrink-0" />
-            <span className="text-[10.5px] font-semibold text-primary-200 whitespace-nowrap">
-              工作路径 · {edgeCount} 条协作边 / {collabTasks.length} 任务
-            </span>
-            <div className="flex items-center gap-1">
-              {PATH_STATUS_META.map(({ status, label }) => {
-                const on = visibleStatuses.includes(status);
-                const c = PATH_STATUS_COLOR[status];
-                return (
-                  <button
-                    key={status}
-                    onClick={() => toggleStatus(status)}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-opacity"
-                    style={{
-                      background: on ? `${c}33` : 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${on ? c : 'rgba(255,255,255,0.15)'}`,
-                      color: on ? c : 'rgba(255,255,255,0.45)',
-                      opacity: on ? 1 : 0.7,
-                    }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? c : 'transparent', border: `1px solid ${c}` }} />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 悬停路径 → 任务卡片 */}
-          {hoverInfo && (
-            <div
-              className="px-3 py-2 rounded-md backdrop-blur-md max-w-[360px]"
-              style={{ background: 'rgba(10,15,30,0.85)', border: `1px solid ${PATH_STATUS_COLOR[hoverInfo.status]}66` }}
-            >
-              <div className="text-[11.5px] font-semibold text-white leading-snug">{hoverInfo.title}</div>
-              <div className="flex items-center gap-2 mt-1 text-[10px] font-mono">
-                <span style={{ color: PATH_STATUS_COLOR[hoverInfo.status] }}>
-                  {PATH_STATUS_META.find((m) => m.status === hoverInfo.status)?.label ?? hoverInfo.status} · {hoverInfo.progress}%
-                </span>
-                <span className="text-white/60">{hoverInfo.ownerName} → {hoverInfo.collabName}</span>
-                {(hoverInfo.priority === 'urgent' || hoverInfo.priority === 'high') && (
-                  <span className="text-warning">{hoverInfo.priority === 'urgent' ? '紧急' : '高优'}</span>
-                )}
-              </div>
-            </div>
-          )}
+    <div className="relative h-full w-full overflow-hidden" style={{ background: '#1A1B1E' }}>
+      {/* Top label */}
+      <div className="absolute top-3 left-3 right-3 z-10 pointer-events-none flex items-start justify-between gap-3">
+        <StageLabel />
+        <div className="hidden md:block text-right text-[10.5px] text-white/70 font-mono">
+          拖拽旋转 · 滚轮缩放 · 点击基座看架构 · 双击工位
         </div>
       </div>
 
-      {/* ─── 衔接：底层基座的视觉过渡 ─── */}
-      <div
-        className="shrink-0"
-        style={{
-          height: 6,
-          background: 'linear-gradient(180deg, rgba(15,15,14,0.18), rgba(15,15,14,0))',
-        }}
-      />
+      <Canvas
+        dpr={[1, 1.6]}
+        shadows={false}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        style={{ background: '#1A1B1E' }}
+      >
+        <PerspectiveCamera makeDefault position={[0, 28, 50]} fov={48} near={0.5} far={260} />
+        <OrbitControls
+          makeDefault enablePan={false}
+          minDistance={12} maxDistance={75}
+          minPolarAngle={Math.PI * 0.12}
+          maxPolarAngle={Math.PI * 0.46}
+          enableDamping dampingFactor={0.08}
+          target={[0, -1.2, 0]}
+        />
+        <CameraRig3D />
+        <Suspense fallback={null}>
+          <CityBackground />
+          <Lighting />
+          <HexPlatform />
+          <BasePedestal activeLayer={baseLayer} onSelect={(id) => setBaseLayer((cur) => (cur === id ? null : id))} />
+          <HQSign />
+          {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
+          <Workstations />
+          <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
+          <FloatingParticles count={130} color="#3B82F6" />
+        </Suspense>
+      </Canvas>
 
-      {/* ─── L2 中层 · Agent OS ─── */}
-      <PlatformStrip
-        layerName="L2"
-        title="Agent OS"
-        tagline="任务调度 · 模型路由 · 权限策略 · A2A 委派 · 工具网关 · 风险审批"
-        accent="#7E22CE"
-        tiltDeg={14}
-        items={[
-          { icon: Shuffle,    label: '任务调度',  sub: '186 / 5min' },
-          { icon: Cpu,        label: '模型路由',  sub: '5 模型' },
-          { icon: NetIcon,    label: 'A2A 委派',  sub: '6 高管分身' },
-          { icon: Wrench,     label: 'MCP 工具',  sub: '12 已连接' },
-          { icon: Shield,     label: '审批策略',  sub: '四眼原则' },
-          { icon: AlertCircle,label: '风险阻断',  sub: '2 高危' },
-        ]}
-      />
+      {/* 基座层详情面板（点击 Agent OS / Data OS 基座展开） */}
+      {layerInfo && (
+        <div
+          className="absolute right-3 bottom-3 z-20 w-[300px] rounded-lg backdrop-blur-md overflow-hidden"
+          style={{ background: 'rgba(10,15,30,0.88)', border: `1px solid ${layerInfo.accent}55` }}
+        >
+          <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${layerInfo.accent}33` }}>
+            <div className="flex items-center gap-2">
+              <Layers size={13} style={{ color: layerInfo.accent }} />
+              <span className="text-[12.5px] font-semibold" style={{ color: layerInfo.accent }}>{layerInfo.title}</span>
+              <span className="text-[10.5px] text-white/60">{layerInfo.zh}</span>
+            </div>
+            <button onClick={() => setBaseLayer(null)} className="text-white/50 hover:text-white transition-colors">
+              <X size={13} />
+            </button>
+          </div>
+          <div className="px-3 pt-2 text-[10px] text-white/55 leading-relaxed">{layerInfo.tagline}</div>
+          <div className="grid grid-cols-2 gap-1.5 p-3">
+            {layerInfo.modules.map((m) => {
+              const Icon = m.icon;
+              return (
+                <div
+                  key={m.label}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-md"
+                  style={{ background: `${layerInfo.accent}14`, border: `1px solid ${layerInfo.accent}30` }}
+                >
+                  <Icon size={12} style={{ color: layerInfo.accent }} />
+                  <div className="leading-tight">
+                    <div className="text-[10.5px] font-medium text-white/90 whitespace-nowrap">{m.label}</div>
+                    <div className="text-[9px] text-white/50 font-mono whitespace-nowrap">{m.sub}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* ─── L1 底层 · Data OS ─── */}
-      <PlatformStrip
-        layerName="L1"
-        title="Data OS"
-        tagline="企业知识图谱 · 业务数据 · 流程定义 · 权限身份 · 审计账本 · 凭证保险柜"
-        accent="#0F766E"
-        tiltDeg={22}
-        items={[
-          { icon: BookOpen,   label: '知识图谱',  sub: '9.6k 边' },
-          { icon: Database,   label: '业务数据',  sub: 'CRM · ERP · BI' },
-          { icon: GitBranch,  label: '流程',      sub: '24 SOP' },
-          { icon: Users2,     label: '权限身份',  sub: 'RBAC + ABAC' },
-          { icon: Activity,   label: '审计账本',  sub: 'Append-only' },
-          { icon: Key,        label: '凭证保险柜',sub: '统一托管' },
-        ]}
-      />
+      {/* 工作路径图例 · 状态筛选（点击 chip 开关对应状态的路径） */}
+      <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5">
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-md backdrop-blur-md"
+          style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(59,130,246,0.35)' }}
+        >
+          <Route size={12} className="text-primary-300 shrink-0" />
+          <span className="text-[10.5px] font-semibold text-primary-200 whitespace-nowrap">
+            工作路径 · {edgeCount} 条协作边 / {collabTasks.length} 任务
+          </span>
+          <div className="flex items-center gap-1">
+            {PATH_STATUS_META.map(({ status, label }) => {
+              const on = visibleStatuses.includes(status);
+              const c = PATH_STATUS_COLOR[status];
+              return (
+                <button
+                  key={status}
+                  onClick={() => toggleStatus(status)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-opacity"
+                  style={{
+                    background: on ? `${c}33` : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${on ? c : 'rgba(255,255,255,0.15)'}`,
+                    color: on ? c : 'rgba(255,255,255,0.45)',
+                    opacity: on ? 1 : 0.7,
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? c : 'transparent', border: `1px solid ${c}` }} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* 底部柔光 */}
-      <div
-        className="shrink-0 pointer-events-none"
-        style={{
-          height: 18,
-          background: 'linear-gradient(180deg, rgba(15,15,14,0.05), rgba(15,15,14,0))',
-        }}
-      />
+        {/* 悬停路径 → 任务卡片 */}
+        {hoverInfo && (
+          <div
+            className="px-3 py-2 rounded-md backdrop-blur-md max-w-[360px]"
+            style={{ background: 'rgba(10,15,30,0.85)', border: `1px solid ${PATH_STATUS_COLOR[hoverInfo.status]}66` }}
+          >
+            <div className="text-[11.5px] font-semibold text-white leading-snug">{hoverInfo.title}</div>
+            <div className="flex items-center gap-2 mt-1 text-[10px] font-mono">
+              <span style={{ color: PATH_STATUS_COLOR[hoverInfo.status] }}>
+                {PATH_STATUS_META.find((m) => m.status === hoverInfo.status)?.label ?? hoverInfo.status} · {hoverInfo.progress}%
+              </span>
+              <span className="text-white/60">{hoverInfo.ownerName} → {hoverInfo.collabName}</span>
+              {(hoverInfo.priority === 'urgent' || hoverInfo.priority === 'high') && (
+                <span className="text-warning">{hoverInfo.priority === 'urgent' ? '紧急' : '高优'}</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ─────────── Layer 3 label ─────────── */
-function Layer3Label() {
+/* ─────────── Stage label ─────────── */
+function StageLabel() {
   return (
     <div
       className="flex items-center gap-2 px-3 py-1.5 rounded-md backdrop-blur-md"
@@ -205,86 +226,8 @@ function Layer3Label() {
     >
       <Users2 size={12} className="text-primary-300" />
       <div className="leading-tight">
-        <div className="text-[11.5px] font-semibold tracking-wide text-primary-200">L3 · Agent Workforce</div>
-        <div className="text-[10px] text-white/70">15 位数字员工 · 6 个分区 · 责任链可见</div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────── Platform strip (Agent OS / Data OS) ─────────── */
-
-interface StripItem { icon: any; label: string; sub: string; }
-
-function PlatformStrip({
-  layerName, title, tagline, accent, items, tiltDeg,
-}: { layerName: string; title: string; tagline: string; accent: string; items: StripItem[]; tiltDeg: number }) {
-  return (
-    <div
-      className="shrink-0 relative"
-      style={{
-        perspective: '1200px',
-        height: tiltDeg > 18 ? 102 : 92,
-      }}
-    >
-      <div
-        className="absolute inset-0 px-3"
-        style={{
-          transform: `rotateX(${tiltDeg}deg) translateZ(-12px)`,
-          transformOrigin: 'top center',
-        }}
-      >
-        <div
-          className="h-full rounded-lg flex items-center px-4 gap-3 relative overflow-hidden"
-          style={{
-            background: `linear-gradient(180deg, #FFFFFF, ${accent}08)`,
-            border: `1px solid ${accent}33`,
-            boxShadow: `0 4px 12px ${accent}1A, inset 0 1px 0 rgba(255,255,255,0.6)`,
-          }}
-        >
-          {/* Subtle data lines (decorative) */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: `repeating-linear-gradient(90deg, ${accent}11, ${accent}11 1px, transparent 1px, transparent 40px)`,
-              opacity: 0.6,
-            }}
-          />
-
-          {/* Layer label */}
-          <div className="shrink-0 relative z-10">
-            <div className="flex items-center gap-1.5">
-              <span
-                className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded"
-                style={{ background: accent, color: 'white' }}
-              >
-                {layerName}
-              </span>
-              <span className="text-[13px] font-semibold" style={{ color: accent }}>{title}</span>
-            </div>
-            <div className="text-[10.5px] hum-muted mt-0.5 hidden xl:block">{tagline}</div>
-          </div>
-
-          {/* Pills */}
-          <div className="flex-1 flex items-center justify-end gap-2 relative z-10 overflow-x-auto">
-            {items.map((it) => {
-              const Icon = it.icon;
-              return (
-                <div
-                  key={it.label}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white shrink-0"
-                  style={{ border: `1px solid ${accent}33` }}
-                >
-                  <Icon size={12} style={{ color: accent }} />
-                  <div className="leading-tight">
-                    <div className="text-[11px] font-medium text-neutral-900 whitespace-nowrap">{it.label}</div>
-                    <div className="text-[9.5px] hum-faint font-mono whitespace-nowrap">{it.sub}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <div className="text-[11.5px] font-semibold tracking-wide text-primary-200">Agent Workforce · HUMMER HQ</div>
+        <div className="text-[10px] text-white/70">15 位数字员工 · 6 个分区 · 基座 Agent OS / Data OS</div>
       </div>
     </div>
   );

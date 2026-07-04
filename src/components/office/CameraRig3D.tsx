@@ -6,10 +6,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { ZONE_SPECS } from './ZonePlatform';
 import { getEmployeePos3D } from './scenePositions';
 
+// 全景收进 Agent OS / Data OS 双层基座（基座底 y≈-5）
 const OVERVIEW = {
-  pos: new THREE.Vector3(0, 22, 28),
-  look: new THREE.Vector3(0, 0, 0),
-  fov: 38,
+  pos: new THREE.Vector3(0, 28, 50),
+  look: new THREE.Vector3(0, -1.0, 0),
+  fov: 48,
 };
 
 export default function CameraRig3D() {
