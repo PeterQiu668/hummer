@@ -17,7 +17,9 @@ import { marketEmployees } from '../../data/marketplace';
 import {
   experts, expertsById, businessStages, teamPackages,
 } from '../../data/experts';
+import { buildCandidates } from '../../data/trial';
 import AgentAvatar from '../ui/AgentAvatar';
+import LifecycleBoard from '../onboarding/LifecycleBoard';
 
 type Tab = 'browse' | 'packages' | 'wizard' | 'experts' | 'mine';
 
@@ -65,6 +67,9 @@ export default function Marketplace() {
     () => JSON.parse(localStorage.getItem('hummer-marketplace-hires') ?? '{}'),
   );
 
+  // 「我的招聘」= 生命周期候选（seed）+ 从「浏览员工」新招聘的员工
+  const mineCount = useMemo(() => buildCandidates(installed).length, [installed]);
+
   const filtered = useMemo(() => {
     return marketEmployees.filter((m) => {
       const stage = CATEGORY_TO_STAGE[m.category];
@@ -79,7 +84,7 @@ export default function Marketplace() {
     setInstalled(next);
     localStorage.setItem('hummer-marketplace-hires', JSON.stringify(next));
     pushAudit({ actor: '昆仑（您）', action: '招聘数字员工', target: m.name, result: 'ok', tags: ['marketplace', 'hire'] });
-    pushToast({ kind: 'success', title: `${m.name} 已入职`, detail: '已进入「我的员工」· 体验工坊任务即将开始' });
+    pushToast({ kind: 'success', title: `${m.name} 已进入沙箱试岗`, detail: '试岗第 1 天 · 在「我的招聘」查看试岗报告与转正决策' });
     triggerSlotIn({ agentName: m.name, skillName: m.tags[0] ?? '岗位 SOP', skillSource: m.expert });
   };
 
@@ -125,7 +130,7 @@ export default function Marketplace() {
             { key: 'packages', label: '团队套餐', count: teamPackages.length },
             { key: 'wizard', label: '定制 5 步', count: 5 },
             { key: 'experts', label: '专家保障', count: experts.length },
-            { key: 'mine', label: '我的招聘', count: Object.values(installed).filter(Boolean).length },
+            { key: 'mine', label: '我的招聘', count: mineCount },
           ] as { key: Tab; label: string; count: number }[]).map((t) => {
             const active = tab === t.key;
             return (
@@ -160,7 +165,7 @@ export default function Marketplace() {
         {tab === 'wizard' && <WizardTab onInstall={onInstallPackage} />}
         {tab === 'experts' && <ExpertsTab />}
         {tab === 'mine' && (
-          <MineTab installed={installed} />
+          <LifecycleBoard installed={installed} />
         )}
 
         {/* Footer */}
@@ -615,41 +620,10 @@ function WizardField({ label, value, options, onChange }: { label: string; value
   );
 }
 
-/* ─────────── My hires tab ─────────── */
-function MineTab({ installed }: { installed: Record<string, boolean> }) {
-  const hires = marketEmployees.filter((m) => installed[m.id]);
-  if (hires.length === 0) {
-    return (
-      <div className="flex-1 grid place-items-center p-12">
-        <div className="hum-card-soft p-8 text-center max-w-md">
-          <div className="w-12 h-12 rounded-full bg-neutral-100 grid place-items-center text-neutral-500 mx-auto mb-3">
-            <Users size={20} />
-          </div>
-          <div className="text-[14px] font-semibold text-neutral-900">尚未招聘任何员工</div>
-          <p className="text-[12.5px] hum-muted mt-1">
-            从「浏览员工」选择岗位，或直接选「团队套餐」一键部署
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      {hires.map((m) => (
-        <div key={m.id} className="hum-card p-3 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg grid place-items-center text-white font-bold" style={{ background: m.color }}>
-            {m.avatar}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-neutral-900 truncate">{m.name}</div>
-            <div className="text-[11px] hum-faint">{m.category}</div>
-          </div>
-          <span className="hum-chip is-success" style={{ padding: '1px 6px', fontSize: 10 }}>试岗 1/7 天</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+/* ─────────── My hires tab ───────────
+ * v9: 「我的招聘」改造为生命周期看板（试岗→评分→授权→入工区闭环），
+ * UI 全部在 components/onboarding/LifecycleBoard.tsx，这里只做挂载。
+ */
 
 /* ─────────── Trial drawer ─────────── */
 function TrialDrawer({ emp, onClose, onHire }: any) {

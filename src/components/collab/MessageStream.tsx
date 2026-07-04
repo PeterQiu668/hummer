@@ -26,6 +26,7 @@ const roleStyle: Record<
   worker:   { bg: 'bg-tertiary-500',                   text: 'text-white', chip: 'bg-tertiary-50 text-tertiary-700' },
   hermes:   { bg: 'bg-gradient-to-br from-secondary-500 to-warning', text: 'text-white', chip: 'bg-warning/10 text-warning' },
   guardian: { bg: 'bg-error',                          text: 'text-white', chip: 'bg-error/10 text-error' },
+  expert:   { bg: 'bg-neutral-800',                    text: 'text-white', chip: 'bg-neutral-100 text-neutral-700' },
 };
 
 // v8 · 9 种消息类型 (brief 第六条)

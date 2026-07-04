@@ -1,13 +1,14 @@
 /**
- * LeftNav (v8) — 真正产品化命名（移除对标产品名）
- *  指挥中心 / 对话流 / 工作任务 / 我的员工 / 员工市场 / 技能与工具 /
- *  知识中枢 / 审计与治理 / 质量与复盘 / 交付物
+ * LeftNav (v9) — 按角色过滤的导航（Phase 0 多角色）
+ * boss / exec / staff / expert / auditor 各看到自己的工作台
  */
 import {
   Building2, MessagesSquare, ListChecks, Users, Store, Wrench,
-  Cable, ShieldCheck, Sparkles, Network, Settings2, BookOpen, FileBox,
+  Cable, ShieldCheck, Sparkles, Settings2, BookOpen, FileBox,
+  Inbox, TrendingUp, LayoutDashboard, Bot, GraduationCap, ScrollText,
 } from 'lucide-react';
 import { useAppStore, type PageKey } from '../../store/useAppStore';
+import type { RoleKey } from '../../lib/types';
 import { channels } from '../../data/feishu';
 
 type NavItem = {
@@ -21,34 +22,53 @@ type NavItem = {
 
 type NavSection = { title: string; items: NavItem[] };
 
-const sections: NavSection[] = [
-  {
-    title: '工作',
-    items: [
-      { key: 'office', label: '指挥中心',     icon: Building2 },
-      { key: 'chat',   label: '对话流',       icon: MessagesSquare, badge: '12' },
-      { key: 'tasks',  label: '工作任务',     icon: ListChecks, badge: '8' },
-      { key: 'evidence', label: '交付物',     icon: FileBox, badge: '8' },
-    ],
-  },
-  {
-    title: '员工',
-    items: [
-      { key: 'employees', label: '我的员工',    icon: Users, badge: '15' },
-      { key: 'market',    label: '员工市场',    icon: Store, badge: '36', highlight: 'market' },
-      { key: 'skills',    label: '技能与工具',  icon: Wrench, badge: '128' },
-      { key: 'connect',   label: 'MCP 连接',    icon: Cable, badge: '12' },
-    ],
-  },
-  {
-    title: '知识与治理',
-    items: [
-      { key: 'kg',         label: '知识中枢',    icon: BookOpen, badge: '9.6k' },
-      { key: 'governance', label: '审计与治理',  icon: ShieldCheck, highlight: 'governance' },
-      { key: 'hermes',     label: '质量与复盘',  icon: Sparkles, badge: '47', highlight: 'hermes' },
-    ],
-  },
-];
+const IT: Record<string, NavItem> = {
+  office:    { key: 'office',    label: '指挥中心',    icon: Building2 },
+  inbox:     { key: 'inbox',     label: '收件箱',      icon: Inbox, badge: '9', badgeTone: 'error' },
+  chat:      { key: 'chat',      label: '对话流',      icon: MessagesSquare, badge: '12' },
+  tasks:     { key: 'tasks',     label: '工作任务',    icon: ListChecks, badge: '8' },
+  evidence:  { key: 'evidence',  label: '交付物',      icon: FileBox, badge: '8' },
+  employees: { key: 'employees', label: '我的员工',    icon: Users, badge: '15' },
+  market:    { key: 'market',    label: '员工市场',    icon: Store, badge: '36', highlight: 'market' },
+  skills:    { key: 'skills',    label: '技能与工具',  icon: Wrench, badge: '128' },
+  connect:   { key: 'connect',   label: 'MCP 连接',    icon: Cable, badge: '12' },
+  roi:       { key: 'roi',       label: 'ROI 经营',    icon: TrendingUp },
+  kg:        { key: 'kg',        label: '知识中枢',    icon: BookOpen, badge: '9.6k' },
+  governance:{ key: 'governance',label: '审计与治理',  icon: ShieldCheck, highlight: 'governance' },
+  hermes:    { key: 'hermes',    label: '质量与复盘',  icon: Sparkles, badge: '47', highlight: 'hermes' },
+  audit:     { key: 'audit',     label: '审计链',      icon: ScrollText },
+  execws:    { key: 'execws',    label: '高管工作台',  icon: LayoutDashboard },
+  myagents:  { key: 'myagents',  label: '我的 AI 同事', icon: Bot },
+  expertportal: { key: 'expertportal', label: '专家门户', icon: GraduationCap },
+};
+
+const ROLE_SECTIONS: Record<RoleKey, NavSection[]> = {
+  boss: [
+    { title: '工作', items: [IT.office, IT.inbox, IT.chat, IT.tasks, IT.evidence] },
+    { title: '员工', items: [IT.employees, IT.market, IT.skills, IT.connect] },
+    { title: '经营与治理', items: [IT.roi, IT.kg, IT.governance, IT.hermes] },
+  ],
+  exec: [
+    { title: '工作台', items: [IT.execws, IT.chat, IT.tasks, IT.evidence] },
+    { title: '团队', items: [IT.employees, IT.skills] },
+  ],
+  staff: [
+    { title: '工作台', items: [IT.myagents, IT.chat, IT.tasks] },
+    { title: '资源', items: [IT.evidence, IT.kg] },
+  ],
+  expert: [
+    { title: '专家', items: [IT.expertportal] },
+    { title: '市场', items: [IT.market] },
+  ],
+  auditor: [
+    { title: '审计', items: [IT.audit, IT.evidence, IT.governance] },
+  ],
+};
+
+// 频道列表只对企业内角色展示
+const ROLE_SHOW_CHANNELS: Record<RoleKey, boolean> = {
+  boss: true, exec: true, staff: true, expert: false, auditor: false,
+};
 
 export default function LeftNav() {
   const activePage = useAppStore((s) => s.activePage);
@@ -58,6 +78,9 @@ export default function LeftNav() {
   const setShowGovernance = useAppStore((s) => s.setShowGovernance);
   const setShowHermes = useAppStore((s) => s.setShowHermes);
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
+  const currentRole = useAppStore((s) => s.currentRole);
+
+  const sections = ROLE_SECTIONS[currentRole] ?? ROLE_SECTIONS.boss;
 
   const onClick = (it: NavItem) => {
     setLeftNav(it.key);
@@ -127,40 +150,42 @@ export default function LeftNav() {
         ))}
 
         {/* Active project channels */}
-        <div>
-          <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-            活跃频道
-          </div>
-          <div className="space-y-0.5">
-            {channels.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setActiveChannel(c.id);
-                  setActivePage('chat');
-                  setLeftNav('chat');
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 transition"
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{
-                    background:
-                      c.type === 'incident' ? 'var(--error)' :
-                      c.type === 'system' ? '#7E22CE' :
-                      'var(--success)',
+        {ROLE_SHOW_CHANNELS[currentRole] && (
+          <div>
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+              活跃频道
+            </div>
+            <div className="space-y-0.5">
+              {channels.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setActiveChannel(c.id);
+                    setActivePage('chat');
+                    setLeftNav('chat');
                   }}
-                />
-                <span className="flex-1 text-left text-[12px] text-neutral-700 truncate">{c.name}</span>
-                {c.unread > 0 && (
-                  <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-1 rounded">
-                    {c.unread}
-                  </span>
-                )}
-              </button>
-            ))}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 transition"
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{
+                      background:
+                        c.type === 'incident' ? 'var(--error)' :
+                        c.type === 'system' ? '#7E22CE' :
+                        'var(--success)',
+                    }}
+                  />
+                  <span className="flex-1 text-left text-[12px] text-neutral-700 truncate">{c.name}</span>
+                  {c.unread > 0 && (
+                    <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-1 rounded">
+                      {c.unread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* Footer status */}

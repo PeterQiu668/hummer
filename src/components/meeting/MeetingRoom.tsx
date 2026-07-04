@@ -4,10 +4,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Users2, Mic, ScreenShare, FileText, Plus, Clock, CheckCircle2, Trash2, ArrowRight,
+  X, Users2, Mic, ScreenShare, FileText, Plus, Clock, CheckCircle2, Trash2, ArrowRight, Send,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { employees } from '../../data/employees';
+import type { CollabTask } from '../../lib/types';
 
 const PRESET_AGENDA = [
   'Q3 增长策略评审',
@@ -20,10 +21,17 @@ const PRESET_AGENDA = [
 interface ActionItem { id: string; owner: string; what: string; due: string; done: boolean; }
 interface NoteLine   { ts: string; speaker: string; text: string; }
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const nowFull = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
 export default function MeetingRoom() {
   const setShowMeeting = useAppStore((s) => s.setShowMeeting);
   const pushToast = useAppStore((s) => s.pushToast);
   const pushAudit = useAppStore((s) => s.pushAudit);
+  const addTask = useAppStore((s) => s.addTask);
 
   const [step, setStep] = useState<'setup' | 'live' | 'finished'>('setup');
   const [agenda, setAgenda] = useState(PRESET_AGENDA[0]);
@@ -95,6 +103,72 @@ export default function MeetingRoom() {
   const toggleAction = (id: string) =>
     setActions((a) => a.map((x) => x.id === id ? { ...x, done: !x.done } : x));
   const removeAction = (id: string) => setActions((a) => a.filter((x) => x.id !== id));
+
+  // ── 行动项 → CollabTask（结束会议后可逐条/一键转任务）──
+  const [converted, setConverted] = useState<Record<string, boolean>>({});
+  const [taskOwners, setTaskOwners] = useState<Record<string, string>>({});
+
+  const defaultOwnerId = (a: ActionItem): string =>
+    employees.find((e) => e.name === a.owner)?.id
+    ?? employees.find((e) => attendees.includes(e.id))?.id
+    ?? 'emp-doc';
+  const ownerOf = (a: ActionItem) => taskOwners[a.id] ?? defaultOwnerId(a);
+
+  const buildTask = (a: ActionItem, ownerId: string): CollabTask => ({
+    id: `tk-meeting-${a.id}-${Date.now()}`,
+    title: a.what,
+    goal: agenda,
+    scope: `会议「${agenda}」行动项`,
+    inputs: ['会议纪要', '行动项上下文'],
+    outputs: ['交付物 · 按行动项约定'],
+    acceptance: ['发起人验收确认'],
+    ownerId,
+    collaboratorIds: [],
+    dueAt: a.due,
+    status: 'pending',
+    progress: 0,
+    channel: 'ch-q3',
+    priority: 'normal',
+    createdAt: nowFull(),
+  });
+
+  const convertOne = (a: ActionItem) => {
+    if (converted[a.id]) return;
+    const ownerId = ownerOf(a);
+    const ownerName = employees.find((e) => e.id === ownerId)?.name ?? ownerId;
+    addTask(buildTask(a, ownerId));
+    setConverted((c) => ({ ...c, [a.id]: true }));
+    pushToast({ kind: 'success', title: `已转任务 · 派给 ${ownerName}`, detail: a.what });
+    pushAudit({
+      actor: '昆仑（您）', action: '会议行动项转任务',
+      target: `${ownerName} · ${a.what}`, result: 'ok',
+      tags: ['meeting', 'task', 'ch-q3'],
+    });
+  };
+
+  const convertAll = () => {
+    const remaining = actions.filter((a) => !converted[a.id]);
+    if (remaining.length === 0) {
+      pushToast({ kind: 'info', title: '所有行动项都已转为任务' });
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    remaining.forEach((a) => {
+      addTask(buildTask(a, ownerOf(a)));
+      next[a.id] = true;
+    });
+    setConverted((c) => ({ ...c, ...next }));
+    pushToast({
+      kind: 'success',
+      title: `已将 ${remaining.length} 个行动项转为任务`,
+      detail: '任务已进入任务看板 · 频道 ch-q3',
+    });
+    pushAudit({
+      actor: '昆仑（您）', action: '会议行动项批量转任务',
+      target: `${agenda} · ${remaining.length} 项`, result: 'ok',
+      tags: ['meeting', 'task', 'batch'],
+    });
+  };
 
   const attendeesData = employees.filter((e) => attendees.includes(e.id));
   const elapsed = `${String(Math.floor(tick / 60)).padStart(2, '0')}:${String(tick % 60).padStart(2, '0')}`;
@@ -291,17 +365,48 @@ export default function MeetingRoom() {
                 ))}
               </ul>
             </Section>
-            <Section title="行动项 · 已分派任务">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="hum-eyebrow flex-1">行动项 · 转为任务</div>
+                <span className="text-[10.5px] hum-faint hum-tabular">
+                  {actions.filter((a) => converted[a.id]).length}/{actions.length} 已转
+                </span>
+                <button
+                  onClick={convertAll}
+                  disabled={actions.every((a) => converted[a.id])}
+                  className="hum-btn is-sm is-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Send size={11} /> 全部转为任务
+                </button>
+              </div>
               <div className="space-y-1.5">
                 {actions.map((a) => (
                   <div key={a.id} className="flex items-center gap-2 hum-card px-3 py-2">
-                    <CheckCircle2 size={12} className={a.done ? 'text-success' : 'text-neutral-300'} />
-                    <span className="flex-1 text-[12.5px]"><b>{a.owner.split('·')[0]}</b> · {a.what}</span>
-                    <span className="hum-chip">{a.due}</span>
+                    <CheckCircle2 size={12} className={converted[a.id] ? 'text-success' : 'text-neutral-300'} />
+                    <span className="flex-1 min-w-0 text-[12.5px] truncate">{a.what}</span>
+                    <span className="hum-chip shrink-0"><Clock size={9} /> {a.due}</span>
+                    <select
+                      value={ownerOf(a)}
+                      onChange={(e) => setTaskOwners((o) => ({ ...o, [a.id]: e.target.value }))}
+                      disabled={!!converted[a.id]}
+                      className="hum-input w-[132px] shrink-0 disabled:opacity-50"
+                      style={{ padding: '3px 6px', fontSize: 11.5 }}
+                    >
+                      {employees.map((e) => (
+                        <option key={e.id} value={e.id}>{e.name}</option>
+                      ))}
+                    </select>
+                    {converted[a.id] ? (
+                      <span className="hum-chip is-success shrink-0">已转任务 ✓</span>
+                    ) : (
+                      <button onClick={() => convertOne(a)} className="hum-btn is-sm shrink-0">
+                        <Send size={10} /> 转为任务
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-            </Section>
+            </div>
           </div>
         )}
 

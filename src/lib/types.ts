@@ -92,7 +92,7 @@ export interface FeishuMessage {
   ts: string;
   channel: string;
   sender: string;
-  senderRole: 'human' | 'manager' | 'worker' | 'hermes' | 'guardian';
+  senderRole: 'human' | 'manager' | 'worker' | 'hermes' | 'guardian' | 'expert';
   avatar: string;
   content: string;
   type:
@@ -126,7 +126,9 @@ export type TaskStatus =
   | 'in_progress'
   | 'waiting_approval'
   | 'blocked'
-  | 'completed';
+  | 'completed'
+  | 'failed'
+  | 'overdue';
 
 export interface CollabTask {
   id: string;
@@ -225,4 +227,70 @@ export interface SkillSlotInEvent {
   skillName: string;
   skillSource: string; // expert name
   startedAt: number;   // Date.now()
+}
+
+// === Phase 0: 多角色 + 闭环补全（docs/phase0-prd.md）===
+
+// 顶栏角色切换（mock 身份）
+export type RoleKey = 'boss' | 'exec' | 'staff' | 'expert' | 'auditor';
+
+// 验收工作台：对任务 acceptance[] 的逐条判定
+export interface AcceptanceJudgement {
+  taskId: string;
+  itemIndex: number;          // acceptance 数组下标
+  verdict: 'passed' | 'failed';
+  judgedBy: string;
+  note?: string;
+  ts: string;
+}
+
+// 交付出口：证据的「生效动作」（发送客户 / 回写 CRM / 发布）
+export type ExitActionKind = 'send_client' | 'writeback_crm' | 'publish';
+export interface DeliverableExitAction {
+  id: string;
+  evidenceId: string;
+  evidenceName: string;
+  action: ExitActionKind;
+  target: string;             // 如「鲲鹏制造 · 王总邮箱」「Salesforce · 商机 #4471」
+  status: 'pending_approval' | 'executed' | 'rejected';
+  requestedBy: string;
+  approvedBy?: string;
+  ts: string;
+}
+
+// 授权仪式：数字员工转正时签署的权限/额度/范围/有效期
+export interface AuthorizationGrant {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  permissions: string[];
+  dataScope: string[];
+  quotaMonthly: number;       // 月度动作额度（元）
+  validUntil: string;
+  signedBy: string;
+  signedAt: string;
+  status: 'active' | 'revoked' | 'expired';
+}
+
+// 试岗第 7 天强制决策
+export interface TrialDecision {
+  candidateId: string;        // marketEmployees 的 id
+  decision: 'promote' | 'extend' | 'return';
+  decidedBy: string;
+  ts: string;
+}
+
+// 专家介入工单（专家保障 SLA 的兑现载体）
+export interface ExpertTicket {
+  id: string;
+  title: string;
+  expertId: string;
+  expertName: string;
+  agentName: string;          // 出事的数字员工
+  taskId?: string;
+  severity: 'low' | 'medium' | 'high';
+  slaHours: number;
+  status: 'open' | 'responding' | 'resolved';
+  createdAt: string;
+  timeline: { ts: string; actor: string; note: string }[];
 }

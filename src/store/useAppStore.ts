@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ZoneId, Employee, ScreenView, RiskAlert, SkillSlotInEvent } from '../lib/types';
+import type {
+  ZoneId, Employee, ScreenView, RiskAlert, SkillSlotInEvent,
+  RoleKey, CollabTask, DeliverableExitAction, AuthorizationGrant, TrialDecision, ExpertTicket,
+} from '../lib/types';
 import { initialRiskAlerts } from '../data/tasks';
 import { a2aHandoffPool } from '../data/executives';
 
@@ -10,7 +13,7 @@ interface CollabFeedItem {
   channel: string;
   sender: string;
   avatar: string;
-  senderRole: 'human' | 'manager' | 'worker' | 'hermes' | 'guardian';
+  senderRole: 'human' | 'manager' | 'worker' | 'hermes' | 'guardian' | 'expert';
   content: string;
   type: 'msg' | 'task' | 'approval' | 'alert' | 'evolution' | 'mention';
 }
@@ -28,7 +31,12 @@ export type PageKey =
   | 'hermes'      // Hermes 进化（modal）
   | 'audit'       // 审计链
   | 'evidence'    // 证据库 / 产出物
-  | 'kg';         // 企业知识中枢
+  | 'kg'          // 企业知识中枢
+  | 'inbox'       // 老板收件箱（Phase 0）
+  | 'roi'         // ROI 经营报告 + 账单（Phase 0）
+  | 'execws'      // 高管工作台（Phase 0）
+  | 'myagents'    // 一线员工「我的 AI 同事」（Phase 0）
+  | 'expertportal'; // 专家门户（Phase 0）
 
 export interface ToastItem {
   id: string;
@@ -130,6 +138,29 @@ interface AppState {
   // ───────── executive twin detail ─────────
   activeExecId: string | null;
   setActiveExecId: (id: string | null) => void;
+
+  // ───────── Phase 0: 多角色 + 闭环补全 ─────────
+  currentRole: RoleKey;
+  setCurrentRole: (r: RoleKey) => void;
+  // 收件箱：itemId -> 处理决定（处理过即从待办隐藏）
+  inboxDone: Record<string, string>;
+  resolveInbox: (id: string, decision: string) => void;
+  // 会议行动项 / 一线员工派活产生的新任务
+  extraTasks: CollabTask[];
+  addTask: (t: CollabTask) => void;
+  // 交付出口动作（证据 → 发送/回写/发布，需审批）
+  exitActions: DeliverableExitAction[];
+  requestExit: (a: Omit<DeliverableExitAction, 'id' | 'ts' | 'status'>) => void;
+  decideExit: (id: string, approve: boolean, approver: string) => void;
+  // 试岗决策 + 授权仪式
+  trialDecisions: Record<string, TrialDecision>;
+  decideTrial: (d: Omit<TrialDecision, 'ts'>) => void;
+  grants: AuthorizationGrant[];
+  addGrant: (g: Omit<AuthorizationGrant, 'id' | 'signedAt' | 'status'>) => void;
+  // 专家介入工单
+  expertTickets: ExpertTicket[];
+  pushExpertTicket: (t: ExpertTicket) => void;
+  updateExpertTicket: (id: string, patch: Partial<ExpertTicket>) => void;
 }
 
 export interface AuditEntry {
@@ -337,6 +368,77 @@ export const useAppStore = create<AppState>()(
 
       activeExecId: null,
       setActiveExecId: (activeExecId) => set({ activeExecId }),
+
+      // ───────── Phase 0: 多角色 + 闭环补全 ─────────
+      currentRole: 'boss',
+      setCurrentRole: (currentRole) => set({ currentRole }),
+
+      inboxDone: {},
+      resolveInbox: (id, decision) =>
+        set((state) => ({ inboxDone: { ...state.inboxDone, [id]: decision } })),
+
+      extraTasks: [],
+      addTask: (t) => set((state) => ({ extraTasks: [...state.extraTasks, t] })),
+
+      exitActions: [],
+      requestExit: (a) =>
+        set((state) => {
+          const full: DeliverableExitAction = {
+            ...a,
+            id: `exit-${Date.now()}`,
+            ts: nowHHMMSS(),
+            status: 'pending_approval',
+          };
+          const auditEntry: AuditEntry = {
+            id: `au-${Date.now()}`, ts: nowHHMMSS(), hash: makeHash(),
+            actor: a.requestedBy, action: `发起交付出口 · ${a.action}`, target: a.evidenceName,
+            result: 'pending', tags: ['exit', 'evidence'],
+          };
+          return { exitActions: [full, ...state.exitActions], auditLog: [auditEntry, ...state.auditLog].slice(0, 500) };
+        }),
+      decideExit: (id, approve, approver) =>
+        set((state) => {
+          const target = state.exitActions.find((e) => e.id === id);
+          const auditEntry: AuditEntry = {
+            id: `au-${Date.now()}`, ts: nowHHMMSS(), hash: makeHash(),
+            actor: approver,
+            action: approve ? '批准交付出口' : '拒绝交付出口',
+            target: target?.evidenceName ?? id,
+            result: approve ? 'ok' : 'blocked',
+            tags: ['exit', 'human-in-loop'],
+          };
+          return {
+            exitActions: state.exitActions.map((e) =>
+              e.id === id ? { ...e, status: approve ? ('executed' as const) : ('rejected' as const), approvedBy: approver } : e,
+            ),
+            auditLog: [auditEntry, ...state.auditLog].slice(0, 500),
+          };
+        }),
+
+      trialDecisions: {},
+      decideTrial: (d) =>
+        set((state) => ({
+          trialDecisions: { ...state.trialDecisions, [d.candidateId]: { ...d, ts: nowHHMMSS() } },
+        })),
+
+      grants: [],
+      addGrant: (g) =>
+        set((state) => {
+          const full: AuthorizationGrant = { ...g, id: `grant-${Date.now()}`, signedAt: nowHHMMSS(), status: 'active' };
+          const auditEntry: AuditEntry = {
+            id: `au-${Date.now()}`, ts: nowHHMMSS(), hash: makeHash(),
+            actor: g.signedBy, action: '签署授权仪式', target: g.employeeName,
+            result: 'ok', tags: ['grant', 'human-in-loop'],
+          };
+          return { grants: [full, ...state.grants], auditLog: [auditEntry, ...state.auditLog].slice(0, 500) };
+        }),
+
+      expertTickets: [],
+      pushExpertTicket: (t) => set((state) => ({ expertTickets: [t, ...state.expertTickets] })),
+      updateExpertTicket: (id, patch) =>
+        set((state) => ({
+          expertTickets: state.expertTickets.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        })),
     }),
     {
       name: 'hummer-v6',
@@ -350,6 +452,9 @@ export const useAppStore = create<AppState>()(
         taskStatuses: s.taskStatuses,
         auditLog: s.auditLog.slice(0, 60),  // cap on disk
         bootDone: s.bootDone,
+        extraTasks: s.extraTasks.slice(0, 30),
+        trialDecisions: s.trialDecisions,
+        grants: s.grants.slice(0, 30),
       }) as any,
     },
   ),

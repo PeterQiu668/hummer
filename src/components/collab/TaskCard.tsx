@@ -11,6 +11,8 @@ const statusMeta: Record<
   waiting_approval: { label: '待审批', bar: 'bg-warning',     pill: 'bg-warning/10 text-warning border-warning/30', ring: 'ring-warning/30' },
   blocked:        { label: '已阻断',  bar: 'bg-error',        pill: 'bg-error/10 text-error border-error/30', ring: 'ring-error/30' },
   completed:      { label: '已完成',  bar: 'bg-success',      pill: 'bg-success/10 text-success border-success/30', ring: 'ring-success/30' },
+  failed:         { label: '已失败',  bar: 'bg-error',        pill: 'bg-error/10 text-error border-error/30', ring: 'ring-error/30' },
+  overdue:        { label: '已超期',  bar: 'bg-warning',      pill: 'bg-warning/10 text-warning border-warning/30', ring: 'ring-warning/30' },
 };
 
 function findEmp(id: string) {

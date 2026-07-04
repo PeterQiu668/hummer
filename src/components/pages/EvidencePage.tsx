@@ -3,10 +3,14 @@
  * 每条记录：产出物 / hash / 时间戳 / 责任 Agent / 关联任务 / 资料来源 / 知识引用
  */
 import { useMemo, useState } from 'react';
-import { Search, Filter, FileText, Download, ExternalLink, Eye, Shield, Tag, Cpu } from 'lucide-react';
+import { Search, Filter, FileText, Download, ExternalLink, Eye, Shield, Tag, ArrowRight } from 'lucide-react';
 import WorkspacePage, { EmptyState } from './WorkspacePage';
 import { collabTasks } from '../../data/tasks';
 import { employees } from '../../data/employees';
+import { useAppStore } from '../../store/useAppStore';
+import type { ExitActionKind } from '../../lib/types';
+import ExitActionModal, { ACTION_META } from '../work/ExitActionModal';
+import ExitQueue from '../work/ExitQueue';
 
 type Kind = 'doc' | 'sheet' | 'pdf' | 'memo' | 'sop' | 'report' | 'log';
 type Status = 'draft' | 'approved' | 'shipped' | 'archived';
@@ -107,9 +111,21 @@ export default function EvidencePage() {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
   const [detail, setDetail] = useState<Evidence | null>(null);
+  const [exitReq, setExitReq] = useState<{ ev: Evidence; action: ExitActionKind } | null>(null);
+  const exitActions = useAppStore((s) => s.exitActions);
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), []);
   const taskMap = useMemo(() => new Map(collabTasks.map((t) => [t.id, t])), []);
+
+  // 已生效的出口动作 → 在对应证据行显示「已生效 → 目标」徽标
+  const executedByEvidence = useMemo(() => {
+    const m = new Map<string, typeof exitActions>();
+    for (const a of exitActions) {
+      if (a.status !== 'executed') continue;
+      m.set(a.evidenceId, [...(m.get(a.evidenceId) ?? []), a]);
+    }
+    return m;
+  }, [exitActions]);
 
   const filtered = useMemo(() => evidenceSeed.filter((ev) =>
     (statusFilter === 'all' || ev.status === statusFilter) &&
@@ -156,7 +172,12 @@ export default function EvidencePage() {
         <Stat label="总产出物" value={evidenceSeed.length.toString()} />
         <Stat label="本周交付" value={evidenceSeed.filter((e) => e.status === 'shipped').length.toString()} color="success" />
         <Stat label="待审批" value={evidenceSeed.filter((e) => e.status === 'draft').length.toString()} color="warning" />
-        <Stat label="平均处理时长" value="2h 14min" />
+        <Stat label="出口动作" value={exitActions.length.toString()} />
+      </div>
+
+      {/* 交付出口队列：发起 → 老板审批 → 生效，全程留痕 */}
+      <div className="px-6 mb-4">
+        <ExitQueue />
       </div>
 
       <div className="px-6 pb-6">
@@ -179,6 +200,8 @@ export default function EvidencePage() {
                 const owner = empMap.get(ev.ownerId);
                 const km = KIND_META[ev.kind];
                 const sm = STATUS_META[ev.status];
+                const canExit = ev.status === 'approved' || ev.status === 'shipped';
+                const executed = executedByEvidence.get(ev.id) ?? [];
                 return (
                   <tr
                     key={ev.id}
@@ -192,6 +215,15 @@ export default function EvidencePage() {
                         <span className="text-neutral-900 font-medium">{ev.name}</span>
                         <span className="hum-faint text-[10px] font-mono">{ev.size}</span>
                       </div>
+                      {executed.length > 0 && (
+                        <div className="mt-1 flex items-center gap-1 flex-wrap">
+                          {executed.map((a) => (
+                            <span key={a.id} className="hum-chip is-success" style={{ padding: '1px 6px', fontSize: 10 }}>
+                              已生效 <ArrowRight size={9} /> {a.target}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="hum-chip" style={{ padding: '1px 6px', fontSize: 10, background: `${km.color}1A`, color: km.color, borderColor: `${km.color}33` }}>
@@ -204,9 +236,26 @@ export default function EvidencePage() {
                     <td className="px-3 py-2.5 hum-faint font-mono text-[11px]">{ev.hash}</td>
                     <td className="px-3 py-2.5 hum-faint font-mono text-[11px]">{ev.ts}</td>
                     <td className="px-3 py-2.5 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); setDetail(ev); }} className="hum-btn is-sm">
-                        <Eye size={11} /> 详情
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {canExit && (['send_client', 'writeback_crm', 'publish'] as ExitActionKind[]).map((k) => {
+                          const am = ACTION_META[k];
+                          const Icon = am.icon;
+                          return (
+                            <button
+                              key={k}
+                              title={`生效动作 · ${am.label}`}
+                              onClick={(e) => { e.stopPropagation(); setExitReq({ ev, action: k }); }}
+                              className="hum-btn is-sm"
+                              style={{ color: am.color, padding: '4px 6px' }}
+                            >
+                              <Icon size={11} />
+                            </button>
+                          );
+                        })}
+                        <button onClick={(e) => { e.stopPropagation(); setDetail(ev); }} className="hum-btn is-sm">
+                          <Eye size={11} /> 详情
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -233,6 +282,15 @@ export default function EvidencePage() {
         <EvidenceDrawer
           ev={detail} empMap={empMap} taskMap={taskMap}
           onClose={() => setDetail(null)}
+        />
+      )}
+
+      {exitReq && (
+        <ExitActionModal
+          evidenceId={exitReq.ev.id}
+          evidenceName={exitReq.ev.name}
+          action={exitReq.action}
+          onClose={() => setExitReq(null)}
         />
       )}
     </WorkspacePage>
