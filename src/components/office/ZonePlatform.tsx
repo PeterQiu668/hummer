@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Edges, Text } from '@react-three/drei';
+import { useMemo, useRef, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { Edges, Text, useCursor } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ZoneId } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
@@ -26,30 +27,36 @@ export const ZONE_SPECS: ZoneSpec[] = [
   { id: 'learn',    label: '充电进化区', sub: 'EVOLUTION CHARGER', center: [-6, 5.5], size: [7, 4.5], color: '#10B981', elevation: 0.4 },
 ];
 
+/** 假玻璃：transmission 材质每帧触发背景拷贝渲染通道，换成透明 standard 材质（此相机距离下视觉等效） */
 function GlassWall({ size, height, color }: { size: [number, number]; height: number; color: string }) {
   const [w, d] = size;
+  const mat = (
+    <meshStandardMaterial
+      color={color}
+      transparent
+      opacity={0.16}
+      roughness={0.1}
+      metalness={0.2}
+      emissive={color}
+      emissiveIntensity={0.08}
+      side={THREE.DoubleSide}
+      depthWrite={false}
+    />
+  );
   return (
     <group>
-      {/* 4 面玻璃围墙（前面留口） */}
+      {/* 3 面玻璃围墙（前面留口） */}
       <mesh position={[0, height / 2, -d / 2]}>
         <boxGeometry args={[w, height, 0.05]} />
-        <meshPhysicalMaterial
-          color={color}
-          transmission={0.9}
-          thickness={0.3}
-          roughness={0.05}
-          transparent
-          opacity={0.25}
-          metalness={0}
-        />
+        {mat}
       </mesh>
       <mesh position={[-w / 2, height / 2, 0]}>
         <boxGeometry args={[0.05, height, d]} />
-        <meshPhysicalMaterial color={color} transmission={0.9} thickness={0.3} roughness={0.05} transparent opacity={0.25} />
+        {mat}
       </mesh>
       <mesh position={[w / 2, height / 2, 0]}>
         <boxGeometry args={[0.05, height, d]} />
-        <meshPhysicalMaterial color={color} transmission={0.9} thickness={0.3} roughness={0.05} transparent opacity={0.25} />
+        {mat}
       </mesh>
     </group>
   );
@@ -74,11 +81,26 @@ function Stairs({ from, to, width = 1.4 }: { from: [number, number, number]; to:
 }
 
 export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
-  const { activeZone, setActiveZone } = useAppStore();
+  const isActive = useAppStore((s) => s.activeZone === spec.id);
+  const setActiveZone = useAppStore((s) => s.setActiveZone);
   const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
   const [cx, cz] = spec.center;
   const [w, d] = spec.size;
-  const isActive = activeZone === spec.id;
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null);
+  const platformMat = useRef<THREE.MeshStandardMaterial>(null);
+  const zoneIndex = ZONE_SPECS.findIndex((s) => s.id === spec.id);
+
+  // 分区光效呼吸（refs 直改，零重渲染）
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    const base = isActive ? 0.5 : 0.18;
+    if (ringMat.current) ringMat.current.opacity = base + 0.07 * Math.sin(t * 0.8 + zoneIndex * 1.1);
+    if (platformMat.current) {
+      const emBase = isActive ? 0.35 : hovered ? 0.22 : 0.1;
+      platformMat.current.emissiveIntensity = emBase + 0.03 * Math.sin(t * 0.8 + zoneIndex * 1.1);
+    }
+  });
 
   const geometry = useMemo(() => {
     const shape = new THREE.Shape();
@@ -111,18 +133,15 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
-          document.body.style.cursor = 'pointer';
         }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = 'auto';
-        }}
+        onPointerOut={() => setHovered(false)}
         onClick={(e) => {
           e.stopPropagation();
           setActiveZone(isActive ? null : spec.id);
         }}
       >
         <meshStandardMaterial
+          ref={platformMat}
           color={isActive ? spec.color : '#101830'}
           roughness={0.5}
           metalness={0.45}
@@ -166,10 +185,10 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
         {spec.sub}
       </Text>
 
-      {/* 地面光圈 */}
+      {/* 地面光圈（呼吸） */}
       <mesh position={[0, spec.elevation + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[Math.max(w, d) / 2 - 0.3, Math.max(w, d) / 2 - 0.1, 32]} />
-        <meshBasicMaterial color={spec.color} transparent opacity={isActive ? 0.5 : 0.18} toneMapped={false} />
+        <meshBasicMaterial ref={ringMat} color={spec.color} transparent opacity={isActive ? 0.5 : 0.18} toneMapped={false} />
       </mesh>
     </group>
   );

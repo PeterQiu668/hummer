@@ -4,31 +4,7 @@ import gsap from 'gsap';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { ZONE_SPECS } from './ZonePlatform';
-import { workstations } from '../../data/workstations';
-
-// 从 Workstations.tsx 复制的简化映射（避免循环依赖）
-const ZONE_2D_CENTERS: Record<string, { x: number; y: number }> = {
-  boss: { x: 81, y: 19 },
-  business: { x: 47, y: 45 },
-  support: { x: 18, y: 42 },
-  meeting: { x: 69, y: 61 },
-  rest: { x: 88, y: 54 },
-  learn: { x: 17, y: 21 },
-  transit: { x: 55, y: 73 },
-};
-
-function getEmployeePos3D(employeeId: string): [number, number, number] | null {
-  const ws = workstations.find((w) => w.employeeId === employeeId);
-  if (!ws) return null;
-  const c2d = ZONE_2D_CENTERS[ws.zone];
-  const spec = ZONE_SPECS.find((s) => s.id === ws.zone);
-  if (!spec || !c2d) return null;
-  const dx = ws.x - c2d.x;
-  const dy = ws.y - c2d.y;
-  const scaleX = (spec.size[0] * 0.35) / 10;
-  const scaleZ = (spec.size[1] * 0.35) / 8;
-  return [spec.center[0] + dx * scaleX, spec.elevation + 1.0, spec.center[1] + dy * scaleZ];
-}
+import { getEmployeePos3D } from './scenePositions';
 
 const OVERVIEW = {
   pos: new THREE.Vector3(0, 22, 28),
@@ -37,20 +13,21 @@ const OVERVIEW = {
 };
 
 export default function CameraRig3D() {
-  const { activeZone, selectedEmployee } = useAppStore();
+  const activeZone = useAppStore((s) => s.activeZone);
+  const selectedEmployeeId = useAppStore((s) => s.selectedEmployee?.id ?? null);
   const { camera, controls } = useThree() as any;
   const tweenRef = useRef<gsap.core.Tween | null>(null);
 
   useEffect(() => {
     let target: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } = OVERVIEW;
 
-    if (selectedEmployee) {
-      const p = getEmployeePos3D(selectedEmployee.id);
+    if (selectedEmployeeId) {
+      const p = getEmployeePos3D(selectedEmployeeId);
       if (p) {
         const [ex, ey, ez] = p;
         target = {
-          pos: new THREE.Vector3(ex + 2, ey + 1.2, ez + 2.5),
-          look: new THREE.Vector3(ex, 1, ez),
+          pos: new THREE.Vector3(ex + 2, ey + 2.2, ez + 2.5),
+          look: new THREE.Vector3(ex, ey + 1, ez),
           fov: 35,
         };
       }
@@ -99,13 +76,18 @@ export default function CameraRig3D() {
         onComplete: () => {
           if (controls) controls.enabled = true;
         },
+        // kill() 不触发 onComplete —— 中断时兜底恢复交互，避免 OrbitControls 永久锁死
+        onInterrupt: () => {
+          if (controls) controls.enabled = true;
+        },
       },
     );
 
     return () => {
       tweenRef.current?.kill();
+      if (controls) controls.enabled = true;
     };
-  }, [activeZone, selectedEmployee, camera, controls]);
+  }, [activeZone, selectedEmployeeId, camera, controls]);
 
   return null;
 }

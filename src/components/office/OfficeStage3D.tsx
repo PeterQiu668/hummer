@@ -1,10 +1,10 @@
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Database, Cpu, Users2, Shuffle, Network as NetIcon, Wrench, Shield, Activity,
-  GitBranch, Key, BookOpen, FileText, AlertCircle,
+  GitBranch, Key, BookOpen, AlertCircle, Route,
 } from 'lucide-react';
 import CityBackground from './CityBackground';
 import HexPlatform from './HexPlatform';
@@ -12,6 +12,20 @@ import ZonePlatform, { ZONE_SPECS } from './ZonePlatform';
 import Workstations from './Workstations';
 import CameraRig3D from './CameraRig3D';
 import Lighting from './Lighting';
+import FloatingParticles from './FloatingParticles';
+import TaskPaths, { PATH_STATUS_COLOR, type HoverInfo } from './TaskPaths';
+import { collabTasks } from '../../data/tasks';
+import type { TaskStatus } from '../../lib/types';
+
+const PATH_STATUS_META: { status: TaskStatus; label: string }[] = [
+  { status: 'in_progress', label: '进行中' },
+  { status: 'blocked', label: '已阻断' },
+  { status: 'waiting_approval', label: '待审批' },
+  { status: 'pending', label: '待启动' },
+  { status: 'completed', label: '已完成' },
+];
+
+const DEFAULT_VISIBLE: TaskStatus[] = ['in_progress', 'blocked', 'waiting_approval'];
 
 /**
  * v8 · 三层立体办公室
@@ -20,6 +34,16 @@ import Lighting from './Lighting';
  *  L1 底层 · Data OS   (知识图谱 / 业务数据 / 流程 / 权限 / 审计 / 凭证) — 更深透视
  */
 export default function OfficeStage3D() {
+  const [visibleStatuses, setVisibleStatuses] = useState<TaskStatus[]>(DEFAULT_VISIBLE);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+
+  const edgeCount = collabTasks
+    .filter((t) => visibleStatuses.includes(t.status))
+    .reduce((n, t) => n + t.collaboratorIds.length, 0);
+
+  const toggleStatus = (s: TaskStatus) =>
+    setVisibleStatuses((list) => (list.includes(s) ? list.filter((x) => x !== s) : [...list, s]));
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-neutral-50 flex flex-col">
       {/* ─── L3 顶层 · 3D 场景区 ─── */}
@@ -54,8 +78,64 @@ export default function OfficeStage3D() {
             <HexPlatform />
             {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
             <Workstations />
+            <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
+            <FloatingParticles count={130} color="#3B82F6" />
           </Suspense>
         </Canvas>
+
+        {/* 工作路径图例 · 状态筛选（点击 chip 开关对应状态的路径） */}
+        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5">
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-md backdrop-blur-md"
+            style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(59,130,246,0.35)' }}
+          >
+            <Route size={12} className="text-primary-300 shrink-0" />
+            <span className="text-[10.5px] font-semibold text-primary-200 whitespace-nowrap">
+              工作路径 · {edgeCount} 条协作边 / {collabTasks.length} 任务
+            </span>
+            <div className="flex items-center gap-1">
+              {PATH_STATUS_META.map(({ status, label }) => {
+                const on = visibleStatuses.includes(status);
+                const c = PATH_STATUS_COLOR[status];
+                return (
+                  <button
+                    key={status}
+                    onClick={() => toggleStatus(status)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-opacity"
+                    style={{
+                      background: on ? `${c}33` : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${on ? c : 'rgba(255,255,255,0.15)'}`,
+                      color: on ? c : 'rgba(255,255,255,0.45)',
+                      opacity: on ? 1 : 0.7,
+                    }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? c : 'transparent', border: `1px solid ${c}` }} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 悬停路径 → 任务卡片 */}
+          {hoverInfo && (
+            <div
+              className="px-3 py-2 rounded-md backdrop-blur-md max-w-[360px]"
+              style={{ background: 'rgba(10,15,30,0.85)', border: `1px solid ${PATH_STATUS_COLOR[hoverInfo.status]}66` }}
+            >
+              <div className="text-[11.5px] font-semibold text-white leading-snug">{hoverInfo.title}</div>
+              <div className="flex items-center gap-2 mt-1 text-[10px] font-mono">
+                <span style={{ color: PATH_STATUS_COLOR[hoverInfo.status] }}>
+                  {PATH_STATUS_META.find((m) => m.status === hoverInfo.status)?.label ?? hoverInfo.status} · {hoverInfo.progress}%
+                </span>
+                <span className="text-white/60">{hoverInfo.ownerName} → {hoverInfo.collabName}</span>
+                {(hoverInfo.priority === 'urgent' || hoverInfo.priority === 'high') && (
+                  <span className="text-warning">{hoverInfo.priority === 'urgent' ? '紧急' : '高优'}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── 衔接：底层基座的视觉过渡 ─── */}

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Edges } from '@react-three/drei';
 
@@ -30,10 +31,22 @@ export default function HexPlatform() {
     return geo;
   }, []);
 
+  const glowMat = useRef<THREE.MeshBasicMaterial>(null);
+  const beamMats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+
+  // 中心光晕 + 体积光呼吸
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (glowMat.current) glowMat.current.opacity = 0.18 + 0.06 * Math.sin(t * 0.6);
+    beamMats.current.forEach((m, i) => {
+      if (m) m.opacity = 0.12 + 0.04 * Math.sin(t * 0.5 + i * 2.1);
+    });
+  });
+
   return (
     <group>
       {/* 主平台 */}
-      <mesh geometry={geometry} position={[0, -0.4, 0]} receiveShadow>
+      <mesh geometry={geometry} position={[0, -0.4, 0]}>
         <meshStandardMaterial
           color="#121a2e"
           roughness={0.55}
@@ -57,6 +70,7 @@ export default function HexPlatform() {
           <mesh key={i} position={[Math.cos(a) * 6, -6, Math.sin(a) * 6]}>
             <cylinderGeometry args={[0.8, 2.4, 11, 16, 1, true]} />
             <meshBasicMaterial
+              ref={(m) => { beamMats.current[i] = m; }}
               color={i === 1 ? '#A855F7' : '#3B82F6'}
               transparent
               opacity={0.12}
@@ -69,10 +83,10 @@ export default function HexPlatform() {
         );
       })}
 
-      {/* 中心光晕 */}
+      {/* 中心光晕（呼吸） */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[3, 32]} />
-        <meshBasicMaterial color="#3B82F6" transparent opacity={0.18} toneMapped={false} />
+        <meshBasicMaterial ref={glowMat} color="#3B82F6" transparent opacity={0.18} toneMapped={false} />
       </mesh>
     </group>
   );

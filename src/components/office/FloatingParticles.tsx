@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export default function FloatingParticles({ count = 120 }: { count?: number }) {
+export default function FloatingParticles({ count = 120, color = '#00ffff' }: { count?: number; color?: string }) {
   const ref = useRef<THREE.Points>(null);
   const { positions, speeds } = useMemo(() => {
     const positions = new Float32Array(count * 3);
@@ -31,7 +31,7 @@ export default function FloatingParticles({ count = 120 }: { count?: number }) {
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
       </bufferGeometry>
-      <pointsMaterial size={0.06} color="#00ffff" transparent opacity={0.55} sizeAttenuation depthWrite={false} />
+      <pointsMaterial size={0.06} color={color} transparent opacity={0.45} sizeAttenuation depthWrite={false} />
     </points>
   );
 }

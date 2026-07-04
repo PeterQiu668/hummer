@@ -83,6 +83,7 @@ export default function Marketplace() {
     const next = { ...installed, [m.id]: true };
     setInstalled(next);
     localStorage.setItem('hummer-marketplace-hires', JSON.stringify(next));
+    window.dispatchEvent(new Event('hummer-hires-changed')); // 同 tab 通知 3D 场景 / 员工页
     pushAudit({ actor: '昆仑（您）', action: '招聘数字员工', target: m.name, result: 'ok', tags: ['marketplace', 'hire'] });
     pushToast({ kind: 'success', title: `${m.name} 已进入沙箱试岗`, detail: '试岗第 1 天 · 在「我的招聘」查看试岗报告与转正决策' });
     triggerSlotIn({ agentName: m.name, skillName: m.tags[0] ?? '岗位 SOP', skillSource: m.expert });
