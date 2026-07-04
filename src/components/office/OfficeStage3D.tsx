@@ -96,7 +96,7 @@ export default function OfficeStage3D() {
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.32 }}
         style={{ background: '#1A1B1E' }}
       >
-        <PerspectiveCamera makeDefault position={[0, 24, 42]} fov={44} near={0.5} far={260} />
+        <PerspectiveCamera makeDefault position={[0, 21, 37]} fov={43} near={0.5} far={260} />
         <OrbitControls
           makeDefault enablePan={false}
           minDistance={10} maxDistance={75}

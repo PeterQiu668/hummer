@@ -9,15 +9,15 @@ import * as THREE from 'three';
 
 interface SilhouetteSpec { position: [number, number, number]; scale: number; seed: number }
 
-/** 拉近到幕墙外 12-20 个单位，隔窗可见的城市天际线 */
+/** 中距离城市天际线：幕墙外可见，但不压迫总部 */
 const SILHOUETTES: SilhouetteSpec[] = [
-  { position: [-26, -3, -30], scale: 1.05, seed: 1 },
-  { position: [0, -3, -34],   scale: 1.25, seed: 2 },
-  { position: [26, -3, -30],  scale: 1.0,  seed: 3 },
-  { position: [34, -3, -6],   scale: 0.9,  seed: 4 },
-  { position: [30, -3, 24],   scale: 0.95, seed: 5 },
-  { position: [-30, -3, 24],  scale: 1.05, seed: 6 },
-  { position: [-34, -3, -6],  scale: 0.95, seed: 7 },
+  { position: [-34, -6, -42], scale: 1.0,  seed: 1 },
+  { position: [0, -6, -48],   scale: 1.15, seed: 2 },
+  { position: [34, -6, -42],  scale: 0.95, seed: 3 },
+  { position: [46, -6, -10],  scale: 0.85, seed: 4 },
+  { position: [40, -6, 32],   scale: 0.9,  seed: 5 },
+  { position: [-40, -6, 32],  scale: 0.95, seed: 6 },
+  { position: [-46, -6, -10], scale: 0.9,  seed: 7 },
 ];
 
 interface BuildingInst { pos: [number, number, number]; scl: [number, number, number] }
