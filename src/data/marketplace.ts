@@ -72,3 +72,151 @@ export const marketEmployees: MarketEmployee[] = seed.map((s, i) => ({
 }));
 
 export const marketCategories = ['全部', ...categories];
+
+// ===== v5.4 deepening: per-employee extras =====
+export interface MarketEvaluation {
+  user: string;
+  rating: number;
+  comment: string;
+  ts: string;
+}
+
+export interface MarketTrainingEvent {
+  ts: string;
+  event: string;
+  delta: string;
+}
+
+export interface MarketExpertProfile {
+  bio: string;
+  exp: string[];
+  awards: string[];
+}
+
+export interface MarketExtras {
+  evaluations: MarketEvaluation[];
+  trainingHistory: MarketTrainingEvent[];
+  expertProfile: MarketExpertProfile;
+}
+
+const defaultEvaluations = (name: string, expert: string): MarketEvaluation[] => [
+  {
+    user: '某 SaaS 公司 · COO',
+    rating: 5,
+    comment: `${name} 上岗一周, ${expert} 老师亲调 SOP, 直接对齐我们 Top 销售经验, 团队 ROI 翻倍.`,
+    ts: '3 天前',
+  },
+  {
+    user: '某连锁零售 · 数字化总监',
+    rating: 5,
+    comment: '比内部新人快 4 倍, 关键是 Hermes 还在不断进化, 我们没有再为新需求加人.',
+    ts: '1 周前',
+  },
+  {
+    user: '某互联网中厂 · HRD',
+    rating: 4,
+    comment: '初期需要花 1-2 天调权限和 KG 对接, 之后就完全自动跑了, 非常值.',
+    ts: '2 周前',
+  },
+];
+
+const defaultTraining = (expert: string): MarketTrainingEvent[] => [
+  { ts: '2026-05-22', event: `初版上线, ${expert} 标注 120 条样本`, delta: '准确率 0% → 78%' },
+  { ts: '2026-05-29', event: 'Hermes GEPA 自动改进 v1.1', delta: '+6.4%' },
+  { ts: '2026-06-05', event: '人审反馈 18 条 bad case', delta: '+3.1%' },
+  { ts: '2026-06-12', event: 'KG schema 扩展 + SOP 调整 v2', delta: '+4.8%' },
+  { ts: '2026-06-19', event: '沙箱 A/B 通过, 发布 v2.3', delta: '+2.2%' },
+];
+
+const defaultProfile = (expert: string, expertTitle: string): MarketExpertProfile => ({
+  bio: `${expert}, ${expertTitle}. 累计带教 300+ 一线团队, 长期与蓝血军团专家共创委员会合作.`,
+  exp: [
+    `${expertTitle} (历任)`,
+    '混沌商学院特邀讲师',
+    '某 500 强企业内训独家讲师',
+  ],
+  awards: ['2024 年度专家共创人 TOP 10', '蓝血军团专家委员会终身荣誉成员'],
+});
+
+// Auto-populate extras for all market employees (keys = id)
+export const marketExtras: Record<string, MarketExtras> = marketEmployees.reduce(
+  (acc, m) => {
+    acc[m.id] = {
+      evaluations: defaultEvaluations(m.name, m.expert),
+      trainingHistory: defaultTraining(m.expert),
+      expertProfile: defaultProfile(m.expert, m.expertTitle),
+    };
+    return acc;
+  },
+  {} as Record<string, MarketExtras>,
+);
+
+// Similar-employee recommendation: same category, excluding self
+export const getSimilarEmployees = (id: string) => {
+  const me = marketEmployees.find((m) => m.id === id);
+  if (!me) return [];
+  return marketEmployees
+    .filter((m) => m.id !== id && m.category === me.category)
+    .slice(0, 4);
+};
+
+// Trial task & permission scope catalog for the 7-day trial modal
+export const trialTaskCatalog: { id: string; label: string; desc: string }[] = [
+  { id: 't-1', label: 'BD 邮件批量起草', desc: '从 CRM 拉客户 → 起草 → 待你审核发出' },
+  { id: 't-2', label: '客户复盘报告', desc: '7 天数据 → 复盘报告 → 飞书文档' },
+  { id: 't-3', label: '合同初筛', desc: 'PDF → 风险标记 → 律师人审' },
+  { id: 't-4', label: '工单情绪分流', desc: '7×24 接单 → 情绪分类 → 分级回复' },
+];
+
+export const trialPermissionPresets: { id: string; label: string; perms: string[] }[] = [
+  { id: 'p-min', label: '最小权限', perms: ['只读 CRM', '只读 KG', '飞书草稿(待审)'] },
+  { id: 'p-std', label: '标准权限', perms: ['读写 CRM', '只读 KG', '飞书草稿(待审)', '邮件草稿(待审)'] },
+  { id: 'p-full', label: '完整权限', perms: ['读写 CRM', '读写 KG', '飞书直发', '邮件直发(<5w 客户)'] },
+];
+
+// "我的招聘" mock 列表
+export interface MyHire {
+  id: string;
+  name: string;
+  hiredAt: string;
+  status: '试岗中' | '已转正' | '训练中';
+  remainingDays?: number;
+  metrics: { label: string; value: string }[];
+}
+
+export const myHires: MyHire[] = [
+  {
+    id: 'mh-1',
+    name: '高客单 BD 顾问',
+    hiredAt: '2026-06-18',
+    status: '试岗中',
+    remainingDays: 3,
+    metrics: [
+      { label: '已起草', value: '48 封' },
+      { label: '回复率', value: '24.6%' },
+      { label: '成本', value: '¥186' },
+    ],
+  },
+  {
+    id: 'mh-2',
+    name: '合同审阅专家',
+    hiredAt: '2026-05-10',
+    status: '已转正',
+    metrics: [
+      { label: '审阅', value: '212 份' },
+      { label: '准确率', value: '94.2%' },
+      { label: '节省', value: '¥38k/月' },
+    ],
+  },
+  {
+    id: 'mh-3',
+    name: '7×24 客服官',
+    hiredAt: '2026-06-20',
+    status: '训练中',
+    metrics: [
+      { label: '训练样本', value: '1.2k 条' },
+      { label: '进度', value: '63%' },
+      { label: '预计上岗', value: '+2 天' },
+    ],
+  },
+];

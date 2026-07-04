@@ -2,172 +2,296 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =====================================================================
+ *  Hummer Enterprise Agent OS · Notion-style 浅色克制企业系统
+ *  Tokens · Spacing · Surfaces · Motion
+ * ===================================================================== */
+
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
+    /* Warm neutrals (Notion / Linear) */
+    --bg-app: #F7F7F4;
+    --bg-canvas: #FAFAF8;
+    --bg-card: #FFFFFF;
+    --bg-subtle: #F1F1ED;
+    --bg-hover: rgba(0, 0, 0, 0.035);
+    --bg-active: rgba(0, 0, 0, 0.06);
+    /* Text */
+    --text-ink: #171717;
+    --text-strong: #0A0A0A;
+    --text-muted: #6B6B65;
+    --text-faint: #9A9A93;
+    /* Borders */
+    --border-subtle: #EFEEE8;
+    --border: #E7E5DE;
+    --border-strong: #D8D6CD;
+    /* Brand cyan (low-sat enterprise blue) */
+    --brand: #0F70B7;
+    --brand-soft: #E8F1FA;
+    --brand-hover: #0C5E9E;
+    /* Status */
+    --success: #1E8F5C;
+    --success-soft: #E6F5ED;
+    --warning: #B07706;
+    --warning-soft: #FBF2DF;
+    --error: #C13D3D;
+    --error-soft: #FBEAEA;
+    --info: #3B82F6;
+    /* Shadows (very subtle, no glow) */
+    --shadow-1: 0 1px 2px rgba(15, 15, 14, 0.04), 0 1px 1px rgba(15, 15, 14, 0.06);
+    --shadow-2: 0 4px 8px rgba(15, 15, 14, 0.05), 0 2px 4px rgba(15, 15, 14, 0.06);
+    --shadow-3: 0 8px 24px rgba(15, 15, 14, 0.08), 0 4px 8px rgba(15, 15, 14, 0.06);
+    --shadow-modal: 0 24px 48px rgba(15, 15, 14, 0.16);
+    /* Radius */
+    --radius-1: 4px;
+    --radius-2: 6px;
+    --radius-3: 8px;
+    --radius-4: 12px;
+    /* Motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   }
-  html,
-  body,
-  #root {
+
+  html, body, #root {
     height: 100%;
     margin: 0;
-    background: #04060f;
-    color: #d8e6ff;
-    font-family: 'HarmonyOS Sans', 'PingFang SC', Inter, system-ui, sans-serif;
+    background: var(--bg-app);
+    color: var(--text-ink);
+    font-family: 'Inter', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   body {
     background:
-      radial-gradient(ellipse at 20% 0%, rgba(168, 85, 247, 0.18), transparent 55%),
-      radial-gradient(ellipse at 80% 100%, rgba(0, 255, 255, 0.12), transparent 60%),
-      radial-gradient(ellipse at 100% 0%, rgba(255, 0, 170, 0.10), transparent 55%),
-      #04060f;
+      radial-gradient(ellipse at 90% -10%, rgba(15, 112, 183, 0.04), transparent 60%),
+      radial-gradient(ellipse at -10% 110%, rgba(168, 85, 247, 0.025), transparent 55%),
+      var(--bg-app);
   }
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(0, 255, 255, 0.18);
-    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.10);
+    border-radius: 5px;
+    border: 2px solid var(--bg-app);
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 255, 255, 0.35);
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.20); }
+
+  /* Selection */
+  ::selection { background: rgba(15, 112, 183, 0.18); }
+
+  /* Focus ring (clean, no glow) */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: var(--radius-1);
   }
 }
 
 @layer components {
+  /* ---------- Surfaces ---------- */
+  .hum-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-3);
+  }
+  .hum-card-soft {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-3);
+  }
+  .hum-elev-1 { box-shadow: var(--shadow-1); }
+  .hum-elev-2 { box-shadow: var(--shadow-2); }
+  .hum-elev-3 { box-shadow: var(--shadow-3); }
+
+  /* ---------- Buttons ---------- */
+  .hum-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-2);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-ink);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    transition: background 120ms var(--ease-out), border-color 120ms var(--ease-out);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .hum-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+  .hum-btn:active { background: var(--bg-active); }
+  .hum-btn.is-primary {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .hum-btn.is-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .hum-btn.is-ghost {
+    border-color: transparent;
+    background: transparent;
+  }
+  .hum-btn.is-ghost:hover { background: var(--bg-hover); }
+  .hum-btn.is-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .hum-btn.is-danger {
+    color: var(--error);
+    border-color: var(--border);
+  }
+  .hum-btn.is-danger:hover { background: var(--error-soft); }
+
+  /* ---------- Inputs ---------- */
+  .hum-input {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: var(--radius-2);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-ink);
+    font-size: 13px;
+    line-height: 1.4;
+    transition: border-color 120ms var(--ease-out);
+  }
+  .hum-input:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(15, 112, 183, 0.14);
+  }
+  .hum-input::placeholder { color: var(--text-faint); }
+
+  /* ---------- Chips / Tags ---------- */
+  .hum-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-1);
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid var(--border-subtle);
+  }
+  .hum-chip.is-brand { background: var(--brand-soft); color: var(--brand); border-color: rgba(15, 112, 183, 0.18); }
+  .hum-chip.is-success { background: var(--success-soft); color: var(--success); border-color: rgba(30, 143, 92, 0.20); }
+  .hum-chip.is-warning { background: var(--warning-soft); color: var(--warning); border-color: rgba(176, 119, 6, 0.22); }
+  .hum-chip.is-error { background: var(--error-soft); color: var(--error); border-color: rgba(193, 61, 61, 0.20); }
+  .hum-chip.is-muted { color: var(--text-faint); }
+
+  /* ---------- Status dot ---------- */
+  .hum-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* ---------- Section heading ---------- */
+  .hum-eyebrow {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .hum-h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+    line-height: 1.2;
+  }
+  .hum-h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-strong);
+    line-height: 1.3;
+  }
+  .hum-h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-ink);
+  }
+  .hum-muted { color: var(--text-muted); }
+  .hum-faint { color: var(--text-faint); }
+
+  /* ---------- Divider ---------- */
+  .hum-divider {
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* ---------- KBD ---------- */
+  .hum-kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+
+  /* ---------- Legacy compatibility (do NOT remove) ---------- */
+  /* Many existing components still use these class names; map them to v6 light. */
   .glass {
-    background: linear-gradient(180deg, rgba(8, 12, 32, 0.78), rgba(8, 12, 32, 0.62));
-    backdrop-filter: blur(14px) saturate(150%);
-    -webkit-backdrop-filter: blur(14px) saturate(150%);
-    border: 1px solid rgba(0, 255, 255, 0.14);
-    box-shadow:
-      0 6px 26px rgba(0, 0, 0, 0.55),
-      inset 0 0 0 1px rgba(0, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-3);
+    backdrop-filter: blur(6px);
   }
   .glass-strong {
-    background: linear-gradient(180deg, rgba(10, 14, 39, 0.92), rgba(10, 14, 39, 0.75));
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    border: 1px solid rgba(0, 255, 255, 0.22);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-3);
+    box-shadow: var(--shadow-1);
   }
-  .neon-text {
-    text-shadow:
-      0 0 6px rgba(0, 255, 255, 0.6),
-      0 0 18px rgba(0, 255, 255, 0.35);
-  }
-  .neon-text-magenta {
-    text-shadow:
-      0 0 6px rgba(255, 0, 170, 0.65),
-      0 0 18px rgba(255, 0, 170, 0.35);
-  }
-  .neon-text-green {
-    text-shadow:
-      0 0 6px rgba(0, 255, 136, 0.65),
-      0 0 18px rgba(0, 255, 136, 0.35);
-  }
-  .hud-corner::before,
-  .hud-corner::after {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border: 1px solid rgba(0, 255, 255, 0.6);
-  }
-  .hud-corner::before {
-    top: -1px;
-    left: -1px;
-    border-right: none;
-    border-bottom: none;
-  }
-  .hud-corner::after {
-    bottom: -1px;
-    right: -1px;
-    border-left: none;
-    border-top: none;
-  }
-  .scanline-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: repeating-linear-gradient(
-      180deg,
-      rgba(0, 255, 255, 0.035) 0px,
-      rgba(0, 255, 255, 0.035) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    mix-blend-mode: screen;
-  }
-  .grid-bg {
-    background-image:
-      linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-  .chip {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-sm border font-mono uppercase tracking-wider;
-  }
-  .chip-cyan {
-    @apply chip text-neon-cyan border-neon-cyan/40 bg-neon-cyan/5;
-  }
-  .chip-magenta {
-    @apply chip text-neon-magenta border-neon-magenta/40 bg-neon-magenta/5;
-  }
-  .chip-green {
-    @apply chip text-neon-green border-neon-green/40 bg-neon-green/5;
-  }
-  .chip-amber {
-    @apply chip text-neon-amber border-neon-amber/40 bg-neon-amber/5;
-  }
-  .chip-red {
-    @apply chip text-neon-red border-neon-red/40 bg-neon-red/5;
-  }
-  .chip-purple {
-    @apply chip text-neon-purple border-neon-purple/40 bg-neon-purple/5;
-  }
-  .btn-neon {
-    @apply relative inline-flex items-center gap-2 px-3 py-1.5 rounded-sm
-           text-[11px] font-mono uppercase tracking-wider
-           border border-neon-cyan/50 text-neon-cyan
-           hover:bg-neon-cyan/10 hover:shadow-neon-cyan transition;
-  }
-  .btn-neon-magenta {
-    @apply relative inline-flex items-center gap-2 px-3 py-1.5 rounded-sm
-           text-[11px] font-mono uppercase tracking-wider
-           border border-neon-magenta/50 text-neon-magenta
-           hover:bg-neon-magenta/10 hover:shadow-neon-magenta transition;
-  }
-  .digital-screen {
-    background: repeating-linear-gradient(
-      0deg,
-      rgba(0, 255, 136, 0.02),
-      rgba(0, 255, 136, 0.02) 1px,
-      transparent 1px,
-      transparent 2px
-    );
-  }
+  .glass-1 { background: rgba(255, 255, 255, 0.92); border: 1px solid var(--border); }
+  .glass-2 { background: rgba(255, 255, 255, 0.78); border: 1px solid var(--border-subtle); }
+  .glass-3 { background: rgba(255, 255, 255, 0.62); border: 1px solid var(--border-subtle); }
+  .neon-text { color: var(--brand); }
+  .neon-text-magenta { color: var(--text-strong); }
+  .neon-text-green { color: var(--success); }
+  .hud-corner { position: relative; }
+  .chip       { @apply inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md border font-medium; background: var(--bg-subtle); border-color: var(--border-subtle); color: var(--text-muted); }
+  .chip-cyan    { @apply chip; background: var(--brand-soft); color: var(--brand); border-color: rgba(15, 112, 183, 0.18); }
+  .chip-magenta { @apply chip; background: rgba(168, 85, 247, 0.08); color: #7E22CE; border-color: rgba(168, 85, 247, 0.18); }
+  .chip-green   { @apply chip; background: var(--success-soft); color: var(--success); border-color: rgba(30, 143, 92, 0.20); }
+  .chip-amber   { @apply chip; background: var(--warning-soft); color: var(--warning); border-color: rgba(176, 119, 6, 0.22); }
+  .chip-red     { @apply chip; background: var(--error-soft); color: var(--error); border-color: rgba(193, 61, 61, 0.20); }
+  .chip-purple  { @apply chip-magenta; }
+  .btn-neon          { @apply hum-btn; }
+  .btn-neon-magenta  { @apply hum-btn; color: #7E22CE; border-color: rgba(168, 85, 247, 0.24); }
+  .digital-screen { background: var(--bg-card); }
   .data-stream {
-    background-image: linear-gradient(
-      180deg,
-      transparent 0%,
-      rgba(0, 255, 136, 0.08) 30%,
-      rgba(0, 255, 255, 0.12) 60%,
-      transparent 100%
-    );
-    background-size: 100% 120px;
-    animation: data-flow 2.6s linear infinite;
+    background-image: linear-gradient(180deg, transparent, rgba(15, 112, 183, 0.04) 50%, transparent);
   }
+  /* Cleaning up old dark utilities so any leftover classes don't break layout */
+  .grid-bg, .scanline-overlay { display: none !important; }
 }
 
-.font-display {
-  font-family: 'Orbitron', system-ui, sans-serif;
-  letter-spacing: 0.06em;
-}
-.font-mono {
-  font-family: 'JetBrains Mono', Menlo, monospace;
+@layer utilities {
+  .font-display { font-family: 'Inter', 'Geist', system-ui, sans-serif; letter-spacing: -0.005em; }
+  .font-mono { font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; }
+  .hum-tabular { font-variant-numeric: tabular-nums; }
+  /* Subtle pulse for live indicators (no glow) */
+  @keyframes humPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .hum-pulse { animation: humPulse 2s ease-in-out infinite; }
 }

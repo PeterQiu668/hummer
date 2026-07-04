@@ -95,7 +95,9 @@ export interface FeishuMessage {
   senderRole: 'human' | 'manager' | 'worker' | 'hermes' | 'guardian';
   avatar: string;
   content: string;
-  type: 'msg' | 'task' | 'approval' | 'alert' | 'evolution' | 'mention';
+  type:
+    | 'msg' | 'task' | 'approval' | 'alert' | 'evolution' | 'mention'
+    | 'translate' | 'decompose' | 'confirm' | 'tool_call' | 'deliverable' | 'evidence';
   mentions?: string[];
   attachments?: { name: string; kind: string }[];
 }
@@ -117,3 +119,110 @@ export type ScreenView =
   | 'marketplace'
   | 'governance'
   | 'evolution';
+
+// === v5.3 collab types ===
+export type TaskStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'waiting_approval'
+  | 'blocked'
+  | 'completed';
+
+export interface CollabTask {
+  id: string;
+  title: string;
+  goal: string;
+  scope: string;
+  inputs: string[];
+  outputs: string[];
+  acceptance: string[];
+  ownerId: string;
+  collaboratorIds: string[];
+  dueAt: string;
+  status: TaskStatus;
+  progress: number;
+  channel: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  createdAt: string;
+}
+
+export interface RiskAlert {
+  id: string;
+  ts: string;
+  agent: string;
+  agentAvatar: string;
+  action: string;
+  data: string[];
+  level: 'low' | 'medium' | 'high' | 'critical';
+  reason: string;
+  suggestion: string;
+  channel: string;
+  status: 'pending' | 'approved' | 'rejected' | 'safer';
+}
+
+// === v5.5 Douyin Lobster Lab injection ===
+// 来源：抖音 3 视频 — 练虾系统(上/下) + AI 飞书
+
+// 视频① 4 要素：每个 Agent 的 SOP 版本演进 + 多轮训练实验记录
+export interface SopVersion {
+  agentId: string;
+  current: string;        // e.g. 'v3.2'
+  trainedRounds: number;  // 累计训练轮次
+  lastBumpAt: string;     // 上次升级时间
+  history: {
+    round: number;
+    version: string;
+    accuracy: number;
+    cost: string;
+    note: string;
+  }[];
+}
+
+// 视频② 老板今日待办收件箱 5 大类
+export type InboxKind = 'approval' | 'block' | 'stuck' | 'accept' | 'anomaly';
+export interface InboxItem {
+  id: string;
+  kind: InboxKind;
+  title: string;
+  agent: string;
+  channel: string;
+  ts: string;
+  detail: string;
+  urgent: boolean;
+}
+
+// 视频① 淘汰流 - 拒绝慢养
+export interface EliminatedAgent {
+  id: string;
+  name: string;
+  reason: string;
+  replacedBy: string;
+  eliminatedAt: string;
+  tasksTried: number;
+  finalScore: number; // 0-100
+}
+
+// 视频③ 上岗 4 阶段：市场→试岗→评分→授权→入工区
+export type LifecycleStage = 'market' | 'trial' | 'scoring' | 'authorizing' | 'onboarded';
+export interface LifecycleCandidate {
+  marketId: string;     // marketEmployees 的 id
+  stage: LifecycleStage;
+  trialDay?: number;    // 试岗第 N 天 (1-7)
+  trialScore?: number;  // 0-100
+  trialMetrics?: {
+    completed: number;
+    quality: number;
+    cost: string;
+    risks: number;
+  };
+  expectedZone?: string;
+}
+
+// 视频① 黑客帝国式技能插盘 — 由 store 触发的动画事件
+export interface SkillSlotInEvent {
+  id: string;
+  agentName: string;
+  skillName: string;
+  skillSource: string; // expert name
+  startedAt: number;   // Date.now()
+}

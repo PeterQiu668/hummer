@@ -1,107 +1,293 @@
-import { useEffect, useRef } from 'react';
-import { AtSign, Paperclip, Send, AlertTriangle, Sparkles, Workflow, FileText } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  AtSign,
+  Paperclip,
+  Send,
+  AlertTriangle,
+  Workflow,
+  UserPlus,
+  Sparkles,
+} from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { feishuMessages, channels } from '../../data/feishu';
+import { feishuMessages, hermesNotices, collabExtraMessages, channels } from '../../data/feishu';
+import { collabTasks } from '../../data/tasks';
+import { employees } from '../../data/employees';
+import type { FeishuMessage, CollabTask } from '../../lib/types';
+import ChannelList from '../collab/ChannelList';
+import MessageStream from '../collab/MessageStream';
+import MentionPicker from '../collab/MentionPicker';
+import RiskAlertModal from '../collab/RiskAlertModal';
+import TaskCard from '../collab/TaskCard';
+
+type AnyMsg = FeishuMessage & {
+  taskCard?: CollabTask;
+  riskAlertId?: string;
+  toolCall?: { tool: string; args: string };
+};
+
+const extraChannels = [
+  { id: 'ch-dept-finance', name: '#部门·财务', unread: 0, type: 'department', members: 4 },
+  { id: 'ch-dm-lin',       name: '林·决策官', unread: 1, type: 'dm',         members: 2 },
+];
 
 export default function BottomFlow() {
-  const { setShowMeeting } = useAppStore();
-  const scroller = useRef<HTMLDivElement>(null);
+  const setShowMeeting = useAppStore((s) => s.setShowMeeting);
+  const activeChannel = useAppStore((s) => s.activeChannel);
+  const setActiveChannel = useAppStore((s) => s.setActiveChannel);
+  const riskAlerts = useAppStore((s) => s.riskAlerts);
+  const pendingApprovals = useAppStore((s) => s.pendingApprovals);
+  const approveAlert = useAppStore((s) => s.approveAlert);
+  const dismissAlert = useAppStore((s) => s.dismissAlert);
+  const collabFeed = useAppStore((s) => s.collabFeed);
+  const pushCollabMessage = useAppStore((s) => s.pushCollabMessage);
 
-  useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
-  }, []);
+  const [draft, setDraft] = useState('');
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [openAlertId, setOpenAlertId] = useState<string | null>(null);
 
-  return (
-    <div className="absolute left-64 right-80 bottom-0 h-72 z-20 glass-strong border-t border-neon-cyan/20 flex">
-      <div className="w-44 border-r border-neon-cyan/10 p-2 space-y-0.5">
-        <div className="text-[10px] font-mono uppercase tracking-widest text-neon-cyan/50 px-2 pb-1">协作群</div>
-        {channels.map((c, i) => (
-          <button
-            key={c.id}
-            className={`w-full text-left px-2 py-1 rounded-sm text-[11px] flex items-center gap-2 transition
-              ${i === 0 ? 'bg-neon-cyan/10 text-neon-cyan' : 'text-slate-300 hover:bg-white/5'}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full
-              ${c.type === 'incident' ? 'bg-neon-red animate-pulse'
-                : c.type === 'system' ? 'bg-neon-magenta'
-                : 'bg-neon-green'}`} />
-            <span className="flex-1 truncate">{c.name}</span>
-            {c.unread > 0 && <span className="text-[9px] font-mono text-neon-magenta">{c.unread}</span>}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 flex flex-col">
-        <div className="px-3 py-2 border-b border-neon-cyan/10 flex items-center gap-2">
-          <span className="font-display text-sm neon-text">#Q3增长策略</span>
-          <span className="chip-cyan">6 成员 · 2 Manager · 4 Worker</span>
-          <div className="flex-1" />
-          <button onClick={() => setShowMeeting(true)} className="btn-neon">
-            <Workflow size={12} /> 拉入会议室
-          </button>
-        </div>
-
-        <div ref={scroller} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-          {feishuMessages.map((m) => (
-            <MessageRow key={m.id} m={m} />
-          ))}
-        </div>
-
-        <div className="px-3 py-2 border-t border-neon-cyan/10 flex items-center gap-2">
-          <button className="text-slate-400 hover:text-neon-cyan"><AtSign size={14} /></button>
-          <button className="text-slate-400 hover:text-neon-cyan"><Paperclip size={14} /></button>
-          <input
-            placeholder="给项目群发消息  ·  @员工调度 · /命令"
-            className="flex-1 bg-white/5 border border-neon-cyan/15 rounded-sm px-3 py-1.5 text-xs font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-neon-cyan/40"
-          />
-          <button className="btn-neon"><Send size={12} /> 发送</button>
-        </div>
-      </div>
-    </div>
+  // First pending alert auto-opens via the banner click; we also let user click banner.
+  const firstPendingAlert = useMemo(
+    () => riskAlerts.find((a) => a.status === 'pending') ?? null,
+    [riskAlerts],
   );
-}
+  const openAlert = openAlertId
+    ? riskAlerts.find((a) => a.id === openAlertId) ?? null
+    : null;
 
-function MessageRow({ m }: { m: ReturnType<typeof channels.find> extends infer _ ? any : never }) {
-  const roleColor: Record<string, string> = {
-    human: 'from-neon-purple to-neon-magenta text-white',
-    manager: 'from-neon-cyan to-neon-purple text-white',
-    worker: 'from-neon-green to-neon-cyan text-ink-900',
-    hermes: 'from-neon-magenta to-neon-amber text-ink-900',
-    guardian: 'from-neon-red to-neon-amber text-ink-900',
+  // Merge feishuMessages + hermesNotices + collab extras + dynamic store feed for active channel.
+  const messages: AnyMsg[] = useMemo(() => {
+    const base: AnyMsg[] = [
+      ...feishuMessages,
+      ...hermesNotices,
+      ...collabExtraMessages,
+      ...collabFeed.map((c) => ({
+        id: c.id,
+        ts: c.ts,
+        channel: c.channel,
+        sender: c.sender,
+        senderRole: c.senderRole,
+        avatar: c.avatar,
+        content: c.content,
+        type: c.type,
+      })),
+    ];
+    // Wire alert messages to their RiskAlert id (heuristic match by channel + role + keyword).
+    const enriched = base.map<AnyMsg>((m) => {
+      if (m.type === 'alert' && m.senderRole === 'guardian') {
+        const match = riskAlerts.find(
+          (a) => a.channel === m.channel && a.status === 'pending',
+        );
+        if (match) return { ...m, riskAlertId: match.id };
+      }
+      // Attach a task card to msg about the BD task (m2) for richer demo
+      if (m.id === 'm2') {
+        return { ...m, taskCard: collabTasks.find((t) => t.id === 'tk-sales-q3') };
+      }
+      if (m.id === 'm9') {
+        return { ...m, taskCard: collabTasks.find((t) => t.id === 'tk-legal-review') };
+      }
+      return m;
+    });
+    return enriched
+      .filter((m) => m.channel === activeChannel)
+      .sort((a, b) => a.ts.localeCompare(b.ts));
+  }, [activeChannel, collabFeed, riskAlerts]);
+
+  // Channel meta for the header
+  const allChannels = [...channels, ...extraChannels];
+  const currentChannel = allChannels.find((c) => c.id === activeChannel) ?? channels[0];
+
+  // Pick a sample of online members (visualization)
+  const onlineMembers = employees.slice(0, 6);
+
+  // Right-side task summary for active channel
+  const channelTasks = collabTasks.filter((t) => t.channel === activeChannel);
+
+  const handleInput = (v: string) => {
+    setDraft(v);
+    // detect last @ token
+    const at = v.lastIndexOf('@');
+    if (at >= 0) {
+      const token = v.slice(at + 1);
+      if (!token.includes(' ')) {
+        setMentionOpen(true);
+        setMentionQuery(token);
+        return;
+      }
+    }
+    setMentionOpen(false);
   };
-  const typeIcon: Record<string, React.ReactNode> = {
-    alert: <AlertTriangle size={12} className="text-neon-red" />,
-    evolution: <Sparkles size={12} className="text-neon-magenta" />,
-    task: <Workflow size={12} className="text-neon-cyan" />,
-    approval: <FileText size={12} className="text-neon-amber" />,
-    mention: <AtSign size={12} className="text-neon-cyan" />,
-    msg: null,
+
+  const pickMention = (handle: string) => {
+    const at = draft.lastIndexOf('@');
+    const next = (at >= 0 ? draft.slice(0, at) : draft) + handle + ' ';
+    setDraft(next);
+    setMentionOpen(false);
   };
+
+  const send = () => {
+    const v = draft.trim();
+    if (!v) return;
+    pushCollabMessage({
+      id: `u-${Date.now()}`,
+      ts: new Date().toLocaleTimeString('zh-CN', { hour12: false }).slice(0, 5),
+      channel: activeChannel,
+      sender: '昆仑（您）',
+      avatar: '昆',
+      senderRole: 'human',
+      content: v,
+      type: v.includes('@') ? 'mention' : 'msg',
+    });
+    setDraft('');
+  };
+
   return (
-    <div className="flex gap-2 group">
-      <div className={`shrink-0 w-7 h-7 rounded-sm bg-gradient-to-br ${roleColor[m.senderRole]} flex items-center justify-center font-display font-bold text-xs shadow-neon-cyan`}>
-        {m.avatar}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs font-display text-slate-200">{m.sender}</span>
-          <span className="text-[9px] font-mono text-slate-500">{m.ts}</span>
-          {typeIcon[m.type]}
-          {m.senderRole === 'guardian' && <span className="chip-red">EXEC-GUARDIAN</span>}
-          {m.senderRole === 'hermes' && <span className="chip-magenta">HERMES</span>}
+    <div className="absolute left-64 right-80 bottom-0 h-72 z-20 glass-strong border-t border-neutral-200 flex flex-col">
+      {/* Banner */}
+      {pendingApprovals > 0 && (
+        <button
+          onClick={() => firstPendingAlert && setOpenAlertId(firstPendingAlert.id)}
+          className="w-full px-3 py-1.5 bg-error/10 border-b border-error/30 text-error flex items-center justify-center gap-2 text-[11px] font-medium hover:bg-error/15 transition group"
+        >
+          <AlertTriangle size={13} className="animate-pulse" />
+          <span>
+            注意 · {pendingApprovals} 个高危待审批
+            {firstPendingAlert && ` · ${firstPendingAlert.agent} → ${firstPendingAlert.action}`}
+          </span>
+          <span className="opacity-60 group-hover:opacity-100 transition text-[10px] font-mono">
+            点击审阅 →
+          </span>
+        </button>
+      )}
+
+      <div className="flex-1 flex min-h-0">
+        {/* Left: ChannelList */}
+        <div className="w-[200px] shrink-0">
+          <ChannelList
+            activeChannel={activeChannel}
+            onSelect={setActiveChannel}
+            extraChannels={extraChannels}
+          />
         </div>
-        <div className={`mt-0.5 text-[12px] leading-relaxed
-          ${m.type === 'alert' ? 'text-neon-red' : m.type === 'evolution' ? 'text-neon-magenta/90' : 'text-slate-200'}`}>
-          {m.content}
-        </div>
-        {m.attachments && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {m.attachments.map((a: any) => (
-              <span key={a.name} className="chip-cyan"><FileText size={10} /> {a.name}</span>
-            ))}
+
+        {/* Center: header + stream + reply */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <div className="px-3 py-2 border-b border-neutral-200 flex items-center gap-2 bg-white">
+            <span className="font-display text-sm font-semibold text-neutral-900">
+              {currentChannel.name}
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-600 bg-neutral-50">
+              {currentChannel.members ?? 0} 成员
+            </span>
+            <div className="flex -space-x-1.5 ml-1">
+              {onlineMembers.map((e) => (
+                <span
+                  key={e.id}
+                  title={`${e.name} · 在线`}
+                  className="w-5 h-5 rounded-full bg-primary-500 text-white text-[10px] font-display font-semibold flex items-center justify-center border-2 border-white"
+                >
+                  {e.avatar}
+                </span>
+              ))}
+            </div>
+            <div className="flex-1" />
+            <button className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-primary-200 text-primary-700 bg-white hover:bg-primary-50 text-[11px] transition">
+              <UserPlus size={11} /> 拉人入群
+            </button>
+            <button
+              onClick={() => setShowMeeting(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-secondary-200 text-secondary-700 bg-white hover:bg-secondary-50 text-[11px] transition"
+            >
+              <Workflow size={11} /> 拉入会议室
+            </button>
           </div>
-        )}
+
+          {/* Stream */}
+          <MessageStream messages={messages} onRiskClick={(id) => setOpenAlertId(id)} />
+
+          {/* Reply */}
+          <div className="relative px-3 py-2 border-t border-neutral-200 flex items-center gap-2 bg-white">
+            <button
+              onClick={() => {
+                setMentionOpen(true);
+                setMentionQuery('');
+                setDraft((d) => (d.endsWith('@') ? d : d + '@'));
+              }}
+              className="text-neutral-500 hover:text-primary-600 transition"
+            >
+              <AtSign size={14} />
+            </button>
+            <button className="text-neutral-500 hover:text-primary-600 transition">
+              <Paperclip size={14} />
+            </button>
+            <input
+              value={draft}
+              onChange={(e) => handleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+                if (e.key === 'Escape') setMentionOpen(false);
+              }}
+              placeholder="给频道发消息  ·  输入 @ 召唤员工 · / 触发命令"
+              className="flex-1 bg-neutral-50 border border-neutral-200 rounded-md px-3 py-1.5 text-[12px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:border-primary-400 focus:bg-white"
+            />
+            <button
+              onClick={send}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary-500 text-white hover:bg-primary-600 text-[11px] font-medium transition"
+            >
+              <Send size={11} /> 发送
+            </button>
+
+            {mentionOpen && (
+              <MentionPicker query={mentionQuery} onPick={pickMention} />
+            )}
+          </div>
+        </div>
+
+        {/* Right: task summary */}
+        <div className="w-[240px] shrink-0 border-l border-neutral-200 bg-white flex flex-col">
+          <div className="px-3 py-2 border-b border-neutral-200 flex items-center justify-between">
+            <span className="font-display text-xs font-semibold text-neutral-800">频道任务</span>
+            <span className="text-[10px] font-mono text-neutral-400">{channelTasks.length}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {channelTasks.length === 0 ? (
+              <div className="px-2 py-4 text-center text-[11px] text-neutral-400 flex flex-col items-center gap-1">
+                <Sparkles size={14} />
+                <span>当前频道暂无任务</span>
+              </div>
+            ) : (
+              channelTasks.map((t) => <TaskCard key={t.id} task={t} compact />)
+            )}
+          </div>
+        </div>
       </div>
+
+      {openAlert && (
+        <RiskAlertModal
+          alert={openAlert}
+          onClose={() => setOpenAlertId(null)}
+          onApprove={() => {
+            approveAlert(openAlert.id, 'approve');
+            setOpenAlertId(null);
+          }}
+          onReject={() => {
+            approveAlert(openAlert.id, 'reject');
+            setOpenAlertId(null);
+          }}
+          onSafer={() => {
+            approveAlert(openAlert.id, 'reject', '改为更安全方式');
+            setOpenAlertId(null);
+          }}
+        />
+      )}
+
+      {/* Suppress unused-variable lint for dismissAlert (kept on store contract) */}
+      <span className="hidden">{dismissAlert.name}</span>
     </div>
   );
 }

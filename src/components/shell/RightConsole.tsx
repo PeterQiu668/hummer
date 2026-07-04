@@ -1,139 +1,201 @@
+/**
+ * RightConsole (v6) — 昆仑·数字分身 / 组织实时状态
+ * 浅色克制风。父级在「选中 Agent」或「非首页」时会卸载本组件。
+ */
 import { motion } from 'framer-motion';
-import { Bot, Workflow, Gauge, Sparkles, Shield, ChevronRight } from 'lucide-react';
+import { Bot, Workflow, Shield, Gauge, Sparkles, ChevronRight, Activity, Network } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { employees, TWIN_NAME } from '../../data/employees';
+import { employees } from '../../data/employees';
+import { executiveTwins, BOSS_TWIN, HUMAN_BOSS } from '../../data/executives';
+import AgentAvatar from '../ui/AgentAvatar';
 
 export default function RightConsole() {
-  const { setShowHermes, setShowGovernance, setSelectedEmployee } = useAppStore();
+  const setSelectedEmployee = useAppStore((s) => s.setSelectedEmployee);
+  const setShowHermes = useAppStore((s) => s.setShowHermes);
+  const setShowGovernance = useAppStore((s) => s.setShowGovernance);
+  const tick = useAppStore((s) => s.tick);
 
-  const working = employees.filter((e) => e.status === 'working');
-  const blocked = employees.filter((e) => e.status === 'blocked');
-  const meeting = employees.filter((e) => e.status === 'meeting');
-  const training = employees.filter((e) => e.status === 'training');
+  const working  = employees.filter((e) => e.status === 'working').length;
+  const blocked  = employees.filter((e) => e.status === 'blocked').length;
+  const meeting  = employees.filter((e) => e.status === 'meeting').length;
+  const training = employees.filter((e) => e.status === 'training').length;
+
+  // 实时小波动
+  const livePct = 92 + ((tick * 7) % 8);
 
   return (
-    <aside className="absolute right-0 top-14 bottom-72 w-80 z-20 glass-strong border-l border-neon-cyan/15 flex flex-col">
-      <div className="p-4 border-b border-neon-cyan/10 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-neon-purple/15 via-transparent to-neon-magenta/15" />
-        <div className="relative">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-neon-cyan/60">数字分身</div>
-          <div className="mt-1 flex items-center gap-3">
-            <motion.div
-              className="relative w-14 h-14 rounded-full bg-gradient-to-br from-neon-purple to-neon-magenta border-2 border-neon-cyan/60 flex items-center justify-center font-display font-black text-xl shadow-neon-magenta"
-              animate={{ scale: [1, 1.04, 1] }}
-              transition={{ duration: 2.4, repeat: Infinity }}
-            >
-              昆
-              <motion.div
-                className="absolute -inset-2 rounded-full border border-neon-cyan/40"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-              />
-            </motion.div>
-            <div>
-              <div className="font-display text-base neon-text-magenta">{TWIN_NAME}</div>
-              <div className="text-[10px] font-mono text-neon-green/80">代表昆仑 · 管理 {employees.length} 个 Agent</div>
-            </div>
+    <aside
+      className="absolute right-0 top-12 bottom-[276px] w-[320px] z-20 flex flex-col bg-neutral-25"
+      style={{ borderLeft: '1px solid var(--border-subtle)' }}
+    >
+      {/* Boss + Boss twin head */}
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="hum-eyebrow mb-2">老板 / 数字分身</div>
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-lg bg-neutral-900 text-white grid place-items-center text-[13px] font-display font-semibold">
+            {HUMAN_BOSS.avatar}
           </div>
+          <ChevronRight size={12} className="text-neutral-300" />
+          <motion.div
+            animate={{ scale: [1, 1.03, 1] }}
+            transition={{ duration: 3, repeat: Infinity }}
+            className="relative w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 grid place-items-center text-white text-[13px] font-display font-bold"
+          >
+            {BOSS_TWIN.avatar}
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-success" />
+          </motion.div>
+          <div className="flex-1 min-w-0 leading-tight ml-1">
+            <div className="text-[13px] text-neutral-900 font-semibold truncate">{BOSS_TWIN.name}</div>
+            <div className="text-[10.5px] text-neutral-500 truncate">{BOSS_TWIN.title}</div>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-            <MiniStat label="在工作" value={working.length} color="cyan" />
-            <MiniStat label="开会" value={meeting.length} color="magenta" />
-            <MiniStat label="阻断" value={blocked.length} color="red" />
-          </div>
+        {/* Org pulse */}
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <PulseStat label="正在工作" value={working} dot="success" />
+          <PulseStat label="会议中" value={meeting} dot="secondary" />
+          <PulseStat label="训练中" value={training} dot="info" />
+          <PulseStat label="风险阻断" value={blocked} dot={blocked > 0 ? 'error' : 'muted'} />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        <Section title="实时状态" subtitle="Manager / Worker">
-          {employees.slice(0, 8).map((e) => (
+      {/* Executive twins chain */}
+      <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="flex items-center gap-1.5 mb-2">
+          <Network size={11} className="text-neutral-400" />
+          <span className="hum-eyebrow">高管分身链路</span>
+          <span className="hum-chip is-muted ml-auto" style={{ padding: '1px 6px', fontSize: 10 }}>
+            {executiveTwins.reduce((s, t) => s + t.pendingHandoffs, 0)} 待回传
+          </span>
+        </div>
+        <div className="space-y-1">
+          {executiveTwins.map((ex) => (
             <button
-              key={e.id}
-              onClick={() => setSelectedEmployee(e)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-white/5 transition group"
+              key={ex.id}
+              onClick={() => useAppStore.getState().setActiveExecId(ex.id)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 transition cursor-pointer group text-left"
+              title={`${ex.responsibility} · 真实高管：${ex.humanName} ${ex.humanTitle}`}
             >
-              <span className={`relative w-7 h-7 rounded-sm flex items-center justify-center font-display font-bold text-xs
-                ${e.status === 'working' ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/40'
-                  : e.status === 'blocked' ? 'bg-neon-red/15 text-neon-red border border-neon-red/40 animate-breathe'
-                  : e.status === 'meeting' ? 'bg-neon-magenta/15 text-neon-magenta border border-neon-magenta/40'
-                  : e.status === 'training' ? 'bg-neon-purple/15 text-neon-purple border border-neon-purple/40'
-                  : 'bg-white/5 text-slate-400 border border-white/10'}`}>
-                {e.avatar}
-                <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full
-                  ${e.status === 'working' ? 'bg-neon-green shadow-neon-green animate-pulse'
-                    : e.status === 'blocked' ? 'bg-neon-red shadow-neon-cyan animate-pulse'
-                    : e.status === 'meeting' ? 'bg-neon-magenta'
-                    : e.status === 'training' ? 'bg-neon-purple'
-                    : 'bg-slate-500'}`} />
-              </span>
-              <div className="flex-1 text-left min-w-0">
-                <div className="text-xs text-slate-200 truncate">{e.name} · <span className="text-slate-400">{e.role}</span></div>
-                <div className="text-[10px] font-mono text-slate-400 truncate">{e.currentTask}</div>
+              <div
+                className="w-6 h-6 rounded-md grid place-items-center text-white text-[11px] font-semibold"
+                style={{ background: ex.color }}
+              >
+                {ex.avatar}
               </div>
-              <ChevronRight size={12} className="text-slate-500 group-hover:text-neon-cyan" />
+              <div className="flex-1 min-w-0 leading-tight">
+                <div className="text-[12px] text-neutral-900 truncate">{ex.name}</div>
+                <div className="text-[10px] hum-faint truncate">→ {ex.humanName} {ex.humanTitle.replace(ex.humanName, '').trim()}</div>
+              </div>
+              {ex.pendingHandoffs > 0 && (
+                <span className="hum-chip is-warning" style={{ padding: '1px 5px', fontSize: 9 }}>
+                  {ex.pendingHandoffs}
+                </span>
+              )}
             </button>
           ))}
-        </Section>
+        </div>
+      </div>
 
-        <Section title="责任划分" subtitle="OpenHuman 模型">
-          <div className="space-y-1.5 px-1">
-            <ResponsibilityRow icon={<Bot size={12} />} label="数字分身决策" value="自动" tone="cyan" />
-            <ResponsibilityRow icon={<Workflow size={12} />} label="Agent 执行" value="授权范围内" tone="green" />
-            <ResponsibilityRow icon={<Shield size={12} />} label="高风险动作" value="人审批准" tone="amber" />
-            <ResponsibilityRow icon={<Gauge size={12} />} label="跨部门外发" value="四眼原则" tone="magenta" />
+      {/* Live agents */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <Section title="实时员工状态" right={<span className="hum-chip is-success"><span className="hum-dot hum-pulse" style={{ background: 'var(--success)' }} />LIVE {livePct}%</span>}>
+          <div className="space-y-0.5">
+            {employees.slice(0, 8).map((e) => (
+              <button
+                key={e.id}
+                onClick={() => setSelectedEmployee(e)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 transition group text-left"
+              >
+                <AgentAvatar id={e.id} size={28} status={e.status} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] text-neutral-900 truncate">
+                    {e.name} <span className="text-neutral-400">· {e.role}</span>
+                  </div>
+                  <div className="text-[10.5px] text-neutral-500 truncate">{e.currentTask}</div>
+                </div>
+                <ChevronRight size={12} className="text-neutral-400 group-hover:text-neutral-700" />
+              </button>
+            ))}
           </div>
         </Section>
 
-        <Section title="进化与治理" subtitle="一键进入">
-          <button onClick={() => setShowHermes(true)} className="w-full btn-neon-magenta justify-between">
-            <span className="flex items-center gap-2"><Sparkles size={12} /> Hermes 进化飞轮</span>
-            <span className="text-[10px] opacity-80">{training.length + 5} 任务</span>
+        <Section title="责任边界" right={<span className="hum-chip is-muted">OpenHuman 模型</span>}>
+          <ResponsibilityRow icon={<Bot size={12} />} label="分身决策（您）" value="自主授权" />
+          <ResponsibilityRow icon={<Workflow size={12} />} label="Agent 执行" value="授权范围内" />
+          <ResponsibilityRow icon={<Shield size={12} />} label="高风险动作" value="人审准许" warn />
+          <ResponsibilityRow icon={<Gauge size={12} />} label="对外发送" value="四眼原则" warn />
+        </Section>
+
+        <Section title="进化与治理">
+          <button
+            onClick={() => setShowHermes(true)}
+            className="w-full hum-btn justify-between"
+          >
+            <span className="flex items-center gap-1.5"><Sparkles size={12} className="text-secondary-500" /> Hermes 进化飞轮</span>
+            <span className="hum-faint text-[11px]">{training + 5} 任务</span>
           </button>
-          <button onClick={() => setShowGovernance(true)} className="w-full btn-neon justify-between mt-2">
-            <span className="flex items-center gap-2"><Shield size={12} /> HiClaw 治理舱</span>
-            <span className="text-[10px] opacity-80">ALL GREEN</span>
+          <button
+            onClick={() => setShowGovernance(true)}
+            className="w-full hum-btn justify-between mt-1.5"
+          >
+            <span className="flex items-center gap-1.5"><Shield size={12} className="text-primary-600" /> HiClaw 治理舱</span>
+            <span className="hum-chip is-success" style={{ padding: '1px 6px', fontSize: 10 }}>ALL GREEN</span>
           </button>
         </Section>
+      </div>
+
+      {/* Footer mini activity */}
+      <div className="px-3 py-2.5 flex items-center gap-2 text-[11px] text-neutral-500" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+        <Activity size={11} />
+        <span className="flex-1">最近 5 分钟 · {18 + (tick % 7)} 次 Agent 调用</span>
+        <span className="hum-tabular">¥{(1.28 + tick * 0.01).toFixed(2)}</span>
       </div>
     </aside>
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({
+  title, right, children,
+}: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-sm relative hud-corner">
-      <div className="px-3 py-2 border-b border-neon-cyan/10 flex items-center justify-between">
-        <div className="text-[11px] font-display tracking-wider text-neon-cyan">{title}</div>
-        {subtitle && <div className="text-[9px] font-mono text-neon-cyan/50">{subtitle}</div>}
+    <div className="hum-card-soft p-2">
+      <div className="flex items-center justify-between px-1 pb-1.5">
+        <div className="hum-eyebrow">{title}</div>
+        {right}
       </div>
-      <div className="p-2">{children}</div>
+      {children}
     </div>
   );
 }
 
-function MiniStat({ label, value, color }: { label: string; value: number; color: 'cyan' | 'magenta' | 'red' }) {
-  const map: Record<string, string> = {
-    cyan: 'text-neon-cyan border-neon-cyan/30',
-    magenta: 'text-neon-magenta border-neon-magenta/30',
-    red: 'text-neon-red border-neon-red/30',
-  };
+function PulseStat({
+  label, value, dot,
+}: { label: string; value: number; dot: 'success' | 'secondary' | 'info' | 'error' | 'muted' }) {
+  const color =
+    dot === 'success' ? 'var(--success)' :
+    dot === 'secondary' ? '#7E22CE' :
+    dot === 'info' ? 'var(--brand)' :
+    dot === 'error' ? 'var(--error)' :
+    'var(--text-faint)';
   return (
-    <div className={`glass border ${map[color]} rounded-sm py-1.5`}>
-      <div className={`font-display text-base ${map[color].split(' ')[0]}`}>{value}</div>
-      <div className="text-[9px] font-mono text-slate-400 mt-0.5">{label}</div>
+    <div className="hum-card-soft px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5 text-[10.5px] text-neutral-500">
+        <span className="hum-dot" style={{ background: color }} />
+        {label}
+      </div>
+      <div className="text-[16px] font-semibold text-neutral-900 hum-tabular mt-0.5">{value}</div>
     </div>
   );
 }
 
-function ResponsibilityRow({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: 'cyan' | 'green' | 'amber' | 'magenta' }) {
-  const map: Record<string, string> = {
-    cyan: 'text-neon-cyan', green: 'text-neon-green', amber: 'text-neon-amber', magenta: 'text-neon-magenta',
-  };
+function ResponsibilityRow({
+  icon, label, value, warn,
+}: { icon: React.ReactNode; label: string; value: string; warn?: boolean }) {
   return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded-sm bg-white/3">
-      <span className={`${map[tone]}`}>{icon}</span>
-      <span className="text-[11px] text-slate-300 flex-1">{label}</span>
-      <span className={`text-[10px] font-mono ${map[tone]}`}>{value}</span>
+    <div className="flex items-center gap-2 px-2 py-1.5">
+      <span className={warn ? 'text-warning' : 'text-neutral-500'}>{icon}</span>
+      <span className="flex-1 text-[12px] text-neutral-700">{label}</span>
+      <span className={`text-[11px] font-mono ${warn ? 'text-warning' : 'text-neutral-500'}`}>{value}</span>
     </div>
   );
 }

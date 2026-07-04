@@ -1,27 +1,61 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+/**
+ * EmployeeDrawer (v7) — Notion 浅色 / 右侧固定 380px
+ * **关键改动**：从中间悬浮抽屉改为「右侧固定面板」，由 AppShell 在 selectedEmployee 时
+ * 渲染、替换 RightConsole 同一槽位（左侧办公室主场景保持完整可见）。
+ */
+import { useEffect, useState, useRef } from 'react';
 import {
-  X, Activity, Brain, Shield, FileText, Sparkles, Cpu, Coins,
-  Lock, Unlock, AlertTriangle, CheckCircle2, Workflow, Play, Pause, RotateCcw,
+  X, Activity, Brain, Shield, FileText, Sparkles,
+  AlertTriangle, CheckCircle2, Workflow, Play, Pause, RotateCcw,
+  Camera, Send, Calendar, MessagesSquare, ChevronRight, Coins,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { executiveTwins, BOSS_TWIN, HUMAN_BOSS } from '../../data/executives';
+import AgentAvatar from '../ui/AgentAvatar';
+
+const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+  working:  { label: '工作中',     color: '#0F70B7', bg: 'var(--brand-soft)' },
+  blocked:  { label: '守护者阻断', color: '#C13D3D', bg: 'var(--error-soft)' },
+  meeting:  { label: '会议中',     color: '#7E22CE', bg: '#F8F0FC' },
+  training: { label: '训练中',     color: '#0F766E', bg: '#EFFAF8' },
+  idle:     { label: '待命',       color: '#6B6B65', bg: 'var(--bg-subtle)' },
+};
 
 const tabs = [
-  { id: 'overview', label: '身份', icon: Activity },
-  { id: 'task', label: '实时任务', icon: Workflow },
-  { id: 'skills', label: '技能树', icon: Brain },
-  { id: 'permissions', label: '权限矩阵', icon: Shield },
-  { id: 'audit', label: '审计链', icon: FileText },
-  { id: 'evolution', label: '进化记录', icon: Sparkles },
+  { id: 'overview',    label: '身份',   icon: Activity },
+  { id: 'task',        label: '任务',   icon: Workflow },
+  { id: 'skills',      label: '技能',   icon: Brain },
+  { id: 'permissions', label: '权限',   icon: Shield },
+  { id: 'audit',       label: '审计',   icon: FileText },
+  { id: 'evolution',   label: '进化',   icon: Sparkles },
 ];
 
 export default function EmployeeDrawer() {
-  const { selectedEmployee: e, setSelectedEmployee } = useAppStore();
+  const e = useAppStore((s) => s.selectedEmployee);
+  const setSelectedEmployee = useAppStore((s) => s.setSelectedEmployee);
+  const pushAudit = useAppStore((s) => s.pushAudit);
+  const pushToast = useAppStore((s) => s.pushToast);
+  const setShowMeeting = useAppStore((s) => s.setShowMeeting);
+  const setActivePage = useAppStore((s) => s.setActivePage);
+
   const [tab, setTab] = useState('overview');
   const [lines, setLines] = useState<string[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
+  // Reset state when selectedEmployee changes (different agent picked)
   useEffect(() => {
-    if (!e?.taskLines) return;
+    setTab('overview');
+    setLines([]);
+    if (e?.id) {
+      const saved = localStorage.getItem(`hummer-avatar-${e.id}`);
+      setAvatarUrl(saved);
+    }
+  }, [e?.id]);
+
+  // Task screen: type-in lines effect
+  useEffect(() => {
+    if (!e?.taskLines || tab !== 'task') return;
     setLines([]);
     let i = 0;
     const id = setInterval(() => {
@@ -30,156 +64,219 @@ export default function EmployeeDrawer() {
       if (i > 10) clearInterval(id);
     }, 700);
     return () => clearInterval(id);
-  }, [e]);
+  }, [e, tab]);
 
   if (!e) return null;
+  const st = STATUS_META[e.status];
 
-  const statusMap: Record<string, { tone: string; text: string }> = {
-    working: { tone: 'text-neon-cyan border-neon-cyan/50', text: '● 工作中' },
-    blocked: { tone: 'text-neon-red border-neon-red/50', text: '● 守护者阻断' },
-    meeting: { tone: 'text-neon-magenta border-neon-magenta/50', text: '● 会议中' },
-    training: { tone: 'text-neon-purple border-neon-purple/50', text: '● 进化训练' },
-    idle: { tone: 'text-slate-400 border-slate-500/50', text: '● 待命' },
+  // Find responsibility chain
+  const execTwin = executiveTwins.find((x) => x.managesEmployeeIds.includes(e.id));
+
+  const onUploadAvatar = (file: File) => {
+    if (file.size > 2_000_000) {
+      pushToast({ kind: 'error', title: '头像过大', detail: '请上传小于 2MB 的图片' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      setAvatarUrl(url);
+      localStorage.setItem(`hummer-avatar-${e.id}`, url);
+      // 触发跨组件同步（同 tab 内 storage 事件不会自发，需要手动派发）
+      window.dispatchEvent(new StorageEvent('storage', { key: `hummer-avatar-${e.id}`, newValue: url }));
+      pushAudit({ actor: '昆仑（您）', action: '更换 Agent 头像', target: e.name, result: 'ok', tags: ['agent', 'avatar'] });
+      pushToast({ kind: 'success', title: `${e.name} 头像已更新`, detail: '已同步到员工列表、首页、对话流、任务 owner' });
+    };
+    reader.readAsDataURL(file);
   };
-  const st = statusMap[e.status];
 
   return (
-    <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', stiffness: 220, damping: 28 }}
-      className="absolute top-14 bottom-72 right-80 w-[500px] z-40 glass-strong border-l border-neon-cyan/30 shadow-neon-cyan flex flex-col"
+    <aside
+      className="absolute right-0 top-12 bottom-[276px] w-[380px] z-30 flex flex-col bg-white"
+      style={{ borderLeft: '1px solid var(--border-subtle)', boxShadow: '-12px 0 24px rgba(15,15,14,0.04)' }}
     >
-      <div className="relative px-4 py-3 border-b border-neon-cyan/15 flex items-start gap-3">
-        <div className="relative">
-          <div className="w-14 h-14 rounded-sm bg-gradient-to-br from-neon-cyan/20 to-neon-magenta/20 border border-neon-cyan/40 flex items-center justify-center font-display font-black text-xl neon-text">
-            {e.avatar}
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="flex items-start gap-3">
+          <div className="relative shrink-0">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="group relative w-14 h-14 rounded-xl overflow-hidden block"
+              title="点击更换头像"
+            >
+              <AgentAvatar id={e.id} size={56} status={e.status} />
+              <div className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 bg-black/40 transition rounded-xl">
+                <Camera size={16} className="text-white" />
+              </div>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(ev) => {
+                const f = ev.target.files?.[0];
+                if (f) onUploadAvatar(f);
+              }}
+            />
           </div>
-          <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded-sm border bg-ink-900 whitespace-nowrap ${st.tone}`}>
-            {st.text}
-          </span>
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <div className="font-display text-lg neon-text">{e.name}</div>
-            <span className="chip-cyan">{e.role}</span>
-          </div>
-          <div className="text-[11px] font-mono text-slate-400 mt-1">{e.department} · 归属 {e.twin}</div>
-          {e.expert && (
-            <div className="mt-1 text-[11px] text-neon-magenta/90">
-              <Sparkles size={10} className="inline" /> 专家共创：{e.expert}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="px-2 py-0.5 rounded-md text-[10.5px] font-medium tabular-nums"
+                style={{ background: st.bg, color: st.color }}
+              >
+                ● {st.label}
+              </span>
+              <span className="hum-chip">{e.role}</span>
             </div>
-          )}
+            <div className="text-[15px] font-semibold text-neutral-900 truncate">{e.name}</div>
+            <div className="text-[11.5px] hum-faint mt-0.5 truncate">{e.department}</div>
+          </div>
+          <button onClick={() => setSelectedEmployee(null)} className="text-neutral-400 hover:text-neutral-900">
+            <X size={18} />
+          </button>
         </div>
-        <button onClick={() => setSelectedEmployee(null)} className="text-slate-400 hover:text-neon-cyan">
-          <X size={18} />
-        </button>
+
+        {/* Responsibility chain (责任链路) */}
+        {execTwin && (
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+            <div className="hum-eyebrow mb-1.5">责任链路</div>
+            <div className="flex items-center gap-1 text-[10.5px] flex-wrap">
+              <ChainNode label={HUMAN_BOSS.name} sub="老板" color="#171717" />
+              <ChevronRight size={10} className="text-neutral-300" />
+              <ChainNode label="昆仑分身" sub="意图入口" color="#7E22CE" />
+              <ChevronRight size={10} className="text-neutral-300" />
+              <ChainNode label={execTwin.name.split('·')[0]} sub={execTwin.role.split(' / ')[0]} color={execTwin.color} />
+              <ChevronRight size={10} className="text-neutral-300" />
+              <ChainNode label={e.name.split('·')[0]} sub="执行 Agent" color="#0F70B7" active />
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="px-4 py-2 grid grid-cols-3 gap-2 border-b border-neon-cyan/10 bg-ink-900/40">
-        <Stat icon={<Cpu size={11} />} label="模型" value={e.model} />
-        <Stat icon={<Activity size={11} />} label="Token (今日)" value={e.tokensToday.toLocaleString()} />
-        <Stat icon={<Coins size={11} />} label="成本 (今日)" value={`$${e.costToday.toFixed(2)}`} />
-      </div>
-
-      <div className="border-b border-neon-cyan/10 flex">
+      {/* Tabs */}
+      <div className="px-2 pt-2 flex items-center gap-0.5 flex-wrap" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         {tabs.map((t) => {
-          const A = tab === t.id;
           const Icon = t.icon;
+          const active = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 px-2 py-2 flex items-center justify-center gap-1 text-[11px] font-mono uppercase tracking-wider transition relative
-                ${A ? 'text-neon-cyan' : 'text-slate-400 hover:text-neon-cyan'}`}
+              className={`px-2 py-1.5 rounded-md text-[11.5px] font-medium flex items-center gap-1 transition ${
+                active ? 'bg-primary-50 text-primary-700' : 'text-neutral-600 hover:bg-neutral-50'
+              }`}
             >
-              <Icon size={12} />
+              <Icon size={11} />
               {t.label}
-              {A && <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-neon-cyan shadow-neon-cyan" />}
             </button>
           );
         })}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {tab === 'overview' && (
-          <div className="space-y-3">
+          <>
             <Panel title="当前任务">
-              <div className="text-sm text-slate-200">{e.currentTask}</div>
+              <div className="text-[12.5px] text-neutral-700 leading-relaxed">{e.currentTask}</div>
               {typeof e.progress === 'number' && (
-                <div className="mt-2">
-                  <div className="h-1.5 bg-ink-900 rounded-sm overflow-hidden border border-neon-cyan/20">
-                    <div className="h-full bg-gradient-to-r from-neon-cyan to-neon-magenta" style={{ width: `${e.progress}%` }} />
+                <>
+                  <div className="mt-2 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${e.progress}%`, background: st.color }}
+                    />
                   </div>
-                  <div className="text-[10px] font-mono text-neon-cyan/70 mt-1">{e.progress}% 完成</div>
-                </div>
+                  <div className="text-[10.5px] hum-faint mt-1 font-mono hum-tabular">{e.progress}% 完成</div>
+                </>
               )}
             </Panel>
-            <Panel title="责任归属链">
-              <RibbonChain
-                items={[
-                  { label: '昆仑（人）', kind: 'human' },
-                  { label: e.twin, kind: 'twin' },
-                  { label: e.name, kind: 'agent' },
-                  { label: e.currentTask || '空闲', kind: 'task' },
-                ]}
-              />
-            </Panel>
-            <Panel title="快捷动作">
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-neon"><Play size={11} /> 派发新任务</button>
-                <button className="btn-neon"><Pause size={11} /> 暂停</button>
-                <button className="btn-neon-magenta"><RotateCcw size={11} /> 回滚最近变更</button>
+
+            <Panel title="今日交付">
+              <div className="space-y-1.5">
+                {[
+                  { name: 'BD 邮件草稿 x3', kind: 'draft', ts: '14:35' },
+                  { name: 'Q3 客户清单 v4.xlsx', kind: 'sheet', ts: '13:22' },
+                  { name: '北辰金融回访纪要', kind: 'memo', ts: '10:08' },
+                ].map((d) => (
+                  <div key={d.name} className="flex items-center gap-2 hum-card-soft px-2.5 py-1.5">
+                    <FileText size={11} className="text-neutral-500" />
+                    <span className="flex-1 text-[12px] text-neutral-700 truncate">{d.name}</span>
+                    <span className="text-[10px] hum-faint font-mono">{d.ts}</span>
+                  </div>
+                ))}
               </div>
             </Panel>
-          </div>
+
+            <Panel title="运行指标">
+              <div className="grid grid-cols-3 gap-1.5">
+                <KV label="模型" value={e.model.replace('Claude ', '')} />
+                <KV label="今日 Token" value={`${(e.tokensToday / 1000).toFixed(1)}K`} mono />
+                <KV label="今日成本" value={`¥${e.costToday.toFixed(1)}`} mono />
+              </div>
+            </Panel>
+
+            <Panel title="快捷操作">
+              <div className="grid grid-cols-2 gap-1.5">
+                <Action icon={<Send size={11} />} label="指派新任务" onClick={() => {
+                  setActivePage('tasks');
+                  setSelectedEmployee(null);
+                }} />
+                <Action icon={<MessagesSquare size={11} />} label="打开对话" onClick={() => {
+                  setActivePage('chat');
+                  setSelectedEmployee(null);
+                }} />
+                <Action icon={<Calendar size={11} />} label="发起会议" onClick={() => {
+                  setShowMeeting(true);
+                  pushAudit({ actor: '昆仑（您）', action: '发起会议', target: e.name, result: 'ok', tags: ['meeting'] });
+                }} />
+                <Action icon={<Shield size={11} />} label="调整权限" onClick={() => {
+                  pushToast({ kind: 'info', title: '权限调整面板', detail: '即将上线 · 当前为占位' });
+                }} />
+                <Action icon={e.status === 'idle' ? <Play size={11} /> : <Pause size={11} />} label={e.status === 'idle' ? '启动 Agent' : '暂停 Agent'} onClick={() => {
+                  pushAudit({ actor: '昆仑（您）', action: e.status === 'idle' ? '启动 Agent' : '暂停 Agent', target: e.name, result: 'ok', tags: ['agent'] });
+                  pushToast({ kind: 'info', title: `${e.name} ${e.status === 'idle' ? '已启动' : '已暂停'}` });
+                }} />
+                <Action icon={<RotateCcw size={11} />} label="回滚最近变更" onClick={() => {
+                  pushToast({ kind: 'warning', title: '回滚需四眼原则', detail: '请在审计页提交回滚请求' });
+                }} />
+              </div>
+            </Panel>
+          </>
         )}
 
         {tab === 'task' && (
-          <Panel title="员工屏幕实时数据流" right={<span className="text-[10px] font-mono text-neon-green animate-pulse">● LIVE</span>}>
-            <div className="relative digital-screen rounded-sm border border-neon-green/30 bg-ink-900 p-3 h-72 overflow-hidden">
-              <div className="data-stream absolute inset-0 pointer-events-none opacity-60" />
-              <div className="relative font-mono text-[11px] text-neon-green space-y-1">
-                {lines.map((l, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={l.startsWith('⚠') ? 'text-neon-red' : ''}
-                  >
-                    {l}
-                  </motion.div>
-                ))}
-                <span className="inline-block w-2 h-3 bg-neon-green animate-pulse ml-1" />
-              </div>
+          <Panel title="员工屏幕实时数据流" right={<span className="hum-chip is-success" style={{ padding: '1px 6px', fontSize: 10 }}><span className="hum-dot hum-pulse" style={{ background: 'var(--success)' }} /> LIVE</span>}>
+            <div className="hum-card-soft p-3 h-64 overflow-hidden font-mono text-[11px] text-neutral-700 leading-relaxed">
+              {lines.map((l, i) => (
+                <div key={i} className={l.startsWith('⚠') ? 'text-error' : ''}>{l}</div>
+              ))}
+              <span className="inline-block w-1.5 h-3 bg-primary-500 animate-pulse ml-1" />
             </div>
           </Panel>
         )}
 
         {tab === 'skills' && (
-          <Panel title="技能树">
-            <div className="grid grid-cols-2 gap-2">
+          <Panel title="已装备技能">
+            <div className="space-y-1.5">
               {e.skills.map((s) => (
-                <div key={s.id} className={`glass rounded-sm p-2.5 border
-                  ${s.equipped ? 'border-neon-cyan/40' : 'border-white/10'}`}>
+                <div key={s.id} className="hum-card-soft p-2.5">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs font-display text-slate-200">{s.name}</div>
-                    <span className={`chip ${
-                      s.source === 'expert' ? 'text-neon-magenta border-neon-magenta/40 bg-neon-magenta/5'
-                      : s.source === 'marketplace' ? 'text-neon-amber border-neon-amber/40 bg-neon-amber/5'
-                      : 'text-neon-cyan border-neon-cyan/40 bg-neon-cyan/5'}`}>
+                    <span className="text-[12.5px] font-medium text-neutral-900">{s.name}</span>
+                    <span className={`hum-chip ${s.source === 'expert' ? 'is-brand' : s.source === 'marketplace' ? 'is-warning' : ''}`} style={{ padding: '1px 6px', fontSize: 10 }}>
                       {s.source === 'expert' ? '专家' : s.source === 'marketplace' ? '市场' : '内置'}
                     </span>
                   </div>
-                  <div className="mt-2 flex gap-0.5">
+                  <div className="mt-1.5 flex gap-0.5">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className={`flex-1 h-1.5 rounded-sm ${i < s.level ? 'bg-neon-cyan' : 'bg-white/10'}`} />
+                      <div key={i} className={`flex-1 h-1 rounded-full ${i < s.level ? 'bg-primary-500' : 'bg-neutral-100'}`} />
                     ))}
                   </div>
-                  <div className="mt-1 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+                  <div className="mt-1 text-[10.5px] hum-faint flex justify-between font-mono">
                     <span>Lv.{s.level}</span>
-                    {s.equipped ? <span className="text-neon-green">● 已装备</span> : <span className="text-slate-500">未装备</span>}
+                    {s.equipped ? <span className="text-success">● 已装备</span> : <span>未装备</span>}
                   </div>
                 </div>
               ))}
@@ -188,55 +285,51 @@ export default function EmployeeDrawer() {
         )}
 
         {tab === 'permissions' && (
-          <Panel title="权限矩阵 · 凭证统一托管">
+          <Panel title="权限矩阵">
             <div className="space-y-1.5">
-              {e.permissions.map((p) => {
-                const tone =
-                  p.level === 'admin' ? 'text-neon-magenta border-neon-magenta/40'
-                  : p.level === 'external' ? 'text-neon-amber border-neon-amber/40'
-                  : p.level === 'write' ? 'text-neon-cyan border-neon-cyan/40'
-                  : 'text-neon-green border-neon-green/40';
-                return (
-                  <div key={p.id} className="glass rounded-sm px-3 py-2 flex items-center gap-3">
-                    {p.approvalRequired ? <Lock size={14} className="text-neon-amber" /> : <Unlock size={14} className="text-neon-green" />}
-                    <div className="flex-1">
-                      <div className="text-xs text-slate-200">{p.scope}</div>
-                      <div className="text-[10px] font-mono text-slate-400">
-                        {p.approvalRequired ? '需人审批准（四眼原则）' : '在授权边界内自动执行'}
-                      </div>
+              {e.permissions.map((p) => (
+                <div key={p.id} className="hum-card-soft p-2.5 flex items-center gap-2.5">
+                  {p.approvalRequired
+                    ? <AlertTriangle size={13} className="text-warning shrink-0" />
+                    : <CheckCircle2 size={13} className="text-success shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12.5px] text-neutral-900">{p.scope}</div>
+                    <div className="text-[10.5px] hum-faint">
+                      {p.approvalRequired ? '需人审批准（四眼原则）' : '在授权边界内自动'}
                     </div>
-                    <span className={`chip ${tone} bg-transparent`}>{p.level.toUpperCase()}</span>
                   </div>
-                );
-              })}
+                  <span className={`hum-chip ${
+                    p.level === 'admin' ? 'is-brand' :
+                    p.level === 'external' ? 'is-warning' :
+                    'is-muted'
+                  }`} style={{ padding: '1px 6px', fontSize: 10 }}>
+                    {p.level.toUpperCase()}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="mt-3 glass rounded-sm p-3 border border-neon-cyan/20">
-              <div className="text-[11px] font-display text-neon-cyan tracking-wider mb-1">凭证存储</div>
-              <div className="text-[11px] text-slate-300">所有 API Key、数据库凭证、第三方 Token 均由 <span className="text-neon-magenta">HiClaw AI Gateway</span> 统一托管，Agent 不持有任何凭证，只能通过策略代理调用。</div>
+            <div className="mt-3 hum-card-soft p-2.5 text-[11px] text-neutral-600 leading-relaxed">
+              所有 API Key / DB 凭证 / 第三方 Token 均由 <b className="text-primary-700">HiClaw AI Gateway</b> 统一托管，Agent 不持任何凭证，只能通过策略代理调用。
             </div>
           </Panel>
         )}
 
         {tab === 'audit' && (
-          <Panel title="审计链 · Append-only" right={<span className="text-[10px] font-mono text-neon-cyan/70">{e.auditEntries.length} 条记录</span>}>
+          <Panel title="审计链" right={<span className="hum-chip">{e.auditEntries.length}</span>}>
             <div className="space-y-1.5">
               {e.auditEntries.length === 0 && (
-                <div className="text-xs text-slate-500 italic px-2 py-4">今日暂无审计事件</div>
+                <div className="text-[11.5px] hum-faint italic text-center py-3">今日暂无审计事件</div>
               )}
               {e.auditEntries.map((a, i) => (
-                <div key={a.id} className="glass rounded-sm px-3 py-2 flex items-start gap-2 border border-white/5">
-                  <span className="text-[10px] font-mono text-slate-500 mt-0.5">#{String(i + 1).padStart(3, '0')}</span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-neon-cyan">{a.ts}</span>
-                      <span className="text-xs text-slate-200">{a.action}</span>
-                      {a.risk === 'high' && <AlertTriangle size={11} className="text-neon-red" />}
-                      {a.risk === 'low' && <CheckCircle2 size={11} className="text-neon-green" />}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      目标 → <span className="text-slate-200">{a.target}</span>
-                      {a.approver && <span className="text-neon-magenta"> · 审批人 {a.approver}</span>}
-                    </div>
+                <div key={a.id} className="hum-card-soft px-2.5 py-2">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="hum-faint font-mono">#{String(i + 1).padStart(3, '0')}</span>
+                    <span className="hum-faint font-mono">{a.ts}</span>
+                    <span className="font-medium text-neutral-900">{a.action}</span>
+                    {a.risk === 'high' && <AlertTriangle size={11} className="text-error" />}
+                  </div>
+                  <div className="text-[11px] text-neutral-600 mt-0.5">
+                    → {a.target}{a.approver && <span className="text-secondary-700"> · 审批 {a.approver}</span>}
                   </div>
                 </div>
               ))}
@@ -245,74 +338,77 @@ export default function EmployeeDrawer() {
         )}
 
         {tab === 'evolution' && (
-          <div className="space-y-3">
+          <>
             <Panel title="Hermes 进化指标">
-              <div className="grid grid-cols-4 gap-2">
-                <Stat icon={<Sparkles size={11} />} label="等级" value={`Lv.${e.evolution.level}`} />
-                <Stat icon={<AlertTriangle size={11} />} label="Bad case" value={String(e.evolution.badCases)} />
-                <Stat icon={<CheckCircle2 size={11} />} label="已优化" value={String(e.evolution.improved)} />
-                <Stat icon={<Activity size={11} />} label="待审" value={String(e.evolution.pending)} />
+              <div className="grid grid-cols-4 gap-1.5">
+                <KV label="等级" value={`Lv.${e.evolution.level}`} />
+                <KV label="Bad" value={String(e.evolution.badCases)} />
+                <KV label="改进" value={String(e.evolution.improved)} />
+                <KV label="待审" value={String(e.evolution.pending)} />
               </div>
             </Panel>
             <Panel title="近期进化记录">
               <div className="space-y-1.5">
                 {[
                   { t: '今日 13:40', e: 'SOP「资金调拨」v3 → v4 沙箱评测' },
-                  { t: '昨日 17:22', e: 'Skill 描述「邮件草稿」精简 12 行' },
-                  { t: '06.19 11:30', e: '工具路由策略：preferring claude-opus-4-7' },
+                  { t: '昨日 17:22', e: 'Skill「邮件草稿」描述精简 12 行' },
+                  { t: '06.19',     e: '工具路由策略：preferring Opus 4.7' },
                 ].map((r, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs">
-                    <span className="font-mono text-[10px] text-neon-cyan w-20 shrink-0">{r.t}</span>
-                    <span className="text-slate-200">{r.e}</span>
+                  <div key={i} className="text-[11.5px] flex items-baseline gap-2">
+                    <span className="hum-faint font-mono w-16 shrink-0">{r.t}</span>
+                    <span className="text-neutral-700">{r.e}</span>
                   </div>
                 ))}
               </div>
             </Panel>
-          </div>
+          </>
         )}
       </div>
-    </motion.div>
+    </aside>
   );
 }
 
 function Panel({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-sm relative hud-corner">
-      <div className="px-3 py-1.5 border-b border-neon-cyan/10 flex items-center justify-between">
-        <div className="text-[10px] font-display tracking-widest text-neon-cyan">{title}</div>
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="hum-eyebrow">{title}</div>
         {right}
       </div>
-      <div className="p-3">{children}</div>
+      <div className="hum-card-soft p-2.5">{children}</div>
     </div>
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function KV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="glass rounded-sm px-2 py-1.5 border border-white/5">
-      <div className="text-[9px] font-mono text-neon-cyan/70 flex items-center gap-1">{icon} {label}</div>
-      <div className="text-[12px] font-display text-slate-100 mt-0.5">{value}</div>
+    <div className="bg-white border border-neutral-150 rounded-md px-2 py-1.5">
+      <div className="text-[9.5px] uppercase tracking-wider hum-faint">{label}</div>
+      <div className={`text-[12px] mt-0.5 text-neutral-900 ${mono ? 'font-mono hum-tabular' : ''}`}>{value}</div>
     </div>
   );
 }
 
-function RibbonChain({ items }: { items: { label: string; kind: 'human' | 'twin' | 'agent' | 'task' }[] }) {
-  const colorMap: Record<string, string> = {
-    human: 'from-neon-purple to-neon-magenta',
-    twin: 'from-neon-magenta to-neon-cyan',
-    agent: 'from-neon-cyan to-neon-green',
-    task: 'from-neon-green to-neon-amber',
-  };
+function Action({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
-    <div className="flex items-center gap-1 flex-wrap">
-      {items.map((it, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <div className={`px-2 py-1 rounded-sm text-[11px] font-mono bg-gradient-to-br ${colorMap[it.kind]} text-ink-900 font-bold`}>
-            {it.label}
-          </div>
-          {i < items.length - 1 && <span className="text-neon-cyan/60">▸</span>}
-        </div>
-      ))}
-    </div>
+    <button onClick={onClick} className="hum-btn is-sm justify-center">
+      {icon} {label}
+    </button>
+  );
+}
+
+function ChainNode({ label, sub, color, active }: { label: string; sub: string; color: string; active?: boolean }) {
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded text-[10px] leading-tight"
+      style={{
+        background: active ? `${color}1A` : 'var(--bg-subtle)',
+        color: active ? color : 'var(--text-muted)',
+        border: `1px solid ${active ? color + '40' : 'var(--border-subtle)'}`,
+      }}
+      title={sub}
+    >
+      {label}
+    </span>
   );
 }

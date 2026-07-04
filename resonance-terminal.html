@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>擒龙 · 四维共振涨停决策终端</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<style>
+  :root{--red:#f6465d;--green:#2ebd85;--gold:#f7c948;--bg:#0a0e14;--panel:#0c121d;--line:#1c2534}
+  html,body{height:100%;overflow:hidden;background:var(--bg)}
+  body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  .num{font-variant-numeric:tabular-nums;font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
+  .up{color:var(--red)}.down{color:var(--green)}
+  .glow-red{text-shadow:0 0 10px rgba(246,70,93,.6)}
+  .glow-gold{text-shadow:0 0 12px rgba(247,201,72,.65)}
+  .scroll-thin::-webkit-scrollbar{width:5px;height:5px}
+  .scroll-thin::-webkit-scrollbar-track{background:transparent}
+  .scroll-thin::-webkit-scrollbar-thumb{background:#223047;border-radius:3px}
+  .badge{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;letter-spacing:.5px;white-space:nowrap}
+  .lv-S{background:linear-gradient(135deg,#fde68a,#f59e0b);color:#0a0e14;animation:sflash 1.1s ease-in-out infinite}
+  .lv-A{background:rgba(246,70,93,.9);color:#fff}
+  .lv-B{background:#2b3a52;color:#9fb3cc}
+  @keyframes sflash{0%,100%{box-shadow:0 0 4px rgba(247,201,72,.8)}50%{box-shadow:0 0 16px rgba(247,201,72,1),0 0 28px rgba(247,201,72,.5)}}
+  .v-ok{background:rgba(246,70,93,.16);color:#f6465d;border:1px solid rgba(246,70,93,.5)}
+  .v-weak{background:rgba(249,115,22,.14);color:#f97316;border:1px solid rgba(249,115,22,.5)}
+  .v-fail{background:rgba(46,189,133,.13);color:#2ebd85;border:1px solid rgba(46,189,133,.5)}
+  .v-wait{background:rgba(100,116,139,.15);color:#94a3b8;border:1px solid rgba(100,116,139,.4)}
+  .card-gold{border-color:rgba(247,201,72,.6)!important;box-shadow:0 0 18px rgba(247,201,72,.12),inset 0 0 24px rgba(247,201,72,.04)}
+  .dim{width:26px;height:20px;border-radius:3px;display:grid;place-items:center;font-size:9px;font-weight:800}
+  .dim.on{background:rgba(246,70,93,.2);color:#f6465d;border:1px solid rgba(246,70,93,.6);box-shadow:0 0 6px rgba(246,70,93,.35)}
+  .dim.off{background:#131b2a;color:#475569;border:1px solid #223047}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .dot.on{background:var(--gold);box-shadow:0 0 6px rgba(247,201,72,.9)}
+  .dot.off{border:1px solid #3a4a63}
+  .plan-label{font-size:10px;font-weight:800;padding:2px 0;width:70px;text-align:center;border-radius:3px;flex:none}
+  .chip-sec{font-size:10px;padding:1px 6px;border-radius:3px;white-space:nowrap}
+  .tick{animation:tick 1s linear infinite}
+  @keyframes tick{0%,100%{opacity:1}50%{opacity:.3}}
+  .phase-btn{position:relative;font-size:11px;font-weight:700;padding:4px 12px;border-radius:5px;border:1px solid #223047;color:#94a3b8;transition:all .2s}
+  .phase-btn.act{background:rgba(246,70,93,.15);border-color:var(--red);color:#f6465d;box-shadow:0 0 10px rgba(246,70,93,.25)}
+  .phase-btn.done{color:#cbd5e1;border-color:#3a4a63}
+  .flow-arrow{color:#334155;font-size:14px}
+  th{font-weight:500}
+  .weakrow{opacity:.45;filter:grayscale(.5)}
+</style>
+<script>
+function rng(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;return()=>((s=s*16807%2147483647)-1)/2147483646}
+function genK(seed,bull){
+  const r=rng(seed);const raw=[];let c=100;
+  for(let i=0;i<30;i++){
+    const isB=i>=22&&bull;
+    const drift=isB?1.4+r()*3.4:(r()-0.485)*3;
+    const o=c;c=o*(1+drift/100);
+    const h=Math.max(o,c)*(1+r()*0.014),l=Math.min(o,c)*(1-r()*0.014);
+    const v=isB?62+r()*38:22+r()*34;
+    raw.push({o,c,h,l,v});
+  }
+  if(!bull){const b=raw[29];b.c=b.o*0.95;b.l=b.c*0.995;b.v=92}
+  const hi=Math.max(...raw.map(b=>b.h)),lo=Math.min(...raw.map(b=>b.l)),span=(hi-lo)||1;
+  const pct=v=>((v-lo)/span*86+7);
+  const mv=Math.max(...raw.map(b=>b.v));
+  const bars=raw.map(b=>({up:b.c>=b.o,
+    wt:+(100-pct(b.h)).toFixed(2),wh:+(pct(b.h)-pct(b.l)).toFixed(2),
+    bt:+(100-pct(Math.max(b.o,b.c))).toFixed(2),bh:Math.max(1.6,+(Math.abs(pct(b.o)-pct(b.c))).toFixed(2)),
+    vp:+(b.v/mv*100).toFixed(1)}));
+  const pts=[];
+  for(let i=4;i<30;i++){const m=(raw[i].c+raw[i-1].c+raw[i-2].c+raw[i-3].c+raw[i-4].c)/5;
+    pts.push(((i+0.5)/30*100).toFixed(1)+','+(100-pct(m)).toFixed(1))}
+  const ph=+(100-pct(Math.max(...raw.slice(0,22).map(b=>b.h)))).toFixed(2);
+  return{bars,ma:pts.join(' '),ph};
+}
+const SEC_COLOR={'机器人':'#f6465d','固态电池':'#f97316','低空经济':'#f7c948','AI算力':'#38bdf8','半导体':'#a78bfa','军工':'#8ea3bd','液冷服务器':'#22d3ee','核电':'#84cc16'};
+const PIDX={pre:0,auction:1,live:2,close:3};
+
+function app(){return{
+  phase:'live', sel:'300607', secFilter:'', toast:'',
+  phases:[
+    {k:'pre',t:'盘前预测',time:'08:55',desc:'事件(因)→预测主力方向，锁定15只候选'},
+    {k:'auction',t:'竞价验证',time:'09:25',desc:'竞价资金(果)印证事件，证伪方向剔除'},
+    {k:'live',t:'盘中执行',time:'10:32',desc:'四维共振触发买点，跟踪封板质量'},
+    {k:'close',t:'收盘复核',time:'15:05',desc:'复核晋级/证伪，生成明日作战预案'}
+  ],
+  emo:{v:72,stage:'高潮期',pos:'80%'},
+  idx:[{n:'上证',v:'3,468.12',c:0.68},{n:'深成',v:'10,892.44',c:1.12},{n:'创业板',v:'2,231.08',c:1.85}],
+  stats:[{k:'昨涨停今均涨',v:'+4.72%',cls:'up'},{k:'涨停/跌停',v:'78/6',cls:'text-slate-200'},{k:'封板率',v:'76.4%',cls:'text-[#f7c948]'},{k:'炸板大面',v:'9家',cls:'down'}],
+  events:[
+    {sec:'机器人',lv:'S',src:'财联社·电报',t:'08:32',title:'特斯拉官宣 Optimus Gen-3 发布会，量产时间表大超预期',
+     cause:'海外映射 + 产业催化，T+2 世界机器人大会接力',
+     a:{k:'ok',tag:'✓ 资金强印证',strong:14,fund:'+8.2亿',top:'拓斯达 竞价+6.8%',note:'竞价承接远超事件级别，主攻方向确立'},
+     x:{k:'ok',tag:'✓ 收盘确认',note:'板块 14 家涨停、晋级率 67%，明日继续主攻'}},
+    {sec:'固态电池',lv:'A',src:'美股映射',t:'08:47',title:'QuantumScape 隔夜暴涨 32%，固态电池装车测试通过',
+     cause:'隔夜情绪映射，龙头 3 连板卡位事件',
+     a:{k:'ok',tag:'✓ 资金印证',strong:9,fund:'+5.1亿',top:'上海洗霸 一字顶格',note:'龙头一字、中军放量跟随，梯队完整'},
+     x:{k:'ok',tag:'✓ 收盘确认',note:'龙头晋级 4 板，主线地位保持'}},
+    {sec:'低空经济',lv:'A',src:'政策·公告',t:'09:02',title:'三部门印发低空经济基建指引，六城试点扩容',
+     cause:'政策线事件，事件级别 A 但已连续炒作 3 周',
+     a:{k:'weak',tag:'△ 弱印证·降级',strong:3,fund:'+0.8亿',top:'万丰奥威 仅+2.1%',note:'资金承接远不及事件级别，降级为观察'},
+     x:{k:'fail',tag:'✗ 收盘证伪',note:'全天高开低走，资金证伪，明日回避该方向'}},
+    {sec:'AI算力',lv:'B',src:'财联社·电报',t:'09:10',title:'算力租赁价格单周上调 12%，GB300 出货指引上修',
+     cause:'产业涨价逻辑，弹性一般，已反复炒作',
+     a:{k:'fail',tag:'✗ 证伪剔除',strong:2,fund:'-1.2亿',top:'鸿博股份 高开回落',note:'高开低走 + 净流出，事件证伪，整体剔除'},
+     x:{k:'fail',tag:'✗ 确认证伪',note:'全天净流出 2.6 亿，确认证伪'}},
+    {sec:'半导体',lv:'B',src:'盘面异动',t:'10:05',title:'半导体设备招标数据环比翻倍，国产化率加速',
+     cause:'盘中突发事件，竞价无数据可验证',
+     a:{k:'wait',tag:'⏳ 待验证',strong:4,fund:'+1.6亿',top:'耐科装备 盘中转强',note:'盘中事件，等待资金持续性确认'},
+     x:{k:'weak',tag:'△ 弱印证',note:'尾盘温和流入，列入明日观察名单'}}
+  ],
+  sectors:[
+    {name:'机器人',strong:14,zt:14,chg:6.8,ladder:[1,1,1],p:'主攻',v:'主攻'},
+    {name:'固态电池',strong:9,zt:9,chg:5.2,ladder:[1,1,1],p:'主攻',v:'主攻'},
+    {name:'低空经济',strong:3,zt:2,chg:1.2,ladder:[1,0,0],p:'主攻',v:'降级观察'},
+    {name:'AI算力',strong:2,zt:1,chg:-0.8,ladder:[0,0,0],p:'次攻',v:'证伪剔除'},
+    {name:'半导体',strong:4,zt:3,chg:2.1,ladder:[1,0,0],p:'观察',v:'盘中转强'},
+    {name:'军工',strong:1,zt:1,chg:0.5,ladder:[0,0,0],p:'观察',v:'剔除'}
+  ],
+  stocks:[
+    {code:'300607',name:'拓斯达',px:15.84,sec:'机器人',pat:'分歧转一致',bd:'3板',dims:[22,25,24,24],
+     c:{pre:0,auction:6.8,live:19.98,close:19.98},
+     st:{pre:'盘前候选 #1',auction:'竞价+6.8% 转强',live:'20cm涨停·封1.8亿',close:'晋级4板 ✓'},weak:null,
+     note:'空间板龙头。昨日巨量分歧今日转一致，套牢盘全部解放，筹码单峰密集。',
+     plan:{buy:'竞价成交 > 昨日全天 10% 且高开 4%~7%，竞价顶排板；开盘炸开则回封瞬间（封单>1.5亿）打板',sell:'次日竞价弱转强失败（高开<3%）竞价卖出；盘中炸板 10 分钟不回封清仓',stop:'15.37 元（-3%）无条件止损',pos:'15%（高潮期单票上限）'}},
+    {code:'603200',name:'上海洗霸',px:28.93,sec:'固态电池',pat:'龙头一致板',bd:'4板',dims:[22,23,25,24],
+     c:{pre:0,auction:10.01,live:10.01,close:10.01},
+     st:{pre:'盘前候选 #2',auction:'一字顶格 9:25',live:'一字未开·封4.2亿',close:'晋级5板 ✓'},weak:null,
+     note:'固态电池总龙头，四连板缩量一字，卡位 T+1 发布会事件兑现日。',
+     plan:{buy:'一字无低吸，只做开板回封：开板 3 分钟内放量回封跟进，封单衰减>50% 放弃',sell:'T+1 发布会当日冲高即兑现（利好落地卖）；竞价高开>7% 竞价出',stop:'28.06 元（-3%）或炸板不回封，触发即离场',pos:'12%'}},
+    {code:'002896',name:'中大力德',px:21.06,sec:'机器人',pat:'龙回头二波',bd:'2板',dims:[22,24,23,21],
+     c:{pre:0,auction:3.9,live:10.02,close:10.02},
+     st:{pre:'盘前候选 #3',auction:'竞价+3.9% 达标',live:'涨停回封·封8600万',close:'晋级3板 ✓'},weak:null,
+     note:'减速器中军，首波 5 板龙回头后二波启动，游资接力辨识度高。',
+     plan:{buy:'开盘 30 分钟内放量回封打板；或分时回踩均线缩量低吸半仓',sell:'次日不涨停冲高兑现；炸板不回封 10 分钟清仓',stop:'20.43 元（-3%）无条件止损',pos:'10%'}},
+    {code:'603667',name:'五洲新春',px:17.30,sec:'机器人',pat:'平台突破',bd:'首板',dims:[22,23,22,20],
+     c:{pre:0,auction:2.8,live:7.86,close:10.01},st:{pre:'盘前候选',auction:'竞价+2.8%',live:'冲板中 +7.86%',close:'尾盘涨停 ✓'},weak:null,
+     note:'丝杠轴承，20 日平台放量突破颈线，量能温和放大 2.3 倍。'},
+    {code:'603663',name:'三祥新材',px:16.88,sec:'固态电池',pat:'中军补涨',bd:'2板',dims:[22,22,23,19],
+     c:{pre:0,auction:4.5,live:9.99,close:9.99},st:{pre:'盘前候选',auction:'竞价+4.5%',live:'涨停·封5200万',close:'晋级3板 ✓'},weak:null,
+     note:'锆基材料中军，跟随龙头节奏补涨，位置低 2 个身位防守强。'},
+    {code:'300718',name:'长盛轴承',px:24.55,sec:'机器人',pat:'空中加油',bd:'首板',dims:[22,23,22,17],
+     c:{pre:0,auction:3.2,live:12.35,close:9.80},st:{pre:'盘前候选',auction:'竞价+3.2%',live:'半路拉升 +12.35%',close:'未封板 +9.8%'},weak:null,
+     note:'20cm 半路，分时两波放量，回踩均线不破，尾盘承接好。'},
+    {code:'002882',name:'金龙羽',px:9.62,sec:'固态电池',pat:'低位启动',bd:'—',dims:[22,21,22,14],
+     c:{pre:0,auction:1.9,live:6.19,close:6.19},st:{pre:'盘前候选',auction:'竞价+1.9%',live:'低位补涨 +6.19%',close:'未板·留观'},weak:null,
+     note:'低价小盘 + 固态电解质预期，低位首次放量，博弈补涨卡位。'},
+    {code:'688419',name:'耐科装备',px:37.61,sec:'半导体',pat:'超跌反弹',bd:'—',dims:[22,15,16,17],
+     c:{pre:0,auction:0.8,live:7.68,close:7.68},st:{pre:'盘前候选',auction:'竞价平淡',live:'盘中事件转强 ↑',close:'明日观察'},weak:null,
+     note:'封装设备微盘，盘中招标事件驱动转强，仅适合短平快。'},
+    {code:'002085',name:'万丰奥威',px:19.07,sec:'低空经济',pat:'老龙反抽',bd:'3板',dims:[22,17,13,18],
+     c:{pre:0,auction:2.1,live:3.10,close:-1.20},st:{pre:'盘前候选',auction:'竞价仅+2.1% ⚠',live:'⚠ 走弱·只标不删',close:'✗ 高开低走 证伪'},weak:'auction',
+     note:'低空老龙反抽，但竞价资金弱印证，事件级别与承接不匹配。'},
+    {code:'688631',name:'莱斯信息',px:43.77,sec:'低空经济',pat:'平台突破',bd:'首板',dims:[22,17,13,16],
+     c:{pre:0,auction:1.2,live:-1.20,close:-3.40},st:{pre:'盘前候选',auction:'竞价+1.2% ⚠',live:'⚠ 走弱·只标不删',close:'✗ 翻绿 证伪'},weak:'auction',
+     note:'空管稀缺标的，但板块资金验证失败，形态失效。'},
+    {code:'001696',name:'宗申动力',px:25.14,sec:'低空经济',pat:'趋势中继',bd:'—',dims:[22,17,13,15],
+     c:{pre:0,auction:1.5,live:1.85,close:0.40},st:{pre:'盘前候选',auction:'竞价+1.5%',live:'滞涨·观察',close:'留观'},weak:'live',
+     note:'趋势票，板块降级后仅剩防守属性，不做进攻。'},
+    {code:'002229',name:'鸿博股份',px:17.93,sec:'AI算力',pat:'历史新高',bd:'首板',dims:[22,10,8,20],
+     c:{pre:0,auction:5.2,live:1.20,close:-2.80},st:{pre:'盘前候选',auction:'高开+5.2% 回落 ⚠',live:'⚠ 走弱·事件证伪拖累',close:'✗ 证伪 明日剔除'},weak:'live',
+     note:'个股形态一流但板块被证伪——四维缺二，共振破坏，坚决不做。'},
+    {code:'000628',name:'高新发展',px:36.20,sec:'AI算力',pat:'缩量回踩',bd:'—',dims:[22,10,8,15],
+     c:{pre:0,auction:0.5,live:-2.40,close:-3.60},st:{pre:'盘前候选',auction:'竞价平开 ⚠',live:'⚠ 走弱·只标不删',close:'✗ 证伪剔除'},weak:'live',
+     note:'板块证伪连带回踩失败，等待板块重新走出方向。'},
+    {code:'688158',name:'优刻得',px:29.35,sec:'AI算力',pat:'波段突破',bd:'—',dims:[22,10,8,14],
+     c:{pre:0,auction:0.2,live:-0.80,close:-1.90},st:{pre:'盘前候选',auction:'竞价平开 ⚠',live:'⚠ 走弱·只标不删',close:'✗ 剔除'},weak:'live',
+     note:'突破失败回落，板块资金证伪后无接力资金。'},
+    {code:'603690',name:'至纯科技',px:27.98,sec:'半导体',pat:'底部放量',bd:'—',dims:[22,15,16,13],
+     c:{pre:0,auction:0.6,live:4.06,close:4.06},st:{pre:'盘前候选',auction:'竞价温和',live:'温和上行·观察',close:'明日观察'},weak:null,
+     note:'湿法设备底部放量，右侧未完全确认，跟随盘中事件观察。'}
+  ],
+  scan:[
+    {code:'002272',name:'川润股份',sec:'液冷服务器',chg:9.98,tag:'竞价新晋·首板'},
+    {code:'688629',name:'华丰科技',sec:'液冷服务器',chg:12.40,tag:'竞价新晋·20cm'},
+    {code:'603169',name:'兰石重装',sec:'核电',chg:5.60,tag:'竞价异动'}
+  ],
+  news:[
+    {t:'10:28',src:'财联社',txt:'机器人板块封板率 87%，拓斯达封单持续增厚'},
+    {t:'10:05',src:'盘面',txt:'半导体设备招标数据环比翻倍'},
+    {t:'09:42',src:'央视财经',txt:'世界机器人大会 T+2 开幕，议程公布'},
+    {t:'09:31',src:'财联社',txt:'AI算力高开回落，鸿博股份炸板'}
+  ],
+  dimNames:['盘','事','板','形'],
+  init(){
+    this.stocks.forEach(s=>{
+      s.k=genK(parseInt(s.code)||1,s.c.live>0);
+      s.score=s.dims.reduce((a,b)=>a+b,0);
+      if(!s.plan)s.plan=this.makePlan(s);
+    });
+  },
+  makePlan(s){
+    const stop=(s.px*0.97).toFixed(2);
+    return{
+      buy:s.bd==='首板'?`放量触板瞬间打板；或分时回踩均线缩量企稳低吸半仓`
+        :s.bd.endsWith('板')?`竞价高开 3%~6% 顺势扫板；低开高走则回封瞬间打板`
+        :`回踩 5 日线缩量企稳低吸，放量突破今日高点确认后加仓`,
+      sell:'次日不涨停/不创新高冲高兑现；跌破分时均线 5 分钟不收回减半仓',
+      stop:`${stop} 元（-3%）无条件止损，触价即走`,
+      pos:s.score>=90?'12%':s.score>=80?'8%':'≤5%（试错仓）'
+    };
+  },
+  pIdx(){return PIDX[this.phase]},
+  isWeak(s){return s.weak&&this.pIdx()>=PIDX[s.weak]},
+  chgOf(s){return s.c[this.phase]},
+  pxOf(s){return (s.px/(1+s.c.live/100)*(1+this.chgOf(s)/100)).toFixed(2)},
+  verdict(e){
+    if(this.phase==='pre')return{k:'wait',tag:'⏳ 预测中·待竞价验证',note:'因果链已建立：'+e.cause};
+    if(this.phase==='close')return{...e.x,strong:e.a.strong,fund:e.a.fund,top:e.a.top};
+    return e.a;
+  },
+  secState(s){return this.phase==='pre'?s.p:s.v},
+  secStateCls(s){const t=this.secState(s);return t.includes('主攻')?'v-ok':t.includes('剔除')?'v-fail':t.includes('转强')?'v-weak':'v-wait'},
+  get pool(){
+    const w=s=>this.isWeak(s)?-1000:0;
+    return [...this.stocks].filter(s=>!this.secFilter||s.sec===this.secFilter)
+      .sort((a,b)=>(w(b)+b.score)-(w(a)+a.score));
+  },
+  get top3(){
+    return [...this.stocks].filter(s=>!this.isWeak(s)&&s.dims.every(d=>d>=18))
+      .sort((a,b)=>b.score-a.score).slice(0,3);
+  },
+  get funnel(){
+    const pre=this.phase==='pre';
+    return[
+      {t:'① 大盘闸门',v:'高潮期 · 80%仓',s:'ok'},
+      {t:'② 事件驱动 (因)',v:'5 起 · S级 1 起',s:'ok'},
+      {t:'③ 板块资金印证 (果)',v:pre?'待竞价验证…':'主攻 2 · 证伪 1 · 观察 2',s:pre?'wait':'ok'},
+      {t:'④ 个股形态过滤',v:'候选 15 只锁定',s:'ok'},
+      {t:'⚡ 四维共振·狙击',v:this.top3.length+' 只',s:'gold'}
+    ];
+  },
+  actionLine(){
+    return{pre:'📋 预案：按计划卡挂竞价条件单，等待 09:25 资金验证',
+      auction:'⚡ 执行：竞价符合买点条件 → 立即按计划排单，证伪方向撤单',
+      live:'🎯 持仓：跟踪封单质量与板块梯队，触发卖点/止损即执行',
+      close:'📖 复核：核对晋级与证伪结果，按明日预案调整持仓'}[this.phase];
+  },
+  cur(){return this.stocks.find(x=>x.code===this.sel)||this.stocks[0]},
+  pick(sec){this.secFilter=this.secFilter===sec?'':sec},
+  secStyle(n){const c=SEC_COLOR[n]||'#475569';return`background:${c}22;color:${c};border:1px solid ${c}55`},
+  say(t){this.toast=t;clearTimeout(this._tm);this._tm=setTimeout(()=>this.toast='',2200)}
+}}
+</script>
+</head>
+<body class="text-slate-200 antialiased" x-data="app()" x-init="init()">
+<div class="h-screen grid" style="grid-template-rows:64px 58px minmax(0,1fr) 26px">
+
+  <!-- ═════ 顶栏：大盘闸门（第一道共振维度） ═════ -->
+  <header class="flex items-center gap-4 border-b px-4 bg-[#0c121d]" style="border-color:var(--line)">
+    <div class="flex-none">
+      <div class="text-[14px] font-black tracking-widest text-[#f7c948] glow-gold">擒龙 · 四维共振</div>
+      <div class="text-[8.5px] text-slate-600 num"><span class="tick text-[#2ebd85]">●</span> 2026-07-03 · 模拟盘 · 每15s刷新</div>
+    </div>
+    <div class="h-8 w-px bg-[#1c2534]"></div>
+    <div class="flex gap-4">
+      <template x-for="i in idx" :key="i.n">
+        <div class="text-center">
+          <div class="text-[9px] text-slate-500" x-text="i.n"></div>
+          <div class="num text-[12px] font-bold leading-tight" :class="i.c>=0?'up':'down'" x-text="i.v"></div>
+          <div class="num text-[9px]" :class="i.c>=0?'up':'down'" x-text="(i.c>=0?'+':'')+i.c.toFixed(2)+'%'"></div>
+        </div>
+      </template>
+    </div>
+    <div class="h-8 w-px bg-[#1c2534]"></div>
+    <!-- 大盘闸门判定 -->
+    <div class="flex items-center gap-3">
+      <div class="text-center">
+        <div class="text-[9px] text-slate-500">情绪周期</div>
+        <span class="badge lv-S" x-text="emo.stage"></span>
+      </div>
+      <div class="text-center">
+        <div class="text-[9px] text-slate-500">今日建议仓位</div>
+        <div class="num text-[22px] leading-none font-black text-[#f7c948] glow-gold" x-text="emo.pos"></div>
+      </div>
+      <div class="badge v-ok">🚪 大盘闸门：通过 · 可重仓打板</div>
+    </div>
+    <div class="flex gap-3 ml-auto">
+      <template x-for="st in stats" :key="st.k">
+        <div class="text-right">
+          <div class="text-[8.5px] text-slate-500" x-text="st.k"></div>
+          <div class="num text-[12px] font-bold" :class="st.cls" x-text="st.v"></div>
+        </div>
+      </template>
+    </div>
+  </header>
+
+  <!-- ═════ 决策流水线：时间轴 + 共振漏斗 ═════ -->
+  <div class="flex items-center gap-3 border-b px-4 bg-[#0b101a]" style="border-color:var(--line)">
+    <!-- 四阶段时间轴（可点击推演） -->
+    <div class="flex items-center gap-1 flex-none">
+      <template x-for="(p,i) in phases" :key="p.k">
+        <div class="flex items-center gap-1">
+          <button class="phase-btn" :class="phase===p.k?'act':(PIDX[p.k]<PIDX[phase]?'done':'')" @click="phase=p.k">
+            <span x-text="p.t"></span>
+            <span class="num text-[9px] opacity-70 ml-1" x-text="p.time"></span>
+          </button>
+          <span class="flow-arrow" x-show="i<3">›</span>
+        </div>
+      </template>
+    </div>
+    <div class="text-[9.5px] text-slate-500 border-l pl-3 flex-none" style="border-color:var(--line)" x-text="phases.find(p=>p.k===phase).desc"></div>
+    <!-- 共振漏斗 -->
+    <div class="flex items-center gap-1.5 ml-auto">
+      <template x-for="(f,i) in funnel" :key="f.t">
+        <div class="flex items-center gap-1.5">
+          <div class="px-2 py-1 rounded border text-center"
+            :class="f.s==='gold'?'card-gold border-[#f7c948]/60 bg-[#f7c948]/10':f.s==='wait'?'border-slate-700 bg-[#0e1522] opacity-60':'border-[#1c2534] bg-[#0e1522]'">
+            <div class="text-[8.5px]" :class="f.s==='gold'?'text-[#f7c948] font-bold':'text-slate-500'" x-text="f.t"></div>
+            <div class="num text-[10px] font-bold" :class="f.s==='gold'?'text-[#f7c948] glow-gold':'text-slate-200'" x-text="f.v"></div>
+          </div>
+          <span class="flow-arrow" x-show="i<4">→</span>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ═════ 主区 ═════ -->
+  <div class="grid min-h-0" style="grid-template-columns:26% 44% 30%">
+
+    <!-- 左：事件因 ⇄ 资金果 双轨验证 -->
+    <aside class="flex flex-col min-h-0 border-r" style="border-color:var(--line)">
+      <div class="px-3 py-2 border-b flex items-center gap-2" style="border-color:var(--line)">
+        <h2 class="text-[12.5px] font-black">🧬 事件因 ⇄ 资金果</h2>
+        <span class="text-[9px] text-slate-500">新闻为因 · 竞价资金为果 · 双向印证</span>
+      </div>
+      <div class="flex-1 overflow-y-auto scroll-thin p-2 space-y-2">
+        <template x-for="e in events" :key="e.title">
+          <div class="rounded border bg-[#0e1522] overflow-hidden cursor-pointer transition-all hover:border-slate-500"
+               :class="secFilter===e.sec?'border-[#f7c948]':'border-[#1c2534]'"
+               @click="pick(e.sec)">
+            <!-- 因 -->
+            <div class="p-2.5">
+              <div class="flex items-center gap-2">
+                <span class="badge" :class="'lv-'+e.lv" x-text="e.lv+' 级'"></span>
+                <span class="chip-sec" :style="secStyle(e.sec)" x-text="e.sec"></span>
+                <span class="text-[9px] text-slate-500" x-text="e.src"></span>
+                <span class="ml-auto num text-[9px] text-[#f7c948]" x-text="e.t"></span>
+              </div>
+              <div class="mt-1.5 text-[12px] leading-snug font-medium" x-text="e.title"></div>
+              <div class="mt-1 text-[9.5px] text-slate-500" x-text="'因果链：'+e.cause"></div>
+            </div>
+            <!-- 果 -->
+            <div class="px-2.5 py-2 border-t bg-[#0b1220]" style="border-color:#141c2b">
+              <div class="flex items-center gap-2">
+                <span class="text-[9px] text-slate-500 flex-none">资金果</span>
+                <span class="badge" :class="'v-'+verdict(e).k" x-text="verdict(e).tag"></span>
+                <template x-if="phase!=='pre'">
+                  <span class="ml-auto num text-[9.5px] text-slate-400">
+                    强势 <b class="up" x-text="verdict(e).strong"></b> 家 ·
+                    <b :class="String(verdict(e).fund).startsWith('+')?'up':'down'" x-text="verdict(e).fund"></b>
+                  </span>
+                </template>
+              </div>
+              <div class="mt-1 text-[9.5px] leading-relaxed" :class="{'text-slate-300':verdict(e).k==='ok','text-[#f97316]':verdict(e).k==='weak','text-[#2ebd85]':verdict(e).k==='fail','text-slate-500':verdict(e).k==='wait'}" x-text="verdict(e).note"></div>
+              <div class="mt-1 text-[9px] text-slate-600" x-show="phase!=='pre'" x-text="'竞价最强：'+verdict(e).top"></div>
+            </div>
+          </div>
+        </template>
+        <!-- 资讯流 -->
+        <div class="rounded border border-[#1c2534] bg-[#0e1522] p-2.5">
+          <div class="text-[10px] font-bold text-slate-400 mb-1.5">📡 资讯 · News Feed</div>
+          <template x-for="n in news" :key="n.txt">
+            <div class="flex gap-2 py-1 border-t text-[9.5px]" style="border-color:#131b2a">
+              <span class="num text-[#f7c948] flex-none" x-text="n.t"></span>
+              <span class="text-slate-600 flex-none" x-text="n.src"></span>
+              <span class="text-slate-400 leading-snug" x-text="n.txt"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中：四维共振狙击 + 候选池 -->
+    <main class="flex flex-col min-h-0 border-r" style="border-color:var(--line)">
+      <!-- 今日狙击 Top3 -->
+      <div class="px-3 pt-2 pb-1 flex items-center gap-2">
+        <h2 class="text-[13px] font-black">🎯 四维共振 · 今日狙击</h2>
+        <span class="text-[9px] text-slate-500">大盘+事件+板块+形态 四灯全亮才出手</span>
+        <span class="ml-auto text-[9.5px] text-[#f7c948]" x-text="actionLine()"></span>
+      </div>
+      <div class="px-3 pb-2 grid grid-cols-3 gap-2 flex-none">
+        <template x-for="(s,i) in top3" :key="s.code">
+          <div class="rounded-lg border card-gold bg-[#0e1522] p-2.5 cursor-pointer transition-transform hover:scale-[1.015]"
+               :class="sel===s.code?'ring-1 ring-[#f7c948]':''" @click="sel=s.code">
+            <div class="flex items-center gap-1.5">
+              <span class="num text-[15px] font-black text-[#f7c948] glow-gold" x-text="'0'+(i+1)"></span>
+              <span class="font-black text-[13px]" x-text="s.name"></span>
+              <span class="text-[9px] px-1 rounded font-bold bg-[#f6465d]/20 text-[#f6465d]" x-text="s.bd"></span>
+              <span class="ml-auto num text-[15px] font-black" :class="chgOf(s)>=0?'up glow-red':'down'" x-text="(chgOf(s)>=0?'+':'')+chgOf(s).toFixed(2)+'%'"></span>
+            </div>
+            <div class="num text-[9px] text-slate-500 mt-0.5" x-text="s.code+' · '+pxOf(s)+' 元 · '+s.pat"></div>
+            <div class="flex items-center gap-1 mt-1.5">
+              <template x-for="(d,j) in s.dims" :key="j">
+                <div class="dim" :class="d>=18?'on':'off'">
+                  <span x-text="dimNames[j]+d"></span>
+                </div>
+              </template>
+              <span class="ml-auto num text-[16px] font-black text-[#f7c948] glow-gold" x-text="s.score"></span>
+            </div>
+            <div class="mt-1.5 text-[9px] text-slate-400 leading-snug border-t pt-1" style="border-color:#1c2534" x-text="s.st[phase]"></div>
+          </div>
+        </template>
+      </div>
+
+      <!-- 候选池 -->
+      <div class="px-3 py-1.5 border-y flex items-center gap-2 flex-wrap" style="border-color:var(--line)">
+        <h3 class="text-[11.5px] font-black">📌 盘前锁定 15 候选</h3>
+        <span class="text-[9px] text-slate-500">成员固定 · 实时刷新价格与排序 · 走弱只标不删</span>
+        <template x-if="secFilter">
+          <span class="flex items-center gap-1 text-[9.5px] px-2 py-0.5 rounded-full bg-[#f7c948]/15 text-[#f7c948] border border-[#f7c948]/40">
+            <span x-text="'过滤: '+secFilter"></span><button class="font-bold hover:text-white" @click="secFilter=''">✕</button>
+          </span>
+        </template>
+        <span class="ml-auto text-[9px] text-slate-600">四维灯: 盘/事/板/形 ≥18 亮灯 · 悬停评分看拆解</span>
+      </div>
+      <div class="flex-1 overflow-y-auto scroll-thin">
+        <table class="w-full text-[11px]">
+          <thead class="sticky top-0 z-10 bg-[#0c121d] text-slate-500 text-[9.5px]">
+            <tr class="border-b" style="border-color:var(--line)">
+              <th class="text-left px-3 py-1.5">候选 / 连板</th>
+              <th class="text-right px-2">现价 / 涨幅</th>
+              <th class="text-center px-2">板块</th>
+              <th class="text-center px-2">形态</th>
+              <th class="text-center px-2">四维共振灯</th>
+              <th class="text-right px-2">共振分</th>
+              <th class="text-left px-3">当前状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in pool" :key="s.code">
+              <tr class="border-b cursor-pointer transition-colors" style="border-color:#141c2b"
+                  :class="[isWeak(s)?'weakrow':'',sel===s.code?'bg-[#16233a]':'hover:bg-[#101827]']"
+                  @click="sel=s.code">
+                <td class="px-3 py-[6px]">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-[11.5px]" x-text="s.name"></span>
+                    <span class="text-[8.5px] px-1 rounded font-bold bg-[#f6465d]/20 text-[#f6465d]" x-show="s.bd!=='—'" x-text="s.bd"></span>
+                  </div>
+                  <div class="num text-[9px] text-slate-500" x-text="s.code"></div>
+                </td>
+                <td class="px-2 text-right">
+                  <div class="num font-bold text-[11px]" :class="chgOf(s)>=0?'up':'down'" x-text="pxOf(s)"></div>
+                  <span class="num text-[9.5px] px-1 rounded inline-block" :class="chgOf(s)>=0?'bg-[#f6465d]/15 up':'bg-[#2ebd85]/15 down'"
+                    x-text="(chgOf(s)>=0?'+':'')+chgOf(s).toFixed(2)+'%'"></span>
+                </td>
+                <td class="px-2 text-center"><span class="chip-sec" :style="secStyle(s.sec)" x-text="s.sec"></span></td>
+                <td class="px-2 text-center"><span class="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 whitespace-nowrap" x-text="s.pat"></span></td>
+                <td class="px-2">
+                  <div class="flex justify-center gap-1">
+                    <template x-for="(d,j) in s.dims" :key="j">
+                      <div class="dim" :class="d>=18?'on':'off'"><span x-text="dimNames[j]"></span></div>
+                    </template>
+                  </div>
+                </td>
+                <td class="px-2 text-right relative">
+                  <div class="group inline-block cursor-help">
+                    <span class="num text-[14px] font-black" :class="s.score>=90?'text-[#f7c948] glow-gold':s.score>=80?'up':'text-slate-400'" x-text="s.score"></span>
+                    <div class="hidden group-hover:block absolute right-[80%] top-0 z-30 w-44 rounded border border-slate-600 bg-[#111a2b] p-2 shadow-2xl text-left">
+                      <div class="text-[9.5px] font-bold text-slate-300 mb-1 border-b border-slate-700 pb-1" x-text="s.name+' · 四维拆解 /25'"></div>
+                      <template x-for="(d,j) in s.dims" :key="j">
+                        <div class="flex items-center gap-1.5 py-0.5">
+                          <span class="text-[9px] text-slate-400 w-14" x-text="['大盘环境','事件驱动','板块资金','个股形态'][j]"></span>
+                          <div class="flex-1 h-1 bg-slate-800 rounded"><div class="h-full rounded bg-gradient-to-r from-[#f6465d] to-[#f7c948]" :style="`width:${d/25*100}%`"></div></div>
+                          <span class="num text-[9.5px] font-bold w-5 text-right" :class="d>=18?'text-slate-200':'text-slate-500'" x-text="d"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-3">
+                  <span class="text-[9.5px] leading-tight"
+                    :class="s.st[phase].includes('⚠')||s.st[phase].includes('✗')?'text-[#f97316]':s.st[phase].includes('✓')||s.st[phase].includes('涨停')?'up font-bold':'text-slate-400'"
+                    x-text="s.st[phase]"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <!-- 预测外·全市场扫描 -->
+        <div class="px-3 py-2 border-t" style="border-color:var(--line)">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[10.5px] font-bold text-slate-400">🛰 预测外 · 全市场扫描</span>
+            <span class="text-[9px] text-slate-600">竞价新晋强势 · 非盘前预测 · 仅观察对照，不纳入狙击</span>
+          </div>
+          <div class="flex gap-2 flex-wrap" x-show="phase!=='pre'">
+            <template x-for="sc in scan" :key="sc.code">
+              <div class="flex items-center gap-1.5 px-2 py-1 rounded border border-slate-700 bg-[#0e1522] text-[10px]">
+                <span class="font-bold" x-text="sc.name"></span>
+                <span class="chip-sec" :style="secStyle(sc.sec)" x-text="sc.sec"></span>
+                <span class="num up font-bold" x-text="'+'+sc.chg.toFixed(2)+'%'"></span>
+                <span class="text-[8.5px] text-slate-500" x-text="sc.tag"></span>
+              </div>
+            </template>
+          </div>
+          <div class="text-[9.5px] text-slate-600" x-show="phase==='pre'">等待竞价数据…（09:25 后自动填充）</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 右：主力方向 + 个股作战室 -->
+    <aside class="min-h-0 overflow-y-auto scroll-thin">
+      <!-- 主力方向 -->
+      <section class="p-3 border-b" style="border-color:var(--line)">
+        <div class="flex items-center justify-between mb-1.5">
+          <h3 class="text-[12px] font-black">🧭 主力方向</h3>
+          <span class="text-[9px] text-slate-500">红数字 = 竞价强势家数 · 梯队 龙/中/跟</span>
+        </div>
+        <template x-for="sec in sectors" :key="sec.name">
+          <div class="grid items-center gap-2 py-[5px] border-b cursor-pointer hover:bg-[#101827] px-1 rounded transition-colors"
+               style="grid-template-columns:1.3fr .55fr .8fr auto;border-color:#131b2a"
+               :class="secFilter===sec.name?'bg-[#f7c948]/5':''" @click="pick(sec.name)">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="chip-sec" :style="secStyle(sec.name)" x-text="sec.name"></span>
+              <sup class="num text-[10px] font-black up" x-text="sec.strong" x-show="phase!=='pre'"></sup>
+              <span class="num text-[10px] font-bold" :class="sec.chg>=0?'up':'down'" x-text="(sec.chg>=0?'+':'')+sec.chg.toFixed(1)+'%'"></span>
+            </div>
+            <span class="num text-[9.5px] text-slate-400">停<b class="up" x-text="sec.zt"></b></span>
+            <span class="badge" :class="secStateCls(sec)" x-text="secState(sec)"></span>
+            <div class="flex items-center gap-1">
+              <template x-for="(d,i) in sec.ladder" :key="i"><span class="dot" :class="d?'on':'off'" :title="['龙头','中军','跟风'][i]"></span></template>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- 个股作战室 -->
+      <section class="p-3">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <h3 class="text-[15px] font-black" x-text="cur().name"></h3>
+          <span class="num text-[10px] text-slate-500" x-text="cur().code"></span>
+          <span class="num text-[12.5px] font-bold" :class="chgOf(cur())>=0?'up glow-red':'down'"
+            x-text="pxOf(cur())+'  '+(chgOf(cur())>=0?'+':'')+chgOf(cur()).toFixed(2)+'%'"></span>
+          <span class="ml-auto flex gap-1">
+            <template x-for="(d,j) in cur().dims" :key="j"><div class="dim" :class="d>=18?'on':'off'"><span x-text="dimNames[j]+d"></span></div></template>
+          </span>
+        </div>
+        <p class="mt-1.5 text-[10px] leading-relaxed text-slate-400 border-l-2 border-[#f7c948]/60 pl-2 bg-[#f7c948]/5 py-1 rounded-r" x-text="cur().note"></p>
+
+        <div class="mt-2 rounded border bg-[#0e1522] p-2" style="border-color:var(--line)">
+          <div class="flex justify-between text-[9px] text-slate-500 mb-1">
+            <span>日K · 近30日</span><span><i class="not-italic text-[#f7c948]">— MA5</i> · 虚线=前高</span>
+          </div>
+          <div class="relative h-28">
+            <div class="absolute inset-x-0 border-t border-dashed border-slate-500/50" :style="`top:${cur().k.ph}%`"></div>
+            <div class="absolute inset-0 flex">
+              <template x-for="(b,i) in cur().k.bars" :key="i">
+                <div class="relative flex-1">
+                  <div class="absolute left-1/2 w-px -translate-x-1/2" :class="b.up?'bg-[#f6465d]':'bg-[#2ebd85]'" :style="`top:${b.wt}%;height:${b.wh}%`"></div>
+                  <div class="absolute left-[22%] right-[22%] rounded-[1px]" :class="b.up?'bg-[#f6465d]':'bg-[#2ebd85]'" :style="`top:${b.bt}%;height:${b.bh}%`"></div>
+                </div>
+              </template>
+            </div>
+            <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline :points="cur().k.ma" fill="none" stroke="#f7c948" stroke-width="0.7" opacity="0.85"/>
+            </svg>
+          </div>
+          <div class="h-8 flex items-end gap-px mt-1 border-t pt-1" style="border-color:#131b2a">
+            <template x-for="(b,i) in cur().k.bars" :key="'v'+i">
+              <div class="flex-1 rounded-t-[1px]" :class="b.up?'bg-[#f6465d]/60':'bg-[#2ebd85]/60'" :style="`height:${b.vp}%`"></div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 机械交易计划卡 -->
+        <div class="mt-2.5 rounded-lg border border-[#f6465d]/50 overflow-hidden shadow-[0_0_20px_rgba(246,70,93,.12)]">
+          <div class="flex items-center px-3 py-1.5 bg-gradient-to-r from-[#f6465d]/20 to-transparent border-b border-[#f6465d]/30">
+            <span class="text-[11.5px] font-black">⚙ 机械交易计划卡</span>
+            <span class="ml-auto text-[8.5px] text-[#f7c948]">纪律高于预判 · 触发即执行</span>
+          </div>
+          <div class="p-2.5 space-y-1.5 bg-[#0e1522]">
+            <div class="flex gap-2"><span class="plan-label bg-[#f6465d]/20 text-[#f6465d] border border-[#f6465d]/50">【买点信号】</span><p class="text-[10px] leading-relaxed text-slate-200" x-text="cur().plan.buy"></p></div>
+            <div class="flex gap-2"><span class="plan-label bg-[#2ebd85]/15 text-[#2ebd85] border border-[#2ebd85]/50">【卖点信号】</span><p class="text-[10px] leading-relaxed text-slate-200" x-text="cur().plan.sell"></p></div>
+            <div class="flex gap-2"><span class="plan-label bg-[#f97316]/15 text-[#f97316] border border-[#f97316]/50">【风控止损】</span><p class="text-[10px] leading-relaxed text-slate-200" x-text="cur().plan.stop"></p></div>
+            <div class="flex gap-2 items-center"><span class="plan-label bg-[#f7c948]/15 text-[#f7c948] border border-[#f7c948]/50">【建议仓位】</span><p class="num text-[12px] font-black text-[#f7c948] glow-gold" x-text="cur().plan.pos"></p></div>
+          </div>
+        </div>
+
+        <div class="mt-2 grid grid-cols-2 gap-2">
+          <button class="py-2 rounded font-black text-[12px] bg-[#f6465d] hover:bg-[#ff5c72] text-white shadow-[0_0_14px_rgba(246,70,93,.35)] transition-all"
+            @click="say('已生成模拟委托：'+cur().name+' 按计划卡条件挂单（仅原型演示）')">⚡ 模拟条件单买入</button>
+          <button class="py-2 rounded font-bold text-[11.5px] border border-slate-600 text-slate-300 hover:border-[#f7c948] hover:text-[#f7c948] transition-all"
+            @click="say(cur().name+' 已加入盯盘，触发买点将推送信号')">＋ 加入盯盘监控</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- ═════ 底部状态栏 ═════ -->
+  <footer class="flex items-center gap-4 px-4 border-t text-[9px] text-slate-600 bg-[#0b101a]" style="border-color:var(--line)">
+    <span>数据质量: <b class="text-slate-400">模拟 MOCK</b></span>
+    <span>行情源: MOCK-L2</span><span>新闻源: MOCK-CLS</span>
+    <span>状态: <span class="tick text-[#2ebd85]">● 正常</span></span>
+    <span class="ml-auto">红涨绿跌 · 每 15s 刷新 · ⚠️ 研究用途，非投资建议，不构成任何交易依据</span>
+  </footer>
+</div>
+
+<div class="fixed left-1/2 bottom-10 -translate-x-1/2 z-50 px-4 py-2 rounded border border-[#f7c948]/50 bg-[#111a2b] text-[11px] shadow-2xl"
+     x-show="toast" x-transition.opacity x-text="toast" style="display:none"></div>
+</body>
+</html>
