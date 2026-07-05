@@ -21,10 +21,10 @@ import type { Employee } from '../../lib/types';
 export const HIRES_CHANGED_EVENT = 'hummer-hires-changed';
 
 const SKIN_TONES = ['#F5D7B5', '#EBC094', '#D4A276'];
-const CHAIR = '#20262F';
-const ISLAND = '#232B38';
-const ISLAND_TOP = '#2A3342';
-const ISLAND_DARK = '#171D28';
+const CHAIR = '#2C3547';
+const ISLAND = '#334157';
+const ISLAND_TOP = '#3C4B64';
+const ISLAND_DARK = '#232E42';
 
 const FALLBACK_LOOK: FigureLook = {
   outfit: '#2B3038', hair: 'neat', hairColor: '#2A2723', accessories: [], build: 'default',
@@ -67,7 +67,7 @@ function PodIsland({ pod }: { pod: PodDef }) {
       </mesh>
       <mesh position={[0, 0.11, 0]}>
         <boxGeometry args={[4.42, 0.015, 1.82]} />
-        <meshBasicMaterial color={NEON} transparent opacity={0.5} toneMapped={false} />
+        <meshBasicMaterial color={NEON} transparent opacity={0.7} toneMapped={false} />
       </mesh>
       {/* 桌体 */}
       <mesh position={[0, 0.44, 0]}>
@@ -91,12 +91,12 @@ function PodIsland({ pod }: { pod: PodDef }) {
       {/* 中脊隔板 + 槽灯 */}
       <mesh position={[0, 0.96, 0]}>
         <boxGeometry args={[4.6, 0.34, 0.12]} />
-        <meshStandardMaterial color="#1E252F" roughness={0.45} metalness={0.35} />
+        <meshStandardMaterial color="#2C3648" roughness={0.45} metalness={0.35} />
       </mesh>
       {[-1.4, 0, 1.4].map((x) => (
         <mesh key={x} position={[x, 0.99, 0]}>
           <boxGeometry args={[0.7, 0.02, 0.14]} />
-          <meshBasicMaterial color={NEON} transparent opacity={0.7} toneMapped={false} />
+          <meshBasicMaterial color={NEON} transparent opacity={0.9} toneMapped={false} />
         </mesh>
       ))}
       {/* 8 席椅子（含空位）+ 键盘 */}
@@ -144,7 +144,7 @@ function ExecConsole() {
       </mesh>
       {/* 大全息屏 */}
       <HoloScreen w={1.75} h={0.95} kind="dashboard" seed={11} tilt={-0.12} position={[0, 1.45, 0.55]} />
-      <GlowPlane size={[2.4, 1.4]} color={NEON} opacity={0.15} position={[0, 1.4, 0.5]} />
+      <GlowPlane size={[2.4, 1.4]} color={NEON} opacity={0.25} position={[0, 1.4, 0.5]} />
       {/* 高背椅 */}
       <group position={[0, 0, 0]}>
         <mesh position={[0, 0.5, -0.15]}>
@@ -183,7 +183,7 @@ function ConferenceSet() {
       {/* 圆桌 */}
       <mesh position={[0, 0.72, 0]}>
         <cylinderGeometry args={[1.5, 1.5, 0.1, 32]} />
-        <meshStandardMaterial color="#1B222E" roughness={0.35} metalness={0.4} />
+        <meshStandardMaterial color="#2A3446" roughness={0.35} metalness={0.4} />
       </mesh>
       <mesh position={[0, 0.36, 0]}>
         <cylinderGeometry args={[0.5, 0.6, 0.72, 16]} />
@@ -231,19 +231,19 @@ function SofaBlock({ width = 2.3, ...props }: { width?: number } & JSX.Intrinsic
     <group {...props}>
       <mesh position={[0, 0.24, 0]}>
         <boxGeometry args={[width, 0.42, 0.95]} />
-        <meshStandardMaterial color="#232A35" roughness={0.9} />
+        <meshStandardMaterial color="#323C4E" roughness={0.9} />
       </mesh>
       <mesh position={[0, 0.62, -0.38]}>
         <boxGeometry args={[width, 0.55, 0.22]} />
-        <meshStandardMaterial color="#232A35" roughness={0.9} />
+        <meshStandardMaterial color="#323C4E" roughness={0.9} />
       </mesh>
       <mesh position={[-width / 2 + 0.1, 0.5, 0]}>
         <boxGeometry args={[0.2, 0.55, 0.95]} />
-        <meshStandardMaterial color="#1D2430" roughness={0.9} />
+        <meshStandardMaterial color="#2A3342" roughness={0.9} />
       </mesh>
       <mesh position={[width / 2 - 0.1, 0.5, 0]}>
         <boxGeometry args={[0.2, 0.55, 0.95]} />
-        <meshStandardMaterial color="#1D2430" roughness={0.9} />
+        <meshStandardMaterial color="#2A3342" roughness={0.9} />
       </mesh>
     </group>
   );
@@ -281,7 +281,7 @@ function Treadmill(props: JSX.IntrinsicElements['group']) {
     <group {...props}>
       <mesh position={[0, 0.09, 0.1]} rotation={[0.05, 0, 0]}>
         <boxGeometry args={[0.75, 0.14, 1.75]} />
-        <meshStandardMaterial color="#1A2028" roughness={0.5} metalness={0.35} />
+        <meshStandardMaterial color="#242E3E" roughness={0.5} metalness={0.35} />
       </mesh>
       <mesh position={[0, 0.17, 0.12]} rotation={[0.05, 0, 0]}>
         <boxGeometry args={[0.6, 0.02, 1.6]} />
@@ -341,12 +341,12 @@ function GymEquipment() {
       <group position={[-13.6, 0, 9.6]} rotation={[0, 0.3, 0]}>
         <mesh position={[0, 0.45, 0]}>
           <boxGeometry args={[1.1, 0.08, 0.35]} />
-          <meshStandardMaterial color="#232A35" roughness={0.8} />
+          <meshStandardMaterial color="#323C4E" roughness={0.8} />
         </mesh>
         {[-0.45, 0.45].map((x) => (
           <mesh key={x} position={[x, 0.22, 0]}>
             <boxGeometry args={[0.06, 0.42, 0.3]} />
-            <meshStandardMaterial color="#1A2028" metalness={0.4} roughness={0.5} />
+            <meshStandardMaterial color="#242E3E" metalness={0.4} roughness={0.5} />
           </mesh>
         ))}
       </group>
@@ -412,7 +412,7 @@ function SandboxAnnex({ hiredIds }: { hiredIds: string[] }) {
     <group position={[5.5, -1.35, 10.8]}>
       <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[Math.max(6, hired.length * 2.4), 3.4]} />
-        <meshStandardMaterial color="#1B222E" roughness={0.9} emissive="#E8A33D" emissiveIntensity={0.03} />
+        <meshStandardMaterial color="#2A3446" roughness={0.9} emissive="#E8A33D" emissiveIntensity={0.03} />
       </mesh>
       <Text position={[0, 0.03, 1.85]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.28} color="#E8A33D" anchorX="center" anchorY="middle" letterSpacing={0.12}>
         SANDBOX · TRIAL

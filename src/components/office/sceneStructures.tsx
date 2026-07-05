@@ -8,12 +8,12 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { NEON, NEON_TEXT, PANEL, PANEL_EDGE, NeonBar, NeonSignPanel, GlowPlane, getHoloTexture, chamferPanelGeo } from './neon';
 
-const STRUCT = '#232B38';
-const STRUCT_DARK = '#171D28';
+const STRUCT = '#334157';
+const STRUCT_DARK = '#232E42';
 const GLASS_TINT = '#A8E4F2';
 
 /* ── 绿植（叶片交叉面片） ── */
-export function Plant({ height = 1.4, potColor = '#20262F', ...props }: { height?: number; potColor?: string } & JSX.IntrinsicElements['group']) {
+export function Plant({ height = 1.4, potColor = '#2C3547', ...props }: { height?: number; potColor?: string } & JSX.IntrinsicElements['group']) {
   const leaves = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
     rotY: (i / 7) * Math.PI * 2 + i * 0.7,
     tilt: 0.35 + (i % 3) * 0.18,
@@ -90,7 +90,7 @@ export function SectionBPlatform() {
     <group position={[-1, 0, -8.5]}>
       <mesh position={[0, 0.15, 0]}>
         <boxGeometry args={[13, 0.3, 7]} />
-        <meshStandardMaterial color="#2A3444" roughness={0.45} metalness={0.25} />
+        <meshStandardMaterial color="#3A4860" roughness={0.45} metalness={0.25} />
       </mesh>
       {/* 前缘踏步 + 平台沿缝光 */}
       <mesh position={[0, 0.075, 3.75]}>
@@ -120,7 +120,7 @@ export function ExecMezzanine() {
       {/* 楼板（厚板） */}
       <mesh position={[0, 2.45, 0]}>
         <boxGeometry args={[10, 0.5, 7]} />
-        <meshStandardMaterial color="#2A3444" roughness={0.45} metalness={0.25} />
+        <meshStandardMaterial color="#3A4860" roughness={0.45} metalness={0.25} />
       </mesh>
       {/* 板底裙边 + 支撑体 */}
       <mesh position={[0, 1.1, -1.2]}>
@@ -185,16 +185,16 @@ export function ConferenceShell() {
         <meshStandardMaterial color={STRUCT_DARK} roughness={0.55} metalness={0.3} />
       </mesh>
       <mesh geometry={octa[1]} position={[0, -0.45, 0]}>
-        <meshStandardMaterial color="#20293A" roughness={0.5} metalness={0.28} />
+        <meshStandardMaterial color="#2F3B52" roughness={0.5} metalness={0.28} />
       </mesh>
       <mesh geometry={octa[2]} position={[0, 0.45, 0]}>
-        <meshStandardMaterial color="#2A3444" roughness={0.45} metalness={0.25} />
+        <meshStandardMaterial color="#3A4860" roughness={0.45} metalness={0.25} />
       </mesh>
       {/* 基座层间霓虹 */}
       {[-0.44, 0.0, 0.46].map((y, i) => (
         <mesh key={i} position={[0, y, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 8]}>
           <ringGeometry args={[3.35 + i * 0.06, 3.42 + i * 0.06, 8, 1]} />
-          <meshBasicMaterial color={NEON} transparent opacity={0.55 - i * 0.1} toneMapped={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={NEON} transparent opacity={0.75 - i * 0.1} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
       ))}
       {/* 圆柱玻璃（门口朝 +z 开 70°） */}
@@ -219,7 +219,7 @@ export function ConferenceShell() {
         <torusGeometry args={[3.01, 0.045, 8, 64]} />
         <meshBasicMaterial color={NEON} toneMapped={false} />
       </mesh>
-      <GlowPlane size={[6.6, 1.2]} color={NEON} opacity={0.22} position={[0, 3.0, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+      <GlowPlane size={[6.6, 1.2]} color={NEON} opacity={0.35} position={[0, 3.0, 0]} rotation={[-Math.PI / 2, 0, 0]} />
       {/* 悬浮标牌 */}
       <NeonSignPanel text="CONFERENCE HUB" width={3.4} height={0.7} position={[0, 3.55, 1.0]} />
     </group>
@@ -233,7 +233,7 @@ export function LoungeTerrace() {
       {/* 露台板 */}
       <mesh position={[0, 0.175, 0]}>
         <boxGeometry args={[8.5, 0.35, 7.5]} />
-        <meshStandardMaterial color="#2A3444" roughness={0.5} metalness={0.25} />
+        <meshStandardMaterial color="#3A4860" roughness={0.5} metalness={0.25} />
       </mesh>
       <mesh position={[-4.24, 0.34, 0]}>
         <boxGeometry args={[0.02, 0.02, 7.4]} />
@@ -243,7 +243,7 @@ export function LoungeTerrace() {
       <group position={[0, 0.35, -3.6]}>
         <mesh position={[0, 1.3, 0]}>
           <boxGeometry args={[6.5, 2.6, 0.3]} />
-          <meshStandardMaterial color="#1C232E" roughness={0.5} metalness={0.35} />
+          <meshStandardMaterial color="#2A3446" roughness={0.5} metalness={0.35} />
         </mesh>
         {/* TV ×2（全息内容） */}
         {[-1.6, 1.7].map((x, i) => (
@@ -289,7 +289,7 @@ export function GymCorner() {
       {/* 地垫 */}
       <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6.2, 4.2]} />
-        <meshStandardMaterial color="#141A22" roughness={0.95} />
+        <meshStandardMaterial color="#222B3C" roughness={0.95} />
       </mesh>
       {/* 侧墙 + 数据屏（朝 +x） */}
       <group position={[-3.3, 0, -1.0]}>
@@ -324,7 +324,7 @@ export function AIEnterpriseBlock() {
       <mesh geometry={useMemo(() => chamferPanelGeo(3.36, 2.76, 0.44, 0.06), [])} position={[0, 0, -0.05]}>
         <meshBasicMaterial color={NEON} toneMapped={false} />
       </mesh>
-      <GlowPlane size={[4.6, 4.6]} color={NEON} opacity={0.3} position={[0, 0, 0.3]} />
+      <GlowPlane size={[4.6, 4.6]} color={NEON} opacity={0.42} position={[0, 0, 0.3]} />
       <Text position={[0, 0.55, 0.3]} fontSize={1.0} color="#EAF7FF" anchorX="center" anchorY="middle" outlineWidth={0.05} outlineColor={NEON}>
         AI
       </Text>

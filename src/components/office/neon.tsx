@@ -14,8 +14,8 @@ import * as THREE from 'three';
 export const NEON = '#3EE0FF';
 export const NEON_DIM = '#1FB6E0';
 export const NEON_TEXT = '#CFF6FF';
-export const PANEL = '#1A2028';
-export const PANEL_EDGE = '#2A333F';
+export const PANEL = '#242E3E';
+export const PANEL_EDGE = '#3A4657';
 
 /* ── 缓存纹理 ── */
 const texCache = new Map<string, THREE.Texture>();
@@ -178,7 +178,7 @@ export function NeonBar({ length = 2, thickness = 0.045, color = NEON, glow = 1,
           <meshBasicMaterial color={color} toneMapped={false} />
         </mesh>
         {glow > 0 && (
-          <GlowPlane size={[length * 1.15, thickness * 9 * glow]} color={color} opacity={0.4 * glow} />
+          <GlowPlane size={[length * 1.15, thickness * 9 * glow]} color={color} opacity={0.55 * glow} />
         )}
       </group>
     </group>
@@ -261,7 +261,7 @@ export function NeonSignPanel({
         <meshStandardMaterial color={PANEL} roughness={0.5} metalness={0.4} />
       </mesh>
       {/* 辉光 */}
-      <GlowPlane size={[width * 1.35, height * 2.6]} color={color} opacity={0.32} position={[0, 0, 0.02]} />
+      <GlowPlane size={[width * 1.35, height * 2.6]} color={color} opacity={0.45} position={[0, 0, 0.02]} />
       <Text
         position={[0, sub ? height * 0.12 : 0, 0.1]}
         fontSize={fs}

@@ -81,7 +81,7 @@ export default function OfficeStage3D() {
   const layerInfo = baseLayer ? BASE_LAYER_INFO[baseLayer] : null;
 
   return (
-    <div className="relative h-full w-full overflow-hidden" style={{ background: '#1A1B1E' }}>
+    <div className="relative h-full w-full overflow-hidden" style={{ background: '#0E1626' }}>
       {/* Top label */}
       <div className="absolute top-3 left-3 right-3 z-10 pointer-events-none flex items-start justify-between gap-3">
         <StageLabel />
@@ -93,8 +93,8 @@ export default function OfficeStage3D() {
       <Canvas
         dpr={[1, 1.6]}
         shadows
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.28 }}
-        style={{ background: '#1A1B1E' }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.6 }}
+        style={{ background: '#0E1626' }}
       >
         <PerspectiveCamera makeDefault position={[-11, 15, 25]} fov={43} near={0.5} far={260} />
         <OrbitControls
@@ -125,7 +125,7 @@ export default function OfficeStage3D() {
       {/* 暗角景深（纯 CSS） */}
       <div
         className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 75% 68% at 50% 42%, transparent 55%, rgba(4,8,18,0.55) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse 78% 72% at 50% 42%, transparent 62%, rgba(6,10,22,0.32) 100%)' }}
       />
 
       {/* 基座层详情面板（点击 Agent OS / Data OS 基座展开） */}

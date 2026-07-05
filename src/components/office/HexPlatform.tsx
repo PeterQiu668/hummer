@@ -19,8 +19,8 @@ const DECK_D = 6.8;  // 下层甲板 z 6.6..13.4
 const DECK_CZ = 10;
 const DECK_Y = -1.35;
 const WALL_Z = -13;
-const STRUCT = '#232B38';
-const STRUCT_DARK = '#171D28';
+const STRUCT = '#334157';
+const STRUCT_DARK = '#232E42';
 
 /** 幕墙窗（竖梃 + 玻璃 + 上下横梁），跨 x∈[-6,17] */
 function WindowWall() {
@@ -54,7 +54,7 @@ function WindowWall() {
         <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
       </mesh>
       {/* 窗侧微光（城市光晕） */}
-      <GlowPlane size={[W, 3.2]} color="#5B7FB0" opacity={0.06} position={[CX, 3, 0.3]} />
+      <GlowPlane size={[W, 3.2]} color="#5B7FB0" opacity={0.16} position={[CX, 3, 0.3]} />
     </group>
   );
 }
@@ -100,7 +100,7 @@ function SignWall() {
 
 export default function HexPlatform() {
   const rootRef = useAutoShadows();
-  const carpetTex = useMemo(() => getCarpetTexture('#2E3949', 'floor-v13'), []);
+  const carpetTex = useMemo(() => getCarpetTexture('#3E4C66', 'floor-v13'), []);
 
   // 地面拼板缝网格
   const gridLines = useMemo(() => {
@@ -115,24 +115,24 @@ export default function HexPlatform() {
       {/* ── 主楼板 ── */}
       <mesh position={[0, -0.25, MAIN_CZ]}>
         <boxGeometry args={[MAIN_W, 0.5, MAIN_D]} />
-        <meshStandardMaterial map={carpetTex} color="#A9B6CC" roughness={0.55} metalness={0.15} />
+        <meshStandardMaterial map={carpetTex} color="#C9D4E8" roughness={0.55} metalness={0.15} />
       </mesh>
       {/* 镜面反射地面（拉丝反射 · 霓虹倒影的关键） */}
       <mesh position={[0, 0.003, MAIN_CZ]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[MAIN_W - 0.2, MAIN_D - 0.2]} />
         <MeshReflectorMaterial
           resolution={512}
-          mirror={0.45}
+          mirror={0.55}
           mixBlur={1}
           blur={[300, 80]}
-          mixStrength={7}
+          mixStrength={4.5}
           mixContrast={1}
-          depthScale={1.1}
+          depthScale={0.8}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.4}
-          color="#1E2735"
-          roughness={0.8}
-          metalness={0.3}
+          color="#31405A"
+          roughness={0.6}
+          metalness={0.2}
         />
       </mesh>
       {/* 主楼板前缘（z=7）沿口 + 霓虹 */}
@@ -148,11 +148,11 @@ export default function HexPlatform() {
       {/* ── 下层甲板 ── */}
       <mesh position={[0, DECK_Y - 0.5, DECK_CZ]}>
         <boxGeometry args={[MAIN_W, 1.0, DECK_D]} />
-        <meshStandardMaterial color="#222A38" roughness={0.6} metalness={0.2} />
+        <meshStandardMaterial color="#2F3B52" roughness={0.6} metalness={0.2} />
       </mesh>
       <mesh position={[0, DECK_Y + 0.012, DECK_CZ + 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[MAIN_W - 0.4, DECK_D - 0.6]} />
-        <meshStandardMaterial color="#1B2230" roughness={0.75} metalness={0.2} />
+        <meshStandardMaterial color="#2A3448" roughness={0.75} metalness={0.2} />
       </mesh>
       {/* 甲板前缘斜切 + 霓虹导引线 */}
       <mesh position={[0, DECK_Y - 0.5, 13.55]} rotation={[0.35, 0, 0]}>
@@ -161,7 +161,7 @@ export default function HexPlatform() {
       </mesh>
       <mesh position={[0, DECK_Y + 0.02, 13.15]}>
         <boxGeometry args={[MAIN_W - 2, 0.02, 0.02]} />
-        <meshBasicMaterial color={NEON} transparent opacity={0.6} toneMapped={false} />
+        <meshBasicMaterial color={NEON} transparent opacity={0.85} toneMapped={false} />
       </mesh>
 
       {/* ── 中央大台阶（主层 → 下层） ── */}
@@ -199,7 +199,7 @@ export default function HexPlatform() {
       {/* ── 地面拼板缝 ── */}
       <Instances limit={gridLines.length}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#39434F" transparent opacity={0.35} />
+        <meshBasicMaterial color="#4A5670" transparent opacity={0.5} />
         {gridLines.map((l, i) => (
           <Instance key={i} position={l.pos} scale={l.scl} />
         ))}
