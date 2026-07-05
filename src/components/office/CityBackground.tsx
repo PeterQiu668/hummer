@@ -73,9 +73,9 @@ export default function CityBackground() {
 
   return (
     <>
-      <color attach="background" args={['#0a0f1e']} />
+      <color attach="background" args={['#0A101E']} />
       {/* fog 拉远：室内不受影响，幕墙外城市夜景可见 */}
-      <fog attach="fog" args={['#0a0f1e', 70, 160]} />
+      <fog attach="fog" args={['#0A101E', 34, 110]} />
 
       {/* 楼栋 · 单位盒实例化（1 draw call） */}
       <Instances limit={buildings.length} frustumCulled={false}>

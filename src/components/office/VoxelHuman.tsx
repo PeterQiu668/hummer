@@ -228,6 +228,8 @@ export interface VoxelHumanProps {
   isSelected: boolean;
   seed: string;
   skin: string;
+  /** 姿态：seated 屈腿坐姿（整体下沉），stand 直立 */
+  pose?: 'stand' | 'sit';
   /** 工位显示器材质（打字状态时做屏幕闪烁） */
   screenMatRef?: React.RefObject<THREE.MeshBasicMaterial>;
   screenBaseColor?: string;
@@ -235,7 +237,7 @@ export interface VoxelHumanProps {
 }
 
 export default function VoxelHuman({
-  position, look, status, isSelected, seed, skin, screenMatRef, screenBaseColor, onClick,
+  position, look, status, isSelected, seed, skin, pose = 'stand', screenMatRef, screenBaseColor, onClick,
 }: VoxelHumanProps) {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered && !!onClick);
@@ -385,13 +387,63 @@ export default function VoxelHuman({
             <meshStandardMaterial color={look.outfit} roughness={0.55} />
           </mesh>
         </group>
+        {/* 双腿（深色西裤 + 鞋）· 站姿直立 / 坐姿屈腿 */}
+        {pose === 'stand' ? (
+          <>
+            <mesh position={[-0.11, 0.5, 0]}>
+              <boxGeometry args={[0.14, 0.6, 0.17]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            <mesh position={[0.11, 0.5, 0]}>
+              <boxGeometry args={[0.14, 0.6, 0.17]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            <mesh position={[-0.11, 0.18, 0.04]}>
+              <boxGeometry args={[0.14, 0.09, 0.26]} />
+              <meshStandardMaterial color="#15181E" roughness={0.5} />
+            </mesh>
+            <mesh position={[0.11, 0.18, 0.04]}>
+              <boxGeometry args={[0.14, 0.09, 0.26]} />
+              <meshStandardMaterial color="#15181E" roughness={0.5} />
+            </mesh>
+          </>
+        ) : (
+          <>
+            {/* 大腿（水平前伸） */}
+            <mesh position={[-0.11, 0.68, 0.2]}>
+              <boxGeometry args={[0.14, 0.15, 0.42]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            <mesh position={[0.11, 0.68, 0.2]}>
+              <boxGeometry args={[0.14, 0.15, 0.42]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            {/* 小腿（垂下） */}
+            <mesh position={[-0.11, 0.38, 0.38]}>
+              <boxGeometry args={[0.13, 0.5, 0.14]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            <mesh position={[0.11, 0.38, 0.38]}>
+              <boxGeometry args={[0.13, 0.5, 0.14]} />
+              <meshStandardMaterial color="#23272F" roughness={0.7} />
+            </mesh>
+            <mesh position={[-0.11, 0.12, 0.44]}>
+              <boxGeometry args={[0.13, 0.08, 0.24]} />
+              <meshStandardMaterial color="#15181E" roughness={0.5} />
+            </mesh>
+            <mesh position={[0.11, 0.12, 0.44]}>
+              <boxGeometry args={[0.13, 0.08, 0.24]} />
+              <meshStandardMaterial color="#15181E" roughness={0.5} />
+            </mesh>
+          </>
+        )}
         {/* 颈 */}
         <mesh position={[0, TORSO_Y + 0.31, 0]}>
-          <boxGeometry args={[0.14, 0.1, 0.14]} />
+          <boxGeometry args={[0.12, 0.1, 0.12]} />
           <meshStandardMaterial color={skin} roughness={0.6} />
         </mesh>
-        {/* 头部组（chibi 大头 + 发型 + 头部配饰） */}
-        <group ref={headRef} position={[0, HEAD_Y, 0]}>
+        {/* 头部组（正常比例 · 整组缩放去 Q 版化） */}
+        <group ref={headRef} position={[0, HEAD_Y, 0]} scale={0.76}>
           <mesh>
             <boxGeometry args={[0.36, 0.32, 0.32]} />
             <meshStandardMaterial color={skin} roughness={0.6} />

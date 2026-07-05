@@ -1,35 +1,37 @@
 /**
- * 灯光 v11 · 写实渲染
- * - 主光实时阴影（PCFSoft，覆盖整个楼层）—— 立体感的核心
- * - 纯灯光方案：Environment portal 渲染在部分环境下会间歇性污染渲染目标（黑屏），不使用
+ * 灯光 v13 · SYBERNETIC 夜景室内
+ * 冷色窗光主光（投影）+ 半球底光 + 霓虹青色点光溢光（假 GI）
  */
 export default function Lighting() {
   return (
     <>
-      <ambientLight intensity={0.68} color="#D8E0EF" />
-      <hemisphereLight args={['#C4D2EC', '#232833', 0.62]} />
-      {/* 暖白主光（投影） */}
+      <ambientLight intensity={0.52} color="#3D4E6C" />
+      <hemisphereLight args={['#3D4E6C', '#10141C', 0.7]} />
+      {/* 冷色主光：来自幕墙方向（投影） */}
       <directionalLight
-        position={[9, 17, 11]}
-        intensity={1.6}
-        color="#FFEDD0"
+        position={[4, 14, -11]}
+        intensity={1.15}
+        color="#AFC8E8"
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-left={-22}
+        shadow-camera-right={22}
+        shadow-camera-top={22}
+        shadow-camera-bottom={-22}
         shadow-camera-near={2}
-        shadow-camera-far={55}
+        shadow-camera-far={60}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
       />
-      {/* 辅光（不投影，柔化暗部） */}
-      <directionalLight position={[-8, 12, 5]} intensity={0.45} color="#F2E6D0" />
-      {/* 冷色窗光 */}
-      <directionalLight position={[-14, 8, -12]} intensity={0.4} color="#8FB0E8" />
-      {/* 金属/玻璃高光补偿（无环境贴图时的点缀高光） */}
-      <pointLight position={[0, 6, 2]} intensity={18} distance={26} decay={2} color="#FFEFD6" />
+      {/* 正面补光（镜头方向，柔化人物面部） */}
+      <directionalLight position={[-4, 10, 16]} intensity={0.42} color="#7FA8D8" />
+      {/* 霓虹溢光点光（假 GI · 让青色打在附近表面上） */}
+      <pointLight position={[3.5, 2.8, 3.5]} intensity={4} distance={7} decay={2} color="#35C7F0" />
+      <pointLight position={[-11.5, 4.5, -11.5]} intensity={5} distance={9} decay={2} color="#35C7F0" />
+      <pointLight position={[1, 4.5, -11.8]} intensity={3} distance={6} decay={2} color="#35C7F0" />
+      <pointLight position={[12.8, 0.2, 8]} intensity={3.5} distance={6} decay={2} color="#35C7F0" />
+      <pointLight position={[14, 2, 1.5]} intensity={2.5} distance={6} decay={2} color="#58E6D9" />
+      <pointLight position={[-14.5, -0.4, 8]} intensity={2} distance={5} decay={2} color="#46C68A" />
     </>
   );
 }

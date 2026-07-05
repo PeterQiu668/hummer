@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import CityBackground from './CityBackground';
 import HexPlatform from './HexPlatform';
-import BasePedestal, { HQSign, type BaseLayerId } from './BasePedestal';
+import BasePedestal, { type BaseLayerId } from './BasePedestal';
 import ZonePlatform, { ZONE_SPECS } from './ZonePlatform';
 import Workstations from './Workstations';
 import CameraRig3D from './CameraRig3D';
@@ -96,28 +96,29 @@ export default function OfficeStage3D() {
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.28 }}
         style={{ background: '#1A1B1E' }}
       >
-        <PerspectiveCamera makeDefault position={[0, 21, 37]} fov={43} near={0.5} far={260} />
+        <PerspectiveCamera makeDefault position={[-11, 15, 25]} fov={43} near={0.5} far={260} />
         <OrbitControls
           makeDefault enablePan={false}
-          minDistance={10} maxDistance={75}
-          minPolarAngle={Math.PI * 0.12}
+          minDistance={8} maxDistance={70}
+          minPolarAngle={Math.PI * 0.1}
           maxPolarAngle={Math.PI * 0.46}
           enableDamping dampingFactor={0.08}
-          target={[0, -0.8, 0]}
+          target={[1.5, 0.6, -2]}
         />
         <CameraRig3D />
         <Suspense fallback={null}>
           <CityBackground />
           <Lighting />
           <HexPlatform />
-          <BasePedestal activeLayer={baseLayer} onSelect={(id) => setBaseLayer((cur) => (cur === id ? null : id))} />
-          <HQSign />
+          <group position-y={-2.4}>
+            <BasePedestal activeLayer={baseLayer} onSelect={(id) => setBaseLayer((cur) => (cur === id ? null : id))} />
+          </group>
           {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
           <Workstations />
           <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
           <FloatingParticles count={90} color="#7FA8DF" />
-
-          {/* 注：EffectComposer 在部分 GPU 上卡死渲染循环，质感由实时阴影 + 纹理 + 环境反射承担 */}
+          {/* 注：后期 bloom（pmndrs 与 three 原生 composer）在此 GPU 上均输出黑屏，
+              霓虹辉光由 GlowPlane 加性贴片承担（neon.tsx） */}
         </Suspense>
       </Canvas>
 

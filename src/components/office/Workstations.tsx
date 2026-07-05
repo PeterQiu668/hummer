@@ -1,312 +1,360 @@
 /**
- * Workstations (v10) · 真实现代办公家具
- * - 槽位系统（scenePositions.WS_SLOTS）：网格化布局 + 朝向 + 家具变体
- * - 变体：desk 木纹办公桌 / exec 老板桌 / table 会议圆桌 / lounge 沙发 / pod 训练舱
- * - 人物面向镜头，桌子在人物身前；桌前缘状态 LED 灯带承载状态色
- * - 名牌仅在选中或分区聚焦时显示（降噪）
+ * Workstations v14 · SYBERNETIC HQ 1:1
+ * - 岛式工位 Pod：整体桌岛（基座缝光 + 台面霓虹缘 + 中脊隔板）+ 2排×4席对坐 + 人手全息屏
+ * - 高管台 / 会议舱圆桌（中央全息投影）/ 休闲沙发组 / 健身角（跑步机充电）
+ * - 人物：坐姿体素小人（状态动作保留），名牌仅选中/分区聚焦显示
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { RoundedBox, Text } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { workstations } from '../../data/workstations';
 import { employees } from '../../data/employees';
 import { marketEmployees } from '../../data/marketplace';
 import { useAppStore } from '../../store/useAppStore';
-import { resolveSlot, type SlotVariant } from './scenePositions';
-import VoxelHuman, { AGENT_LOOKS, TRAINEE_LOOK, STATUS_COLOR, hashCode, type FigureLook } from './VoxelHuman';
-import { getWoodTexture } from './textures';
+import { resolveSlot, PODS, seatLocal, type SlotVariant, type PodDef } from './scenePositions';
+import VoxelHuman, { AGENT_LOOKS, TRAINEE_LOOK, hashCode, type FigureLook } from './VoxelHuman';
+import { NEON, HoloScreen, GlowPlane } from './neon';
 import { useAutoShadows } from './useAutoShadows';
 import type { Employee } from '../../lib/types';
 
 export const HIRES_CHANGED_EVENT = 'hummer-hires-changed';
 
 const SKIN_TONES = ['#F5D7B5', '#EBC094', '#D4A276'];
-const WOOD = '#D4B489';
-const WOOD_DARK = '#96754F';
-const METAL_DARK = '#2A2F38';
-const FABRIC = '#5C6577';
+const CHAIR = '#20262F';
+const ISLAND = '#232B38';
+const ISLAND_TOP = '#2A3342';
+const ISLAND_DARK = '#171D28';
 
 const FALLBACK_LOOK: FigureLook = {
-  outfit: '#0F70B7', hair: 'neat', hairColor: '#2A2723', accessories: [], build: 'default',
+  outfit: '#2B3038', hair: 'neat', hairColor: '#2A2723', accessories: [], build: 'default',
 };
 
-/* ───────────── 现代办公桌（木纹面 + 白侧板 + 显示器 + 键盘 + 状态灯带） ───────────── */
-function ModernDesk({ statusColor, screenMatRef, dim }: {
-  statusColor?: string;
-  screenMatRef?: React.RefObject<THREE.MeshBasicMaterial>;
-  dim?: boolean;
-}) {
+const HOLO_KINDS = ['dashboard', 'chart', 'rings', 'dashboard'] as const;
+
+/* ───────────── 科幻办公椅 ───────────── */
+function SciChair(props: JSX.IntrinsicElements['group']) {
   return (
-    <group>
-      {/* 桌面（木纹 + 圆角） */}
-      <RoundedBox args={[1.5, 0.05, 0.7]} radius={0.018} smoothness={2} position={[0, 0.72, 0.75]}>
-        <meshStandardMaterial map={getWoodTexture()} color={dim ? '#B09C7E' : '#E8D4B2'} roughness={0.55} metalness={0.05} />
-      </RoundedBox>
-      {/* 侧板腿 */}
-      <mesh position={[-0.68, 0.36, 0.75]}>
-        <boxGeometry args={[0.05, 0.7, 0.6]} />
-        <meshStandardMaterial color="#D8DBE0" roughness={0.5} metalness={0.15} />
+    <group {...props}>
+      <mesh position={[0, 0.48, -0.1]}>
+        <boxGeometry args={[0.5, 0.07, 0.5]} />
+        <meshStandardMaterial color={CHAIR} roughness={0.7} />
       </mesh>
-      <mesh position={[0.68, 0.36, 0.75]}>
-        <boxGeometry args={[0.05, 0.7, 0.6]} />
-        <meshStandardMaterial color="#D8DBE0" roughness={0.5} metalness={0.15} />
+      <mesh position={[0, 0.85, -0.38]} rotation={[-0.08, 0, 0]}>
+        <boxGeometry args={[0.48, 0.62, 0.06]} />
+        <meshStandardMaterial color={CHAIR} roughness={0.7} />
       </mesh>
-      {/* 显示器（屏幕面向人物；镜头看到背板 + 顶部散热缝光） */}
-      <mesh position={[0, 0.83, 0.95]}>
-        <cylinderGeometry args={[0.09, 0.13, 0.02, 8]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.5} roughness={0.4} />
+      <mesh position={[0, 0.3, -0.1]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.32, 6]} />
+        <meshStandardMaterial color="#3A424E" metalness={0.7} roughness={0.3} />
       </mesh>
-      <mesh position={[0, 0.92, 0.95]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.18, 6]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.5} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 1.12, 0.94]}>
-        <boxGeometry args={[0.8, 0.44, 0.035]} />
-        <meshStandardMaterial color="#252A33" metalness={0.4} roughness={0.35} />
-      </mesh>
-      {/* 屏幕（朝 -z 即人物侧） */}
-      <mesh position={[0, 1.12, 0.918]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[0.74, 0.38]} />
-        <meshBasicMaterial ref={screenMatRef} color={dim ? '#2A3140' : '#9FC3EF'} toneMapped={false} />
-      </mesh>
-      {/* 显示器顶部散热缝光（镜头可见的科技细节） */}
-      {!dim && (
-        <mesh position={[0, 1.335, 0.94]}>
-          <boxGeometry args={[0.78, 0.015, 0.02]} />
-          <meshBasicMaterial color="#7FA8DF" transparent opacity={0.5} toneMapped={false} />
-        </mesh>
-      )}
-      {/* 键盘 + 鼠标 */}
-      <mesh position={[0.02, 0.755, 0.52]}>
-        <boxGeometry args={[0.46, 0.02, 0.15]} />
-        <meshStandardMaterial color={METAL_DARK} roughness={0.5} />
-      </mesh>
-      <mesh position={[0.36, 0.755, 0.55]}>
-        <boxGeometry args={[0.07, 0.02, 0.11]} />
-        <meshStandardMaterial color={METAL_DARK} roughness={0.5} />
-      </mesh>
-      {/* 桌前缘状态 LED 灯带（面向镜头） */}
-      <mesh position={[0, 0.705, 1.105]}>
-        <boxGeometry args={[1.5, 0.028, 0.015]} />
-        <meshBasicMaterial
-          color={statusColor ?? '#39404E'}
-          transparent
-          opacity={statusColor ? 0.95 : 0.4}
-          toneMapped={false}
-        />
+      <mesh position={[0, 0.13, -0.1]}>
+        <cylinderGeometry args={[0.26, 0.28, 0.025, 10]} />
+        <meshStandardMaterial color="#2A303A" metalness={0.6} roughness={0.4} />
       </mesh>
     </group>
   );
 }
 
-/* ───────────── 人体工学椅 ───────────── */
-function OfficeChair({ z = -0.28 }: { z?: number }) {
+/* ───────────── 办公岛（4.6×2 · 8 席） ───────────── */
+function PodIsland({ pod }: { pod: PodDef }) {
   return (
-    <group position={[0, 0, z]}>
-      <RoundedBox args={[0.48, 0.09, 0.46]} radius={0.03} smoothness={2} position={[0, 0.5, 0]}>
-        <meshStandardMaterial color="#353B47" roughness={0.75} />
-      </RoundedBox>
-      <RoundedBox args={[0.46, 0.62, 0.07]} radius={0.03} smoothness={2} position={[0, 0.88, -0.22]} rotation={[-0.08, 0, 0]}>
-        <meshStandardMaterial color="#353B47" roughness={0.75} />
-      </RoundedBox>
-      {/* 扶手 */}
-      <mesh position={[-0.24, 0.65, -0.04]}>
-        <boxGeometry args={[0.04, 0.05, 0.3]} />
-        <meshStandardMaterial color="#2A2F38" roughness={0.5} metalness={0.3} />
+    <group position={[pod.center[0], pod.y, pod.center[1]]} rotation={[0, pod.rotY, 0]}>
+      {/* 基座缝光 */}
+      <mesh position={[0, 0.06, 0]}>
+        <boxGeometry args={[4.4, 0.12, 1.8]} />
+        <meshStandardMaterial color={ISLAND_DARK} roughness={0.6} metalness={0.3} />
       </mesh>
-      <mesh position={[0.24, 0.65, -0.04]}>
-        <boxGeometry args={[0.04, 0.05, 0.3]} />
-        <meshStandardMaterial color="#2A2F38" roughness={0.5} metalness={0.3} />
+      <mesh position={[0, 0.11, 0]}>
+        <boxGeometry args={[4.42, 0.015, 1.82]} />
+        <meshBasicMaterial color={NEON} transparent opacity={0.5} toneMapped={false} />
       </mesh>
-      <mesh position={[0, 0.32, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.36, 6]} />
-        <meshStandardMaterial color="#4A505C" metalness={0.7} roughness={0.3} />
+      {/* 桌体 */}
+      <mesh position={[0, 0.44, 0]}>
+        <boxGeometry args={[4.6, 0.62, 2.0]} />
+        <meshStandardMaterial color={ISLAND} roughness={0.5} metalness={0.3} />
       </mesh>
-      <mesh position={[0, 0.14, 0]}>
-        <cylinderGeometry args={[0.26, 0.26, 0.025, 10]} />
-        <meshStandardMaterial color="#3A404C" metalness={0.6} roughness={0.4} />
-      </mesh>
-    </group>
-  );
-}
-
-/* ───────────── 老板桌（加宽胡桃木 + 双显示器 + 台灯 + 地毯） ───────────── */
-function ExecDesk({ statusColor, screenMatRef }: {
-  statusColor?: string;
-  screenMatRef?: React.RefObject<THREE.MeshBasicMaterial>;
-}) {
-  return (
-    <group>
-      {/* 区域地毯 */}
-      <mesh position={[0, 0.006, 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[3.4, 2.6]} />
-        <meshStandardMaterial color="#2B3040" roughness={0.95} />
-      </mesh>
-      {/* 桌面（深色胡桃木纹 + 圆角） */}
-      <RoundedBox args={[2.3, 0.07, 0.95]} radius={0.02} smoothness={2} position={[0, 0.74, 0.8]}>
-        <meshStandardMaterial map={getWoodTexture('#96754F', '#6E5236', 'walnut')} color="#C9A87E" roughness={0.45} metalness={0.08} />
-      </RoundedBox>
-      {/* 前挡板 */}
-      <mesh position={[0, 0.42, 1.1]}>
-        <boxGeometry args={[2.3, 0.6, 0.05]} />
-        <meshStandardMaterial map={getWoodTexture('#96754F', '#6E5236', 'walnut')} color="#A88B62" roughness={0.55} />
-      </mesh>
-      {/* 腿 */}
-      <mesh position={[-1.05, 0.36, 0.8]}>
-        <boxGeometry args={[0.08, 0.72, 0.8]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.6} roughness={0.35} />
-      </mesh>
-      <mesh position={[1.05, 0.36, 0.8]}>
-        <boxGeometry args={[0.08, 0.72, 0.8]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.6} roughness={0.35} />
-      </mesh>
-      {/* 双显示器 */}
-      {[-0.46, 0.46].map((x, i) => (
-        <group key={i} position={[x, 0, 0]} rotation={[0, i === 0 ? 0.28 : -0.28, 0]}>
-          <mesh position={[0, 1.18, 1.0]}>
-            <boxGeometry args={[0.78, 0.46, 0.035]} />
-            <meshStandardMaterial color="#252A33" metalness={0.4} roughness={0.35} />
-          </mesh>
-          <mesh position={[0, 1.18, 0.978]} rotation={[0, Math.PI, 0]}>
-            <planeGeometry args={[0.72, 0.4]} />
-            <meshBasicMaterial ref={i === 0 ? screenMatRef : undefined} color="#9FC3EF" toneMapped={false} />
-          </mesh>
-          <mesh position={[0, 0.9, 1.0]}>
-            <cylinderGeometry args={[0.025, 0.025, 0.24, 6]} />
-            <meshStandardMaterial color={METAL_DARK} />
-          </mesh>
-        </group>
-      ))}
-      {/* 黄铜台灯 */}
-      <mesh position={[0.95, 0.92, 0.7]}>
-        <cylinderGeometry args={[0.015, 0.015, 0.3, 6]} />
-        <meshStandardMaterial color="#B9975B" metalness={0.8} roughness={0.25} />
-      </mesh>
-      <mesh position={[0.88, 1.06, 0.7]} rotation={[0, 0, 0.7]}>
-        <cylinderGeometry args={[0.05, 0.08, 0.12, 8]} />
-        <meshStandardMaterial color="#B9975B" metalness={0.8} roughness={0.25} emissive="#FFE9BE" emissiveIntensity={0.6} />
-      </mesh>
-      {/* 状态 LED */}
-      <mesh position={[0, 0.72, 1.28]}>
-        <boxGeometry args={[2.3, 0.03, 0.015]} />
-        <meshBasicMaterial color={statusColor ?? '#39404E'} transparent opacity={0.95} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-/* ───────────── 会议圆桌（含全息投影 + 空椅） ───────────── */
-function MeetingTable() {
-  const holoRef = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (holoRef.current) holoRef.current.rotation.y = clock.elapsedTime * 0.5;
-  });
-  return (
-    <group>
-      <mesh position={[0, 0.72, 0]}>
-        <cylinderGeometry args={[1.15, 1.15, 0.06, 32]} />
-        <meshStandardMaterial map={getWoodTexture()} color="#E8D4B2" roughness={0.5} metalness={0.05} />
-      </mesh>
-      <mesh position={[0, 0.38, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.66, 8]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.6} roughness={0.35} />
-      </mesh>
-      <mesh position={[0, 0.05, 0]}>
-        <cylinderGeometry args={[0.5, 0.55, 0.05, 16]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.6} roughness={0.35} />
-      </mesh>
-      {/* 全息投影台 + 旋转全息环 */}
+      {/* 台面板（悬挑） */}
       <mesh position={[0, 0.78, 0]}>
-        <cylinderGeometry args={[0.14, 0.16, 0.05, 10]} />
-        <meshStandardMaterial color="#1A2030" metalness={0.5} roughness={0.3} />
+        <boxGeometry args={[4.7, 0.06, 2.15]} />
+        <meshStandardMaterial color={ISLAND_TOP} roughness={0.4} metalness={0.35} />
       </mesh>
-      <mesh ref={holoRef} position={[0, 1.25, 0]}>
-        <torusGeometry args={[0.28, 0.015, 8, 32]} />
-        <meshBasicMaterial color="#B07CF0" transparent opacity={0.7} toneMapped={false} />
+      {/* 台面霓虹缘 ×2 */}
+      <mesh position={[0, 0.81, 1.06]}>
+        <boxGeometry args={[4.68, 0.02, 0.02]} />
+        <meshBasicMaterial color={NEON} toneMapped={false} />
       </mesh>
-      <mesh position={[0, 1.05, 0]}>
-        <cylinderGeometry args={[0.05, 0.3, 0.55, 12, 1, true]} />
-        <meshBasicMaterial color="#B07CF0" transparent opacity={0.08} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+      <mesh position={[0, 0.81, -1.06]}>
+        <boxGeometry args={[4.68, 0.02, 0.02]} />
+        <meshBasicMaterial color={NEON} toneMapped={false} />
       </mesh>
-      {/* 椅子：两个与会位（±x）+ 三把空椅 */}
-      {[0, Math.PI, Math.PI * 0.5, Math.PI * 1.3, Math.PI * 1.7].map((a, i) => (
-        <group key={i} position={[Math.cos(a) * 1.7, 0, Math.sin(a) * 1.7]} rotation={[0, -a - Math.PI / 2, 0]}>
-          <OfficeChair z={0} />
-        </group>
+      {/* 中脊隔板 + 槽灯 */}
+      <mesh position={[0, 0.96, 0]}>
+        <boxGeometry args={[4.6, 0.34, 0.12]} />
+        <meshStandardMaterial color="#1E252F" roughness={0.45} metalness={0.35} />
+      </mesh>
+      {[-1.4, 0, 1.4].map((x) => (
+        <mesh key={x} position={[x, 0.99, 0]}>
+          <boxGeometry args={[0.7, 0.02, 0.14]} />
+          <meshBasicMaterial color={NEON} transparent opacity={0.7} toneMapped={false} />
+        </mesh>
       ))}
+      {/* 8 席椅子（含空位）+ 键盘 */}
+      {Array.from({ length: 8 }, (_, seat) => {
+        const { dx, dz, rotY } = seatLocal(seat);
+        return (
+          <group key={seat} position={[dx, 0, dz]} rotation={[0, rotY, 0]}>
+            <SciChair position={[0, 0, -0.32]} />
+            {/* 键盘（台面上，靠人一侧） */}
+            <mesh position={[0, 0.825, 0.62]}>
+              <boxGeometry args={[0.32, 0.02, 0.12]} />
+              <meshStandardMaterial color="#12161D" roughness={0.5} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
 
-/* ───────────── 休息区沙发组 ───────────── */
-function LoungeSofa() {
+/* ───────────── 高管控制台（夹层） ───────────── */
+function ExecConsole() {
   return (
     <group>
-      <mesh position={[0, 0.005, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[1.7, 24]} />
-        <meshStandardMaterial color="#31281F" roughness={0.95} />
+      {/* 桌板 + 侧板腿 + 前挡板霓虹 */}
+      <mesh position={[0, 0.78, 0.75]}>
+        <boxGeometry args={[3.4, 0.08, 1.3]} />
+        <meshStandardMaterial color={ISLAND_TOP} roughness={0.35} metalness={0.4} />
       </mesh>
-      {/* 沙发（圆角软包 + 坐垫分块） */}
-      <group position={[0, 0, -0.5]}>
-        <RoundedBox args={[1.7, 0.32, 0.68]} radius={0.06} smoothness={3} position={[0, 0.3, 0]}>
-          <meshStandardMaterial color={FABRIC} roughness={0.95} />
-        </RoundedBox>
-        {[-0.42, 0.42].map((x) => (
-          <RoundedBox key={x} args={[0.78, 0.1, 0.6]} radius={0.04} smoothness={3} position={[x, 0.49, 0.02]}>
-            <meshStandardMaterial color="#677185" roughness={0.95} />
-          </RoundedBox>
-        ))}
-        <RoundedBox args={[1.7, 0.5, 0.16]} radius={0.06} smoothness={3} position={[0, 0.62, -0.28]}>
-          <meshStandardMaterial color={FABRIC} roughness={0.95} />
-        </RoundedBox>
-        <RoundedBox args={[0.16, 0.44, 0.68]} radius={0.05} smoothness={3} position={[-0.84, 0.48, 0]}>
-          <meshStandardMaterial color={FABRIC} roughness={0.95} />
-        </RoundedBox>
-        <RoundedBox args={[0.16, 0.44, 0.68]} radius={0.05} smoothness={3} position={[0.84, 0.48, 0]}>
-          <meshStandardMaterial color={FABRIC} roughness={0.95} />
-        </RoundedBox>
+      <mesh position={[-1.55, 0.38, 0.75]}>
+        <boxGeometry args={[0.12, 0.76, 1.1]} />
+        <meshStandardMaterial color={ISLAND_DARK} metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[1.55, 0.38, 0.75]}>
+        <boxGeometry args={[0.12, 0.76, 1.1]} />
+        <meshStandardMaterial color={ISLAND_DARK} metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.42, 1.38]}>
+        <boxGeometry args={[3.4, 0.72, 0.06]} />
+        <meshStandardMaterial color={ISLAND} roughness={0.5} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.76, 1.42]}>
+        <boxGeometry args={[3.3, 0.025, 0.02]} />
+        <meshBasicMaterial color={NEON} toneMapped={false} />
+      </mesh>
+      {/* 大全息屏 */}
+      <HoloScreen w={1.75} h={0.95} kind="dashboard" seed={11} tilt={-0.12} position={[0, 1.45, 0.55]} />
+      <GlowPlane size={[2.4, 1.4]} color={NEON} opacity={0.15} position={[0, 1.4, 0.5]} />
+      {/* 高背椅 */}
+      <group position={[0, 0, 0]}>
+        <mesh position={[0, 0.5, -0.15]}>
+          <boxGeometry args={[0.55, 0.08, 0.52]} />
+          <meshStandardMaterial color="#12161D" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 1.05, -0.45]} rotation={[-0.06, 0, 0]}>
+          <boxGeometry args={[0.55, 1.05, 0.08]} />
+          <meshStandardMaterial color="#12161D" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 0.28, -0.15]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.3, 6]} />
+          <meshStandardMaterial color="#3A424E" metalness={0.7} roughness={0.3} />
+        </mesh>
       </group>
-      {/* 茶几 */}
-      <mesh position={[0, 0.3, 0.6]}>
-        <cylinderGeometry args={[0.4, 0.4, 0.04, 16]} />
-        <meshStandardMaterial color={WOOD_DARK} roughness={0.5} />
+      {/* 背柜 + 暖光台灯 */}
+      <mesh position={[0.4, 0.45, -1.5]}>
+        <boxGeometry args={[2.6, 0.9, 0.5]} />
+        <meshStandardMaterial color={ISLAND} roughness={0.5} metalness={0.3} />
       </mesh>
-      <mesh position={[0, 0.15, 0.6]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.28, 6]} />
-        <meshStandardMaterial color={METAL_DARK} metalness={0.6} />
-      </mesh>
+      <pointLight position={[1.2, 1.2, -1.4]} intensity={2.2} distance={4} decay={2} color="#D9A05B" />
     </group>
   );
 }
 
-/* ───────────── 训练舱（充电进化区） ───────────── */
-function TrainingPod() {
-  const ringMat = useRef<THREE.MeshBasicMaterial>(null);
+/* ───────────── 会议圆桌（中央全息投影） ───────────── */
+function ConferenceSet() {
+  const holoRing = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (ringMat.current) ringMat.current.opacity = 0.4 + 0.25 * Math.sin(clock.elapsedTime * 2);
+    if (holoRing.current) holoRing.current.rotation.z = clock.elapsedTime * 0.4;
   });
+  // 空椅（避开门口 200°-270° 和两个与会者 20°/160°）
+  const emptyAngles = [60, 110, 300, 340];
   return (
-    <group>
-      {/* 发光基座圆环 */}
-      <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.75, 0.92, 32]} />
-        <meshBasicMaterial ref={ringMat} color="#46C68A" transparent opacity={0.5} toneMapped={false} />
+    <group position={[3.5, 0.53, 3.5]}>
+      {/* 圆桌 */}
+      <mesh position={[0, 0.72, 0]}>
+        <cylinderGeometry args={[1.5, 1.5, 0.1, 32]} />
+        <meshStandardMaterial color="#1B222E" roughness={0.35} metalness={0.4} />
       </mesh>
-      <mesh position={[0, 0.03, 0]}>
-        <cylinderGeometry args={[0.75, 0.78, 0.06, 24]} />
-        <meshStandardMaterial color="#232B38" metalness={0.4} roughness={0.5} emissive="#46C68A" emissiveIntensity={0.06} />
+      <mesh position={[0, 0.36, 0]}>
+        <cylinderGeometry args={[0.5, 0.6, 0.72, 16]} />
+        <meshStandardMaterial color={ISLAND_DARK} metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* 弧形背板 */}
-      <mesh position={[0, 1.1, -0.55]}>
-        <cylinderGeometry args={[0.85, 0.85, 2.1, 16, 1, true, Math.PI * 0.7, Math.PI * 0.6]} />
-        <meshStandardMaterial color="#2A3242" metalness={0.4} roughness={0.5} side={THREE.DoubleSide} emissive="#46C68A" emissiveIntensity={0.08} />
+      {/* 台面同心全息环 */}
+      {[0.35, 0.7, 1.05, 1.35].map((r, i) => (
+        <mesh key={r} position={[0, 0.78, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[r - 0.025, r + 0.025, 48]} />
+          <meshBasicMaterial color="#4DD8FF" transparent opacity={0.7 - i * 0.13} toneMapped={false} />
+        </mesh>
+      ))}
+      {/* 全息投影：光锥 + 旋转环 + 核心 */}
+      <mesh position={[0, 1.16, 0]}>
+        <cylinderGeometry args={[0.6, 0.06, 0.7, 24, 1, true]} />
+        <meshBasicMaterial color="#4DD8FF" transparent opacity={0.1} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+      <mesh ref={holoRing} position={[0, 1.38, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.55, 0.02, 8, 48]} />
+        <meshBasicMaterial color="#9FE8FF" toneMapped={false} />
+      </mesh>
+      <mesh position={[0, 1.4, 0]}>
+        <sphereGeometry args={[0.12, 12, 12]} />
+        <meshBasicMaterial color="#B5ECFF" toneMapped={false} />
+      </mesh>
+      <GlowPlane size={[1.6, 1.6]} color="#4DD8FF" opacity={0.3} position={[0, 1.35, 0]} />
+      {/* 空椅 */}
+      {emptyAngles.map((deg) => {
+        const a = (deg * Math.PI) / 180;
+        const x = Math.cos(a) * 2.15;
+        const z = Math.sin(a) * 2.15;
+        return (
+          <group key={deg} position={[x, -0.08, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
+            <SciChair />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ───────────── 休闲沙发组 ───────────── */
+function SofaBlock({ width = 2.3, ...props }: { width?: number } & JSX.IntrinsicElements['group']) {
+  return (
+    <group {...props}>
+      <mesh position={[0, 0.24, 0]}>
+        <boxGeometry args={[width, 0.42, 0.95]} />
+        <meshStandardMaterial color="#232A35" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.62, -0.38]}>
+        <boxGeometry args={[width, 0.55, 0.22]} />
+        <meshStandardMaterial color="#232A35" roughness={0.9} />
+      </mesh>
+      <mesh position={[-width / 2 + 0.1, 0.5, 0]}>
+        <boxGeometry args={[0.2, 0.55, 0.95]} />
+        <meshStandardMaterial color="#1D2430" roughness={0.9} />
+      </mesh>
+      <mesh position={[width / 2 - 0.1, 0.5, 0]}>
+        <boxGeometry args={[0.2, 0.55, 0.95]} />
+        <meshStandardMaterial color="#1D2430" roughness={0.9} />
       </mesh>
     </group>
   );
 }
 
-/* ───────────── EmployeeFigure：按槽位变体组装 ───────────── */
+function LoungeSet() {
+  return (
+    <group position={[0, 0.35, 0]}>
+      {/* 对坐沙发 ×2 */}
+      <SofaBlock position={[10.6, 0, 2.2]} rotation={[0, Math.PI / 2, 0]} />
+      <SofaBlock position={[14.4, 0, 2.2]} rotation={[0, -Math.PI / 2, 0]} />
+      {/* 单人扶手椅 ×2（面向电视墙） */}
+      <SofaBlock width={1.1} position={[11.6, 0, 5.0]} rotation={[0, Math.PI, 0]} />
+      <SofaBlock width={1.1} position={[13.4, 0, 5.0]} rotation={[0, Math.PI, 0]} />
+      {/* 茶几（玻璃面） */}
+      <mesh position={[12.5, 0.36, 2.2]}>
+        <boxGeometry args={[1.3, 0.05, 0.7]} />
+        <meshStandardMaterial color="#A8E4F2" transparent opacity={0.22} roughness={0.1} metalness={0.2} />
+      </mesh>
+      <mesh position={[12.5, 0.18, 2.2]}>
+        <boxGeometry args={[1.1, 0.32, 0.5]} />
+        <meshStandardMaterial color={ISLAND_DARK} roughness={0.5} metalness={0.3} />
+      </mesh>
+      <mesh position={[12.3, 0.43, 2.2]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.08, 8]} />
+        <meshBasicMaterial color={NEON} transparent opacity={0.7} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ───────────── 跑步机（充电进化 · 数据官在此训练） ───────────── */
+function Treadmill(props: JSX.IntrinsicElements['group']) {
+  return (
+    <group {...props}>
+      <mesh position={[0, 0.09, 0.1]} rotation={[0.05, 0, 0]}>
+        <boxGeometry args={[0.75, 0.14, 1.75]} />
+        <meshStandardMaterial color="#1A2028" roughness={0.5} metalness={0.35} />
+      </mesh>
+      <mesh position={[0, 0.17, 0.12]} rotation={[0.05, 0, 0]}>
+        <boxGeometry args={[0.6, 0.02, 1.6]} />
+        <meshStandardMaterial color="#10141B" roughness={0.7} />
+      </mesh>
+      {/* 侧扶手 + 前控制台 */}
+      {[-0.34, 0.34].map((x) => (
+        <mesh key={x} position={[x, 0.7, -0.55]} rotation={[0.5, 0, 0]}>
+          <boxGeometry args={[0.05, 0.05, 0.9]} />
+          <meshStandardMaterial color="#3A424E" metalness={0.6} roughness={0.3} />
+        </mesh>
+      ))}
+      <group position={[0, 1.05, -0.92]}>
+        <mesh rotation={[-0.3, 0, 0]}>
+          <boxGeometry args={[0.6, 0.32, 0.06]} />
+          <meshStandardMaterial color="#12161D" roughness={0.4} metalness={0.4} />
+        </mesh>
+        <mesh position={[0, 0.02, 0.04]} rotation={[-0.3, 0, 0]}>
+          <planeGeometry args={[0.5, 0.22]} />
+          <meshBasicMaterial color="#46C68A" transparent opacity={0.75} toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function GymEquipment() {
+  return (
+    <group position={[0, -1.35, 0]}>
+      {/* 哑铃架 */}
+      <group position={[-12.4, 0, 7.4]} rotation={[0, -0.17, 0]}>
+        {[-0.7, 0.7].map((x) => (
+          <mesh key={x} position={[x, 0.55, 0]} rotation={[0.2, 0, 0]}>
+            <boxGeometry args={[0.08, 1.1, 0.6]} />
+            <meshStandardMaterial color="#262C36" metalness={0.5} roughness={0.4} />
+          </mesh>
+        ))}
+        {[0.35, 0.7, 1.05].map((y) => (
+          <mesh key={y} position={[0, y, (1.05 - y) * 0.35]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.022, 0.022, 1.4, 6]} />
+            <meshStandardMaterial color="#3A424E" metalness={0.6} roughness={0.3} />
+          </mesh>
+        ))}
+        {Array.from({ length: 8 }, (_, i) => {
+          const tier = i < 4 ? 0.35 : 0.7;
+          const x = -0.5 + (i % 4) * 0.33;
+          return (
+            <group key={i} position={[x, tier + 0.07, (1.05 - tier) * 0.35]} rotation={[0, 0, Math.PI / 2]}>
+              <mesh><cylinderGeometry args={[0.018, 0.018, 0.2, 6]} /><meshStandardMaterial color="#3A424E" metalness={0.5} /></mesh>
+              <mesh position={[0, 0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#262C36" roughness={0.5} /></mesh>
+              <mesh position={[0, -0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#262C36" roughness={0.5} /></mesh>
+            </group>
+          );
+        })}
+      </group>
+      {/* 训练凳 */}
+      <group position={[-13.6, 0, 9.6]} rotation={[0, 0.3, 0]}>
+        <mesh position={[0, 0.45, 0]}>
+          <boxGeometry args={[1.1, 0.08, 0.35]} />
+          <meshStandardMaterial color="#232A35" roughness={0.8} />
+        </mesh>
+        {[-0.45, 0.45].map((x) => (
+          <mesh key={x} position={[x, 0.22, 0]}>
+            <boxGeometry args={[0.06, 0.42, 0.3]} />
+            <meshStandardMaterial color="#1A2028" metalness={0.4} roughness={0.5} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+/* ───────────── EmployeeFigure：按槽位变体 ───────────── */
 const EmployeeFigure = memo(function EmployeeFigure({
   employee, pos, rotY, variant,
 }: { employee: Employee; pos: [number, number, number]; rotY: number; variant: SlotVariant }) {
@@ -315,51 +363,39 @@ const EmployeeFigure = memo(function EmployeeFigure({
   const setSelectedEmployee = useAppStore((s) => s.setSelectedEmployee);
   const look = AGENT_LOOKS[employee.id] ?? FALLBACK_LOOK;
   const skin = SKIN_TONES[hashCode(employee.id) % SKIN_TONES.length];
-  const screenMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const statusColor = STATUS_COLOR[employee.status];
   const showName = isSelected || zoneFocused;
+  const seated = variant === 'desk' || variant === 'exec' || variant === 'table' || variant === 'lounge';
+  const holoKind = HOLO_KINDS[hashCode(employee.id) % HOLO_KINDS.length];
 
   return (
-    <group position={pos} rotation={[0, rotY, 0]} scale={1.12}>
+    <group position={pos} rotation={[0, rotY, 0]}>
+      {variant === 'exec' && <ExecConsole />}
+      {variant === 'gym' && <Treadmill />}
+      {/* 席位全息屏（工位席） */}
       {variant === 'desk' && (
-        <>
-          <ModernDesk statusColor={statusColor} screenMatRef={screenMatRef} />
-          <OfficeChair />
-        </>
+        <group rotation={[0, Math.PI, 0]} position={[0, 0, 0.72]}>
+          <HoloScreen w={0.58} h={0.42} kind={holoKind} seed={hashCode(employee.id) % 17} tilt={-0.24} position={[0, 1.18, 0]} />
+        </group>
       )}
-      {variant === 'exec' && (
-        <>
-          <ExecDesk statusColor={statusColor} screenMatRef={screenMatRef} />
-          <OfficeChair z={-0.3} />
-        </>
-      )}
-      {variant === 'lounge' && <LoungeSofa />}
-      {variant === 'pod' && <TrainingPod />}
-      {/* table 变体的圆桌由 Workstations 在分区中心渲染一次 */}
-
-      {/* 体素小人（面向 +z；table/lounge 由槽位 rotY 决定朝向） */}
       <VoxelHuman
-        position={variant === 'lounge' ? [0.6, 0, 0.5] : [0, 0, 0]}
+        position={[0, seated ? -0.06 : variant === 'gym' ? 0.16 : 0, 0]}
         look={look}
         status={employee.status}
         isSelected={isSelected}
         seed={employee.id}
         skin={skin}
-        screenMatRef={variant === 'desk' || variant === 'exec' ? screenMatRef : undefined}
-        screenBaseColor="#9FC3EF"
+        pose={seated ? 'sit' : 'stand'}
         onClick={(e) => { e.stopPropagation(); setSelectedEmployee(employee); }}
       />
-
-      {/* 名牌：仅选中 / 分区聚焦时显示（降噪） */}
       {showName && (
         <Text
-          position={variant === 'lounge' ? [0.6, 2.1, 0.5] : [0, 2.1, 0]}
+          position={[0, 2.1, 0]}
           fontSize={0.16}
           color={isSelected ? '#FFFFFF' : '#B8C2D4'}
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.01}
-          outlineColor="#10151F"
+          outlineColor="#0A0F18"
         >
           {employee.name}
         </Text>
@@ -368,50 +404,30 @@ const EmployeeFigure = memo(function EmployeeFigure({
   );
 });
 
-/* ───────────── 空工位（简化桌 + 暗显示器） ───────────── */
-function EmptyDesk({ pos, rotY }: { pos: [number, number, number]; rotY: number }) {
-  return (
-    <group position={pos} rotation={[0, rotY, 0]} scale={1.12}>
-      <ModernDesk dim />
-      <OfficeChair />
-    </group>
-  );
-}
-
-/* ───────────── 沙箱试岗区（市场招聘员工） ───────────── */
+/* ───────────── 沙箱试岗区（下层甲板） ───────────── */
 function SandboxAnnex({ hiredIds }: { hiredIds: string[] }) {
   const hired = marketEmployees.filter((m) => hiredIds.includes(m.id));
   if (hired.length === 0) return null;
   return (
-    <group position={[0, 0, 10.2]}>
-      {/* 试岗区地毯 */}
-      <mesh position={[0, 0.008, 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[Math.max(5.6, hired.length * 2.4), 3]} />
-        <meshStandardMaterial color="#2A2820" roughness={0.95} emissive="#E8A33D" emissiveIntensity={0.02} />
+    <group position={[5.5, -1.35, 10.8]}>
+      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[Math.max(6, hired.length * 2.4), 3.4]} />
+        <meshStandardMaterial color="#1B222E" roughness={0.9} emissive="#E8A33D" emissiveIntensity={0.03} />
       </mesh>
-      <mesh position={[0, 0.012, 0.3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[Math.max(5.72, hired.length * 2.4 + 0.12), 3.12]} />
-        <meshBasicMaterial color="#E8A33D" transparent opacity={0.12} toneMapped={false} />
-      </mesh>
-      <Text position={[0, 0.03, 1.6]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.24} color="#E8A33D" anchorX="center" anchorY="middle">
-        沙箱 · 试岗区
+      <Text position={[0, 0.03, 1.85]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.28} color="#E8A33D" anchorX="center" anchorY="middle" letterSpacing={0.12}>
+        SANDBOX · TRIAL
       </Text>
       {hired.map((m, i) => {
         const x = (i - (hired.length - 1) / 2) * 2.4;
         const look: FigureLook = { ...TRAINEE_LOOK, outfit: m.color };
         return (
-          <group key={m.id} position={[x, 0.02, 0]} scale={1.12}>
-            <ModernDesk statusColor="#0F766E" />
-            <OfficeChair />
-            <VoxelHuman
-              position={[0, 0, 0]}
-              look={look}
-              status="training"
-              isSelected={false}
-              seed={m.id}
-              skin={SKIN_TONES[hashCode(m.id) % SKIN_TONES.length]}
-            />
-            <Text position={[0, 2.1, 0]} fontSize={0.15} color="#E8A33D" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#10151F">
+          <group key={m.id} position={[x, 0, 0]}>
+            <SciChair position={[0, 0, -0.32]} />
+            <group rotation={[0, Math.PI, 0]} position={[0, 0, 0.6]}>
+              <HoloScreen w={0.58} h={0.42} kind="chart" seed={i + 21} tilt={-0.24} position={[0, 1.15, 0]} />
+            </group>
+            <VoxelHuman position={[0, -0.06, 0]} look={look} status="training" isSelected={false} seed={m.id} skin={SKIN_TONES[hashCode(m.id) % SKIN_TONES.length]} pose="sit" />
+            <Text position={[0, 2.05, 0]} fontSize={0.15} color="#E8A33D" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#0A0F18">
               {`${m.name} · 试岗中`}
             </Text>
           </group>
@@ -439,7 +455,6 @@ export default function Workstations() {
     [],
   );
 
-  // 招聘自市场的员工 id：storage 事件（跨 tab）+ 自定义事件（同 tab）
   const [hiredIds, setHiredIds] = useState<string[]>(readHires);
   useEffect(() => {
     const read = () => setHiredIds(readHires());
@@ -454,26 +469,22 @@ export default function Workstations() {
     };
   }, []);
 
-  // 全树自动阴影（招聘变化后重新标记）
   const rootRef = useAutoShadows([hiredIds]);
 
   return (
     <group ref={rootRef}>
+      {/* 办公岛 ×4（含全部椅子） */}
+      {PODS.map((pod) => <PodIsland key={pod.id} pod={pod} />)}
+      {/* 员工（各变体） */}
       {slots.map(({ ws, slot }) => {
         const emp = ws.employeeId ? empById[ws.employeeId] : null;
-        if (emp) {
-          return <EmployeeFigure key={ws.id} employee={emp} pos={slot.pos} rotY={slot.rotY} variant={slot.variant} />;
-        }
-        // 空槽位：桌位画空桌，站立/沙发/舱位留白
-        if (slot.variant === 'desk') {
-          return <EmptyDesk key={ws.id} pos={slot.pos} rotY={slot.rotY} />;
-        }
-        return null;
+        if (!emp) return null;
+        return <EmployeeFigure key={ws.id} employee={emp} pos={slot.pos} rotY={slot.rotY} variant={slot.variant} />;
       })}
-      {/* 会议圆桌（渲染一次，与会者槽位绕桌分布） */}
-      <group position={[6.5, 0.06, 4]}>
-        <MeetingTable />
-      </group>
+      {/* 会议圆桌 + 休闲沙发组 + 健身器械 */}
+      <ConferenceSet />
+      <LoungeSet />
+      <GymEquipment />
       <SandboxAnnex hiredIds={hiredIds} />
     </group>
   );

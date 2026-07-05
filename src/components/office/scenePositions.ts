@@ -1,80 +1,102 @@
 /**
- * 3D 场景坐标系统 v2 · 显式工位槽位表
- * 此前用 2D 百分比坐标投影 → 工位散乱重叠。现在每个工位在分区局部坐标系
- * 里有确定的槽位（dx/dz 相对分区中心 + 朝向），布局是建筑化的网格阵列。
+ * 3D 场景坐标系统 v3 · SYBERNETIC HQ 1:1 布局
+ * 岛式工位 Pod（2 排 × 4 席对坐）+ 特殊席位（高管台/会议舱/休闲区/健身角）
+ * 坐标系：主楼板 x∈[-17,17] z∈[-13,7]，镜头在 +z 侧
  */
 import { workstations } from '../../data/workstations';
-import { ZONE_SPECS } from './ZonePlatform';
 
-export type SlotVariant = 'desk' | 'exec' | 'table' | 'lounge' | 'pod' | 'standing';
+export type SlotVariant = 'desk' | 'exec' | 'table' | 'lounge' | 'gym' | 'standing';
 
-export interface WsSlot {
-  zone: string;      // 所属平台（可与数据里的 zone 不同，如训练位归充电区）
-  dx: number;        // 相对分区中心 x
-  dz: number;        // 相对分区中心 z
-  rotY: number;      // 朝向（0 = 面向 +z 即镜头）
-  variant: SlotVariant;
+export interface PodDef {
+  id: 'A-1' | 'A-2' | 'B-1' | 'B-2';
+  center: [number, number]; // x,z
+  y: number;
+  rotY: number;
+  section: 'A' | 'B';
 }
 
-/** 每个工位 id → 槽位。业务区 3×4 网格；支持区 2×2；会议圆桌；老板独桌；休息沙发；充电舱 */
-export const WS_SLOTS: Record<string, WsSlot> = {
-  // ── 决策中心（抬高平台 · 独桌居中）──
-  'ws-exec-1': { zone: 'boss', dx: 0,    dz: -0.4, rotY: 0, variant: 'exec' },
-  'ws-exec-2': { zone: 'boss', dx: 2.3,  dz: 1.0,  rotY: 0, variant: 'desk' },
+/** 4 座办公岛（参考图 A-1/A-2/B-1/B-2） */
+export const PODS: PodDef[] = [
+  { id: 'A-1', center: [-13.0, -0.5], y: 0,   rotY: 0.2, section: 'A' },
+  { id: 'A-2', center: [-6.5, -3.5],  y: 0,   rotY: 0.2, section: 'A' },
+  { id: 'B-1', center: [-4.2, -8.8],  y: 0.3, rotY: 0,   section: 'B' },
+  { id: 'B-2', center: [1.8, -8.3],   y: 0.3, rotY: 0,   section: 'B' },
+];
 
-  // ── 业务办公区 · 3 行 × 4 列，全部面向镜头 ──
-  'ws-biz-1':  { zone: 'business', dx: -3.9, dz: -2.0, rotY: 0, variant: 'desk' },
-  'ws-biz-2':  { zone: 'business', dx: -1.3, dz: -2.0, rotY: 0, variant: 'desk' },
-  'ws-biz-3':  { zone: 'business', dx: 1.3,  dz: -2.0, rotY: 0, variant: 'desk' },
-  'ws-biz-4':  { zone: 'business', dx: 3.9,  dz: -2.0, rotY: 0, variant: 'desk' },
-  'ws-biz-5':  { zone: 'business', dx: -3.9, dz: -0.1, rotY: 0, variant: 'desk' },
-  'ws-biz-6':  { zone: 'business', dx: -1.3, dz: -0.1, rotY: 0, variant: 'desk' },
-  'ws-biz-7':  { zone: 'business', dx: 1.3,  dz: -0.1, rotY: 0, variant: 'desk' },
-  'ws-biz-8':  { zone: 'business', dx: 3.9,  dz: -0.1, rotY: 0, variant: 'desk' },
-  'ws-prod-1': { zone: 'business', dx: -3.9, dz: 1.8,  rotY: 0, variant: 'desk' },
-  'ws-prod-2': { zone: 'business', dx: -1.3, dz: 1.8,  rotY: 0, variant: 'desk' },
-  'ws-prod-3': { zone: 'business', dx: 1.3,  dz: 1.8,  rotY: 0, variant: 'desk' },
-  'ws-prod-4': { zone: 'business', dx: 3.9,  dz: 1.8,  rotY: 0, variant: 'desk' },
+const SEAT_X = [-1.65, -0.55, 0.55, 1.65];
 
-  // ── 行政支持 · 2×2 ──
-  'ws-sup-1': { zone: 'support', dx: -1.2, dz: -1.2, rotY: 0, variant: 'desk' },
-  'ws-sup-2': { zone: 'support', dx: 1.2,  dz: -1.2, rotY: 0, variant: 'desk' },
-  'ws-sup-3': { zone: 'support', dx: -1.2, dz: 0.9,  rotY: 0, variant: 'desk' },
-  'ws-sup-4': { zone: 'support', dx: 1.2,  dz: 0.9,  rotY: 0, variant: 'desk' },
+/** 席位局部坐标：0-3 前排（+z 侧，面向 -z），4-7 后排（-z 侧，面向 +z 即镜头） */
+export function seatLocal(seat: number): { dx: number; dz: number; rotY: number } {
+  const front = seat < 4;
+  return { dx: SEAT_X[seat % 4], dz: front ? 1.35 : -1.35, rotY: front ? Math.PI : 0 };
+}
 
-  // ── 会议室 · 圆桌对坐（桌子本体由 Workstations 在分区中心渲染一次）──
-  'ws-meet-1': { zone: 'meeting', dx: -1.7, dz: 0.1, rotY: -Math.PI / 2, variant: 'table' },
-  'ws-meet-2': { zone: 'meeting', dx: 1.7,  dz: 0.1, rotY: Math.PI / 2,  variant: 'table' },
+/** 工位 id → Pod 席位 */
+export const POD_SEAT_ASSIGN: Record<string, { pod: PodDef['id']; seat: number }> = {
+  'ws-biz-1':  { pod: 'A-1', seat: 5 }, // 雪·销售官（面向镜头）
+  'ws-biz-2':  { pod: 'A-1', seat: 6 }, // 岚·运营官
+  'ws-biz-3':  { pod: 'A-1', seat: 1 }, // 砚·财务官（前排 · blocked）
+  'ws-biz-4':  { pod: 'A-1', seat: 4 }, // 染·设计师
+  'ws-biz-5':  { pod: 'A-2', seat: 5 }, // 戟·安全官
+  'ws-biz-6':  { pod: 'A-2', seat: 1 },
+  'ws-biz-7':  { pod: 'A-2', seat: 2 },
+  'ws-biz-8':  { pod: 'A-1', seat: 2 },
+  'ws-prod-1': { pod: 'A-2', seat: 6 }, // 炅·研发官
+  'ws-prod-2': { pod: 'A-2', seat: 4 }, // 芸·文档官
+  'ws-prod-3': { pod: 'A-1', seat: 0 },
+  'ws-prod-4': { pod: 'A-2', seat: 7 },
+  'ws-sup-1':  { pod: 'B-1', seat: 5 }, // 荷·人事官
+  'ws-sup-2':  { pod: 'B-1', seat: 6 }, // 律·法务官
+  'ws-sup-3':  { pod: 'B-1', seat: 4 }, // 苓·客服官
+  'ws-sup-4':  { pod: 'B-1', seat: 1 },
+  'ws-exec-2': { pod: 'B-2', seat: 5 },
+};
 
-  // ── 休息区 · 沙发 ──
-  'ws-lounge-1': { zone: 'rest', dx: -0.9, dz: 0.3, rotY: 0.35,  variant: 'lounge' },
-  'ws-lounge-2': { zone: 'rest', dx: 1.1,  dz: 0.6, rotY: -0.35, variant: 'lounge' },
+/** 会议舱席位（圆桌 R2.15，绕中心 [3.5,3.5]，避开 +z 门口） */
+const CONF_CENTER: [number, number] = [3.5, 3.5];
+function confSeat(angleDeg: number): { pos: [number, number, number]; rotY: number } {
+  const a = (angleDeg * Math.PI) / 180;
+  const x = CONF_CENTER[0] + Math.cos(a) * 2.15;
+  const z = CONF_CENTER[1] + Math.sin(a) * 2.15;
+  // 面向圆心
+  const rotY = Math.atan2(CONF_CENTER[0] - x, CONF_CENTER[1] - z);
+  return { pos: [x, 0.45, z], rotY };
+}
 
-  // ── 充电进化区 · 训练舱（璇 归位到这里）──
-  'ws-train-1': { zone: 'learn', dx: 0, dz: 0.1, rotY: 0, variant: 'pod' },
-
-  // ── 中央过渡 · 站立位 ──
-  'ws-transit': { zone: 'hex', dx: 0, dz: 3.4, rotY: 0, variant: 'standing' },
+/** 特殊席位 */
+const SPECIALS: Record<string, { pos: [number, number, number]; rotY: number; variant: SlotVariant }> = {
+  'ws-exec-1':   { pos: [12, 2.7, -10.15], rotY: 0, variant: 'exec' },       // 决策官 · 高管台
+  'ws-meet-1':   { ...confSeat(160), variant: 'table' },                      // 会议主持
+  'ws-meet-2':   { ...confSeat(20), variant: 'table' },                       // 产品经理
+  'ws-lounge-1': { pos: [10.8, 0.35, 2.2], rotY: Math.PI / 2, variant: 'lounge' },  // 营销官 · 沙发
+  'ws-lounge-2': { pos: [12.5, 0.35, 4.6], rotY: Math.PI, variant: 'lounge' },
+  'ws-train-1':  { pos: [-14.5, -1.35, 8.0], rotY: 0.26, variant: 'gym' },    // 数据官 · 跑步机充电
+  'ws-transit':  { pos: [-3, -1.35, 10.5], rotY: 0, variant: 'standing' },
 };
 
 export interface ResolvedSlot {
   pos: [number, number, number];
   rotY: number;
   variant: SlotVariant;
+  pod?: PodDef['id'];
+  seat?: number;
 }
 
 export function resolveSlot(wsId: string): ResolvedSlot | null {
-  const slot = WS_SLOTS[wsId];
-  if (!slot) return null;
-  if (slot.zone === 'hex') {
-    return { pos: [slot.dx, 0.02, slot.dz], rotY: slot.rotY, variant: slot.variant };
-  }
-  const spec = ZONE_SPECS.find((s) => s.id === slot.zone);
-  if (!spec) return null;
+  const special = SPECIALS[wsId];
+  if (special) return { ...special };
+  const assign = POD_SEAT_ASSIGN[wsId];
+  if (!assign) return null;
+  const pod = PODS.find((p) => p.id === assign.pod)!;
+  const { dx, dz, rotY } = seatLocal(assign.seat);
+  const c = Math.cos(pod.rotY);
+  const s = Math.sin(pod.rotY);
   return {
-    pos: [spec.center[0] + slot.dx, spec.elevation + 0.02, spec.center[1] + slot.dz],
-    rotY: slot.rotY,
-    variant: slot.variant,
+    pos: [pod.center[0] + dx * c + dz * s, pod.y, pod.center[1] - dx * s + dz * c],
+    rotY: pod.rotY + rotY,
+    variant: 'desk',
+    pod: pod.id,
+    seat: assign.seat,
   };
 }
 

@@ -1,224 +1,214 @@
 /**
- * OfficeFloor v10（文件名保留 HexPlatform 以免改动引用）
- * 悬浮六边形 → 真实办公楼层：
- * 圆角楼板 + 地毯拼块网格 + 木纹主走道 + 三面玻璃幕墙（透出城市夜景）
- * + 线性吊灯 + 盆栽绿植 + 楼板边缘 LED 缝光
+ * OfficeFloor v13 · SYBERNETIC HQ 1:1（文件名保留 HexPlatform 以免改动引用）
+ * 主楼板（镜面反射地面）+ 下层甲板 + 中央大台阶 + 招牌实体墙 + 幕墙窗
+ * + HQ 巨型霓虹招牌 + 世界地图数据屏 + AI WORKFLOW 悬浮牌 + EXEC 墙牌
+ * + AI EMPOWERING ENTERPRISE 发光块 + OPEN OFFICE 地面蚀刻
  */
 import { useMemo } from 'react';
-import { Instances, Instance } from '@react-three/drei';
+import { Instances, Instance, MeshReflectorMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import { getCarpetTexture, getWoodTexture } from './textures';
+import { NEON, NeonBar, NeonSignPanel, FloorText, GlowPlane, getHoloTexture } from './neon';
+import { NeonStairs, GlassRail, AIEnterpriseBlock, Plant } from './sceneStructures';
+import { getCarpetTexture } from './textures';
 import { useAutoShadows } from './useAutoShadows';
 
-const FLOOR_W = 33;
-const FLOOR_D = 25.5;
-const WALL_H = 4.4;
-const FRAME = '#48536A';
+const MAIN_W = 34;   // x -17..17
+const MAIN_D = 20;   // z -13..7
+const MAIN_CZ = -3;  // 主楼板中心 z
+const DECK_D = 6.8;  // 下层甲板 z 6.6..13.4
+const DECK_CZ = 10;
+const DECK_Y = -1.35;
+const WALL_Z = -13;
+const STRUCT = '#232B38';
+const STRUCT_DARK = '#171D28';
 
-function roundedRectGeo(w: number, d: number, depth: number, r = 1.2) {
-  const shape = new THREE.Shape();
-  shape.moveTo(-w / 2 + r, -d / 2);
-  shape.lineTo(w / 2 - r, -d / 2);
-  shape.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r);
-  shape.lineTo(w / 2, d / 2 - r);
-  shape.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2);
-  shape.lineTo(-w / 2 + r, d / 2);
-  shape.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r);
-  shape.lineTo(-w / 2, -d / 2 + r);
-  shape.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2);
-  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
-  g.rotateX(-Math.PI / 2);
-  return g;
+/** 幕墙窗（竖梃 + 玻璃 + 上下横梁），跨 x∈[-6,17] */
+function WindowWall() {
+  const H = 6.6;
+  const X0 = -6.2, X1 = 17;
+  const W = X1 - X0;
+  const CX = (X0 + X1) / 2;
+  const mullions = useMemo(() => {
+    const arr: number[] = [];
+    const n = 9;
+    for (let i = 0; i <= n; i++) arr.push(X0 + (W / n) * i);
+    return arr;
+  }, [W]);
+  return (
+    <group position={[0, 0, WALL_Z]}>
+      <mesh position={[CX, H / 2, 0]}>
+        <boxGeometry args={[W, H, 0.06]} />
+        <meshStandardMaterial color="#9FBEDF" transparent opacity={0.05} roughness={0.05} metalness={0.1} depthWrite={false} />
+      </mesh>
+      <Instances limit={mullions.length}>
+        <boxGeometry args={[0.09, H, 0.09]} />
+        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+        {mullions.map((x) => <Instance key={x} position={[x, H / 2, 0]} />)}
+      </Instances>
+      <mesh position={[CX, H, 0]}>
+        <boxGeometry args={[W + 0.1, 0.14, 0.16]} />
+        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+      </mesh>
+      <mesh position={[CX, 0.06, 0]}>
+        <boxGeometry args={[W + 0.1, 0.12, 0.16]} />
+        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+      </mesh>
+      {/* 窗侧微光（城市光晕） */}
+      <GlowPlane size={[W, 3.2]} color="#5B7FB0" opacity={0.06} position={[CX, 3, 0.3]} />
+    </group>
+  );
 }
 
-/** 幕墙：竖梃 + 玻璃 + 上下横梁（正面 +z 开放，便于俯视观察） */
-function CurtainWall() {
-  const mullions = useMemo(() => {
-    const arr: { pos: [number, number, number]; rotY: number }[] = [];
-    const nBack = 7;
-    for (let i = 0; i <= nBack; i++) {
-      arr.push({ pos: [-FLOOR_W / 2 + (FLOOR_W / nBack) * i, WALL_H / 2, -FLOOR_D / 2], rotY: 0 });
-    }
-    const nSide = 5;
-    for (let i = 0; i <= nSide; i++) {
-      const z = -FLOOR_D / 2 + (FLOOR_D / nSide) * i;
-      arr.push({ pos: [-FLOOR_W / 2, WALL_H / 2, z], rotY: Math.PI / 2 });
-      arr.push({ pos: [FLOOR_W / 2, WALL_H / 2, z], rotY: Math.PI / 2 });
-    }
-    return arr;
-  }, []);
-
-  const glassMat = (
-    <meshStandardMaterial
-      color="#9FBEDF"
-      transparent
-      opacity={0.06}
-      roughness={0.05}
-      metalness={0.1}
-      side={THREE.DoubleSide}
-      depthWrite={false}
-    />
-  );
-
+/** 招牌实体墙（x -17..-6.2）：HQ 巨型霓虹招牌 + 世界地图数据屏 + 竖霓虹柱 */
+function SignWall() {
   return (
-    <group>
-      {/* 玻璃面 */}
-      <mesh position={[0, WALL_H / 2, -FLOOR_D / 2]}>
-        <boxGeometry args={[FLOOR_W, WALL_H, 0.04]} />
-        {glassMat}
+    <group position={[0, 0, WALL_Z + 0.15]}>
+      <mesh position={[-11.6, 3.7, -0.2]}>
+        <boxGeometry args={[10.8, 7.4, 0.4]} />
+        <meshStandardMaterial color={STRUCT} roughness={0.55} metalness={0.3} />
       </mesh>
-      <mesh position={[-FLOOR_W / 2, WALL_H / 2, 0]}>
-        <boxGeometry args={[0.04, WALL_H, FLOOR_D]} />
-        {glassMat}
-      </mesh>
-      <mesh position={[FLOOR_W / 2, WALL_H / 2, 0]}>
-        <boxGeometry args={[0.04, WALL_H, FLOOR_D]} />
-        {glassMat}
-      </mesh>
-      {/* 竖梃（实例化） */}
-      <Instances limit={mullions.length}>
-        <boxGeometry args={[0.055, WALL_H, 0.055]} />
-        <meshStandardMaterial color={FRAME} metalness={0.6} roughness={0.35} />
-        {mullions.map((m, i) => (
-          <Instance key={i} position={m.pos} rotation={[0, m.rotY, 0]} />
-        ))}
-      </Instances>
-      {/* 上下横梁（背 + 两侧） */}
-      {[
-        { pos: [0, WALL_H, -FLOOR_D / 2] as [number, number, number], size: [FLOOR_W + 0.1, 0.12, 0.14] as [number, number, number] },
-        { pos: [0, 0.05, -FLOOR_D / 2] as [number, number, number],   size: [FLOOR_W + 0.1, 0.1, 0.14] as [number, number, number] },
-        { pos: [-FLOOR_W / 2, WALL_H, 0] as [number, number, number], size: [0.14, 0.12, FLOOR_D] as [number, number, number] },
-        { pos: [-FLOOR_W / 2, 0.05, 0] as [number, number, number],   size: [0.14, 0.1, FLOOR_D] as [number, number, number] },
-        { pos: [FLOOR_W / 2, WALL_H, 0] as [number, number, number],  size: [0.14, 0.12, FLOOR_D] as [number, number, number] },
-        { pos: [FLOOR_W / 2, 0.05, 0] as [number, number, number],    size: [0.14, 0.1, FLOOR_D] as [number, number, number] },
-      ].map((b, i) => (
-        <mesh key={i} position={b.pos}>
-          <boxGeometry args={b.size} />
-          <meshStandardMaterial color={FRAME} metalness={0.6} roughness={0.35} />
+      {/* 面板缝线 */}
+      {[-14.6, -8.6].map((x) => (
+        <mesh key={x} position={[x, 3.7, 0.01]}>
+          <boxGeometry args={[0.02, 7.2, 0.02]} />
+          <meshBasicMaterial color="#39434F" />
         </mesh>
       ))}
-    </group>
-  );
-}
-
-/** 线性吊灯：细吊索 + 发光灯管 */
-function PendantLight({ position, length = 3.4 }: { position: [number, number, number]; length?: number }) {
-  return (
-    <group position={position}>
-      <mesh position={[-length / 2 + 0.3, 0.45, 0]}>
-        <cylinderGeometry args={[0.008, 0.008, 0.9, 4]} />
-        <meshStandardMaterial color="#454C5A" />
-      </mesh>
-      <mesh position={[length / 2 - 0.3, 0.45, 0]}>
-        <cylinderGeometry args={[0.008, 0.008, 0.9, 4]} />
-        <meshStandardMaterial color="#454C5A" />
-      </mesh>
-      <mesh>
-        <boxGeometry args={[length, 0.08, 0.2]} />
-        <meshStandardMaterial color="#3A424F" metalness={0.5} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, -0.05, 0]}>
-        <boxGeometry args={[length - 0.08, 0.035, 0.16]} />
-        <meshBasicMaterial color="#FFF3DC" toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-/** 盆栽：陶盆 + 层叠球状绿植 */
-function Plant({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
-  return (
-    <group position={position} scale={scale}>
-      <mesh position={[0, 0.18, 0]}>
-        <cylinderGeometry args={[0.2, 0.26, 0.36, 10]} />
-        <meshStandardMaterial color="#4A5262" roughness={0.7} /></mesh>
-      <mesh position={[0, 0.55, 0]}>
-        <sphereGeometry args={[0.3, 8, 8]} />
-        <meshStandardMaterial color="#3E9463" roughness={1} />
-      </mesh>
-      <mesh position={[0.14, 0.78, 0.05]}>
-        <sphereGeometry args={[0.22, 8, 8]} />
-        <meshStandardMaterial color="#4AAB74" roughness={1} />
-      </mesh>
-      <mesh position={[-0.13, 0.72, -0.08]}>
-        <sphereGeometry args={[0.18, 8, 8]} />
-        <meshStandardMaterial color="#358355" roughness={1} />
-      </mesh>
+      {/* HQ 巨型招牌 */}
+      <NeonSignPanel text="HUMMER HQ" width={9.2} height={2.3} fontSize={1.05} position={[-11.5, 5.2, 0.15]} />
+      {/* 世界地图 + 数据面板 */}
+      <group position={[-12.3, 2.2, 0.05]}>
+        <mesh>
+          <boxGeometry args={[6.2, 2.3, 0.1]} />
+          <meshStandardMaterial color="#10141B" roughness={0.3} metalness={0.4} />
+        </mesh>
+        <mesh position={[-1.4, 0, 0.07]}>
+          <planeGeometry args={[3.1, 2.0]} />
+          <meshBasicMaterial map={getHoloTexture('map', 5)} color="#9FE8FF" transparent opacity={0.9} toneMapped={false} />
+        </mesh>
+        <mesh position={[1.9, 0, 0.07]}>
+          <planeGeometry args={[2.1, 2.0]} />
+          <meshBasicMaterial map={getHoloTexture('dashboard', 6)} color="#9FE8FF" transparent opacity={0.85} toneMapped={false} />
+        </mesh>
+      </group>
+      {/* 两侧竖霓虹灯柱 */}
+      <NeonBar length={5.6} vertical position={[-16.6, 3.6, 0.1]} thickness={0.07} />
+      <NeonBar length={5.6} vertical position={[-6.5, 3.6, 0.1]} thickness={0.07} />
     </group>
   );
 }
 
 export default function HexPlatform() {
-  const floorGeo = useMemo(() => roundedRectGeo(FLOOR_W, FLOOR_D, 0.16), []);
   const rootRef = useAutoShadows();
-  const carpetTex = useMemo(() => getCarpetTexture('#333D50'), []);
-  const walkwayTex = useMemo(() => getWoodTexture('#7E6044', '#5C4630', 'walkway'), []);
+  const carpetTex = useMemo(() => getCarpetTexture('#2E3949', 'floor-v13'), []);
 
-  // 地毯拼块网格线（实例化细条）
+  // 地面拼板缝网格
   const gridLines = useMemo(() => {
     const lines: { pos: [number, number, number]; scl: [number, number, number] }[] = [];
-    for (let x = -15; x <= 15; x += 2.5) {
-      lines.push({ pos: [x, 0.005, 0], scl: [0.02, 0.002, FLOOR_D - 2] });
-    }
-    for (let z = -11; z <= 11; z += 2.5) {
-      lines.push({ pos: [0, 0.005, z], scl: [FLOOR_W - 2, 0.002, 0.02] });
-    }
+    for (let x = -15; x <= 15; x += 3) lines.push({ pos: [x, 0.004, MAIN_CZ], scl: [0.02, 0.002, MAIN_D - 1.5] });
+    for (let z = -12; z <= 6; z += 3) lines.push({ pos: [0, 0.004, z], scl: [MAIN_W - 1.5, 0.002, 0.02] });
     return lines;
   }, []);
 
   return (
     <group ref={rootRef}>
-      {/* 楼板（地毯面 · 程序化地毯纹理） */}
-      <mesh geometry={floorGeo} position={[0, 0, 0]}>
-        <meshStandardMaterial map={carpetTex} color="#B9C4DA" roughness={0.92} metalness={0.02} />
+      {/* ── 主楼板 ── */}
+      <mesh position={[0, -0.25, MAIN_CZ]}>
+        <boxGeometry args={[MAIN_W, 0.5, MAIN_D]} />
+        <meshStandardMaterial map={carpetTex} color="#A9B6CC" roughness={0.55} metalness={0.15} />
       </mesh>
-      {/* 楼板侧沿 LED 缝光 */}
-      <mesh position={[0, -0.17, 0]}>
-        <boxGeometry args={[FLOOR_W - 0.6, 0.03, FLOOR_D - 0.6]} />
-        <meshBasicMaterial color="#3B82F6" transparent opacity={0.28} toneMapped={false} />
+      {/* 镜面反射地面（拉丝反射 · 霓虹倒影的关键） */}
+      <mesh position={[0, 0.003, MAIN_CZ]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[MAIN_W - 0.2, MAIN_D - 0.2]} />
+        <MeshReflectorMaterial
+          resolution={512}
+          mirror={0.45}
+          mixBlur={1}
+          blur={[300, 80]}
+          mixStrength={7}
+          mixContrast={1}
+          depthScale={1.1}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.4}
+          color="#1E2735"
+          roughness={0.8}
+          metalness={0.3}
+        />
+      </mesh>
+      {/* 主楼板前缘（z=7）沿口 + 霓虹 */}
+      <mesh position={[0, -0.7, 7.2]}>
+        <boxGeometry args={[MAIN_W, 1.4, 0.5]} />
+        <meshStandardMaterial color={STRUCT_DARK} roughness={0.6} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.01, 6.98]}>
+        <boxGeometry args={[MAIN_W - 0.4, 0.025, 0.025]} />
+        <meshBasicMaterial color={NEON} toneMapped={false} />
       </mesh>
 
-      {/* 地毯拼块网格 */}
+      {/* ── 下层甲板 ── */}
+      <mesh position={[0, DECK_Y - 0.5, DECK_CZ]}>
+        <boxGeometry args={[MAIN_W, 1.0, DECK_D]} />
+        <meshStandardMaterial color="#222A38" roughness={0.6} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, DECK_Y + 0.012, DECK_CZ + 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[MAIN_W - 0.4, DECK_D - 0.6]} />
+        <meshStandardMaterial color="#1B2230" roughness={0.75} metalness={0.2} />
+      </mesh>
+      {/* 甲板前缘斜切 + 霓虹导引线 */}
+      <mesh position={[0, DECK_Y - 0.5, 13.55]} rotation={[0.35, 0, 0]}>
+        <boxGeometry args={[MAIN_W, 1.1, 0.35]} />
+        <meshStandardMaterial color={STRUCT_DARK} roughness={0.6} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, DECK_Y + 0.02, 13.15]}>
+        <boxGeometry args={[MAIN_W - 2, 0.02, 0.02]} />
+        <meshBasicMaterial color={NEON} transparent opacity={0.6} toneMapped={false} />
+      </mesh>
+
+      {/* ── 中央大台阶（主层 → 下层） ── */}
+      <group position={[-3.5, 0, 6.1]}>
+        <NeonStairs steps={9} width={2.8} rise={0.15} run={0.36} down />
+        <GlassRail length={3.3} height={0.9} position={[-1.5, -0.7, 1.6]} rotation={[0, Math.PI / 2, 0]} />
+        <GlassRail length={3.3} height={0.9} position={[1.5, -0.7, 1.6]} rotation={[0, Math.PI / 2, 0]} />
+      </group>
+
+      {/* ── 背墙：招牌墙 + 幕墙窗 ── */}
+      <SignWall />
+      <WindowWall />
+
+      {/* ── 悬浮招牌 ── */}
+      <NeonSignPanel text="AI WORKFLOW" width={4.6} height={1.1} position={[1, 5, -12.4]} />
+      <NeonSignPanel text="EXECUTIVE SUITE / B3" width={5.4} height={0.9} position={[12.5, 5.6, -12.55]} />
+      {/* 高管区背墙数据屏 */}
+      <group position={[10, 4.1, -12.65]}>
+        <mesh>
+          <boxGeometry args={[3.4, 1.6, 0.08]} />
+          <meshStandardMaterial color="#10141B" roughness={0.3} metalness={0.4} />
+        </mesh>
+        <mesh position={[0, 0, 0.05]}>
+          <planeGeometry args={[3.2, 1.45]} />
+          <meshBasicMaterial map={getHoloTexture('chart', 8)} color="#9FE8FF" transparent opacity={0.85} toneMapped={false} />
+        </mesh>
+      </group>
+
+      {/* ── 地面蚀刻 ── */}
+      <FloorText text="OPEN OFFICE" size={0.55} position={[-2.5, 0.006, 1.5]} rotation={[0, -0.15, 0]} opacity={0.8} />
+
+      {/* ── AI EMPOWERING ENTERPRISE 发光块（下层甲板右） ── */}
+      <AIEnterpriseBlock />
+
+      {/* ── 地面拼板缝 ── */}
       <Instances limit={gridLines.length}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#2A3242" transparent opacity={0.5} />
+        <meshBasicMaterial color="#39434F" transparent opacity={0.35} />
         {gridLines.map((l, i) => (
           <Instance key={i} position={l.pos} scale={l.scl} />
         ))}
       </Instances>
 
-      {/* 木纹主走道（横贯业务区与休闲区之间） */}
-      <mesh position={[0.5, 0.012, 2.65]}>
-        <boxGeometry args={[25, 0.02, 1.5]} />
-        <meshStandardMaterial map={walkwayTex} color="#D8C0A0" roughness={0.7} metalness={0.05} />
-      </mesh>
-      {/* 走道拼板缝 */}
-      <Instances limit={17}>
-        <boxGeometry args={[0.015, 0.005, 1.5]} />
-        <meshBasicMaterial color="#57422C" />
-        {Array.from({ length: 17 }, (_, i) => (
-          <Instance key={i} position={[0.5 - 12 + i * 1.5, 0.024, 2.65]} />
-        ))}
-      </Instances>
-
-      {/* 幕墙 */}
-      <CurtainWall />
-
-      {/* 线性吊灯 */}
-      <PendantLight position={[0, 4.1, -2.9]} length={7} />
-      <PendantLight position={[0, 4.1, -0.2]} length={7} />
-      <PendantLight position={[-9, 4.0, -3]} length={4} />
-      <PendantLight position={[9.5, 4.2, -7.5]} length={4.4} />
-      <PendantLight position={[-6, 4.0, 5.5]} length={4.4} />
-      <PendantLight position={[7.8, 4.0, 5.6]} length={3.6} />
-
-      {/* 绿植点缀 */}
-      <Plant position={[-14, 0.02, -10.5]} scale={1.4} />
-      <Plant position={[14.6, 0.02, -3.6]} scale={1.2} />
-      <Plant position={[-14.2, 0.02, 7.8]} scale={1.3} />
-      <Plant position={[3.6, 0.02, -9.8]} scale={1.1} />
-      <Plant position={[-2.4, 0.02, 8.6]} scale={1.0} />
-      <Plant position={[13.2, 0.02, 3.4]} scale={1.0} />
+      {/* ── 绿植点缀（参考图位置） ── */}
+      <Plant height={1.4} position={[7.8, 0, -11.6]} />
+      <Plant height={1.2} position={[16.2, 0, -3]} />
+      <Plant height={1.3} position={[-16.2, 0, 3.8]} />
     </group>
   );
 }

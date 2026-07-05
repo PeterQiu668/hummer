@@ -6,11 +6,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { ZONE_SPECS } from './ZonePlatform';
 import { getEmployeePos3D } from './scenePositions';
 
-// 全景收进 Agent OS / Data OS 双层基座（基座底 y≈-5）
+// 全景 · 参考图 3/4 俯视机位
 const OVERVIEW = {
-  pos: new THREE.Vector3(0, 28, 50),
-  look: new THREE.Vector3(0, -1.0, 0),
-  fov: 48,
+  pos: new THREE.Vector3(-11, 15, 25),
+  look: new THREE.Vector3(1.5, 0.6, -2),
+  fov: 43,
 };
 
 export default function CameraRig3D() {
