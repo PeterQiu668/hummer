@@ -18,14 +18,17 @@ export interface ZoneSpec {
   round?: boolean; // 圆形玻璃舱（会议室）
 }
 
-/** 6 个分区配置 */
+/** 6 个分区配置 · v11 参考图布局（矩形楼板 40×30，x∈[-20,20] z∈[-15,15]）
+ *  后排：Section A（左）· Section B 开放办公（中）· Executive Suite/B3 抬高夹层（右）
+ *  前排：Evolution Center（左）· Conference Hub 圆舱（中右）· Relaxation Lounge（右）
+ */
 export const ZONE_SPECS: ZoneSpec[] = [
-  { id: 'boss',     label: '决策中心',   sub: 'EXECUTIVE SUITE',   center: [9.5, -7.5], size: [7, 5.5], color: '#A855F7', elevation: 1.5, hasGlassWall: true, hasStairs: true },
-  { id: 'business', label: '业务办公区', sub: 'OPEN OFFICE',       center: [0, -1],    size: [10.5, 6], color: '#3B82F6', elevation: 0.3 },
-  { id: 'support',  label: '行政支持',   sub: 'SUPPORT CENTER',    center: [-9, -3],   size: [5.5, 5],  color: '#14B8A6', elevation: 0.4 },
-  { id: 'meeting',  label: '会议舱',     sub: 'CONFERENCE HUB',    center: [6.5, 4],   size: [5, 5],   color: '#7E22CE', elevation: 0.5, round: true },
-  { id: 'rest',     label: '休息区',     sub: 'RELAXATION LOUNGE', center: [9, 7.5],   size: [5, 4],   color: '#F59E0B', elevation: 0.35 },
-  { id: 'learn',    label: '充电进化区', sub: 'EVOLUTION CENTER',  center: [-6, 5.5],  size: [7, 4.5], color: '#10B981', elevation: 0.4 },
+  { id: 'boss',     label: '决策中心',   sub: 'EXECUTIVE SUITE · B3',      center: [14, -10],    size: [10, 8],   color: '#A855F7', elevation: 2.4, hasGlassWall: true, hasStairs: true },
+  { id: 'business', label: '业务办公区', sub: 'PUBLIC OFFICE · SECTION B', center: [-2, -6.5],   size: [13, 10],  color: '#3B82F6', elevation: 0.25 },
+  { id: 'support',  label: '行政支持',   sub: 'PUBLIC OFFICE · SECTION A', center: [-14.5, -6.5], size: [9, 9],   color: '#14B8A6', elevation: 0.25 },
+  { id: 'meeting',  label: '会议舱',     sub: 'CONFERENCE HUB',            center: [7, 5],       size: [7, 7],    color: '#7E22CE', elevation: 0.5, round: true },
+  { id: 'rest',     label: '休息区',     sub: 'RELAXATION LOUNGE',         center: [15.5, 4.5],  size: [7.5, 6.5], color: '#F59E0B', elevation: 0.35 },
+  { id: 'learn',    label: '充电进化区', sub: 'EVOLUTION CENTER',          center: [-11, 7.5],   size: [9, 6],    color: '#10B981', elevation: 0.3 },
 ];
 
 /** 假玻璃：transmission 材质每帧触发背景拷贝渲染通道，换成透明 standard 材质（此相机距离下视觉等效） */
@@ -67,7 +70,7 @@ function GlassWall({ size, height, color }: { size: [number, number]; height: nu
 }
 
 function Stairs({ from, to, width = 1.4 }: { from: [number, number, number]; to: [number, number, number]; width?: number }) {
-  const steps = 6;
+  const steps = Math.max(6, Math.round(Math.abs(to[1] - from[1]) / 0.24));
   const items = [];
   for (let i = 0; i < steps; i++) {
     const t = i / steps;
@@ -82,6 +85,21 @@ function Stairs({ from, to, width = 1.4 }: { from: [number, number, number]; to:
     );
   }
   return <>{items}</>;
+}
+
+/* ─────────── 桌群编号地面铭牌（A-1 / B-2 …） ─────────── */
+function ClusterTag({ text, color, pos }: { text: string; color: string; pos: [number, number, number] }) {
+  return (
+    <group position={pos}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.5, 0.58, 24]} />
+        <meshBasicMaterial color={color} transparent opacity={0.35} toneMapped={false} depthWrite={false} />
+      </mesh>
+      <Text position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.42} color={color} anchorX="center" anchorY="middle" letterSpacing={0.1} fillOpacity={0.8}>
+        {text}
+      </Text>
+    </group>
+  );
 }
 
 /* ─────────── 悬浮发光铭牌（始终面向相机） ─────────── */
@@ -384,9 +402,23 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
       {spec.id === 'learn' && <ChargerProps spec={spec} />}
       {spec.id === 'boss' && <ExecWallProps spec={spec} />}
 
-      {/* 楼梯 · executive */}
+      {/* 楼梯 · executive（长梯下到走道方向） */}
       {spec.hasStairs && (
-        <Stairs from={[-w / 2 - 0.7, 0, 0]} to={[-w / 2 + 0.2, spec.elevation, 0]} />
+        <Stairs from={[-w / 2 - 3.4, 0, 0]} to={[-w / 2 + 0.4, spec.elevation, 0]} width={1.8} />
+      )}
+
+      {/* 桌群编号铭牌（参考图 A-1/A-2/B-1/B-2） */}
+      {spec.id === 'support' && (
+        <>
+          <ClusterTag text="A-1" color={spec.color} pos={[-3.0, spec.elevation + 0.012, -2.2]} />
+          <ClusterTag text="A-2" color={spec.color} pos={[-3.0, spec.elevation + 0.012, 1.6]} />
+        </>
+      )}
+      {spec.id === 'business' && (
+        <>
+          <ClusterTag text="B-1" color={spec.color} pos={[-5.0, spec.elevation + 0.012, -2.6]} />
+          <ClusterTag text="B-2" color={spec.color} pos={[-5.0, spec.elevation + 0.012, 2.6]} />
+        </>
       )}
 
       {/* 悬浮发光铭牌（双语，面向相机） */}

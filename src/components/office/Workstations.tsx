@@ -6,7 +6,7 @@
  * - 精细化 zustand 订阅：仅选中态翻转的小人重渲染
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Instances, Instance, Text } from '@react-three/drei';
+import { Edges, Instances, Instance, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { workstations } from '../../data/workstations';
 import { employees } from '../../data/employees';
@@ -58,17 +58,20 @@ const EmployeeFigure = memo(function EmployeeFigure({
         <boxGeometry args={[0.06, 0.42, 0.06]} />
         <meshStandardMaterial color="#3a3a36" />
       </mesh>
-      {/* 显示器框 + 屏幕（屏幕材质交给 VoxelHuman 做状态闪烁） */}
-      <mesh position={[0, 0.95, -0.35]}>
-        <boxGeometry args={[0.95, 0.6, 0.04]} />
-        <meshStandardMaterial color="#1f1d1a" metalness={0.4} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.95, -0.33]}>
-        <planeGeometry args={[0.86, 0.5]} />
-        <meshBasicMaterial ref={screenMatRef} color={look.outfit} toneMapped={false} />
-      </mesh>
+      {/* 全息显示屏：细边悬浮框 + 半透明屏面（材质交给 VoxelHuman 做状态闪烁），微后倾更像参考图 */}
+      <group position={[0, 0.98, -0.35]} rotation={[-0.09, 0, 0]}>
+        <mesh>
+          <boxGeometry args={[0.98, 0.62, 0.03]} />
+          <meshStandardMaterial color="#0d1320" metalness={0.5} roughness={0.3} />
+          <Edges color={look.outfit} threshold={15} />
+        </mesh>
+        <mesh position={[0, 0, 0.02]}>
+          <planeGeometry args={[0.88, 0.52]} />
+          <meshBasicMaterial ref={screenMatRef} color={look.outfit} toneMapped={false} transparent opacity={0.92} />
+        </mesh>
+      </group>
       <mesh position={[0, 0.62, -0.35]}>
-        <boxGeometry args={[0.08, 0.2, 0.04]} />
+        <boxGeometry args={[0.07, 0.22, 0.04]} />
         <meshStandardMaterial color="#1f1d1a" />
       </mesh>
 
@@ -126,7 +129,8 @@ function HiredFigures({ hiredIds }: { hiredIds: string[] }) {
       {hired.map((m, i) => {
         const col = i % 3;
         const row = Math.floor(i / 3);
-        const pos: [number, number, number] = [3 + col * 2.2, 0.02, 8 + row * 2.2];
+        // 试岗区 · 楼板前排空地（走道以南，避开会议舱）
+        const pos: [number, number, number] = [-1.5 - col * 2.4, 0.02, 11 + row * 2.2];
         const look: FigureLook = { ...TRAINEE_LOOK, outfit: m.color };
         return (
           <group key={m.id} position={pos}>

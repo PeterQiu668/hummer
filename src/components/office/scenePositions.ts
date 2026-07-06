@@ -7,7 +7,7 @@ import { ZONE_SPECS } from './ZonePlatform';
 
 export const ZONE_2D_CENTERS: Record<string, { x: number; y: number }> = {
   boss:     { x: 81, y: 19 },
-  business: { x: 47, y: 45 },
+  business: { x: 46, y: 52 }, // B-1（y≈40-50）与 B-2 研发簇（y≈63-70）两簇的中点
   support:  { x: 18, y: 42 },
   meeting:  { x: 69, y: 61 },
   rest:     { x: 88, y: 54 },
@@ -15,14 +15,18 @@ export const ZONE_2D_CENTERS: Record<string, { x: number; y: number }> = {
   transit:  { x: 55, y: 73 },
 };
 
+/** business 区覆盖 B-1/B-2 两簇（2D y 跨度 ±18%），用更小的系数压进 13×10 平台 */
+const SPREAD: Record<string, number> = { business: 0.2 };
+
 export function getPos3D(ws: { x: number; y: number; zone: string }): [number, number, number] {
   const c2d = ZONE_2D_CENTERS[ws.zone] ?? { x: 50, y: 50 };
   const spec = ZONE_SPECS.find((s) => s.id === ws.zone);
-  if (!spec) return [0, 0.4, 6];
+  if (!spec) return [0, 0.02, 2.6]; // transit 空位 → 主走道旁
   const dx = ws.x - c2d.x;
   const dy = ws.y - c2d.y;
-  const scaleX = (spec.size[0] * 0.35) / 10;
-  const scaleZ = (spec.size[1] * 0.35) / 8;
+  const k = SPREAD[ws.zone] ?? 0.35;
+  const scaleX = (spec.size[0] * k) / 10;
+  const scaleZ = (spec.size[1] * k) / 8;
   return [spec.center[0] + dx * scaleX, spec.elevation + 0.02, spec.center[1] + dy * scaleZ];
 }
 

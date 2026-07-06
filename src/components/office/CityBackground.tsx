@@ -9,15 +9,16 @@ import * as THREE from 'three';
 
 interface SilhouetteSpec { position: [number, number, number]; scale: number; seed: number }
 
+// 城市地基下沉到 Data OS 基座之下（基座底 y≈-11.5）
 const SILHOUETTES: SilhouetteSpec[] = [
-  { position: [-40, -2, -45], scale: 1.1, seed: 1 },
-  { position: [0, -2, -55],   scale: 1.3, seed: 2 },
-  { position: [40, -2, -45],  scale: 1.0, seed: 3 },
-  { position: [55, -2, 0],    scale: 0.9, seed: 4 },
-  { position: [40, -2, 45],   scale: 1.0, seed: 5 },
-  { position: [-40, -2, 45],  scale: 1.1, seed: 6 },
-  { position: [-55, -2, 0],   scale: 1.0, seed: 7 },
-  { position: [0, -2, 55],    scale: 0.9, seed: 8 },
+  { position: [-45, -13, -50], scale: 1.1, seed: 1 },
+  { position: [0, -13, -60],   scale: 1.3, seed: 2 },
+  { position: [45, -13, -50],  scale: 1.0, seed: 3 },
+  { position: [62, -13, 0],    scale: 0.9, seed: 4 },
+  { position: [45, -13, 50],   scale: 1.0, seed: 5 },
+  { position: [-45, -13, 50],  scale: 1.1, seed: 6 },
+  { position: [-62, -13, 0],   scale: 1.0, seed: 7 },
+  { position: [0, -13, 60],    scale: 0.9, seed: 8 },
 ];
 
 interface BuildingInst { pos: [number, number, number]; scl: [number, number, number] }
@@ -74,7 +75,7 @@ export default function CityBackground() {
   return (
     <>
       <color attach="background" args={['#0a0f1e']} />
-      <fog attach="fog" args={['#0a0f1e', 35, 90]} />
+      <fog attach="fog" args={['#0a0f1e', 42, 115]} />
 
       {/* 楼栋 · 单位盒实例化（1 draw call） */}
       <Instances limit={buildings.length} frustumCulled={false}>
@@ -100,7 +101,7 @@ export default function CityBackground() {
       </Instances>
 
       {/* 远处地平线微光 */}
-      <mesh position={[0, -3, -50]}>
+      <mesh position={[0, -13.5, -55]}>
         <planeGeometry args={[200, 0.6]} />
         <meshBasicMaterial color="#1e3a5f" transparent opacity={0.4} toneMapped={false} />
       </mesh>

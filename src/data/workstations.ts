@@ -19,8 +19,8 @@ export const workstations: Workstation[] = [
   { id: 'ws-exec-1', x: 80, y: 18, zone: 'boss', employeeId: 'emp-ceo', variant: 'desk' },
   { id: 'ws-exec-2', x: 86, y: 20, zone: 'boss', variant: 'desk' }, // 空
 
-  // ── TRAINING / EVOLUTION · 左上训练区（zone center 17,21） ─────────────
-  { id: 'ws-train-1', x: 16, y: 22, zone: 'business', employeeId: 'emp-data', variant: 'pod' }, // 璇 训练
+  // ── TRAINING / EVOLUTION · 训练区（zone center 17,21）→ 3D 落位充电进化区 ──
+  { id: 'ws-train-1', x: 16, y: 22, zone: 'learn', employeeId: 'emp-data', variant: 'pod' }, // 璇 训练
 
   // ── SUPPORT CENTER · 中左支持中心（zone center 18,42） ─────────────────
   { id: 'ws-sup-1',  x: 13, y: 39, zone: 'support', employeeId: 'emp-hr',    variant: 'desk' },

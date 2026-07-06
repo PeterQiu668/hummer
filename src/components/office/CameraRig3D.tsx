@@ -6,10 +6,10 @@ import { useAppStore } from '../../store/useAppStore';
 import { ZONE_SPECS } from './ZonePlatform';
 import { getEmployeePos3D } from './scenePositions';
 
-// 全景收进 Agent OS / Data OS 双层基座（基座底 y≈-5）
+// 全景收进 Data OS / Agent OS 双层基座（Agentrix 堆叠，基座底 y≈-11.5）
 const OVERVIEW = {
-  pos: new THREE.Vector3(0, 28, 50),
-  look: new THREE.Vector3(0, -1.0, 0),
+  pos: new THREE.Vector3(0, 26, 58),
+  look: new THREE.Vector3(0, -2.5, 0),
   fov: 48,
 };
 
