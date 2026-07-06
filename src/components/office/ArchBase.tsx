@@ -117,16 +117,17 @@ function StorageField({ onSelectDbNode }: { onSelectDbNode: () => void }) {
   useCursor(hovered);
   const hotRingMat = useRef<THREE.MeshBasicMaterial>(null);
 
+  // 阵列收缩到右半区 —— 左半区留给知识图谱星座 + 企业数据域（v12）
   const nodes = useMemo<NodeInst[]>(() => {
     const list: NodeInst[] = [];
-    const cols = 9, rows = 6;
+    const cols = 6, rows = 5;
     const rng = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
         if (rng(i * 3 + 2) < 0.12) continue; // 稀疏缺口，避免呆板
-        const x = -w * 0.42 + (c / (cols - 1)) * w * 0.84 + (rng(i) - 0.5) * 1.2;
-        const z = -d * 0.4 + (r / (rows - 1)) * d * 0.8 + (rng(i * 7 + 1) - 0.5) * 1.0;
+        const x = w * 0.04 + (c / (cols - 1)) * w * 0.38 + (rng(i) - 0.5) * 1.2;
+        const z = -d * 0.38 + (r / (rows - 1)) * d * 0.76 + (rng(i * 7 + 1) - 0.5) * 1.0;
         list.push({ pos: [x, topY, z], scl: 0.8 + rng(i * 13 + 5) * 0.45, hot: false });
       }
     }
@@ -184,6 +185,202 @@ function StorageField({ onSelectDbNode }: { onSelectDbNode: () => void }) {
   );
 }
 
+/* ─────────── Data OS · 知识图谱星座（企业知识 9.6k 边 · 缓慢自转） ─────────── */
+function KnowledgeGraph() {
+  const { w, d, topY } = STACK.dataos;
+  const groupRef = useRef<THREE.Group>(null);
+
+  const { nodes, edgeGeometry } = useMemo(() => {
+    const rng = (n: number) => { const x = Math.sin(n * 91.7 + 47.3) * 43758.5453; return x - Math.floor(x); };
+    const pts: THREE.Vector3[] = [];
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+      const a = rng(i) * Math.PI * 2;
+      const r = 0.7 + rng(i * 3 + 1) * 1.9;
+      pts.push(new THREE.Vector3(Math.cos(a) * r, 0.9 + rng(i * 7 + 2) * 1.7, Math.sin(a) * r * 0.8));
+    }
+    // 邻近连边（每点连 2 个最近点）
+    const positions: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const dists = pts.map((p, j) => ({ j, d: i === j ? Infinity : pts[i].distanceTo(p) }))
+        .sort((a, b) => a.d - b.d).slice(0, 2);
+      for (const { j } of dists) {
+        positions.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    return { nodes: pts, edgeGeometry: geo };
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (groupRef.current) groupRef.current.rotation.y = clock.elapsedTime * 0.12;
+  });
+
+  return (
+    <group position={[-w * 0.3, topY, -d * 0.14]}>
+      <group ref={groupRef}>
+        <Instances limit={nodes.length}>
+          <sphereGeometry args={[0.14, 10, 10]} />
+          <meshBasicMaterial color="#2DD4BF" toneMapped={false} />
+          {nodes.map((p, i) => (
+            <Instance key={i} position={[p.x, p.y, p.z]} scale={0.7 + (i % 4) * 0.22} color={i % 5 === 0 ? '#38BDF8' : '#2DD4BF'} />
+          ))}
+        </Instances>
+        <lineSegments geometry={edgeGeometry}>
+          <lineBasicMaterial color="#14B8A6" transparent opacity={0.35} toneMapped={false} />
+        </lineSegments>
+      </group>
+      {/* 图谱基环 */}
+      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.4, 2.62, 40]} />
+        <meshBasicMaterial color="#14B8A6" transparent opacity={0.3} toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+      <Text position={[0, 2.9, 0]} fontSize={0.34} color="#5EEAD4" anchorX="center" anchorY="middle" letterSpacing={0.1} outlineWidth={0.015} outlineColor="#050810">
+        知识图谱 · 9.6k 边
+      </Text>
+    </group>
+  );
+}
+
+/* ─────────── Data OS · 企业数据域方块（CRM / ERP / BI / OA / 合同 / 工单） ─────────── */
+const DATA_DOMAINS = ['CRM', 'ERP', 'BI', 'OA', '合同', '工单'];
+
+function DataDomains() {
+  const { w, d, topY } = STACK.dataos;
+  const mats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+  useFrame(({ clock }) => {
+    mats.current.forEach((m, i) => {
+      if (m) m.emissiveIntensity = 0.16 + 0.1 * Math.sin(clock.elapsedTime * 1.1 + i * 1.05);
+    });
+  });
+  return (
+    <group position={[-w * 0.36, topY, d * 0.3]}>
+      {DATA_DOMAINS.map((name, i) => (
+        <group key={name} position={[i * 2.5, 0, (i % 2) * 0.9 - 0.45]}>
+          <mesh position={[0, 0.55, 0]}>
+            <boxGeometry args={[1.9, 1.1, 1.5]} />
+            <meshStandardMaterial
+              ref={(m) => { mats.current[i] = m; }}
+              color="#0d1a2a" roughness={0.45} metalness={0.55}
+              emissive="#14B8A6" emissiveIntensity={0.16}
+            />
+            <Edges color="#2DD4BF" threshold={15} />
+          </mesh>
+          <Text position={[0, 0.58, 0.78]} fontSize={0.4} color="#99F6E4" anchorX="center" anchorY="middle" letterSpacing={0.06} outlineWidth={0.012} outlineColor="#050810">
+            {name}
+          </Text>
+        </group>
+      ))}
+      <Text position={[6.2, 2.0, 0]} fontSize={0.3} color="#5EEAD4" anchorX="center" anchorY="middle" letterSpacing={0.14}>
+        企业业务数据域
+      </Text>
+    </group>
+  );
+}
+
+/* ─────────── Agent OS · 技能芯片阵列（爱化身式能力单元） ─────────── */
+const SKILLS = ['合同审阅', '数据分析', '文案生成', '报表生成', '客服应答', '舆情监控', '招聘筛选', '排班优化'];
+
+function SkillChips() {
+  const { w, d, topY } = STACK.agentos;
+  const chipRefs = useRef<(THREE.Group | null)[]>([]);
+  const chipMats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    chipRefs.current.forEach((g, i) => {
+      if (g) g.position.y = 0.5 + 0.1 * Math.sin(t * 1.3 + i * 0.9);
+    });
+    chipMats.current.forEach((m, i) => {
+      if (m) m.emissiveIntensity = 0.22 + 0.14 * Math.sin(t * 1.6 + i * 0.8);
+    });
+  });
+  return (
+    <group position={[w * 0.13, topY, d * 0.2]}>
+      {SKILLS.map((name, i) => {
+        const col = i % 4;
+        const row = Math.floor(i / 4);
+        return (
+          <group key={name} ref={(g) => { chipRefs.current[i] = g; }} position={[col * 3.1, 0.5, row * 2.6]}>
+            <mesh>
+              <boxGeometry args={[2.6, 0.34, 1.5]} />
+              <meshStandardMaterial
+                ref={(m) => { chipMats.current[i] = m; }}
+                color="#151132" roughness={0.4} metalness={0.55}
+                emissive={i % 2 === 0 ? '#A855F7' : '#6366F1'} emissiveIntensity={0.22}
+              />
+              <Edges color={i % 2 === 0 ? '#C084FC' : '#818CF8'} threshold={15} />
+            </mesh>
+            <Text position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.44} color="#EDE9FE" anchorX="center" anchorY="middle" outlineWidth={0.012} outlineColor="#0a0618">
+              {name}
+            </Text>
+          </group>
+        );
+      })}
+      <Text position={[4.7, 2.1, -1.3]} fontSize={0.3} color="#C4B5FD" anchorX="center" anchorY="middle" letterSpacing={0.14}>
+        技能库 · SKILL UNITS
+      </Text>
+    </group>
+  );
+}
+
+/* ─────────── Agent OS · 工作流流水线（意图 → 拆解 → 执行 → 交付） ─────────── */
+const WORKFLOW_STAGES = ['意图理解', '任务拆解', '执行 · 工具', '审批交付'];
+
+function WorkflowPipeline() {
+  const { w, d, topY } = STACK.agentos;
+  const pulseRef = useRef<THREE.Mesh>(null);
+  const stageMats = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+  const stageX = (i: number) => i * 3.9;
+  const total = stageX(WORKFLOW_STAGES.length - 1);
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    const u = (t * 0.28) % 1;
+    if (pulseRef.current) pulseRef.current.position.x = u * total;
+    // 脉冲经过的阶段点亮
+    stageMats.current.forEach((m, i) => {
+      if (!m) return;
+      const su = stageX(i) / total;
+      const lit = Math.max(0, 1 - Math.abs(u - su) * 6);
+      m.emissiveIntensity = 0.18 + lit * 0.5;
+    });
+  });
+
+  return (
+    <group position={[-w * 0.42, topY, d * 0.16]}>
+      {/* 传送轨道 */}
+      <mesh position={[total / 2, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.035, 0.035, total, 6]} />
+        <meshBasicMaterial color="#A855F7" transparent opacity={0.35} toneMapped={false} />
+      </mesh>
+      <mesh ref={pulseRef} position={[0, 0.5, 0]}>
+        <sphereGeometry args={[0.13, 8, 8]} />
+        <meshBasicMaterial color="#F0ABFC" toneMapped={false} />
+      </mesh>
+      {WORKFLOW_STAGES.map((name, i) => (
+        <group key={name} position={[stageX(i), 0, 0]}>
+          <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[2.2, 1.0, 1.5]} />
+            <meshStandardMaterial
+              ref={(m) => { stageMats.current[i] = m; }}
+              color="#141230" roughness={0.42} metalness={0.55}
+              emissive="#A855F7" emissiveIntensity={0.18}
+            />
+            <Edges color="#C084FC" threshold={15} />
+          </mesh>
+          <Text position={[0, 0.52, 0.78]} fontSize={0.3} color="#F3E8FF" anchorX="center" anchorY="middle" outlineWidth={0.012} outlineColor="#0a0618">
+            {name}
+          </Text>
+        </group>
+      ))}
+      <Text position={[total / 2, 1.9, 0]} fontSize={0.3} color="#C4B5FD" anchorX="center" anchorY="middle" letterSpacing={0.14}>
+        工作流引擎 · WORKFLOW
+      </Text>
+    </group>
+  );
+}
+
 /* ─────────── Agent OS · 任务塔 ×3 + 业务目标条（复刻 taskTower / businessGoalBars） ─────────── */
 function TaskTowers({ onSelectTaskTower }: { onSelectTaskTower: () => void }) {
   const { w, d, topY } = STACK.agentos;
@@ -194,7 +391,7 @@ function TaskTowers({ onSelectTaskTower }: { onSelectTaskTower: () => void }) {
   const barMeshes = useRef<(THREE.Mesh | null)[]>([]);
 
   const towers = [-w * 0.3, -w * 0.02, w * 0.26];
-  const slabs = 5;
+  const slabs = 4; // 塔顶须低于上层楼板底（层间净空 3.4）
   const goalBars = [0.55, 0.85, 0.68, 1.0, 0.75, 0.6];
 
   useFrame(({ clock }) => {
@@ -250,7 +447,7 @@ function TaskTowers({ onSelectTaskTower }: { onSelectTaskTower: () => void }) {
             </mesh>
           </group>
         ))}
-        <Text position={[towers[1], 3.6, -d * 0.16]} fontSize={0.36} color="#C084FC" anchorX="center" anchorY="middle" letterSpacing={0.12} outlineWidth={0.015} outlineColor="#050810">
+        <Text position={[towers[1], 2.95, -d * 0.16]} fontSize={0.36} color="#C084FC" anchorX="center" anchorY="middle" letterSpacing={0.12} outlineWidth={0.015} outlineColor="#050810">
           TASK-42 · 调度矩阵
         </Text>
       </group>
@@ -402,13 +599,17 @@ export default function ArchBase({ focusLayer, onSelectLayer, onSelectDbNode, on
       <TierPlatform id="agentos" focusLayer={focusLayer} onSelect={onSelectLayer} />
       <TierPlatform id="dataos" focusLayer={focusLayer} onSelect={onSelectLayer} />
 
-      <LayerFrontLabel badge="AGENT OS" zh="企业智能体操作系统 · 调度 / 路由 / A2A / 审批" color={ACCENT.agentos}
+      <LayerFrontLabel badge="AGENT OS" zh="企业智能体操作系统 · 技能库 / 工作流 / 调度 / A2A" color={ACCENT.agentos}
         w={STACK.agentos.w} d={STACK.agentos.d} topY={STACK.agentos.topY} h={STACK.agentos.h} />
-      <LayerFrontLabel badge="DATA OS" zh="企业数据与知识底座 · 42 异构存储节点" color={ACCENT.dataos}
+      <LayerFrontLabel badge="DATA OS" zh="企业数据与知识底座 · 知识图谱 / 数据域 / 存储节点" color={ACCENT.dataos}
         w={STACK.dataos.w} d={STACK.dataos.d} topY={STACK.dataos.topY} h={STACK.dataos.h} />
 
       <StorageField onSelectDbNode={onSelectDbNode} />
+      <KnowledgeGraph />
+      <DataDomains />
       <TaskTowers onSelectTaskTower={onSelectTaskTower} />
+      <SkillChips />
+      <WorkflowPipeline />
       <DataFlows />
       <CornerBeams />
 

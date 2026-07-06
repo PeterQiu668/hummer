@@ -36,27 +36,33 @@ const EmployeeFigure = memo(function EmployeeFigure({
 
   return (
     <group position={position}>
-      {/* 椅子 */}
+      {/* 工位底座垫（把桌椅"锚"在平台上，带职业色描边） */}
+      <mesh position={[0, 0.035, 0.15]}>
+        <boxGeometry args={[2.1, 0.07, 2.0]} />
+        <meshStandardMaterial color="#10182b" metalness={0.55} roughness={0.4} emissive={look.outfit} emissiveIntensity={0.06} />
+        <Edges color={look.outfit} threshold={15} />
+      </mesh>
+      {/* 椅子（深金属科技风） */}
       <mesh position={[0, 0.25, 0.55]}>
         <boxGeometry args={[0.55, 0.5, 0.55]} />
-        <meshStandardMaterial color="#3a3a36" metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#1c2333" metalness={0.5} roughness={0.45} />
       </mesh>
       <mesh position={[0, 0.7, 0.78]}>
         <boxGeometry args={[0.55, 0.55, 0.08]} />
-        <meshStandardMaterial color="#3a3a36" metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#1c2333" metalness={0.5} roughness={0.45} />
       </mesh>
       {/* 桌子 */}
       <mesh position={[0, 0.45, -0.1]}>
         <boxGeometry args={[1.4, 0.06, 0.8]} />
-        <meshStandardMaterial color="#5a5a55" metalness={0.3} roughness={0.4} />
+        <meshStandardMaterial color="#232b3d" metalness={0.5} roughness={0.4} emissive="#3B82F6" emissiveIntensity={0.05} />
       </mesh>
       <mesh position={[-0.6, 0.22, -0.3]}>
         <boxGeometry args={[0.06, 0.42, 0.06]} />
-        <meshStandardMaterial color="#3a3a36" />
+        <meshStandardMaterial color="#1c2333" metalness={0.5} />
       </mesh>
       <mesh position={[0.6, 0.22, -0.3]}>
         <boxGeometry args={[0.06, 0.42, 0.06]} />
-        <meshStandardMaterial color="#3a3a36" />
+        <meshStandardMaterial color="#1c2333" metalness={0.5} />
       </mesh>
       {/* 全息显示屏：细边悬浮框 + 半透明屏面（材质交给 VoxelHuman 做状态闪烁），微后倾更像参考图 */}
       <group position={[0, 0.98, -0.35]} rotation={[-0.09, 0, 0]}>
@@ -109,9 +115,18 @@ function EmptyDeskCluster({ desks }: { desks: { id: string; pos: [number, number
   if (desks.length === 0) return null;
   return (
     <group>
+      {/* 底座垫 */}
+      <Instances limit={workstations.length}>
+        <boxGeometry args={[2.0, 0.06, 1.8]} />
+        <meshStandardMaterial color="#0f1626" metalness={0.55} roughness={0.45} emissive="#3B82F6" emissiveIntensity={0.04} />
+        {desks.map((d) => (
+          <Instance key={d.id} position={[d.pos[0], d.pos[1] + 0.03, d.pos[2] + 0.1]} />
+        ))}
+      </Instances>
+      {/* 空桌面 */}
       <Instances limit={workstations.length}>
         <boxGeometry args={[1.4, 0.06, 0.8]} />
-        <meshStandardMaterial color="#3a3a36" metalness={0.3} roughness={0.6} />
+        <meshStandardMaterial color="#232b3d" metalness={0.45} roughness={0.5} />
         {desks.map((d) => (
           <Instance key={d.id} position={[d.pos[0], d.pos[1] + 0.45, d.pos[2] - 0.1]} />
         ))}
@@ -136,7 +151,7 @@ function HiredFigures({ hiredIds }: { hiredIds: string[] }) {
           <group key={m.id} position={pos}>
             <mesh position={[0, 0.45, -0.1]}>
               <boxGeometry args={[1.4, 0.06, 0.8]} />
-              <meshStandardMaterial color="#5a5a55" roughness={0.45} />
+              <meshStandardMaterial color="#232b3d" metalness={0.5} roughness={0.45} />
             </mesh>
             <VoxelHuman
               position={[0, 0, 0.4]}

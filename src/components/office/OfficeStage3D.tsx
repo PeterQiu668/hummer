@@ -7,8 +7,12 @@ import {
   GitBranch, Key, BookOpen, AlertCircle, Route, X, Layers, Target, Sparkles,
   Server, ListChecks,
 } from 'lucide-react';
-import CityBackground from './CityBackground';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { AnimatePresence } from 'framer-motion';
+import SpaceBackdrop from './SpaceBackdrop';
 import ArchBase from './ArchBase';
+import BossCockpit from './BossCockpit';
+import { useAppStore } from '../../store/useAppStore';
 import OfficeShell from './OfficeShell';
 import ZonePlatform, { ZONE_SPECS } from './ZonePlatform';
 import Workstations from './Workstations';
@@ -47,6 +51,7 @@ export default function OfficeStage3D() {
   const [focusLayer, setFocusLayer] = useState<ArchLayerId | null>(null);
   const [showDbNode, setShowDbNode] = useState(false);
   const [showTaskTower, setShowTaskTower] = useState(false);
+  const activeZone = useAppStore((s) => s.activeZone);
 
   const edgeCount = collabTasks
     .filter((t) => visibleStatuses.includes(t.status))
@@ -71,7 +76,7 @@ export default function OfficeStage3D() {
       <Canvas
         dpr={[1, 1.6]}
         shadows={false}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12, preserveDrawingBuffer: true }}
         style={{ background: '#1A1B1E' }}
       >
         <PerspectiveCamera makeDefault position={[0, 26, 58]} fov={48} near={0.5} far={280} />
@@ -85,7 +90,7 @@ export default function OfficeStage3D() {
         />
         <CameraRig3D />
         <Suspense fallback={null}>
-          <CityBackground />
+          <SpaceBackdrop />
           <Lighting />
           {/* 三层架构：Data OS → Agent OS（基座）→ Agent Workforce（办公室） */}
           <ArchBase
@@ -99,8 +104,15 @@ export default function OfficeStage3D() {
           <Workstations />
           <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
           <FloatingParticles count={130} color="#3B82F6" />
+          {/* Bloom 辉光：霓虹/自发光表面泛光，整体科技高级感 */}
+          <EffectComposer multisampling={0}>
+            <Bloom intensity={0.75} luminanceThreshold={0.32} luminanceSmoothing={0.28} mipmapBlur radius={0.72} />
+          </EffectComposer>
         </Suspense>
       </Canvas>
+
+      {/* 老板驾驶舱（点击 EXECUTIVE SUITE 聚焦时弹出） */}
+      <AnimatePresence>{activeZone === 'boss' && <BossCockpit />}</AnimatePresence>
 
       {/* 右下 · 架构层档案 + 元素档案（Agentrix 式弹窗） */}
       <div className="absolute right-3 bottom-3 z-20 flex flex-col gap-2 items-end">

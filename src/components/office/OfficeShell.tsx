@@ -203,77 +203,138 @@ function FloorMarkings() {
   );
 }
 
-/* ─────────── 绿植盆栽 ─────────── */
+/* ─────────── 智能绿植舱（暗金属花盆 + 霓虹环 + 低多边形植株，风格与全场统一） ─────────── */
 function Plant({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
   return (
     <group position={position} scale={scale}>
-      <mesh position={[0, 0.22, 0]}>
-        <cylinderGeometry args={[0.26, 0.34, 0.44, 10]} />
-        <meshStandardMaterial color="#e7e2d8" roughness={0.7} />
+      {/* 六棱金属盆 */}
+      <mesh position={[0, 0.26, 0]}>
+        <cylinderGeometry args={[0.28, 0.36, 0.52, 6]} />
+        <meshStandardMaterial color="#141c2e" metalness={0.6} roughness={0.35} emissive="#10B981" emissiveIntensity={0.08} />
+        <Edges color="#10B981" threshold={30} />
       </mesh>
-      {[0, 1.1, 2.2, 3.4, 4.6].map((a) => (
-        <mesh key={a} position={[Math.cos(a) * 0.12, 0.78, Math.sin(a) * 0.12]} rotation={[Math.cos(a) * 0.4, 0, Math.sin(a) * 0.4]}>
-          <coneGeometry args={[0.13, 0.85, 6]} />
-          <meshStandardMaterial color="#166534" roughness={0.7} />
+      {/* 盆口霓虹环 */}
+      <mesh position={[0, 0.53, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.2, 0.27, 18]} />
+        <meshBasicMaterial color="#34D399" transparent opacity={0.55} toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+      {/* 低多边形植株（八面体叶簇，微发光边缘） */}
+      {[[0, 0.95, 0, 0.3], [-0.16, 0.8, 0.1, 0.2], [0.15, 0.82, -0.1, 0.22], [0.02, 1.18, 0.05, 0.18]].map(([x, y, z, s], i) => (
+        <mesh key={i} position={[x, y, z]} rotation={[i * 0.6, i * 1.1, 0]}>
+          <octahedronGeometry args={[s as number]} />
+          <meshStandardMaterial color="#14532d" roughness={0.55} metalness={0.2} emissive="#22C55E" emissiveIntensity={0.12} flatShading />
         </mesh>
       ))}
+      <mesh position={[0, 0.72, 0]}>
+        <cylinderGeometry args={[0.03, 0.045, 0.42, 6]} />
+        <meshStandardMaterial color="#1f2d24" roughness={0.6} />
+      </mesh>
     </group>
   );
 }
 
-/* ─────────── 健身角（跑步机 + 哑铃架，参考图左下） ─────────── */
+/* ─────────── 能量健身舱（悬浮跑步机 + 智能力量架 · 暗金属 + 霓虹描边） ─────────── */
 function GymCorner() {
   const beltMat = useRef<THREE.MeshBasicMaterial>(null);
+  const padMat = useRef<THREE.MeshBasicMaterial>(null);
   useFrame(({ clock }) => {
-    if (beltMat.current) beltMat.current.opacity = 0.25 + 0.1 * Math.sin(clock.elapsedTime * 3.2);
+    const t = clock.elapsedTime;
+    if (beltMat.current) beltMat.current.opacity = 0.35 + 0.18 * Math.sin(t * 3.2);
+    if (padMat.current) padMat.current.opacity = 0.22 + 0.1 * Math.sin(t * 1.1);
   });
   return (
     <group position={[-16.8, F.topY, 12.2]} rotation={[0, Math.PI / 7, 0]}>
-      {/* 跑步机 */}
+      {/* 区域能量垫 */}
+      <mesh position={[1.3, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.6, 2.74, 36]} />
+        <meshBasicMaterial ref={padMat} color="#F59E0B" transparent opacity={0.25} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {/* 悬浮跑步机：流线基座 + 光带跑带 + 全息面板 */}
       <group>
-        <mesh position={[0, 0.12, 0]}>
-          <boxGeometry args={[0.85, 0.16, 2.0]} />
-          <meshStandardMaterial color="#15171d" metalness={0.4} roughness={0.5} />
+        <mesh position={[0, 0.14, 0]}>
+          <boxGeometry args={[0.9, 0.14, 2.1]} />
+          <meshStandardMaterial color="#101623" metalness={0.6} roughness={0.3} emissive="#38BDF8" emissiveIntensity={0.1} />
+          <Edges color="#38BDF8" threshold={15} />
         </mesh>
-        <mesh position={[0, 0.21, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.6, 1.6]} />
-          <meshBasicMaterial ref={beltMat} color="#38BDF8" transparent opacity={0.3} toneMapped={false} />
+        <mesh position={[0, 0.22, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.62, 1.7]} />
+          <meshBasicMaterial ref={beltMat} color="#38BDF8" transparent opacity={0.4} toneMapped={false} />
         </mesh>
-        {[-0.32, 0.32].map((x) => (
-          <mesh key={x} position={[x, 0.7, -0.82]} rotation={[0.25, 0, 0]}>
-            <boxGeometry args={[0.06, 1.15, 0.06]} />
-            <meshStandardMaterial color="#22262e" metalness={0.5} roughness={0.4} />
+        {/* 单侧悬臂扶手 */}
+        {[-0.36, 0.36].map((x) => (
+          <mesh key={x} position={[x, 0.72, -0.85]} rotation={[0.22, 0, 0]}>
+            <boxGeometry args={[0.05, 1.2, 0.05]} />
+            <meshStandardMaterial color="#182238" metalness={0.65} roughness={0.3} emissive="#38BDF8" emissiveIntensity={0.15} />
           </mesh>
         ))}
-        <mesh position={[0, 1.28, -0.95]}>
-          <boxGeometry args={[0.78, 0.34, 0.08]} />
-          <meshStandardMaterial color="#0b0f18" emissive="#38BDF8" emissiveIntensity={0.5} />
+        {/* 悬浮全息面板（半透明发光屏） */}
+        <mesh position={[0, 1.36, -0.98]} rotation={[-0.12, 0, 0]}>
+          <planeGeometry args={[0.8, 0.42]} />
+          <meshBasicMaterial color="#38BDF8" transparent opacity={0.5} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
       </group>
-      {/* 哑铃架 */}
-      <group position={[1.7, 0, 0.3]} rotation={[0, -0.3, 0]}>
-        {[-0.55, 0.55].map((x) => (
-          <mesh key={x} position={[x, 0.42, 0]}>
-            <boxGeometry args={[0.08, 0.84, 0.5]} />
-            <meshStandardMaterial color="#22262e" metalness={0.5} roughness={0.4} />
+      {/* 智能力量架：发光杠铃 + 磁悬浮配重 */}
+      <group position={[1.8, 0, 0.35]} rotation={[0, -0.3, 0]}>
+        {[-0.6, 0.6].map((x) => (
+          <mesh key={x} position={[x, 0.46, 0]}>
+            <boxGeometry args={[0.09, 0.92, 0.5]} />
+            <meshStandardMaterial color="#141c2e" metalness={0.6} roughness={0.3} emissive="#A855F7" emissiveIntensity={0.12} />
+            <Edges color="#A855F7" threshold={15} />
           </mesh>
         ))}
-        {[0.3, 0.66].map((yy) => (
+        {[0.34, 0.72].map((yy) => (
           <group key={yy}>
             <mesh position={[0, yy, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.028, 0.028, 1.1, 6]} />
-              <meshStandardMaterial color="#3a3f49" metalness={0.6} roughness={0.35} />
+              <cylinderGeometry args={[0.025, 0.025, 1.2, 6]} />
+              <meshStandardMaterial color="#2a3550" metalness={0.7} roughness={0.25} emissive="#A855F7" emissiveIntensity={0.2} />
             </mesh>
-            {[-0.32, 0.32].map((x) => (
+            {[-0.36, 0.36].map((x) => (
               <mesh key={x} position={[x, yy, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.09, 0.09, 0.14, 10]} />
-                <meshStandardMaterial color="#15171d" metalness={0.5} roughness={0.4} />
+                <cylinderGeometry args={[0.1, 0.1, 0.12, 12]} />
+                <meshStandardMaterial color="#101623" metalness={0.6} roughness={0.3} emissive="#C084FC" emissiveIntensity={0.18} />
               </mesh>
             ))}
           </group>
         ))}
       </group>
-      <Plant position={[2.9, 0, -0.5]} scale={1.15} />
+      <Plant position={[3.1, 0, -0.6]} scale={1.15} />
+      <Text position={[1.3, 2.0, 0]} fontSize={0.26} color="#FCD34D" anchorX="center" anchorY="middle" letterSpacing={0.2}>
+        ENERGY GYM
+      </Text>
+    </group>
+  );
+}
+
+/* ─────────── 楼板周圈能量光带（双色呼吸，科技感描边） ─────────── */
+function PerimeterGlow() {
+  const matA = useRef<THREE.MeshBasicMaterial>(null);
+  const matB = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (matA.current) matA.current.opacity = 0.4 + 0.2 * Math.sin(t * 1.4);
+    if (matB.current) matB.current.opacity = 0.4 + 0.2 * Math.sin(t * 1.4 + Math.PI);
+  });
+  const y = F.topY + 0.02;
+  const inset = 0.55;
+  const hw = F.w / 2 - inset;
+  const hd = F.d / 2 - inset;
+  const flat: [number, number, number] = [-Math.PI / 2, 0, 0];
+  return (
+    <group>
+      {/* 前后光带（青） */}
+      {[hd, -hd].map((z) => (
+        <mesh key={`z${z}`} position={[0, y, z]} rotation={flat}>
+          <planeGeometry args={[hw * 2, 0.12]} />
+          <meshBasicMaterial ref={z > 0 ? matA : undefined} color="#22D3EE" transparent opacity={0.45} toneMapped={false} depthWrite={false} />
+        </mesh>
+      ))}
+      {/* 左右光带（蓝紫） */}
+      {[hw, -hw].map((x) => (
+        <mesh key={`x${x}`} position={[x, y, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[hd * 2, 0.12]} />
+          <meshBasicMaterial ref={x > 0 ? matB : undefined} color="#818CF8" transparent opacity={0.45} toneMapped={false} depthWrite={false} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -301,6 +362,7 @@ export default function OfficeShell({ focusLayer, onSelectLayer }: {
 
       <AiPlaque />
       <FloorMarkings />
+      <PerimeterGlow />
       <GymCorner />
 
       {/* 绿植点缀 */}
