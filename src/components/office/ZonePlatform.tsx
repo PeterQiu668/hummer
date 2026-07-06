@@ -24,12 +24,12 @@ export interface ZoneSpec {
 
 /** 6 个分区 · 参考图坐标 */
 export const ZONE_SPECS: ZoneSpec[] = [
-  { id: 'boss',     label: '决策中心',   sub: 'EXECUTIVE SUITE / B3',      center: [11.5, -9],   size: [10, 7],    color: NEON,      elevation: 2.7 },
-  { id: 'business', label: '业务办公区', sub: 'PUBLIC OFFICE SECTION A',   center: [-9.5, -2],   size: [14, 9],    color: NEON,      elevation: 0 },
-  { id: 'support',  label: '行政支持',   sub: 'PUBLIC OFFICE SECTION B',   center: [-1, -8.5],   size: [13, 7],    color: NEON,      elevation: 0.3 },
-  { id: 'meeting',  label: '会议舱',     sub: 'CONFERENCE HUB',            center: [3.5, 3.5],   size: [8.6, 8.6], color: NEON,      elevation: 0.45 },
-  { id: 'rest',     label: '休息区',     sub: 'RELAXATION LOUNGE',         center: [12.5, 2.5],  size: [8.5, 7.5], color: '#58E6D9', elevation: 0.35 },
-  { id: 'learn',    label: '充电进化区', sub: 'EVOLUTION GYM',             center: [-13.5, 8.5], size: [6.5, 4.5], color: '#46C68A', elevation: -1.35 },
+  { id: 'boss',     label: '决策中心',   sub: 'EXECUTIVE SUITE / B3',      center: [11.5, -9],   size: [10, 7],    color: '#8B5CF6',  elevation: 2.7 },
+  { id: 'business', label: '业务办公区', sub: 'PUBLIC OFFICE SECTION A',   center: [-9.5, -2],   size: [14, 9],    color: '#2E90FA',  elevation: 0 },
+  { id: 'support',  label: '行政支持',   sub: 'PUBLIC OFFICE SECTION B',   center: [-1, -8.5],   size: [13, 7],    color: '#06B6D4',  elevation: 0.3 },
+  { id: 'meeting',  label: '会议舱',     sub: 'CONFERENCE HUB',            center: [3.5, 3.5],   size: [8.6, 8.6], color: '#6366F1',  elevation: 0.45 },
+  { id: 'rest',     label: '休息区',     sub: 'RELAXATION LOUNGE',         center: [12.5, 2.5],  size: [8.5, 7.5], color: '#EC6A5E',  elevation: 0.35 },
+  { id: 'learn',    label: '充电进化区', sub: 'EVOLUTION GYM',             center: [-13.5, 8.5], size: [6.5, 4.5], color: '#10B981',  elevation: -1.35 },
 ];
 
 export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
@@ -46,7 +46,7 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
       {/* 结构件 */}
       {spec.id === 'business' && (
         <group position={[cx, 0.002, cz]}>
-          <NeonRectOutline w={14} d={9} r={1.2} opacity={isActive ? 1 : 0.55} />
+          <NeonRectOutline w={14} d={9} r={1.2} opacity={isActive ? 1 : 0.72} />
           <FloorText text="PUBLIC OFFICE SECTION A" size={0.42} position={[-1.5, 0.004, 4.2]} rotation={[0, -0.18, 0]} opacity={0.75} />
           <FloorText text="A-1" size={0.7} position={[-4.2, 0.004, 2.2]} />
           <FloorText text="A-2" size={0.7} position={[1.8, 0.004, -0.6]} />
@@ -56,7 +56,7 @@ export default function ZonePlatform({ spec }: { spec: ZoneSpec }) {
         <>
           <SectionBPlatform />
           <group position={[cx, 0.312, cz]}>
-            <NeonRectOutline w={11.6} d={5.8} r={0.9} opacity={isActive ? 1 : 0.5} />
+            <NeonRectOutline w={11.6} d={5.8} r={0.9} opacity={isActive ? 1 : 0.7} />
             <FloorText text="PUBLIC OFFICE SECTION B" size={0.36} position={[-0.5, 0.004, 2.9]} opacity={0.75} />
             <FloorText text="B-1" size={0.62} position={[-4.5, 0.004, 1.9]} />
             <FloorText text="B-2" size={0.62} position={[1.5, 0.004, 2.2]} />

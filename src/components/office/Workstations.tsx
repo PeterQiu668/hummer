@@ -21,10 +21,10 @@ import type { Employee } from '../../lib/types';
 export const HIRES_CHANGED_EVENT = 'hummer-hires-changed';
 
 const SKIN_TONES = ['#F5D7B5', '#EBC094', '#D4A276'];
-const CHAIR = '#2C3547';
-const ISLAND = '#334157';
-const ISLAND_TOP = '#3C4B64';
-const ISLAND_DARK = '#232E42';
+const CHAIR = '#8B98AC';
+const ISLAND = '#CDD3DE';
+const ISLAND_TOP = '#E9DFCE';
+const ISLAND_DARK = '#C7CDD7';
 
 const FALLBACK_LOOK: FigureLook = {
   outfit: '#2B3038', hair: 'neat', hairColor: '#2A2723', accessories: [], build: 'default',
@@ -46,11 +46,11 @@ function SciChair(props: JSX.IntrinsicElements['group']) {
       </mesh>
       <mesh position={[0, 0.3, -0.1]}>
         <cylinderGeometry args={[0.03, 0.03, 0.32, 6]} />
-        <meshStandardMaterial color="#3A424E" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial color="#AEB6C1" metalness={0.7} roughness={0.3} />
       </mesh>
       <mesh position={[0, 0.13, -0.1]}>
         <cylinderGeometry args={[0.26, 0.28, 0.025, 10]} />
-        <meshStandardMaterial color="#2A303A" metalness={0.6} roughness={0.4} />
+        <meshStandardMaterial color="#B7BDC7" metalness={0.6} roughness={0.4} />
       </mesh>
     </group>
   );
@@ -91,7 +91,7 @@ function PodIsland({ pod }: { pod: PodDef }) {
       {/* 中脊隔板 + 槽灯 */}
       <mesh position={[0, 0.96, 0]}>
         <boxGeometry args={[4.6, 0.34, 0.12]} />
-        <meshStandardMaterial color="#2C3648" roughness={0.45} metalness={0.35} />
+        <meshStandardMaterial color="#D0D6DF" roughness={0.45} metalness={0.35} />
       </mesh>
       {[-1.4, 0, 1.4].map((x) => (
         <mesh key={x} position={[x, 0.99, 0]}>
@@ -108,7 +108,7 @@ function PodIsland({ pod }: { pod: PodDef }) {
             {/* 键盘（台面上，靠人一侧） */}
             <mesh position={[0, 0.825, 0.62]}>
               <boxGeometry args={[0.32, 0.02, 0.12]} />
-              <meshStandardMaterial color="#12161D" roughness={0.5} />
+              <meshStandardMaterial color="#26303F" roughness={0.5} />
             </mesh>
           </group>
         );
@@ -149,15 +149,15 @@ function ExecConsole() {
       <group position={[0, 0, 0]}>
         <mesh position={[0, 0.5, -0.15]}>
           <boxGeometry args={[0.55, 0.08, 0.52]} />
-          <meshStandardMaterial color="#12161D" roughness={0.6} />
+          <meshStandardMaterial color="#26303F" roughness={0.6} />
         </mesh>
         <mesh position={[0, 1.05, -0.45]} rotation={[-0.06, 0, 0]}>
           <boxGeometry args={[0.55, 1.05, 0.08]} />
-          <meshStandardMaterial color="#12161D" roughness={0.6} />
+          <meshStandardMaterial color="#26303F" roughness={0.6} />
         </mesh>
         <mesh position={[0, 0.28, -0.15]}>
           <cylinderGeometry args={[0.035, 0.035, 0.3, 6]} />
-          <meshStandardMaterial color="#3A424E" metalness={0.7} roughness={0.3} />
+          <meshStandardMaterial color="#AEB6C1" metalness={0.7} roughness={0.3} />
         </mesh>
       </group>
       {/* 背柜 + 暖光台灯 */}
@@ -183,7 +183,7 @@ function ConferenceSet() {
       {/* 圆桌 */}
       <mesh position={[0, 0.72, 0]}>
         <cylinderGeometry args={[1.5, 1.5, 0.1, 32]} />
-        <meshStandardMaterial color="#2A3446" roughness={0.35} metalness={0.4} />
+        <meshStandardMaterial color="#D6DCE5" roughness={0.35} metalness={0.4} />
       </mesh>
       <mesh position={[0, 0.36, 0]}>
         <cylinderGeometry args={[0.5, 0.6, 0.72, 16]} />
@@ -193,23 +193,23 @@ function ConferenceSet() {
       {[0.35, 0.7, 1.05, 1.35].map((r, i) => (
         <mesh key={r} position={[0, 0.78, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[r - 0.025, r + 0.025, 48]} />
-          <meshBasicMaterial color="#4DD8FF" transparent opacity={0.7 - i * 0.13} toneMapped={false} />
+          <meshBasicMaterial color="#6366F1" transparent opacity={0.75 - i * 0.13} toneMapped={false} />
         </mesh>
       ))}
       {/* 全息投影：光锥 + 旋转环 + 核心 */}
       <mesh position={[0, 1.16, 0]}>
         <cylinderGeometry args={[0.6, 0.06, 0.7, 24, 1, true]} />
-        <meshBasicMaterial color="#4DD8FF" transparent opacity={0.1} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial color="#6366F1" transparent opacity={0.16} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={holoRing} position={[0, 1.38, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.55, 0.02, 8, 48]} />
-        <meshBasicMaterial color="#9FE8FF" toneMapped={false} />
+        <meshBasicMaterial color="#6366F1" toneMapped={false} />
       </mesh>
       <mesh position={[0, 1.4, 0]}>
         <sphereGeometry args={[0.12, 12, 12]} />
         <meshBasicMaterial color="#B5ECFF" toneMapped={false} />
       </mesh>
-      <GlowPlane size={[1.6, 1.6]} color="#4DD8FF" opacity={0.3} position={[0, 1.35, 0]} />
+      <GlowPlane size={[1.6, 1.6]} color="#6366F1" opacity={0.18} position={[0, 1.35, 0]} />
       {/* 空椅 */}
       {emptyAngles.map((deg) => {
         const a = (deg * Math.PI) / 180;
@@ -231,19 +231,19 @@ function SofaBlock({ width = 2.3, ...props }: { width?: number } & JSX.Intrinsic
     <group {...props}>
       <mesh position={[0, 0.24, 0]}>
         <boxGeometry args={[width, 0.42, 0.95]} />
-        <meshStandardMaterial color="#323C4E" roughness={0.9} />
+        <meshStandardMaterial color="#D9CFC3" roughness={0.9} />
       </mesh>
       <mesh position={[0, 0.62, -0.38]}>
         <boxGeometry args={[width, 0.55, 0.22]} />
-        <meshStandardMaterial color="#323C4E" roughness={0.9} />
+        <meshStandardMaterial color="#D9CFC3" roughness={0.9} />
       </mesh>
       <mesh position={[-width / 2 + 0.1, 0.5, 0]}>
         <boxGeometry args={[0.2, 0.55, 0.95]} />
-        <meshStandardMaterial color="#2A3342" roughness={0.9} />
+        <meshStandardMaterial color="#CDC2B4" roughness={0.9} />
       </mesh>
       <mesh position={[width / 2 - 0.1, 0.5, 0]}>
         <boxGeometry args={[0.2, 0.55, 0.95]} />
-        <meshStandardMaterial color="#2A3342" roughness={0.9} />
+        <meshStandardMaterial color="#CDC2B4" roughness={0.9} />
       </mesh>
     </group>
   );
@@ -261,7 +261,7 @@ function LoungeSet() {
       {/* 茶几（玻璃面） */}
       <mesh position={[12.5, 0.36, 2.2]}>
         <boxGeometry args={[1.3, 0.05, 0.7]} />
-        <meshStandardMaterial color="#A8E4F2" transparent opacity={0.22} roughness={0.1} metalness={0.2} />
+        <meshStandardMaterial color="#D2E6EF" transparent opacity={0.3} roughness={0.1} metalness={0.2} />
       </mesh>
       <mesh position={[12.5, 0.18, 2.2]}>
         <boxGeometry args={[1.1, 0.32, 0.5]} />
@@ -281,27 +281,27 @@ function Treadmill(props: JSX.IntrinsicElements['group']) {
     <group {...props}>
       <mesh position={[0, 0.09, 0.1]} rotation={[0.05, 0, 0]}>
         <boxGeometry args={[0.75, 0.14, 1.75]} />
-        <meshStandardMaterial color="#242E3E" roughness={0.5} metalness={0.35} />
+        <meshStandardMaterial color="#26303F" roughness={0.5} metalness={0.35} />
       </mesh>
       <mesh position={[0, 0.17, 0.12]} rotation={[0.05, 0, 0]}>
         <boxGeometry args={[0.6, 0.02, 1.6]} />
-        <meshStandardMaterial color="#10141B" roughness={0.7} />
+        <meshStandardMaterial color="#C7CDD7" roughness={0.7} />
       </mesh>
       {/* 侧扶手 + 前控制台 */}
       {[-0.34, 0.34].map((x) => (
         <mesh key={x} position={[x, 0.7, -0.55]} rotation={[0.5, 0, 0]}>
           <boxGeometry args={[0.05, 0.05, 0.9]} />
-          <meshStandardMaterial color="#3A424E" metalness={0.6} roughness={0.3} />
+          <meshStandardMaterial color="#AEB6C1" metalness={0.6} roughness={0.3} />
         </mesh>
       ))}
       <group position={[0, 1.05, -0.92]}>
         <mesh rotation={[-0.3, 0, 0]}>
           <boxGeometry args={[0.6, 0.32, 0.06]} />
-          <meshStandardMaterial color="#12161D" roughness={0.4} metalness={0.4} />
+          <meshStandardMaterial color="#26303F" roughness={0.4} metalness={0.4} />
         </mesh>
         <mesh position={[0, 0.02, 0.04]} rotation={[-0.3, 0, 0]}>
           <planeGeometry args={[0.5, 0.22]} />
-          <meshBasicMaterial color="#46C68A" transparent opacity={0.75} toneMapped={false} />
+          <meshBasicMaterial color="#10B981" transparent opacity={0.9} toneMapped={false} />
         </mesh>
       </group>
     </group>
@@ -316,13 +316,13 @@ function GymEquipment() {
         {[-0.7, 0.7].map((x) => (
           <mesh key={x} position={[x, 0.55, 0]} rotation={[0.2, 0, 0]}>
             <boxGeometry args={[0.08, 1.1, 0.6]} />
-            <meshStandardMaterial color="#262C36" metalness={0.5} roughness={0.4} />
+            <meshStandardMaterial color="#B7BDC7" metalness={0.5} roughness={0.4} />
           </mesh>
         ))}
         {[0.35, 0.7, 1.05].map((y) => (
           <mesh key={y} position={[0, y, (1.05 - y) * 0.35]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.022, 0.022, 1.4, 6]} />
-            <meshStandardMaterial color="#3A424E" metalness={0.6} roughness={0.3} />
+            <meshStandardMaterial color="#AEB6C1" metalness={0.6} roughness={0.3} />
           </mesh>
         ))}
         {Array.from({ length: 8 }, (_, i) => {
@@ -330,9 +330,9 @@ function GymEquipment() {
           const x = -0.5 + (i % 4) * 0.33;
           return (
             <group key={i} position={[x, tier + 0.07, (1.05 - tier) * 0.35]} rotation={[0, 0, Math.PI / 2]}>
-              <mesh><cylinderGeometry args={[0.018, 0.018, 0.2, 6]} /><meshStandardMaterial color="#3A424E" metalness={0.5} /></mesh>
-              <mesh position={[0, 0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#262C36" roughness={0.5} /></mesh>
-              <mesh position={[0, -0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#262C36" roughness={0.5} /></mesh>
+              <mesh><cylinderGeometry args={[0.018, 0.018, 0.2, 6]} /><meshStandardMaterial color="#AEB6C1" metalness={0.5} /></mesh>
+              <mesh position={[0, 0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#B7BDC7" roughness={0.5} /></mesh>
+              <mesh position={[0, -0.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.06, 8]} /><meshStandardMaterial color="#B7BDC7" roughness={0.5} /></mesh>
             </group>
           );
         })}
@@ -341,12 +341,12 @@ function GymEquipment() {
       <group position={[-13.6, 0, 9.6]} rotation={[0, 0.3, 0]}>
         <mesh position={[0, 0.45, 0]}>
           <boxGeometry args={[1.1, 0.08, 0.35]} />
-          <meshStandardMaterial color="#323C4E" roughness={0.8} />
+          <meshStandardMaterial color="#D9CFC3" roughness={0.8} />
         </mesh>
         {[-0.45, 0.45].map((x) => (
           <mesh key={x} position={[x, 0.22, 0]}>
             <boxGeometry args={[0.06, 0.42, 0.3]} />
-            <meshStandardMaterial color="#242E3E" metalness={0.4} roughness={0.5} />
+            <meshStandardMaterial color="#26303F" metalness={0.4} roughness={0.5} />
           </mesh>
         ))}
       </group>
@@ -412,7 +412,7 @@ function SandboxAnnex({ hiredIds }: { hiredIds: string[] }) {
     <group position={[5.5, -1.35, 10.8]}>
       <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[Math.max(6, hired.length * 2.4), 3.4]} />
-        <meshStandardMaterial color="#2A3446" roughness={0.9} emissive="#E8A33D" emissiveIntensity={0.03} />
+        <meshStandardMaterial color="#D6DCE5" roughness={0.9} emissive="#E8A33D" emissiveIntensity={0.03} />
       </mesh>
       <Text position={[0, 0.03, 1.85]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.28} color="#E8A33D" anchorX="center" anchorY="middle" letterSpacing={0.12}>
         SANDBOX · TRIAL

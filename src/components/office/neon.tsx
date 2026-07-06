@@ -11,11 +11,13 @@ import { useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 
-export const NEON = '#3EE0FF';
-export const NEON_DIM = '#1FB6E0';
-export const NEON_TEXT = '#CFF6FF';
-export const PANEL = '#242E3E';
-export const PANEL_EDGE = '#3A4657';
+// 浅色高端：强调线改用饱和青蓝（在浅底上清晰可读，不像近白青那样发糊）
+export const NEON = '#1683D8';       // 主强调线
+export const NEON_DIM = '#0E6BB8';
+export const NEON_TEXT = '#FFFFFF';
+export const INK = '#1E2A3A';        // 浅底深字
+export const PANEL = '#F2F5FA';      // 招牌浅面板
+export const PANEL_EDGE = '#BFC8D6';
 
 /* ── 缓存纹理 ── */
 const texCache = new Map<string, THREE.Texture>();
@@ -67,7 +69,7 @@ export function getBarGlowTexture(): THREE.Texture {
   return tex;
 }
 
-/** 全息 UI 纹理：同心圆环 / 数据条 / 网格，青色透明底 */
+/** 全息 UI 纹理 v2：明亮显示器风格（浅面板 + 饱和蓝/青数据 · 落在深色屏框上，真实设备感） */
 export function getHoloTexture(kind: 'rings' | 'dashboard' | 'map' | 'chart' = 'dashboard', seed = 1): THREE.Texture {
   const key = `holo:${kind}:${seed}`;
   const hit = texCache.get(key);
@@ -78,64 +80,58 @@ export function getHoloTexture(kind: 'rings' | 'dashboard' | 'map' | 'chart' = '
   const ctx = c.getContext('2d')!;
   let s = seed * 7 + 3;
   const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
-  ctx.strokeStyle = 'rgba(102,224,255,0.9)';
-  ctx.fillStyle = 'rgba(62,224,255,0.25)';
-  ctx.lineWidth = 2;
-  // 底面板
-  ctx.fillStyle = 'rgba(30,120,170,0.22)';
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(102,224,255,0.8)';
-  ctx.strokeRect(3, 3, w - 6, h - 6);
+  const BG = '#F5F8FC', WHITE = '#FFFFFF', GRID = '#D8E2EF', BLUE = '#1683D8', TEAL = '#0E9488', INK2 = '#1B2A3A', SUB = '#8494A8';
+  // 浅面板 + 描边 + 顶部标题条
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = WHITE; ctx.fillRect(6, 6, w - 12, h - 12);
+  ctx.strokeStyle = GRID; ctx.lineWidth = 2; ctx.strokeRect(6, 6, w - 12, h - 12);
+  ctx.fillStyle = BLUE; ctx.fillRect(6, 6, w - 12, 15);
+  ctx.fillStyle = WHITE; ctx.fillRect(14, 10, 56, 6);
   if (kind === 'rings') {
+    ctx.lineWidth = 3;
     for (let i = 1; i <= 4; i++) {
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(102,224,255,${0.9 - i * 0.15})`;
-      ctx.arc(w / 2, h / 2, i * 20, 0, Math.PI * 2);
+      ctx.strokeStyle = i % 2 ? BLUE : TEAL;
+      ctx.globalAlpha = 0.88 - i * 0.12;
+      ctx.arc(w / 2, h / 2 + 8, i * 18, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.fillStyle = 'rgba(160,240,255,0.9)';
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2, 6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BLUE;
+    ctx.beginPath(); ctx.arc(w / 2, h / 2 + 8, 6, 0, Math.PI * 2); ctx.fill();
   } else if (kind === 'map') {
-    // 抽象世界地图点阵
-    ctx.fillStyle = 'rgba(102,224,255,0.75)';
+    ctx.fillStyle = '#BFD2E8';
     for (let i = 0; i < 380; i++) {
-      const x = rnd() * w, y = rnd() * (h * 0.7) + h * 0.1;
+      const x = rnd() * w, y = rnd() * (h * 0.6) + h * 0.22;
       if (rnd() > 0.45) ctx.fillRect(x, y, 2, 2);
     }
+    ctx.strokeStyle = BLUE; ctx.lineWidth = 1.5;
     for (let i = 0; i < 4; i++) {
-      ctx.strokeStyle = 'rgba(102,224,255,0.5)';
+      ctx.globalAlpha = 0.7;
       ctx.beginPath();
       ctx.moveTo(rnd() * w, rnd() * h);
       ctx.quadraticCurveTo(rnd() * w, rnd() * h, rnd() * w, rnd() * h);
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
   } else if (kind === 'chart') {
-    ctx.strokeStyle = 'rgba(102,224,255,0.9)';
-    ctx.beginPath();
-    ctx.moveTo(10, h - 20);
-    for (let x = 10; x < w - 10; x += 12) {
-      ctx.lineTo(x, h - 20 - rnd() * (h - 50));
-    }
+    ctx.strokeStyle = BLUE; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(14, h - 22);
+    for (let x = 14; x < w - 10; x += 12) ctx.lineTo(x, h - 22 - rnd() * (h - 70));
     ctx.stroke();
-    ctx.fillStyle = 'rgba(62,224,255,0.35)';
-    for (let i = 0; i < 6; i++) ctx.fillRect(12 + i * 16, h - 16, 10, -(rnd() * 30 + 6));
+    ctx.lineTo(w - 10, h - 22); ctx.lineTo(14, h - 22); ctx.closePath();
+    ctx.fillStyle = 'rgba(22,131,216,0.14)'; ctx.fill();
+    ctx.fillStyle = TEAL;
+    for (let i = 0; i < 6; i++) ctx.fillRect(16 + i * 17, h - 22, 11, -(rnd() * 30 + 6));
   } else {
-    // dashboard：标题条 + 数据条 + 小圆环
-    ctx.fillStyle = 'rgba(102,224,255,0.85)';
-    ctx.fillRect(10, 10, w * 0.4, 8);
+    ctx.fillStyle = INK2; ctx.fillRect(16, 30, 72, 7);
+    ctx.fillStyle = SUB; ctx.fillRect(16, 42, 44, 5);
     for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = 'rgba(102,224,255,0.5)';
-      ctx.fillRect(10, 32 + i * 18, (0.3 + rnd() * 0.6) * (w - 90), 6);
+      ctx.fillStyle = GRID; ctx.fillRect(16, 60 + i * 17, w - 100, 7);
+      ctx.fillStyle = i % 2 ? BLUE : TEAL; ctx.fillRect(16, 60 + i * 17, (0.3 + rnd() * 0.6) * (w - 100), 7);
     }
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(102,224,255,0.9)';
-    ctx.lineWidth = 5;
-    ctx.arc(w - 45, 55, 24, -Math.PI / 2, Math.PI * (rnd() * 1.2));
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(102,224,255,0.6)';
-    for (let i = 0; i < 3; i++) ctx.fillRect(w - 70, 100 + i * 16, 50, 5);
+    ctx.beginPath(); ctx.strokeStyle = GRID; ctx.lineWidth = 6; ctx.arc(w - 46, 52, 22, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.strokeStyle = BLUE; ctx.lineWidth = 6; ctx.arc(w - 46, 52, 22, -Math.PI / 2, Math.PI * (rnd() * 1.2)); ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   texCache.set(key, tex);
@@ -144,8 +140,8 @@ export function getHoloTexture(kind: 'rings' | 'dashboard' | 'map' | 'chart' = '
 
 /* ── 组件 ── */
 
-/** 加性辉光贴片（billboard 用 sprite 亦可，此处固定朝向） */
-export function GlowPlane({ size = [1, 1] as [number, number], color = NEON, opacity = 0.5, ...props }: {
+/** 柔和色晕贴片 v2：浅底上加性辉光不可见，改用普通混合的柔色晕（不发光，仅柔化点缀） */
+export function GlowPlane({ size = [1, 1] as [number, number], color = NEON, opacity = 0.25, ...props }: {
   size?: [number, number]; color?: string; opacity?: number;
 } & JSX.IntrinsicElements['mesh']) {
   return (
@@ -156,9 +152,7 @@ export function GlowPlane({ size = [1, 1] as [number, number], color = NEON, opa
         color={color}
         transparent
         opacity={opacity}
-        blending={THREE.AdditiveBlending}
         depthWrite={false}
-        toneMapped={false}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -241,42 +235,45 @@ export function chamferPanelGeo(w: number, h: number, cut = 0.25, depth = 0.08):
   return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
 }
 
-/** 霓虹招牌：切角暗面板 + 霓虹描边 + 发光文字（含辉光衬底） */
+/** 招牌 v2 · 浅色高端：实心强调色填充 或 白面板 + 清脆文字 + 细强调下划线（无加性辉光） */
 export function NeonSignPanel({
-  text, sub, width = 4, height = 1.1, color = NEON, textColor = NEON_TEXT, fontSize, ...props
+  text, sub, width = 4, height = 1.1, color = NEON, textColor, fill = 'accent', fontSize, ...props
 }: {
-  text: string; sub?: string; width?: number; height?: number; color?: string; textColor?: string; fontSize?: number;
+  text: string; sub?: string; width?: number; height?: number; color?: string; textColor?: string;
+  fill?: 'accent' | 'white'; fontSize?: number;
 } & JSX.IntrinsicElements['group']) {
   const geo = useMemo(() => chamferPanelGeo(width, height, Math.min(0.28, height * 0.3)), [width, height]);
-  const frameGeo = useMemo(() => chamferPanelGeo(width + 0.12, height + 0.12, Math.min(0.33, height * 0.33), 0.04), [width, height]);
+  const frameGeo = useMemo(() => chamferPanelGeo(width + 0.1, height + 0.1, Math.min(0.31, height * 0.33), 0.03), [width, height]);
   const fs = fontSize ?? height * (sub ? 0.34 : 0.42);
+  const onAccent = fill === 'accent';
+  const ink = textColor ?? (onAccent ? '#FFFFFF' : INK);
   return (
     <group {...props}>
-      {/* 霓虹外框 */}
-      <mesh geometry={frameGeo} position={[0, 0, -0.03]}>
+      {/* 细强调描边 */}
+      <mesh geometry={frameGeo} position={[0, 0, -0.02]}>
         <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
-      {/* 暗面板 */}
-      <mesh geometry={geo} position={[0, 0, 0]}>
-        <meshStandardMaterial color={PANEL} roughness={0.5} metalness={0.4} />
+      {/* 面板本体 */}
+      <mesh geometry={geo}>
+        <meshStandardMaterial
+          color={onAccent ? color : '#FFFFFF'}
+          roughness={0.55}
+          metalness={0.06}
+          emissive={onAccent ? color : '#FFFFFF'}
+          emissiveIntensity={onAccent ? 0.18 : 0.08}
+        />
       </mesh>
-      {/* 辉光 */}
-      <GlowPlane size={[width * 1.35, height * 2.6]} color={color} opacity={0.45} position={[0, 0, 0.02]} />
-      <Text
-        position={[0, sub ? height * 0.12 : 0, 0.1]}
-        fontSize={fs}
-        color={textColor}
-        anchorX="center"
-        anchorY="middle"
-        letterSpacing={0.08}
-        outlineWidth={fs * 0.06}
-        outlineColor={color}
-        outlineOpacity={0.65}
-      >
+      {/* 清脆文字（无发光描边） */}
+      <Text position={[0, sub ? height * 0.13 : 0, 0.08]} fontSize={fs} color={ink} anchorX="center" anchorY="middle" letterSpacing={0.06}>
         {text}
       </Text>
+      {/* 细强调下划线 */}
+      <mesh position={[0, sub ? -height * 0.04 : -height * 0.24, 0.08]}>
+        <boxGeometry args={[width * 0.5, height * 0.03, 0.01]} />
+        <meshBasicMaterial color={onAccent ? '#FFFFFF' : color} toneMapped={false} />
+      </mesh>
       {sub && (
-        <Text position={[0, -height * 0.24, 0.1]} fontSize={height * 0.17} color={color} anchorX="center" anchorY="middle" letterSpacing={0.2}>
+        <Text position={[0, -height * 0.26, 0.08]} fontSize={height * 0.16} color={onAccent ? '#EAF2FF' : color} anchorX="center" anchorY="middle" letterSpacing={0.2}>
           {sub}
         </Text>
       )}
@@ -305,7 +302,7 @@ export function FloorText({ text, size = 0.4, color = NEON, opacity = 0.85, ...p
   );
 }
 
-/** 全息屏：斜立的半透明 UI 面板（加性发光） */
+/** 显示器屏 v2：深色屏框 + 明亮 UI 面板（普通混合，真实设备感） */
 export function HoloScreen({
   w = 0.5, h = 0.36, kind = 'dashboard', seed = 1, tilt = -0.18, ...props
 }: {
@@ -313,19 +310,25 @@ export function HoloScreen({
 } & JSX.IntrinsicElements['group']) {
   return (
     <group {...props}>
-      <mesh rotation={[tilt, 0, 0]}>
-        <planeGeometry args={[w, h]} />
-        <meshBasicMaterial
-          map={getHoloTexture(kind, seed)}
-          color="#9FE8FF"
-          transparent
-          opacity={0.9}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-          toneMapped={false}
-        />
-      </mesh>
+      <group rotation={[tilt, 0, 0]}>
+        {/* 深色屏框（唯一保留的深色元素 · 让浅 UI 有依托） */}
+        <mesh position={[0, 0, -0.01]}>
+          <planeGeometry args={[w * 1.08, h * 1.12]} />
+          <meshStandardMaterial color="#26303F" roughness={0.4} metalness={0.3} />
+        </mesh>
+        <mesh>
+          <planeGeometry args={[w, h]} />
+          <meshBasicMaterial
+            map={getHoloTexture(kind, seed)}
+            color="#FFFFFF"
+            transparent
+            opacity={0.98}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
     </group>
   );
 }

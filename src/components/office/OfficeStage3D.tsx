@@ -81,7 +81,7 @@ export default function OfficeStage3D() {
   const layerInfo = baseLayer ? BASE_LAYER_INFO[baseLayer] : null;
 
   return (
-    <div className="relative h-full w-full overflow-hidden" style={{ background: '#0E1626' }}>
+    <div className="relative h-full w-full overflow-hidden" style={{ background: 'linear-gradient(180deg, #E9F1FB 0%, #EEF0F4 46%, #F5F0E8 100%)' }}>
       {/* Top label */}
       <div className="absolute top-3 left-3 right-3 z-10 pointer-events-none flex items-start justify-between gap-3">
         <StageLabel />
@@ -93,8 +93,8 @@ export default function OfficeStage3D() {
       <Canvas
         dpr={[1, 1.6]}
         shadows
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.6 }}
-        style={{ background: '#0E1626' }}
+        gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+        style={{ background: 'transparent' }}
       >
         <PerspectiveCamera makeDefault position={[-11, 15, 25]} fov={43} near={0.5} far={260} />
         <OrbitControls
@@ -116,7 +116,7 @@ export default function OfficeStage3D() {
           {ZONE_SPECS.map((spec) => <ZonePlatform key={spec.id} spec={spec} />)}
           <Workstations />
           <TaskPaths visibleStatuses={visibleStatuses} onHover={setHoverInfo} />
-          <FloatingParticles count={90} color="#7FA8DF" />
+          <FloatingParticles count={40} color="#AEC4EC" />
           {/* 注：后期 bloom（pmndrs 与 three 原生 composer）在此 GPU 上均输出黑屏，
               霓虹辉光由 GlowPlane 加性贴片承担（neon.tsx） */}
         </Suspense>
@@ -125,7 +125,7 @@ export default function OfficeStage3D() {
       {/* 暗角景深（纯 CSS） */}
       <div
         className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 78% 72% at 50% 42%, transparent 62%, rgba(6,10,22,0.32) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse 82% 76% at 50% 40%, transparent 72%, rgba(84,100,140,0.12) 100%)' }}
       />
 
       {/* 基座层详情面板（点击 Agent OS / Data OS 基座展开） */}

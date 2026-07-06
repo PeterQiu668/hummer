@@ -19,8 +19,8 @@ const DECK_D = 6.8;  // 下层甲板 z 6.6..13.4
 const DECK_CZ = 10;
 const DECK_Y = -1.35;
 const WALL_Z = -13;
-const STRUCT = '#334157';
-const STRUCT_DARK = '#232E42';
+const STRUCT = '#C6C0B5';
+const STRUCT_DARK = '#B2ADA2';
 
 /** 幕墙窗（竖梃 + 玻璃 + 上下横梁），跨 x∈[-6,17] */
 function WindowWall() {
@@ -38,23 +38,23 @@ function WindowWall() {
     <group position={[0, 0, WALL_Z]}>
       <mesh position={[CX, H / 2, 0]}>
         <boxGeometry args={[W, H, 0.06]} />
-        <meshStandardMaterial color="#9FBEDF" transparent opacity={0.05} roughness={0.05} metalness={0.1} depthWrite={false} />
+        <meshStandardMaterial color="#CFE0F0" transparent opacity={0.08} roughness={0.05} metalness={0.1} depthWrite={false} />
       </mesh>
       <Instances limit={mullions.length}>
         <boxGeometry args={[0.09, H, 0.09]} />
-        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+        <meshStandardMaterial color="#AEB6C1" metalness={0.6} roughness={0.35} />
         {mullions.map((x) => <Instance key={x} position={[x, H / 2, 0]} />)}
       </Instances>
       <mesh position={[CX, H, 0]}>
         <boxGeometry args={[W + 0.1, 0.14, 0.16]} />
-        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+        <meshStandardMaterial color="#AEB6C1" metalness={0.6} roughness={0.35} />
       </mesh>
       <mesh position={[CX, 0.06, 0]}>
         <boxGeometry args={[W + 0.1, 0.12, 0.16]} />
-        <meshStandardMaterial color="#39434F" metalness={0.6} roughness={0.35} />
+        <meshStandardMaterial color="#AEB6C1" metalness={0.6} roughness={0.35} />
       </mesh>
       {/* 窗侧微光（城市光晕） */}
-      <GlowPlane size={[W, 3.2]} color="#5B7FB0" opacity={0.16} position={[CX, 3, 0.3]} />
+      <GlowPlane size={[W, 3.2]} color="#CBDCF2" opacity={0.3} position={[CX, 3, 0.3]} />
     </group>
   );
 }
@@ -71,7 +71,7 @@ function SignWall() {
       {[-14.6, -8.6].map((x) => (
         <mesh key={x} position={[x, 3.7, 0.01]}>
           <boxGeometry args={[0.02, 7.2, 0.02]} />
-          <meshBasicMaterial color="#39434F" />
+          <meshBasicMaterial color="#AEB6C1" />
         </mesh>
       ))}
       {/* HQ 巨型招牌 */}
@@ -80,15 +80,15 @@ function SignWall() {
       <group position={[-12.3, 2.2, 0.05]}>
         <mesh>
           <boxGeometry args={[6.2, 2.3, 0.1]} />
-          <meshStandardMaterial color="#10141B" roughness={0.3} metalness={0.4} />
+          <meshStandardMaterial color="#26303F" roughness={0.35} metalness={0.35} />
         </mesh>
         <mesh position={[-1.4, 0, 0.07]}>
           <planeGeometry args={[3.1, 2.0]} />
-          <meshBasicMaterial map={getHoloTexture('map', 5)} color="#9FE8FF" transparent opacity={0.9} toneMapped={false} />
+          <meshBasicMaterial map={getHoloTexture('map', 5)} color="#FFFFFF" transparent opacity={0.98} toneMapped={false} />
         </mesh>
         <mesh position={[1.9, 0, 0.07]}>
           <planeGeometry args={[2.1, 2.0]} />
-          <meshBasicMaterial map={getHoloTexture('dashboard', 6)} color="#9FE8FF" transparent opacity={0.85} toneMapped={false} />
+          <meshBasicMaterial map={getHoloTexture('dashboard', 6)} color="#FFFFFF" transparent opacity={0.98} toneMapped={false} />
         </mesh>
       </group>
       {/* 两侧竖霓虹灯柱 */}
@@ -100,7 +100,7 @@ function SignWall() {
 
 export default function HexPlatform() {
   const rootRef = useAutoShadows();
-  const carpetTex = useMemo(() => getCarpetTexture('#3E4C66', 'floor-v13'), []);
+  const carpetTex = useMemo(() => getCarpetTexture('#CDC7BB', 'floor-v16'), []);
 
   // 地面拼板缝网格
   const gridLines = useMemo(() => {
@@ -115,24 +115,24 @@ export default function HexPlatform() {
       {/* ── 主楼板 ── */}
       <mesh position={[0, -0.25, MAIN_CZ]}>
         <boxGeometry args={[MAIN_W, 0.5, MAIN_D]} />
-        <meshStandardMaterial map={carpetTex} color="#C9D4E8" roughness={0.55} metalness={0.15} />
+        <meshStandardMaterial map={carpetTex} color="#CFC9BD" roughness={0.72} metalness={0.05} />
       </mesh>
       {/* 镜面反射地面（拉丝反射 · 霓虹倒影的关键） */}
       <mesh position={[0, 0.003, MAIN_CZ]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[MAIN_W - 0.2, MAIN_D - 0.2]} />
         <MeshReflectorMaterial
           resolution={512}
-          mirror={0.55}
+          mirror={0.2}
           mixBlur={1}
           blur={[300, 80]}
-          mixStrength={4.5}
+          mixStrength={0.5}
           mixContrast={1}
           depthScale={0.8}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.4}
-          color="#31405A"
-          roughness={0.6}
-          metalness={0.2}
+          color="#C6CCD6"
+          roughness={0.85}
+          metalness={0.1}
         />
       </mesh>
       {/* 主楼板前缘（z=7）沿口 + 霓虹 */}
@@ -148,11 +148,11 @@ export default function HexPlatform() {
       {/* ── 下层甲板 ── */}
       <mesh position={[0, DECK_Y - 0.5, DECK_CZ]}>
         <boxGeometry args={[MAIN_W, 1.0, DECK_D]} />
-        <meshStandardMaterial color="#2F3B52" roughness={0.6} metalness={0.2} />
+        <meshStandardMaterial color="#C8CEDA" roughness={0.6} metalness={0.12} />
       </mesh>
       <mesh position={[0, DECK_Y + 0.012, DECK_CZ + 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[MAIN_W - 0.4, DECK_D - 0.6]} />
-        <meshStandardMaterial color="#2A3448" roughness={0.75} metalness={0.2} />
+        <meshStandardMaterial color="#C2C9D6" roughness={0.75} metalness={0.1} />
       </mesh>
       {/* 甲板前缘斜切 + 霓虹导引线 */}
       <mesh position={[0, DECK_Y - 0.5, 13.55]} rotation={[0.35, 0, 0]}>
@@ -182,11 +182,11 @@ export default function HexPlatform() {
       <group position={[10, 4.1, -12.65]}>
         <mesh>
           <boxGeometry args={[3.4, 1.6, 0.08]} />
-          <meshStandardMaterial color="#10141B" roughness={0.3} metalness={0.4} />
+          <meshStandardMaterial color="#26303F" roughness={0.35} metalness={0.35} />
         </mesh>
         <mesh position={[0, 0, 0.05]}>
           <planeGeometry args={[3.2, 1.45]} />
-          <meshBasicMaterial map={getHoloTexture('chart', 8)} color="#9FE8FF" transparent opacity={0.85} toneMapped={false} />
+          <meshBasicMaterial map={getHoloTexture('chart', 8)} color="#FFFFFF" transparent opacity={0.98} toneMapped={false} />
         </mesh>
       </group>
 
@@ -199,7 +199,7 @@ export default function HexPlatform() {
       {/* ── 地面拼板缝 ── */}
       <Instances limit={gridLines.length}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#4A5670" transparent opacity={0.5} />
+        <meshBasicMaterial color="#B7BEC9" transparent opacity={0.4} />
         {gridLines.map((l, i) => (
           <Instance key={i} position={l.pos} scale={l.scl} />
         ))}
