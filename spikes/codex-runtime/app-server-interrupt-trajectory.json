@@ -1,0 +1,27 @@
+[
+  {
+    "sequence": 1,
+    "kind": "system",
+    "text": "1Runtime 诊断协作成员 · {\"timestamp\":\"2026-08-27T18:55:35.708675Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_small: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}可追溯"
+  },
+  {
+    "sequence": 2,
+    "kind": "system",
+    "text": "2Runtime 诊断协作成员 · {\"timestamp\":\"2026-08-27T18:55:35.708779Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"ignoring interface.icon_large: icon path with '..' must resolve under plugin assets/\"},\"target\":\"codex_skills::interface\"}可追溯"
+  },
+  {
+    "sequence": 3,
+    "kind": "system",
+    "text": "3Runtime 诊断协作成员 · {\"timestamp\":\"2026-08-27T18:55:35.726585Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}可追溯"
+  },
+  {
+    "sequence": 4,
+    "kind": "system",
+    "text": "4Codex 开始执行codex · 已建立非交互运行，等待结构化事件。可追溯"
+  },
+  {
+    "sequence": 5,
+    "kind": "system",
+    "text": "5会话被策略阻断codex · Codex turn was interrupted.阻断使用的能力协作记录耗时 / 成本-- / --工作范围当前步骤无需额外范围结果Codex turn was interrupted.交付物本步骤没有单独交付物可核验记录操作日志 从这里重新尝试"
+  }
+]
