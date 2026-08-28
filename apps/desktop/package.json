@@ -1,0 +1,37 @@
+{
+  "name": "@hummer/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "electron dist/main.js",
+    "package:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.hummer.desktop",
+    "productName": "HUMMER",
+    "asar": true,
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../dist",
+        "to": "renderer"
+      }
+    ],
+    "win": {
+      "target": "dir"
+    }
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
+  }
+}
