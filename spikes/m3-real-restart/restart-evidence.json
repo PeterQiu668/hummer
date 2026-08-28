@@ -1,0 +1,78 @@
+{
+  "occurredAt": "2026-08-28T14:00:23.419Z",
+  "sessionId": "codex_hkzqk0_1",
+  "nativeSessionId": "01a048aa-c3bb-7473-8933-acbe938f1cd9",
+  "before": {
+    "status": "running",
+    "eventCount": 7,
+    "sequences": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "after": {
+    "status": "interrupted",
+    "eventCount": 8,
+    "events": [
+      {
+        "sequence": 1,
+        "type": "step",
+        "status": "completed",
+        "tool": null
+      },
+      {
+        "sequence": 2,
+        "type": "step",
+        "status": "running",
+        "tool": null
+      },
+      {
+        "sequence": 3,
+        "type": "step",
+        "status": "completed",
+        "tool": null
+      },
+      {
+        "sequence": 4,
+        "type": "step",
+        "status": "completed",
+        "tool": null
+      },
+      {
+        "sequence": 5,
+        "type": "step",
+        "status": "completed",
+        "tool": null
+      },
+      {
+        "sequence": 6,
+        "type": "step",
+        "status": "completed",
+        "tool": null
+      },
+      {
+        "sequence": 7,
+        "type": "tool",
+        "status": "completed",
+        "tool": "shell.command"
+      },
+      {
+        "sequence": 8,
+        "type": "status",
+        "status": "interrupted",
+        "tool": null
+      }
+    ]
+  },
+  "integrity": {
+    "valid": true,
+    "checked": 8
+  },
+  "screenshotPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\dist\\hummer-m3-real-restart.png",
+  "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m3-real-restart\\codex-restart-wire.jsonl"
+}

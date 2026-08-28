@@ -288,18 +288,97 @@ DeepSeek Harness 官方当前明确标记 developer preview，存在兼容性破
 - RuntimeEvent 严格先经 IPC 落库，再返回 renderer 投影；重启后从 SQLite 回放，React 不接触 SQL/Electron 类型；
 - 文件产物存入 `blobs/sha256/<digest>`，事件使用 `evidence://sha256/<digest>`；旧 `evi://` 与 `fixture://` 不再作为持久化证据；
 - Codex token usage 映射为 runtime-neutral 字段，结果耗时使用 turn wall-clock；`runtime-pricing.json` 价格表默认空，不猜价格；
-- 双 Electron 进程重启验收通过：同一 SQLite 目录中的 8 条轨迹、审批与成果包完整恢复，重开前后 hash chain 均为 `valid: true, checked: 8`；证据在 `spikes/m2-persistence/restart-evidence.json`；
+- 双 Electron 进程重启验收通过：同一 SQLite 目录中的 8 条轨迹、审批与成果包完整恢复，重开前后 hash chain 均为 `valid: true, checked: 9`；证据在 `spikes/m2-persistence/restart-evidence.json`；
 - Codex 启动失败时显式回落 Mock，节点条显示“演示运行时”和失败原因；
 - 映射、JSONL 拆行、app-server 翻译、桌面边界与前端替换性的自动测试。
 
 未完成且未伪装完成：
 
 - WindowsApps 版本的 `codex.exe` 仍被 `Access is denied` 阻断；实际运行使用 npm CLI；
-- 2026-08-28 的最新 `exec --json` 与 approval 复验均被 Codex 远端插件目录请求的 EOF/连接错误阻断；历史真实 E2E 证据仍有效，但本轮网络复验不能报告为绿色；
+- 2026-08-28 21:54（Asia/Shanghai）的 approval E2E 已重新通过；远端 plugin catalog 通过 `--disable plugins` 确定性降级，不再阻断审批；
 - pause/resume 没有可用的 app-server 产品语义，前端不应把它声称为已接通；
 - 正式 schema 版本协商与兼容矩阵；
 - Codex thread checkpoint 到 HUMMER sequence 的精确 fork 映射；
-- 当前实测成功样例只拿到 token usage 字段且数值为 0；尚未获得可用于计费验证的非零 usage；
+- 2026-08-28 21:54 的真实审批运行获得 `23,022` total tokens 与 `62.19s` wall-clock；价格表仍为空，因此 `costCny=null`；
 - `runtime-pricing.json` 尚无经当前账号计费路径核实的 CNY 模型价格，因此真实 Codex `costCny` 继续为 `null`，UI 显示“价格未配置”或“该 runtime 未提供用量”。
 
 M1.5 的协议闭环与 M2 本地事实源已经完成；当前仍不是云端多租户或生产审计系统。React 继续不得接触 Node `child_process`、Electron 或 SQLite 类型，也不得为“看起来连通”制造假事件。
+
+## 12. M3 多引擎与审批复核（2026-08-28）
+
+### 12.1 Codex 供应商配置事实
+
+本机版本仍为 npm 安装的 `codex-cli 0.150.1`。本轮实测结论：
+
+- DeepSeek 档使用 dotted `-c` 路径、`wire_api="responses"` 与 `requires_openai_auth=false` 后，`codex doctor --json` 的 `config.load=ok`；因为 `DEEPSEEK_API_KEY` 不存在，`auth.credentials=fail`，没有发送模型任务。
+- Codex 0.150.1 已不接受 chat-completions provider。智谱当前档明确标为 blocked，不把配置失败伪装成 runtime 回落。
+- OpenAI API 档使用非保留 provider id `openai_hummer`；当前没有 `OPENAI_API_KEY`。用现有 Codex 登录令牌直连 `api.openai.com/v1/responses` 实测得到 401 `api.responses.write` scope 缺失，不能算旗舰档 E2E。
+- 内部 `openai-codex-validation` 档只用于验证 Codex 外壳，走 Codex 已登录通道，审计域名为 `chatgpt.com`，不在产品档位选择中出现，也不计入 OpenAI API 档 benchmark。
+- argv 只出现环境变量名称，绝不出现值；`WireLog` 在写入前再次按所有已知 key 值脱敏。对应断言在 `apps/desktop/src/engine-profiles.test.ts`、`wire-log.test.ts` 与 `claude-host-contract.test.ts`。
+
+### 12.2 远端 plugin catalog 降级与审批报文
+
+先后进行了两个受控命令：
+
+1. 只加 `--disable remote_plugin --disable recommended_plugins`：stderr 仍出现 `/ps/plugins/installed`、featured plugin 与 `plugins.git` 请求，证明两个细粒度 flag 不足。
+2. 再加 `--disable plugins`：同类 catalog 请求为 0。HUMMER Codex host 现在对每一档都注入这三个 flag，确定性牺牲 Codex plugin 加载以保证企业任务启动；MCP 是独立能力通道，不由该结论冒充已关闭。
+
+2026-08-28 21:53:46 至 21:54:48（Asia/Shanghai）运行：
+
+```text
+npm run test:desktop:codex:approval
+```
+
+真实通过。完整报文位于 `spikes/codex-runtime/app-server-approval-wire.jsonl`（481 行、200,971 bytes），同一次运行包含：
+
+```json
+{"method":"item/commandExecution/requestApproval","id":0,"params":{"availableDecisions":["accept",{"acceptWithExecpolicyAmendment":{}},"cancel"]}}
+{"id":0,"result":{"decision":"accept"}}
+{"method":"turn/completed","params":{"turn":{"status":"completed","durationMs":37556}}}
+```
+
+wire 中 request 与 decision 之间约 231ms，批准后出现写文件 command、回读 command 和 `turn/completed`。trajectory 证据为 `spikes/codex-runtime/app-server-approval-trajectory.json`，关键序号为 7 approval_required、8 人工批准、9 后续 tool、17 result。
+
+这次证据继续排除两个协议嫌疑：server 接受不带 `jsonrpc:"2.0"` 的响应，接受的 decision 是 `accept`。对历史 120 秒挂起，当前最强结论是“远端 plugin catalog 是疑似启动干扰源，而非已证明的唯一根因”：关闭 plugins 后 catalog 请求消失且审批闭环通过，但该对比同时发生在不同运行，不能做单变量因果宣称。审批 watchdog 继续保留。
+
+### 12.3 第二个外壳
+
+`ClaudeRuntimeAdapter` 是独立实现，`apps/desktop/src/claude-host.ts` 独立 spawn `claude` 并通过 preload IPC 转发 stream-json。React 没有 import Node/Electron 类型。接入过程中不需要修改 `RuntimeAdapter` 的方法集合；通用 `RuntimeHandle.engine` 用于供应商、模型、域名和沙箱审计披露。
+
+本机 `claude 2.1.248` 可启动并返回真实 session，但 `claude auth status` 为 `loggedIn:false`。2026-08-28 14:10 的真实尝试在任何工具事件前返回 `authentication_failed`，因此审批 E2E 未通过；证据在 `spikes/claude-runtime/2026-08-28-auth-blocked.jsonl`。host 的 approval IPC 会明确抛出“external permission-prompt MCP tool 未连接”，不会制造 approval 事件。
+
+DeepSeek Harness 本轮只做源码 spike，不写 adapter；四问、源码行号、工作量和有限 GO 建议见 `docs/research/deepseek-harness-spike.md`。
+
+### 12.4 基准状态
+
+固定 3 任务 x 5 次 x 4 档的矩阵已写入 `spikes/engine-benchmark/benchmark-plan.json`。当前产品档凭据与 wire 兼容性未满足，真实计分运行是 0/60；原始 preflight 在 `attempts.jsonl`。不得用内部 Codex 登录验证档的成功数据替代 DeepSeek、智谱、OpenAI API 或 Claude Code 的完成率。
+
+### 12.5 MCP 连接事实
+
+2026-08-28 21:53:46 至 21:54:48 的真实审批运行同时提供了 MCP client 证据。app-server-approval-wire.jsonl 中 node_repl 在 21:53:46.315 为 starting，21:53:46.393 为 ready；codex_apps 在 21:53:46.314 为 starting，21:53:48.766 为 ready。
+
+桌面主进程现在只接收 mcpServer/startupStatus/updated 并映射为 starting / connected / failed，通过 preload 暴露 runtime-neutral 的只读端口。能力页只有在宿主观察到 ready 时才显示“已验证连接”；飞书、钉钉等应用目录没有真实 OAuth/握手，统一显示“待接入”。浏览器原型明确显示无法核验本机连接。该证据证明 MCP 握手成功，不等于某个业务应用已完成授权或工具调用。
+
+### 12.6 真会话重启语义
+
+npm run test:desktop:codex:restart 在 2026-08-28 22:00:23 完成真实复验。关闭 App 前，session codex_hkzqk0_1 / native thread 01a048aa-c3bb-7473-8933-acbe938f1cd9 已落库 7 条真实事件，包含已完成的 shell.command。重开后：
+
+- 原 7 条事件和 native session ID 全部保留；
+- 主进程追加 sequence 8、status=interrupted，不声称恢复已经死亡的子进程；
+- stop 与 steer 控件禁用，不向失效 RuntimeHandle 静默发送命令；
+- hash chain 为 valid: true, checked: 8。
+
+证据在 spikes/m3-real-restart/restart-evidence.json、codex-restart-wire.jsonl 与 dist/hummer-m3-real-restart.png。当前确定行为是“保留并标记中断”，不是自动续跑；真正 resume 仍需独立协议设计。
+
+### 12.7 M3 组织与责任链
+
+迁移 version 2 新增 human_users、departments、digital_twins、digital_employees、approval_policies 和 execution_nodes，没有修改 version 1。雇佣通过 Electron 组织端口写 SQLite；团队页和工作台读取同一 durable employee ID。审批策略默认拒绝未匹配动作，当前高危规则覆盖文件写入、shell 命令、外发、CRM 写回、付款、权限变化和数据删除，并要求指定 human:owner。
+
+apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employee ID 贯穿雇佣、派活、审批、工具结果和成果包，六条 domain event 的 hash chain 有效。执行节点页读取主进程真实节点记录、当前会话与权限范围，kill switch 调用 Codex/Claude host 的 stop-all。
+
+必须区分两种证据：
+
+1. 组织、审批策略和成果包责任链是本地 SQLite 集成测试事实。
+2. 真实 shell 审批、MCP 握手和重启中断是 openai-codex-validation 外壳验证事实。
+
+默认 DeepSeek 产品档因为本机没有 DEEPSEEK_API_KEY，尚未完成“雇员工后用默认 DeepSeek 派真任务”的整链验收，不能把上述两种证据拼接成已完成声明。完整状态见 spikes/m3-organization/acceptance-status.md。

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-08-28T14:30:16+08:00",
+  "repetitionsPerTask": 5,
+  "tasks": [
+    { "id": "read-summary", "goal": "Read a fixed local input and return an evidence-backed summary", "requiresApproval": false },
+    { "id": "approval-write", "goal": "Read input, request approval, write one output file, read it back", "requiresApproval": true },
+    { "id": "repo-report", "goal": "Inspect a fixed small repository fixture and produce a structured report", "requiresApproval": false }
+  ],
+  "engines": [
+    { "id": "deepseek-standard", "shell": "codex", "model": "deepseek-v4-flash" },
+    { "id": "zhipu-enhanced", "shell": "codex", "model": "glm-5.2" },
+    { "id": "openai-flagship", "shell": "codex", "model": "gpt-5.4" },
+    { "id": "claude-code", "shell": "claude-code", "model": "configured by Claude Code" }
+  ],
+  "expectedRuns": 60,
+  "completedRuns": 0,
+  "status": "blocked",
+  "note": "No benchmark score is computed until every row is a real run. Validation runs using openai-codex-validation are excluded because that internal login path is not the openai-flagship product profile."
+}

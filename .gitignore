@@ -15,6 +15,7 @@ dist-swarm-verify/
 # Local runtime facts and spike databases
 spikes/codex-runtime/.facts-*/
 spikes/m2-persistence/facts/
+spikes/**/facts/
 
 # Local Claude Code config
 .claude/settings.local.json
