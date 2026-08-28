@@ -1,256 +1,94 @@
-/**
- * 我的员工 — 组织架构（按部门 zone 分组）
- */
-import { useMemo, useState, useEffect } from 'react';
-import { Plus, Filter, Search, Pause, Play, Shield, ListFilter, Sparkles, BadgeCheck } from 'lucide-react';
-import WorkspacePage from './WorkspacePage';
+import { useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  Bot,
+  Building2,
+  Check,
+  ChevronRight,
+  CircleUserRound,
+  Network,
+  Orbit,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import { employees } from '../../data/employees';
 import { marketEmployees } from '../../data/marketplace';
 import { useAppStore } from '../../store/useAppStore';
-import type { ZoneId } from '../../lib/types';
 import AgentAvatar from '../ui/AgentAvatar';
+import WorkspacePage from './WorkspacePage';
 
-const ZONE_META: Record<ZoneId, { label: string; sub: string; color: string }> = {
-  boss:     { label: '决策中心',       sub: 'Boss Office',        color: '#7E22CE' },
-  business: { label: '业务办公区',     sub: 'Business Floor',     color: '#0F70B7' },
-  support:  { label: '行政支持中心',   sub: 'Public Office Zone', color: '#0F766E' },
-  meeting:  { label: '项目会议室',     sub: 'Conference Hub',     color: '#9333EA' },
-  rest:     { label: '休息区',         sub: 'Lounge',             color: '#B07706' },
-  learn:    { label: '进化训练区',     sub: 'Learning',           color: '#1E8F5C' },
-};
+type TeamTab = 'mine' | 'organization' | 'relations';
 
-const STATUS_META: Record<string, { label: string; chip: string }> = {
-  working:  { label: '工作中',  chip: 'hum-chip is-brand' },
-  blocked:  { label: '已阻断',  chip: 'hum-chip is-error' },
-  meeting:  { label: '会议中',  chip: 'hum-chip is-warning' },
-  training: { label: '训练中',  chip: 'hum-chip' },
-  idle:     { label: '待命',    chip: 'hum-chip is-muted' },
-};
+const humanColleagues = [
+  { name: '吴帆', role: '销售负责人', relation: '向你汇报', focus: '华东标杆客户与销售节奏', work: '2 项需要你确认' },
+  { name: '陈若澜', role: '产品与交付负责人', relation: '协作伙伴', focus: '客户实施与交付质量', work: '1 项跨部门协作' },
+  { name: '小周', role: '销售专员', relation: '团队成员', focus: '重点客户跟进与会议准备', work: '今天有 3 项工作' },
+];
+
+const departments = [
+  { name: '增长与销售', owner: '吴帆', people: '4 位真人', twins: '4 个个人分身', digital: '5 位数字同事', current: '华东标杆客户计划', health: '节奏正常' },
+  { name: '产品与交付', owner: '陈若澜', people: '6 位真人', twins: '5 个个人分身', digital: '4 位数字同事', current: '客户实施验收', health: '1 项风险' },
+  { name: '组织与管理', owner: '昆仑', people: '3 位真人', twins: '3 个个人分身', digital: '2 位数字同事', current: 'Q3 经营复盘', health: '等待确认' },
+];
 
 export default function EmployeesPage() {
-  const [q, setQ] = useState('');
-  const [zoneFilter, setZoneFilter] = useState<ZoneId | 'all'>('all');
-  const setSelectedEmployee = useAppStore((s) => s.setSelectedEmployee);
-  const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
-  const pushToast = useAppStore((s) => s.pushToast);
-
-  // 招聘自市场的员工
+  const [tab, setTab] = useState<TeamTab>('mine');
+  const [query, setQuery] = useState('');
+  const [hireOpen, setHireOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hiredIds, setHiredIds] = useState<string[]>([]);
-  useEffect(() => {
-    const map = JSON.parse(localStorage.getItem('hummer-marketplace-hires') ?? '{}');
-    setHiredIds(Object.keys(map).filter((k) => map[k]));
-    const onStorage = () => {
-      const m = JSON.parse(localStorage.getItem('hummer-marketplace-hires') ?? '{}');
-      setHiredIds(Object.keys(m).filter((k) => m[k]));
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-  const hiredFromMarket = marketEmployees.filter((m) => hiredIds.includes(m.id));
+  const settings = useAppStore((state) => state.personalSettings);
+  const filtered = useMemo(() => employees.filter((employee) => !query || `${employee.name} ${employee.role} ${employee.currentTask ?? ''}`.includes(query)), [query]);
+  const selected = employees.find((employee) => employee.id === selectedId);
 
-  const filtered = useMemo(
-    () =>
-      employees.filter(
-        (e) =>
-          (zoneFilter === 'all' || e.zone === zoneFilter) &&
-          (q === '' || e.name.includes(q) || e.role.includes(q) || (e.currentTask ?? '').includes(q)),
-      ),
-    [q, zoneFilter],
-  );
-
-  const grouped = useMemo(() => {
-    const m: Partial<Record<ZoneId, typeof employees>> = {};
-    for (const e of filtered) {
-      (m[e.zone] ??= [] as any).push(e);
-    }
-    return m;
-  }, [filtered]);
-
-  return (
-    <WorkspacePage
-      title="我的员工"
-      sub="数字员工组织架构 · 按部门展示在岗状态"
-      actions={
-        <>
-          <button className="hum-btn is-sm">
-            <ListFilter size={12} /> 分组视图
-          </button>
-          <button className="hum-btn is-sm">
-            <Filter size={12} /> 筛选
-          </button>
-          <button onClick={() => setShowMarketplace(true)} className="hum-btn is-sm is-primary">
-            <Plus size={12} /> 招聘新员工
-          </button>
-        </>
-      }
-      sticky={
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 max-w-md">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="搜索员工姓名 / 岗位 / 任务关键词…"
-              className="hum-input pl-7"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <ZoneFilterChip current={zoneFilter} value="all" onClick={setZoneFilter} label="全部" />
-            {(Object.keys(ZONE_META) as ZoneId[]).map((z) => (
-              <ZoneFilterChip
-                key={z}
-                current={zoneFilter}
-                value={z}
-                onClick={setZoneFilter}
-                label={ZONE_META[z].label}
-                color={ZONE_META[z].color}
-              />
-            ))}
-          </div>
-          <span className="hum-chip is-muted ml-auto">{filtered.length} / {employees.length}</span>
-        </div>
-      }
-    >
-      <div className="p-6 space-y-6">
-        {/* 新招聘自市场（沙箱试岗中） */}
-        {hiredFromMarket.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="hum-dot" style={{ background: '#F59E0B', width: 8, height: 8 }} />
-              <h2 className="hum-h2">新招聘 · 沙箱试岗中</h2>
-              <span className="hum-chip is-warning">{hiredFromMarket.length}</span>
-              <span className="text-[11px] hum-faint font-mono uppercase tracking-wider">SANDBOX TRIAL · 7 天</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {hiredFromMarket.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => pushToast({ kind: 'info', title: `${m.name} 沙箱试岗中`, detail: '第 1/7 天 · 完成 5 任务 · 评分 88/100' })}
-                  className="hum-card text-left p-3 hover:hum-elev-2 transition group"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="relative">
-                      <div
-                        className="w-11 h-11 rounded-lg grid place-items-center text-white text-[15px] font-semibold"
-                        style={{ background: m.color }}
-                      >
-                        {m.avatar}
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white bg-warning hum-pulse" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <div className="text-[13.5px] font-semibold text-neutral-900 truncate">{m.name}</div>
-                        <span className="hum-chip is-warning" style={{ padding: '1px 6px', fontSize: 10 }}>试岗 1/7 天</span>
-                      </div>
-                      <div className="text-[11.5px] text-neutral-500 mt-0.5">{m.category}</div>
-                      <div className="text-[11.5px] text-neutral-700 mt-1.5 line-clamp-2">{m.tagline}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-2.5 flex items-center gap-2 text-[11px] hum-muted" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    <BadgeCheck size={11} className="text-secondary-600" />
-                    <span>{m.expert} 兜底</span>
-                    <span className="flex-1" />
-                    <Sparkles size={11} className="text-warning" />
-                    <span>Hermes 学习中</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {(Object.keys(ZONE_META) as ZoneId[]).map((zone) => {
-          const list = grouped[zone] ?? [];
-          if (list.length === 0 && zoneFilter !== 'all' && zoneFilter !== zone) return null;
-          if (list.length === 0) return null;
-          const meta = ZONE_META[zone];
-          return (
-            <section key={zone}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="hum-dot" style={{ background: meta.color, width: 8, height: 8 }} />
-                <h2 className="hum-h2">{meta.label}</h2>
-                <span className="hum-chip">{list.length}</span>
-                <span className="text-[11px] hum-faint font-mono uppercase tracking-wider">{meta.sub}</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {list.map((e) => (
-                  <Card
-                    key={e.id}
-                    e={e}
-                    onPick={() => setSelectedEmployee(e)}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </WorkspacePage>
-  );
+  return <WorkspacePage title="团队协作" sub="看清真人、个人分身、数字同事与专家之间的责任和协作关系。" actions={<button type="button" onClick={() => setHireOpen(true)} className="hum-btn is-sm is-primary"><Plus size={12} /> 添加数字同事</button>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex flex-1 gap-1"><Tab active={tab === 'mine'} onClick={() => setTab('mine')} icon={<UsersRound size={12} />} label="我的团队" /><Tab active={tab === 'organization'} onClick={() => setTab('organization')} icon={<Building2 size={12} />} label="组织协作" /><Tab active={tab === 'relations'} onClick={() => setTab('relations')} icon={<Network size={12} />} label="协作关系" /></div><div className="relative w-full sm:w-72"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索团队成员" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索同事、职责或当前工作" className="hum-input pl-7" /></div></div>}>
+    <div className="mx-auto max-w-[1320px] p-5">
+      {tab === 'mine' && <MyTeam twinName={settings.twinName} employees={filtered} hiredIds={hiredIds} onSelect={setSelectedId} />}
+      {tab === 'organization' && <OrganizationView />}
+      {tab === 'relations' && <RelationsView />}
+    </div>
+    {selected && <MemberDrawer member={selected} onClose={() => setSelectedId(null)} />}
+    {hireOpen && <HireDrawer onClose={() => setHireOpen(false)} onHire={(id) => { setHiredIds((current) => current.includes(id) ? current : [...current, id]); setHireOpen(false); }} />}
+  </WorkspacePage>;
 }
 
-function ZoneFilterChip({
-  current, value, onClick, label, color,
-}: {
-  current: ZoneId | 'all';
-  value: ZoneId | 'all';
-  onClick: (v: any) => void;
-  label: string;
-  color?: string;
-}) {
-  const isActive = current === value;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium transition ${
-        isActive ? 'bg-neutral-900 text-white' : 'hum-card-soft text-neutral-600 hover:text-neutral-900'
-      }`}
-      style={isActive ? { background: color ?? '#171717' } : undefined}
-    >
-      {label}
-    </button>
-  );
+function MyTeam({ twinName, employees: team, hiredIds, onSelect }: { twinName: string; employees: Array<(typeof employees)[number]>; hiredIds: string[]; onSelect: (id: string) => void }) {
+  return <div className="space-y-6"><section className="grid overflow-hidden rounded-md border border-neutral-200 bg-white lg:grid-cols-[1.15fr_0.85fr]"><div className="p-5"><div className="flex items-start gap-4"><div className="grid h-12 w-12 place-items-center rounded-full bg-neutral-900 text-white"><Orbit size={21} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-[16px] font-semibold text-neutral-900">{twinName}</h2><span className="hum-chip is-success">我的分身 · 在线</span></div><p className="mt-1 text-[11.5px] text-neutral-500">代表你协调内部工作，也会根据目标和复盘给出职场建议。</p></div></div><div className="mt-5 grid grid-cols-3 divide-x divide-neutral-200 rounded-md border border-neutral-200 bg-neutral-25 text-center"><MiniMetric value="4" label="正在协调" /><MiniMetric value="2" label="等你确认" /><MiniMetric value="92%" label="建议采纳" /></div></div><div className="border-t border-neutral-200 bg-neutral-25 p-5 lg:border-l lg:border-t-0"><div className="text-[11px] font-medium text-neutral-500">当前代表范围</div><div className="mt-3 space-y-2">{['接受内部工作并安排优先级', '协调数字同事并汇总结果', '外发、付款和权限变化前必须问你'].map((item, index) => <div key={item} className="flex items-center gap-2 text-[11.5px] text-neutral-700">{index === 2 ? <ShieldCheck size={13} className="text-warning" /> : <Check size={13} className="text-success" />}{item}</div>)}</div><button type="button" className="hum-btn is-sm mt-4">调整代表范围</button></div></section>
+
+    <section><SectionTitle icon={<CircleUserRound size={15} />} title="真人同事" detail="你仍然和真人共同负责结果，分身只承担明确授权的协调工作。" /><div className="grid grid-cols-1 gap-3 lg:grid-cols-3">{humanColleagues.map((person) => <div key={person.name} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-full bg-neutral-800 text-[11px] text-white">{person.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{person.name}</div><div className="text-[10.5px] text-neutral-500">{person.role} · {person.relation}</div></div></div><div className="mt-3 text-[11.5px] leading-5 text-neutral-600">{person.focus}</div><div className="mt-3 rounded-md bg-neutral-25 px-3 py-2 text-[10.5px] text-neutral-500">{person.work}</div></div>)}</div></section>
+
+    <section><SectionTitle icon={<Bot size={15} />} title="数字同事" detail="每位数字同事都有岗位、负责人、能力范围和需要真人确认的事项。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{team.map((employee) => <button type="button" key={employee.id} onClick={() => onSelect(employee.id)} className="hum-card min-h-[156px] p-4 text-left transition hover:border-neutral-300 hover:shadow-sm"><div className="flex items-start gap-3"><AgentAvatar id={employee.id} size={40} status={employee.status} ringWidth={2} /><div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-[13px] font-semibold text-neutral-900">{employee.name}</span><span className={`hum-chip ${employee.status === 'working' ? 'is-brand' : 'is-muted'}`} style={{ padding: '1px 5px', fontSize: 10 }}>{employee.status === 'working' ? '工作中' : '待命'}</span></div><div className="mt-0.5 text-[11px] text-neutral-500">{employee.role}</div></div><ChevronRight size={14} className="mt-1 text-neutral-300" /></div><div className="mt-3 line-clamp-2 text-[11px] leading-4 text-neutral-700">{employee.currentTask ?? '等待新的工作安排'}</div><div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2.5 text-[10.5px] text-neutral-500"><span>负责人：昆仑</span><span>本周交付 {2 + employee.id.length % 5} 项</span></div></button>)}</div></section>
+
+    {hiredIds.length > 0 && <section><SectionTitle icon={<Sparkles size={15} />} title="试用中的数字同事" detail="试用期间只获得当前任务需要的最小权限。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{marketEmployees.filter((candidate) => hiredIds.includes(candidate.id)).map((candidate) => <div key={candidate.id} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-md text-white" style={{ background: candidate.color }}>{candidate.avatar}</div><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-semibold text-neutral-900">{candidate.name}</div><div className="text-[11px] text-neutral-500">{candidate.category} · 7 天试用</div></div><Check size={15} className="text-success" /></div></div>)}</div></section>}
+  </div>;
 }
 
-function Card({ e, onPick }: { e: any; onPick: () => void }) {
-  const status = STATUS_META[e.status] ?? STATUS_META.idle;
-  return (
-    <button
-      onClick={onPick}
-      className="hum-card text-left p-3 hover:hum-elev-2 transition group"
-    >
-      <div className="flex items-start gap-3">
-        <AgentAvatar id={e.id} size={44} status={e.status} ringWidth={2} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <div className="text-[13.5px] font-semibold text-neutral-900 truncate">{e.name}</div>
-            <span className={status.chip} style={{ padding: '1px 6px', fontSize: 10 }}>{status.label}</span>
-          </div>
-          <div className="text-[11.5px] text-neutral-500 mt-0.5">{e.role}</div>
-          <div className="text-[11.5px] text-neutral-700 mt-1.5 line-clamp-2">{e.currentTask}</div>
-        </div>
-      </div>
-
-      {/* Footer metrics */}
-      <div className="mt-3 pt-2.5 flex items-center gap-3 text-[11px] hum-muted hum-tabular" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-        <span title="今日 Token">{(e.tokensToday / 1000).toFixed(1)}K</span>
-        <span title="今日成本">¥{e.costToday.toFixed(1)}</span>
-        <span className="flex-1" />
-        <span className="hum-chip is-muted" style={{ padding: '1px 6px', fontSize: 10 }}>
-          {e.model.replace('Claude ', '')}
-        </span>
-      </div>
-
-      {/* Quick actions (opacity hover) */}
-      <div className="mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-        <button onClick={(ev) => { ev.stopPropagation(); }} className="hum-btn is-sm is-ghost">
-          {e.status === 'idle' ? <Play size={11} /> : <Pause size={11} />}
-        </button>
-        <button onClick={(ev) => { ev.stopPropagation(); }} className="hum-btn is-sm is-ghost">
-          <Shield size={11} />
-        </button>
-      </div>
-    </button>
-  );
+function OrganizationView() {
+  return <div className="space-y-5"><section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0"><MiniMetric value="13" label="真人成员" /><MiniMetric value="12" label="个人分身" /><MiniMetric value="11" label="数字同事" /></section><section><SectionTitle icon={<Building2 size={15} />} title="部门协作" detail="部门负责人对结果负责，分身负责跨团队协调，数字同事承担可验收工作。" /><div className="space-y-3">{departments.map((department) => <div key={department.name} className="hum-card grid gap-4 p-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-center"><div><div className="text-[13px] font-semibold text-neutral-900">{department.name}</div><div className="mt-1 text-[10.5px] text-neutral-500">负责人：{department.owner}</div></div><div><div className="flex flex-wrap gap-2 text-[10.5px]"><span className="hum-chip">{department.people}</span><span className="hum-chip is-brand">{department.twins}</span><span className="hum-chip is-success">{department.digital}</span></div><div className="mt-2 text-[11px] text-neutral-600">当前重点：{department.current}</div></div><span className={`hum-chip ${department.health.includes('风险') ? 'is-warning' : department.health.includes('等待') ? 'is-brand' : 'is-success'}`}>{department.health}</span></div>)}</div></section></div>;
 }
+
+function RelationsView() {
+  const [selected, setSelected] = useState('昆仑');
+  const nodes = [{ name: '昆仑', type: '真人负责人', tone: 'dark' }, { name: '昆仑助理', type: '个人分身', tone: 'brand' }, { name: '吴帆', type: '销售负责人', tone: 'neutral' }, { name: '雪·销售官', type: '数字同事', tone: 'success' }, { name: '林知远', type: '外部专家', tone: 'warning' }, { name: '华东客户知识', type: '共享知识', tone: 'neutral' }];
+  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]"><section><SectionTitle icon={<Network size={15} />} title="协作关系" detail="点击成员可查看谁向谁负责、谁可以代表谁，以及共享了哪些知识。" /><div className="relative grid min-h-[430px] grid-cols-2 content-center gap-4 rounded-md border border-neutral-200 bg-white p-6 sm:grid-cols-3">{nodes.map((node) => <button type="button" key={node.name} onClick={() => setSelected(node.name)} className={`relative z-10 min-h-[88px] rounded-md border p-3 text-left ${selected === node.name ? 'border-primary-400 bg-primary-50 shadow-sm' : 'border-neutral-200 bg-white hover:bg-neutral-25'}`}><div className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-full ${node.tone === 'dark' ? 'bg-neutral-900 text-white' : node.tone === 'brand' ? 'bg-primary-100 text-primary-700' : node.tone === 'success' ? 'bg-success-soft text-success' : node.tone === 'warning' ? 'bg-warning-soft text-warning' : 'bg-neutral-100 text-neutral-600'}`}>{node.type.includes('知识') ? <Network size={12} /> : node.type.includes('分身') ? <Orbit size={12} /> : <UsersRound size={12} />}</span><span className="text-[12px] font-semibold text-neutral-900">{node.name}</span></div><div className="mt-2 text-[10.5px] text-neutral-500">{node.type}</div></button>)}</div></section><aside className="hum-card h-fit p-4 xl:sticky xl:top-3"><div className="text-[10.5px] text-primary-700">当前查看</div><div className="mt-1 text-[16px] font-semibold text-neutral-900">{selected}</div><div className="mt-4 space-y-2 text-[11px] text-neutral-600"><Relation label="结果负责人" value={selected === '昆仑' ? '本人' : '昆仑'} /><Relation label="可代表范围" value={selected.includes('助理') ? '内部协调与信息汇总' : '按岗位授权'} /><Relation label="共享知识" value="公司目标 · 华东客户 · 销售方法" /><Relation label="必须确认" value="外发 · 写回 · 付款 · 权限变化" /></div></aside></div>;
+}
+
+function MemberDrawer({ member, onClose }: { member: typeof employees[number]; onClose: () => void }) {
+  return <div className="absolute inset-0 z-40 bg-white/60" onClick={onClose}><aside className="absolute bottom-0 right-0 top-0 w-full max-w-[420px] border-l border-neutral-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-neutral-200 p-5"><AgentAvatar id={member.id} size={44} status={member.status} /><div className="min-w-0 flex-1"><h2 className="text-[16px] font-semibold text-neutral-900">{member.name}</h2><p className="mt-1 text-[11px] text-neutral-500">{member.role}</p></div><button type="button" aria-label="关闭成员详情" onClick={onClose} className="text-neutral-400"><X size={18} /></button></div><div className="space-y-5 p-5"><DetailBlock title="当前工作" value={member.currentTask ?? '等待新的工作安排'} /><DetailBlock title="向谁负责" value="昆仑 · 最终结果由真人负责人确认" /><DetailBlock title="可以做" value="读取授权资料、整理信息、生成草稿、调用已批准的工作应用" /><DetailBlock title="必须先问" value="客户外发、业务系统写回、付款、删除和权限变化" /><div className="grid grid-cols-2 gap-3"><MiniMetric value="94%" label="结果采纳率" /><MiniMetric value="3" label="本周交付" /></div><button type="button" className="hum-btn is-primary w-full justify-center">交给他一项工作 <ArrowRight size={12} /></button></div></aside></div>;
+}
+
+function HireDrawer({ onClose, onHire }: { onClose: () => void; onHire: (id: string) => void }) {
+  const [query, setQuery] = useState('');
+  const candidates = marketEmployees.filter((candidate) => !query || `${candidate.name} ${candidate.category} ${candidate.tagline}`.includes(query)).slice(0, 6);
+  return <div className="absolute inset-0 z-40 bg-white/70" onClick={onClose}><aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[440px] flex-col border-l border-neutral-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-neutral-200 p-5"><div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-900 text-white"><Sparkles size={16} /></div><div className="flex-1"><h2 className="text-[16px] font-semibold text-neutral-900">添加数字同事</h2><p className="mt-1 text-[11.5px] leading-4 text-neutral-500">先用一项真实工作试用 7 天，通过验收后再加入团队。</p></div><button type="button" aria-label="关闭添加数字同事" onClick={onClose} className="text-neutral-400"><X size={18} /></button></div><div className="border-b border-neutral-200 p-4"><div className="relative"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索数字同事" value={query} onChange={(event) => setQuery(event.target.value)} className="hum-input pl-7" placeholder="搜索岗位或能力" /></div></div><div className="flex-1 space-y-2 overflow-y-auto p-4">{candidates.map((candidate) => <div key={candidate.id} className="rounded-md border border-neutral-200 p-3"><div className="flex items-start gap-3"><div className="grid h-9 w-9 place-items-center rounded-md text-white" style={{ background: candidate.color }}>{candidate.avatar}</div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{candidate.name}</div><div className="mt-0.5 text-[11px] text-neutral-500">{candidate.category}</div><p className="mt-1.5 text-[11px] leading-4 text-neutral-600">{candidate.tagline}</p></div></div><button type="button" onClick={() => onHire(candidate.id)} className="hum-btn is-sm is-primary mt-3 w-full justify-center"><Plus size={12} /> 开始 7 天试用</button></div>)}</div></aside></div>;
+}
+
+function Tab({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) { return <button type="button" onClick={onClick} className={`hum-btn is-sm ${active ? 'is-primary' : ''}`}>{icon}{label}</button>; }
+function SectionTitle({ icon, title, detail }: { icon: React.ReactNode; title: string; detail: string }) { return <div className="mb-3 flex items-start gap-2"><span className="mt-0.5 text-primary-600">{icon}</span><div><h2 className="text-[14px] font-semibold text-neutral-900">{title}</h2><p className="mt-0.5 text-[11px] text-neutral-500">{detail}</p></div></div>; }
+function MiniMetric({ value, label }: { value: string; label: string }) { return <div className="p-3"><div className="text-[17px] font-semibold text-neutral-900">{value}</div><div className="mt-0.5 text-[10px] text-neutral-500">{label}</div></div>; }
+function Relation({ label, value }: { label: string; value: string }) { return <div className="rounded-md bg-neutral-25 p-3"><div className="text-[10px] text-neutral-400">{label}</div><div className="mt-1 leading-4 text-neutral-700">{value}</div></div>; }
+function DetailBlock({ title, value }: { title: string; value: string }) { return <section><div className="text-[10.5px] font-medium text-neutral-400">{title}</div><div className="mt-1.5 rounded-md border border-neutral-200 bg-neutral-25 p-3 text-[11.5px] leading-5 text-neutral-700">{value}</div></section>; }

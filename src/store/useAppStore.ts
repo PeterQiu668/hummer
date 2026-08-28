@@ -39,6 +39,13 @@ export type PageKey =
   | 'expertportal' // 专家门户（Phase 0）
   | 'evolution';   // 进化中心（成长闭环 × 质量飞轮合并，grills/01）
 
+export function normalizeV3Page(value: unknown): PageKey {
+  if (value === 'employees' || value === 'market') return 'employees';
+  if (value === 'connect') return 'connect';
+  if (value === 'evidence' || value === 'roi' || value === 'evolution' || value === 'audit') return 'evidence';
+  return 'office';
+}
+
 export interface ToastItem {
   id: string;
   kind: 'success' | 'info' | 'warning' | 'error';
@@ -59,6 +66,16 @@ interface SkillState {
   id: string;
   enabled: boolean;
   installedAt: string;
+}
+
+export interface PersonalSettings {
+  preferredModel: '智能选择' | '高质量模型' | '快速模型' | '公司私有模型';
+  defaultPermission: 'L1' | 'L2' | 'L3';
+  defaultWorkspace: '我的工作空间' | '销售共享空间' | '公司知识库';
+  twinName: string;
+  twinCanRepresent: boolean;
+  mentorEnabled: boolean;
+  dailyBriefEnabled: boolean;
 }
 
 interface AppState {
@@ -135,6 +152,10 @@ interface AppState {
   // ───────── command palette ─────────
   cmdkOpen: boolean;
   setCmdkOpen: (v: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (v: boolean) => void;
+  personalSettings: PersonalSettings;
+  updatePersonalSettings: (patch: Partial<PersonalSettings>) => void;
 
   // ───────── executive twin detail ─────────
   activeExecId: string | null;
@@ -178,6 +199,7 @@ export interface AuditEntry {
 // Default MCP catalog (used when persisted is empty)
 const defaultMCPApps: Record<string, MCPApp> = {
   feishu:    { id: 'feishu',    name: '飞书',          kind: 'IM 协同',    connected: true,  syncedAt: '2 分钟前' },
+  dingtalk:  { id: 'dingtalk',  name: '钉钉',          kind: 'IM 协同',    connected: false },
   wework:    { id: 'wework',    name: '企业微信',      kind: 'IM 协同',    connected: true,  syncedAt: '7 分钟前' },
   wechat:    { id: 'wechat',    name: '个人微信',      kind: 'IM 协同',    connected: false },
   notion:    { id: 'notion',    name: 'Notion',       kind: '知识协同',    connected: true,  syncedAt: '1 小时前' },
@@ -196,7 +218,7 @@ const seedAudit: AuditEntry[] = [
   { id: 'au-2', ts: '14:33:48', actor: 'Exec-Guardian', action: '阻断高危调拨',      target: '财务 138w',         result: 'blocked', hash: '0x9c01', tags: ['risk:high'] },
   { id: 'au-3', ts: '14:32:08', actor: '林·决策官',    action: '战略 A2A 下发',     target: '销售/运营/财务',     result: 'ok',      hash: '0x82e0', tags: ['protocol:a2a'] },
   { id: 'au-4', ts: '14:30:22', actor: '昆仑（您）',    action: '审批通过',          target: 'Q3 客户回访预算',    result: 'ok',      hash: '0xb44a', tags: ['human-in-loop'] },
-  { id: 'au-5', ts: '14:28:51', actor: 'Hermes',       action: 'SOP 自动进化',     target: '资金调拨 v3 → v4',  result: 'pending', hash: '0x6e11', tags: ['evolution'] },
+  { id: 'au-5', ts: '14:28:51', actor: '组织学习助手', action: '提出工作方法改进', target: '资金调拨 v3 → v4',  result: 'pending', hash: '0x6e11', tags: ['evolution'] },
   { id: 'au-6', ts: '14:25:30', actor: '炅·研发官',    action: '创建 worktree',    target: 'fix/order-p1',     result: 'ok',      hash: '0xfa72', tags: ['mcp:gitlab.repo'] },
   { id: 'au-7', ts: '14:21:09', actor: '岚·运营官',    action: 'BI 查询',          target: 'gmv_618.sql',       result: 'ok',      hash: '0xd91a', tags: ['mcp:bi.warehouse'] },
   { id: 'au-8', ts: '14:18:00', actor: '律·法务官',    action: '调用 KG',          target: 'contract.risk_v3',  result: 'ok',      hash: '0x33ca', tags: ['kg'] },
@@ -391,6 +413,20 @@ export const useAppStore = create<AppState>()(
 
       cmdkOpen: false,
       setCmdkOpen: (cmdkOpen) => set({ cmdkOpen }),
+      settingsOpen: false,
+      setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+      personalSettings: {
+        preferredModel: '智能选择',
+        defaultPermission: 'L2',
+        defaultWorkspace: '我的工作空间',
+        twinName: '昆仑助理',
+        twinCanRepresent: true,
+        mentorEnabled: true,
+        dailyBriefEnabled: true,
+      },
+      updatePersonalSettings: (patch) => set((state) => ({
+        personalSettings: { ...state.personalSettings, ...patch },
+      })),
 
       activeExecId: null,
       setActiveExecId: (activeExecId) => set({ activeExecId }),
@@ -468,7 +504,12 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'hummer-v6',
-      version: 1,
+      version: 2,
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Record<string, unknown>;
+        const activePage = normalizeV3Page(state.activePage);
+        return { ...state, activePage, leftNav: activePage } as any;
+      },
       // Only persist user-state, not transient UI state (toasts/modals/slot-in/drawer)
       partialize: (s) => ({
         activePage: s.activePage,
@@ -481,6 +522,7 @@ export const useAppStore = create<AppState>()(
         extraTasks: s.extraTasks.slice(0, 30),
         trialDecisions: s.trialDecisions,
         grants: s.grants.slice(0, 30),
+        personalSettings: s.personalSettings,
       }) as any,
     },
   ),
@@ -491,7 +533,7 @@ if (typeof window !== 'undefined') {
   const heartbeats: { sender: string; avatar: string; senderRole: CollabFeedItem['senderRole']; content: string; channel: string; type: CollabFeedItem['type'] }[] = [
     { sender: '雪·销售官',    avatar: '雪', senderRole: 'worker',   content: '已起草 1 封 BD 邮件，等待法务模板核验。', channel: 'ch-q3',      type: 'msg' },
     { sender: '岚·运营官',    avatar: '岚', senderRole: 'worker',   content: '618 复盘报告 v4.1 数据已回收，进入图表生成。', channel: 'ch-618',     type: 'msg' },
-    { sender: 'Hermes',       avatar: '⟁', senderRole: 'hermes',   content: '检测到「合同审阅」回归测试通过，召回率 81% → 94%。', channel: 'ch-hermes', type: 'evolution' },
+    { sender: '组织学习助手', avatar: '学', senderRole: 'hermes',   content: '「合同审阅」改进方案已通过验证，准确率由 81% 提升到 94%。', channel: 'ch-growth', type: 'evolution' },
     { sender: '苓·客服官',    avatar: '苓', senderRole: 'worker',   content: '云海制药验收单已回签，交付里程碑 M2 关闭。', channel: 'ch-delivery', type: 'msg' },
     { sender: '炅·研发官',    avatar: '炅', senderRole: 'worker',   content: 'fix/order-p1 完成单测，等待主干合并审批。', channel: 'ch-q3',      type: 'task' },
     { sender: '岚·运营官',    avatar: '岚', senderRole: 'worker',   content: '视频号素材 A/B 组投放中，2 小时后回收首批 CTR。', channel: 'ch-mkt',   type: 'msg' },
@@ -501,7 +543,7 @@ if (typeof window !== 'undefined') {
     { actor: '苓·客服官', action: '调用情绪识别',         target: '工单 #2891',        result: 'ok',      tags: ['skill', 'mcp:ticket'] },
     { actor: '岚·运营官', action: 'BI 查询',              target: 'gmv_618.sql',       result: 'ok',      tags: ['mcp:bi.warehouse'] },
     { actor: '律·法务官', action: '合同条款匹配',         target: '主合同 v4',          result: 'warning', tags: ['skill', 'kg'] },
-    { actor: 'Hermes',    action: 'SOP 进化',             target: '客服情绪 v2 → v3',   result: 'pending', tags: ['evolution'] },
+    { actor: '组织学习助手', action: '提出工作方法改进',   target: '客服情绪 v2 → v3',   result: 'pending', tags: ['evolution'] },
   ];
 
   let beat = 0;

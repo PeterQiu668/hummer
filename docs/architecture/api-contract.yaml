@@ -1,0 +1,364 @@
+openapi: 3.1.0
+info:
+  title: HUMMER Trusted MVP API
+  version: 0.1.0
+  description: >-
+    Contract-first API for the WorkOrder, approval, evidence, runtime, result,
+    and audit loop. This specification is a target contract; no production API
+    exists yet.
+servers:
+  - url: /api/v1
+paths:
+  /work-orders:
+    post:
+      summary: Create a WorkOrder in draft state
+      operationId: createWorkOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkOrderRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrder'
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /work-orders/{workOrderId}:
+    get:
+      summary: Get WorkOrder projection and timeline summary
+      operationId: getWorkOrder
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      responses:
+        '200':
+          description: WorkOrder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrder'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /work-orders/{workOrderId}/commands:
+    post:
+      summary: Apply an allowed state transition
+      operationId: commandWorkOrder
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkOrderCommand'
+      responses:
+        '200':
+          description: Updated projection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrder'
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /work-orders/{workOrderId}/approvals:
+    post:
+      summary: Request approval for a protected action
+      operationId: requestApproval
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApprovalRequest'
+      responses:
+        '201':
+          description: Approval requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /approvals/{approvalId}/decision:
+    post:
+      summary: Record the immutable human approval decision
+      operationId: decideApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^apr_' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Recorded decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /work-orders/{workOrderId}/runs:
+    post:
+      summary: Start the RuntimeAdapter for an approved WorkOrder
+      operationId: startRuntime
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      responses:
+        '202':
+          description: Runtime job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeJob'
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /work-orders/{workOrderId}/result-package:
+    get:
+      summary: Read the latest ResultPackage
+      operationId: getResultPackage
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      responses:
+        '200':
+          description: ResultPackage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultPackage'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /work-orders/{workOrderId}/acceptance:
+    post:
+      summary: Accept or reject a delivered ResultPackage
+      operationId: decideAcceptance
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptanceDecisionRequest'
+      responses:
+        '200':
+          description: Updated ResultPackage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultPackage'
+  /work-orders/{workOrderId}/events:
+    get:
+      summary: Read append-only domain events in occurrence order
+      operationId: listEvents
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+      responses:
+        '200':
+          description: Event timeline
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DomainEvent' }
+components:
+  parameters:
+    WorkOrderId:
+      name: workOrderId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^wo_' }
+  responses:
+    ValidationError:
+      description: Invalid request
+    NotFound:
+      description: Resource not found
+    InvalidTransition:
+      description: The command is not allowed for the current state
+  schemas:
+    ActorRef:
+      type: string
+      pattern: '^(human|twin|employee|system|expert):[A-Za-z0-9_-]+$'
+    WorkOrderStatus:
+      type: string
+      enum: [draft, submitted, approved, planned, running, awaiting_approval, blocked, delivered, accepted, rejected, failed, cancelled, archived]
+    RiskLevel:
+      type: string
+      enum: [low, medium, high]
+    AcceptanceCriterion:
+      type: object
+      required: [id, text, required]
+      properties:
+        id: { type: string }
+        text: { type: string, minLength: 1 }
+        required: { type: boolean }
+    CreateWorkOrderRequest:
+      type: object
+      required: [tenantId, title, goal, scope, acceptanceCriteria, ownerActorRef, assignedEmployeeId, budgetLimitCny]
+      properties:
+        tenantId: { type: string }
+        title: { type: string, minLength: 1 }
+        goal: { type: string, minLength: 1 }
+        scope: { type: string, minLength: 1 }
+        inputRefs: { type: array, items: { type: string } }
+        acceptanceCriteria: { type: array, minItems: 1, items: { $ref: '#/components/schemas/AcceptanceCriterion' } }
+        ownerActorRef: { $ref: '#/components/schemas/ActorRef' }
+        assignedEmployeeId: { type: string, pattern: '^employee_' }
+        collaboratorActorRefs: { type: array, items: { $ref: '#/components/schemas/ActorRef' } }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        budgetLimitCny: { type: number, minimum: 0 }
+        dueAt: { type: string, format: date-time }
+    WorkOrder:
+      allOf:
+        - $ref: '#/components/schemas/CreateWorkOrderRequest'
+        - type: object
+          required: [id, version, status, correlationId, createdAt, updatedAt]
+          properties:
+            id: { type: string, pattern: '^wo_' }
+            version: { type: integer, minimum: 0 }
+            status: { $ref: '#/components/schemas/WorkOrderStatus' }
+            correlationId: { type: string }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    WorkOrderCommand:
+      type: object
+      required: [type, actorRef, idempotencyKey, expectedVersion]
+      properties:
+        type:
+          type: string
+          enum: [submit, approve_assignment, plan, start, block, cancel, archive, request_rework]
+        actorRef: { $ref: '#/components/schemas/ActorRef' }
+        idempotencyKey: { type: string, minLength: 8 }
+        expectedVersion: { type: integer, minimum: 0 }
+        note: { type: string }
+    CreateApprovalRequest:
+      type: object
+      required: [requesterActorRef, action, riskLevel, rationale, idempotencyKey, expectedVersion]
+      properties:
+        requesterActorRef: { $ref: '#/components/schemas/ActorRef' }
+        action: { type: string }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        rationale: { type: string }
+        idempotencyKey: { type: string, minLength: 8 }
+        expectedVersion: { type: integer, minimum: 0 }
+        evidenceRefs: { type: array, items: { type: string, pattern: '^evi_' } }
+    ApprovalDecisionRequest:
+      type: object
+      required: [approverActorRef, decision, idempotencyKey, expectedVersion]
+      properties:
+        approverActorRef: { $ref: '#/components/schemas/ActorRef' }
+        decision: { type: string, enum: [approved, rejected] }
+        idempotencyKey: { type: string, minLength: 8 }
+        expectedVersion: { type: integer, minimum: 0 }
+        rationale: { type: string }
+    Approval:
+      type: object
+      required: [id, workOrderId, requesterActorRef, action, riskLevel, status, createdAt]
+      properties:
+        id: { type: string, pattern: '^apr_' }
+        workOrderId: { type: string, pattern: '^wo_' }
+        requesterActorRef: { $ref: '#/components/schemas/ActorRef' }
+        approverActorRef: { $ref: '#/components/schemas/ActorRef' }
+        action: { type: string }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        rationale: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time }
+    RuntimeJob:
+      type: object
+      required: [id, workOrderId, adapter, status, createdAt]
+      properties:
+        id: { type: string, pattern: '^run_' }
+        workOrderId: { type: string, pattern: '^wo_' }
+        adapter: { type: string, enum: [mock] }
+        status: { type: string, enum: [queued, running, awaiting_approval, completed, failed, cancelled] }
+        traceRef: { type: string }
+        createdAt: { type: string, format: date-time }
+    AcceptanceVerdict:
+      type: object
+      required: [criterionId, verdict]
+      properties:
+        criterionId: { type: string }
+        verdict: { type: string, enum: [passed, failed] }
+        note: { type: string }
+    AcceptanceDecisionRequest:
+      type: object
+      required: [actorRef, decision, verdicts, idempotencyKey, expectedVersion]
+      properties:
+        actorRef: { $ref: '#/components/schemas/ActorRef' }
+        decision: { type: string, enum: [accepted, rejected] }
+        verdicts: { type: array, minItems: 1, items: { $ref: '#/components/schemas/AcceptanceVerdict' } }
+        note: { type: string }
+        idempotencyKey: { type: string, minLength: 8 }
+        expectedVersion: { type: integer, minimum: 0 }
+    ResultPackage:
+      type: object
+      required: [id, workOrderId, status, summary, acceptanceCriteria, evidenceRefs, cost, risk, rollback, createdAt, updatedAt]
+      properties:
+        id: { type: string, pattern: '^res_' }
+        workOrderId: { type: string, pattern: '^wo_' }
+        status: { type: string, enum: [delivered, accepted, rejected] }
+        summary: { type: string }
+        deliverables:
+          type: array
+          items:
+            type: object
+            required: [id, name, kind]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              kind: { type: string, enum: [report, table, recommendation] }
+              uri: { type: string }
+        acceptanceCriteria:
+          type: array
+          items:
+            type: object
+            required: [id, text, verdict]
+            properties:
+              id: { type: string }
+              text: { type: string }
+              verdict: { type: string, enum: [pending, passed, failed] }
+              note: { type: string }
+        evidenceRefs: { type: array, items: { type: string, pattern: '^evi_' } }
+        cost:
+          type: object
+          required: [modelTokens, modelCostCny, toolCostCny, totalCostCny]
+          properties:
+            modelTokens: { type: integer, minimum: 0 }
+            modelCostCny: { type: number, minimum: 0 }
+            toolCostCny: { type: number, minimum: 0 }
+            totalCostCny: { type: number, minimum: 0 }
+        risk:
+          type: object
+          required: [level, notes]
+          properties:
+            level: { $ref: '#/components/schemas/RiskLevel' }
+            notes: { type: array, items: { type: string } }
+        rollback:
+          type: object
+          required: [supported]
+          properties:
+            supported: { type: boolean }
+            instructions: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DomainEvent:
+      type: object
+      required: [id, tenantId, sequence, type, occurredAt, actorRef, subjectRef, correlationId, eventHash, data]
+      properties:
+        id: { type: string, pattern: '^evt_' }
+        tenantId: { type: string }
+        sequence: { type: integer, minimum: 1 }
+        type: { type: string }
+        occurredAt: { type: string, format: date-time }
+        actorRef: { $ref: '#/components/schemas/ActorRef' }
+        subjectRef: { type: string }
+        correlationId: { type: string }
+        causationId: { type: string }
+        previousEventHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        eventHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        data: { type: object, additionalProperties: true }

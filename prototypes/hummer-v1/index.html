@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HUMMER V1 - 可信数字员工经营系统</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #101514;
+      --surface: #18211e;
+      --surface-2: #1f2a26;
+      --surface-3: #26342f;
+      --line: #34433d;
+      --text: #edf3ee;
+      --muted: #9aa8a0;
+      --lime: #b7e76a;
+      --teal: #65d6c0;
+      --amber: #f3bd62;
+      --rose: #ef829a;
+      --blue: #8cb8ff;
+      --shadow: 0 16px 34px rgba(0, 0, 0, .24);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: Inter, "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .prototype-banner {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 16px;
+      color: #d8e8d9;
+      background: #24342c;
+      border-bottom: 1px solid #40554a;
+      font-size: 12px;
+    }
+    .shell {
+      min-height: calc(100vh - 28px);
+      display: grid;
+      grid-template-columns: 224px minmax(0, 1fr);
+    }
+    .sidebar {
+      min-width: 0;
+      padding: 18px 12px;
+      border-right: 1px solid var(--line);
+      background: #131b18;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .brand {
+      display: grid;
+      gap: 5px;
+      padding: 2px 8px;
+    }
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 18px;
+      font-weight: 760;
+    }
+    .brand-mark i {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      background: var(--lime);
+      border: 4px solid #4f7b3c;
+      box-shadow: 7px 7px 0 -4px var(--teal), 7px 0 0 -4px var(--teal), 0 7px 0 -4px var(--teal);
+    }
+    .brand small, .hint, .eyebrow, .muted { color: var(--muted); }
+    .brand small { font-size: 11px; }
+    .nav {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .nav button {
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: #c4d0c8;
+      background: transparent;
+      text-align: left;
+      font-size: 13px;
+    }
+    .nav button:hover { background: #1d2924; }
+    .nav button[aria-current="page"] {
+      border-color: #56713b;
+      color: var(--lime);
+      background: #263123;
+    }
+    .sidebar-bottom {
+      margin-top: auto;
+      display: grid;
+      gap: 10px;
+      padding: 12px 8px 0;
+      border-top: 1px solid var(--line);
+    }
+    .person {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      font-size: 12px;
+    }
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: #172116;
+      background: var(--lime);
+      font-weight: 760;
+    }
+    .main { min-width: 0; }
+    .topbar {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(16, 21, 20, .94);
+    }
+    .topbar h1 { margin: 0; font-size: 17px; font-weight: 720; }
+    .topbar-copy { display: grid; gap: 4px; }
+    .topbar-copy span { font-size: 12px; color: var(--muted); }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .count {
+      min-height: 34px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #6a5631;
+      border-radius: 5px;
+      background: #30291c;
+      color: var(--amber);
+      font-size: 12px;
+    }
+    .command {
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid #6c9441;
+      border-radius: 5px;
+      color: #152011;
+      background: var(--lime);
+      font-weight: 720;
+      font-size: 13px;
+    }
+    .command:hover { background: #c9f07d; }
+    .content { padding: 24px 28px 32px; }
+    .view { display: none; }
+    .view.is-active { display: block; }
+    .view-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .view-header h2 { margin: 0; font-size: 22px; font-weight: 730; }
+    .eyebrow { margin: 0 0 7px; font-size: 12px; }
+    .context { margin: 0; color: var(--muted); font-size: 13px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .metric, .panel, .task-row, .approval-card, .employee-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+    }
+    .metric {
+      min-height: 116px;
+      padding: 15px;
+      display: grid;
+      align-content: space-between;
+    }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric-value { font-size: 25px; font-weight: 740; }
+    .metric-delta { color: var(--teal); font-size: 12px; }
+    .metric.alert .metric-value, .metric.alert .metric-delta { color: var(--amber); }
+    .metric.risk .metric-value, .metric.risk .metric-delta { color: var(--rose); }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .85fr); gap: 16px; }
+    .panel { overflow: hidden; }
+    .panel-head {
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .panel-head h3 { margin: 0; font-size: 14px; }
+    .subtle-action {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--teal);
+      font-size: 12px;
+    }
+    .priority-list, .timeline { margin: 0; padding: 0; list-style: none; }
+    .priority-list li, .timeline li {
+      display: grid;
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 61px;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(52, 67, 61, .78);
+    }
+    .priority-list li:last-child, .timeline li:last-child { border-bottom: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); }
+    .dot.amber { background: var(--amber); }
+    .dot.rose { background: var(--rose); }
+    .item-title { font-size: 13px; }
+    .item-sub { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .status { white-space: nowrap; color: var(--teal); font-size: 11px; }
+    .status.waiting { color: var(--amber); }
+    .status.blocked { color: var(--rose); }
+    .decision-panel { padding: 15px; display: grid; gap: 13px; }
+    .decision-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .risk-tag, .state-tag, .role-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 23px;
+      padding: 0 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      border: 1px solid currentColor;
+    }
+    .risk-tag { color: var(--amber); background: #2e291e; }
+    .state-tag { color: var(--teal); background: #1e302d; }
+    .role-tag { color: var(--blue); background: #202a3a; }
+    .decision-title { margin: 0; font-size: 15px; line-height: 1.42; }
+    .decision-facts { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .fact { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 12px; }
+    .fact b { color: var(--text); font-weight: 600; text-align: right; }
+    .split-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .danger, .approve {
+      min-height: 36px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 680;
+    }
+    .danger { color: #ffc0cc; border: 1px solid #955063; background: #39232b; }
+    .approve { color: #162011; border: 1px solid #6c9441; background: var(--lime); }
+    .section-note { margin: 16px 0 0; color: var(--muted); font-size: 11px; }
+    .office {
+      min-height: 456px;
+      display: grid;
+      grid-template-columns: 1.08fr 1fr 1.08fr;
+      grid-template-rows: 1fr .72fr;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #111917;
+    }
+    .room {
+      position: relative;
+      min-width: 0;
+      padding: 16px;
+      overflow: hidden;
+      border: 1px solid #4c5d52;
+      border-radius: 5px;
+      background: #202a25;
+      text-align: left;
+      color: var(--text);
+    }
+    .room:hover { border-color: var(--lime); }
+    .room::after {
+      content: "";
+      position: absolute;
+      right: 16px;
+      bottom: 15px;
+      width: 74px;
+      height: 42px;
+      opacity: .7;
+      background: repeating-linear-gradient(90deg, #2e4539 0 12px, transparent 12px 17px), repeating-linear-gradient(0deg, #2b3d34 0 6px, transparent 6px 11px);
+      border: 1px solid #567260;
+    }
+    .room-name { display: block; margin-bottom: 7px; font-weight: 700; font-size: 15px; }
+    .room-info { display: block; max-width: 190px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .room-status { position: absolute; right: 16px; top: 15px; color: var(--teal); font-size: 11px; }
+    .room.risk .room-status { color: var(--amber); }
+    .room.cockpit { grid-column: 2; grid-row: 2; background: #252c22; border-color: #607e43; }
+    .room.meeting { grid-column: 3; grid-row: 1; }
+    .room.quality { grid-column: 1; grid-row: 2; }
+    .task-layout { display: grid; grid-template-columns: minmax(300px, .85fr) minmax(0, 1.45fr); gap: 16px; }
+    .task-list { display: grid; gap: 8px; }
+    .task-row { min-height: 94px; padding: 14px; text-align: left; color: inherit; }
+    .task-row:hover, .task-row.is-selected { border-color: #71974c; background: #243126; }
+    .task-row h3 { margin: 0 0 7px; font-size: 13px; }
+    .task-row p { margin: 0; color: var(--muted); font-size: 11px; }
+    .task-row footer { display: flex; justify-content: space-between; margin-top: 11px; color: var(--muted); font-size: 11px; }
+    .detail-body { padding: 18px; }
+    .detail-top { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .detail-top h3 { margin: 7px 0 0; font-size: 19px; }
+    .responsibility { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .stepper { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; margin: 18px 0; }
+    .step { position: relative; padding-top: 22px; color: var(--muted); font-size: 10px; }
+    .step::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 4px; background: #3a4a43; }
+    .step.done::before { background: var(--teal); }
+    .step.current::before { background: var(--amber); }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .detail-block { padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); }
+    .detail-block h4 { margin: 0 0 11px; color: var(--muted); font-size: 11px; font-weight: 600; }
+    .detail-block ul { margin: 0; padding-left: 16px; color: #d5dfd7; font-size: 12px; line-height: 1.7; }
+    .approval-list, .employee-grid, .result-grid { display: grid; gap: 12px; }
+    .approval-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .approval-card { padding: 16px; display: grid; gap: 12px; }
+    .approval-card h3 { margin: 0; font-size: 15px; line-height: 1.4; }
+    .approval-meta { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+    .employee-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .employee-card { padding: 16px; display: grid; gap: 13px; text-align: left; color: var(--text); }
+    .employee-card:hover { border-color: var(--teal); }
+    .employee-card h3 { margin: 0; font-size: 15px; }
+    .employee-card p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .employee-facts { display: grid; gap: 7px; padding-top: 11px; border-top: 1px solid var(--line); }
+    .result-grid { grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); }
+    .result-main { padding: 18px; }
+    .result-main h3 { margin: 0 0 7px; font-size: 19px; }
+    .result-main > p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .criteria { display: grid; gap: 8px; margin-top: 18px; }
+    .criteria div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .criteria div:last-child { border-bottom: 0; }
+    .pass { color: var(--teal); }
+    .pending { color: var(--amber); }
+    .timeline li { grid-template-columns: 78px minmax(0, 1fr) auto; }
+    .timeline time { color: var(--muted); font-size: 11px; }
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 4;
+      max-width: min(360px, calc(100vw - 44px));
+      padding: 12px 14px;
+      border: 1px solid #678b46;
+      border-radius: 6px;
+      background: #263522;
+      box-shadow: var(--shadow);
+      color: #e8f3df;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 1080px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .employee-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .office { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(160px, 1fr)); }
+      .room.cockpit { grid-column: 1; grid-row: 3; }
+      .room.meeting { grid-column: 2; grid-row: 2; }
+      .room.quality { grid-column: 2; grid-row: 3; }
+    }
+    @media (max-width: 780px) {
+      .shell { grid-template-columns: minmax(0, 1fr); }
+      .sidebar { padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--line); gap: 10px; }
+      .brand { grid-template-columns: auto 1fr; align-items: center; }
+      .brand small, .sidebar-bottom { display: none; }
+      .nav { display: flex; max-width: 100%; overflow-x: auto; }
+      .nav button { flex: 0 0 auto; white-space: nowrap; }
+      .topbar { padding: 12px 16px; }
+      .topbar-copy span, .count { display: none; }
+      .content { padding: 18px 16px 26px; }
+      .view-header { flex-direction: column; align-items: start; }
+      .metrics, .dashboard-grid, .task-layout, .approval-list, .employee-grid, .result-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .office { min-height: 0; grid-template-columns: 1fr; grid-template-rows: none; }
+      .room, .room.cockpit, .room.meeting, .room.quality { min-height: 145px; grid-column: auto; grid-row: auto; }
+      .stepper { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="prototype-banner">产品原型，使用完全合成的组织与经营数据。未连接 CRM、IM、本地文件或桌面执行器。</div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><i aria-hidden="true"></i> HUMMER</div>
+        <small>可信数字员工经营系统</small>
+      </div>
+      <nav class="nav" aria-label="主导航">
+        <button type="button" data-view-target="dashboard" aria-current="page">经营驾驶舱</button>
+        <button type="button" data-view-target="organization">组织全景</button>
+        <button type="button" data-view-target="tasks">任务军令状</button>
+        <button type="button" data-view-target="approvals">审批中心</button>
+        <button type="button" data-view-target="employees">员工工作台</button>
+        <button type="button" data-view-target="results">成果与证据</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="person"><span class="avatar">Q</span><span>邱总<br /><small>老板 / 审批人</small></span></div>
+        <small class="hint">tenant_demo · 合成工作区</small>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <h1 id="page-title">经营驾驶舱</h1>
+          <span id="page-subtitle">本周 GTM 目标的决策、交付与风险全貌</span>
+        </div>
+        <div class="topbar-actions">
+          <span class="count" id="approval-count">2 项待审批</span>
+          <button class="command" type="button" id="create-order">新建军令状</button>
+        </div>
+      </header>
+      <div class="content">
+        <section class="view is-active" id="dashboard" aria-labelledby="dashboard-title">
+          <div class="view-header">
+            <div><p class="eyebrow">周一 09:30 · GTM 合成工作区</p><h2 id="dashboard-title">老板只看需要决策的事</h2></div>
+            <p class="context">所有指标可回到任务、证据和验收记录</p>
+          </div>
+          <div class="metrics">
+            <article class="metric"><span class="metric-label">本周经营目标</span><strong class="metric-value">12 / 20</strong><span class="metric-delta">高匹配目标账户</span></article>
+            <article class="metric alert"><span class="metric-label">待真人决策</span><strong class="metric-value">2</strong><span class="metric-delta">最高风险：高</span></article>
+            <article class="metric"><span class="metric-label">已验收成果</span><strong class="metric-value">4</strong><span class="metric-delta">3 项被业务采纳</span></article>
+            <article class="metric risk"><span class="metric-label">风险或阻塞</span><strong class="metric-value">1</strong><span class="metric-delta">一项写入等待批准</span></article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h3>本周重点任务</h3><button class="subtle-action" data-view-target="tasks">查看全部</button></div>
+              <ul class="priority-list">
+                <li><span class="dot amber"></span><span><span class="item-title">优先级 GTM 目标账户研究</span><span class="item-sub">GTM 研究员 · 证据已就绪 · 等待合成 CRM/CSV 写回审批</span></span><span class="status waiting">等待审批</span></li>
+                <li><span class="dot"></span><span><span class="item-title">销售线索周报复盘</span><span class="item-sub">质检复盘员 · 已生成可审阅报告</span></span><span class="status">已交付</span></li>
+                <li><span class="dot rose"></span><span><span class="item-title">内容活动线索归因</span><span class="item-sub">内容运营员 · 缺少合成渠道字段</span></span><span class="status blocked">需补资料</span></li>
+              </ul>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>现在需要你决定</h3><button class="subtle-action" data-view-target="approvals">审批中心</button></div>
+              <div class="decision-panel">
+                <div class="decision-top"><span class="risk-tag">高风险动作</span><span class="hint">等待 08:12</span></div>
+                <p class="decision-title">将 20 条“高匹配”建议写入合成 CRM/CSV</p>
+                <div class="decision-facts">
+                  <div class="fact"><span>申请人</span><b>GTM 研究员</b></div>
+                  <div class="fact"><span>证据</span><b>2 条 · 已脱敏</b></div>
+                  <div class="fact"><span>成本</span><b>0.42 / 10 CNY</b></div>
+                  <div class="fact"><span>回滚</span><b>恢复 fixture revision-17</b></div>
+                </div>
+                <div class="split-actions"><button class="danger" data-approval-action="reject">拒绝</button><button class="approve" data-approval-action="approve">批准写回</button></div>
+              </div>
+            </section>
+          </div>
+          <p class="section-note">ROI 口径：仅统计合成任务的模型/工具成本、人工审核时长和已验收成果；不代表真实经营收入。</p>
+        </section>
+
+        <section class="view" id="organization" aria-labelledby="organization-title">
+          <div class="view-header"><div><p class="eyebrow">组织数字孪生</p><h2 id="organization-title">部门和工位对应真实责任链</h2></div><p class="context">点击部门或工位进入所属员工与任务</p></div>
+          <div class="office">
+            <button class="room" type="button" data-view-target="employees"><span class="room-status">4 在岗</span><span class="room-name">内容创作室</span><span class="room-info">内容运营员、质检复盘员<br />2 项交付，1 项待补资料</span></button>
+            <button class="room risk" type="button" data-view-target="tasks"><span class="room-status">1 等待审批</span><span class="room-name">电商运营室</span><span class="room-info">GTM 研究员、CRM 助理<br />高风险写回停在人工关口</span></button>
+            <button class="room meeting" type="button" data-view-target="approvals"><span class="room-status">需决策</span><span class="room-name">会议室</span><span class="room-info">老板、销售负责人分身<br />处理升级、审批和复盘</span></button>
+            <button class="room quality" type="button" data-view-target="results"><span class="room-status">4 已验收</span><span class="room-name">质量复核室</span><span class="room-info">成果逐项验收、证据校验<br />失败案例等待归档</span></button>
+            <button class="room cockpit" type="button" data-view-target="dashboard"><span class="room-status">本周目标 60%</span><span class="room-name">老板驾驶舱</span><span class="room-info">经营目标、待决策、风险、已验收价值与人机组织负荷</span></button>
+            <button class="room" type="button" data-view-target="employees"><span class="room-status">2 空闲</span><span class="room-name">交付支持室</span><span class="room-info">项目助理、客户材料整理员<br />等待下一份军令状</span></button>
+          </div>
+          <p class="section-note">公司全景是组织导航，不是独立数据源。房间状态应由部门、员工、任务、审批和成果的投影计算。</p>
+        </section>
+
+        <section class="view" id="tasks" aria-labelledby="tasks-title">
+          <div class="view-header"><div><p class="eyebrow">任务军令状</p><h2 id="tasks-title">目标、责任、边界和验收先于执行</h2></div><p class="context">当前显示：tenant_demo / GTM 部门</p></div>
+          <div class="task-layout">
+            <div class="task-list" aria-label="任务列表">
+              <button class="task-row is-selected" type="button" data-task="gtm"><h3>优先级 GTM 目标账户研究</h3><p>老板 -> 销售负责人分身 -> GTM 研究员</p><footer><span>预算 0.42 / 10 CNY</span><span class="status waiting">等待审批</span></footer></button>
+              <button class="task-row" type="button" data-task="weekly"><h3>销售线索周报复盘</h3><p>销售负责人 -> 质检复盘员</p><footer><span>3 条证据</span><span class="status">已交付</span></footer></button>
+              <button class="task-row" type="button" data-task="content"><h3>内容活动线索归因</h3><p>内容负责人 -> 内容运营员</p><footer><span>缺少渠道材料</span><span class="status blocked">已阻塞</span></footer></button>
+            </div>
+            <article class="panel" id="task-detail">
+              <div class="detail-body">
+                <div class="detail-top"><div><span class="state-tag" id="task-state">等待高风险审批</span><h3 id="task-name">优先级 GTM 目标账户研究</h3></div><span class="hint" id="task-version">wo_gtm_001 · v5</span></div>
+                <p class="responsibility" id="task-responsibility">责任链：老板 -> 销售负责人分身 -> GTM 研究员 -> CRM 助理</p>
+                <div class="stepper" aria-label="任务进度"><span class="step done">草稿</span><span class="step done">已分派</span><span class="step done">已计划</span><span class="step done">执行中</span><span class="step current">等待审批</span><span class="step">已交付</span></div>
+                <div class="detail-grid">
+                  <section class="detail-block"><h4>目标与范围</h4><ul id="task-goal"><li>从合成资料中识别 20 个高匹配账户</li><li>不读取真实客户数据，不外发信息</li><li>截止：今天 17:00</li></ul></section>
+                  <section class="detail-block"><h4>验收与边界</h4><ul id="task-criteria"><li>账户清单和分群理由可审阅</li><li>每项结论有证据引用</li><li>CSV 写回必须由真人批准</li></ul></section>
+                  <section class="detail-block"><h4>当前运行计划</h4><ul id="task-plan"><li>读取合成账户与行业资料</li><li>生成分群建议与证据</li><li>请求合成 CRM/CSV 写回审批</li></ul></section>
+                  <section class="detail-block"><h4>可信事实</h4><ul id="task-facts"><li>evi_00000001、evi_00000002</li><li>8 个审计事件，链条完整</li><li>可回滚至 fixture revision-17</li></ul></section>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="approvals" aria-labelledby="approvals-title">
+          <div class="view-header"><div><p class="eyebrow">人工关口</p><h2 id="approvals-title">批准的是动作、影响和证据</h2></div><p class="context">只有真人可以做出不可变审批决定</p></div>
+          <div class="approval-list">
+            <article class="approval-card" id="primary-approval"><div class="decision-top"><span class="risk-tag">高风险</span><span class="hint">apr_00000001</span></div><h3>将 20 条高匹配建议写回合成 CRM/CSV</h3><div class="approval-meta"><span>申请人：GTM 研究员；sponsor：销售负责人</span><span>证据：2 条脱敏摘要，哈希已校验</span><span>影响：合成 fixture；回滚：revision-17</span><span>理由：供销售负责人复核分群效果</span></div><div class="split-actions"><button class="danger" data-approval-action="reject">拒绝并记录理由</button><button class="approve" data-approval-action="approve">批准写回</button></div></article>
+            <article class="approval-card"><div class="decision-top"><span class="risk-tag">中风险</span><span class="hint">apr_00000002</span></div><h3>发布销售周报到合成团队空间</h3><div class="approval-meta"><span>申请人：质检复盘员</span><span>证据：3 条；无外部连接</span><span>影响：合成文档，支持撤回</span><span>等待：01:38</span></div><div class="split-actions"><button class="danger" data-secondary-action="reject">拒绝</button><button class="approve" data-secondary-action="approve">批准发布</button></div></article>
+          </div>
+          <p class="section-note">本原型中的批准和拒绝只改变页面演示状态。正式产品会通过带 `expectedVersion` 和 `idempotencyKey` 的 API 写入审批事实与审计事件。</p>
+        </section>
+
+        <section class="view" id="employees" aria-labelledby="employees-title">
+          <div class="view-header"><div><p class="eyebrow">数字员工工作台</p><h2 id="employees-title">员工有岗位，不只是一个对话机器人</h2></div><p class="context">点击员工可进入其当前任务与证据</p></div>
+          <div class="employee-grid">
+            <button class="employee-card" type="button" data-view-target="tasks"><div><span class="role-tag">GTM / 执行中</span><h3>GTM 研究员</h3><p>sponsor：销售负责人分身</p></div><div class="employee-facts"><div class="fact"><span>当前任务</span><b>目标账户研究</b></div><div class="fact"><span>权限</span><b>读取 + 审批申请</b></div><div class="fact"><span>预算</span><b>0.42 / 10 CNY</b></div></div></button>
+            <button class="employee-card" type="button" data-view-target="approvals"><div><span class="role-tag">CRM / 等待批准</span><h3>CRM 助理</h3><p>sponsor：销售负责人分身</p></div><div class="employee-facts"><div class="fact"><span>当前关口</span><b>合成 CSV 写回</b></div><div class="fact"><span>权限</span><b>受控写入</b></div><div class="fact"><span>证据</span><b>2 条已就绪</b></div></div></button>
+            <button class="employee-card" type="button" data-view-target="results"><div><span class="role-tag">质量 / 已交付</span><h3>质检复盘员</h3><p>sponsor：销售负责人</p></div><div class="employee-facts"><div class="fact"><span>当前任务</span><b>销售线索周报</b></div><div class="fact"><span>验收通过率</span><b>4 / 5</b></div><div class="fact"><span>下一步</span><b>等待验收</b></div></div></button>
+            <button class="employee-card" type="button" data-view-target="tasks"><div><span class="role-tag">内容 / 已阻塞</span><h3>内容运营员</h3><p>sponsor：内容负责人</p></div><div class="employee-facts"><div class="fact"><span>阻塞原因</span><b>缺少渠道字段</b></div><div class="fact"><span>升级给</span><b>真人协作者</b></div><div class="fact"><span>可用能力</span><b>内容归因</b></div></div></button>
+            <button class="employee-card" type="button" data-view-target="dashboard"><div><span class="role-tag">分身 / 代理中</span><h3>销售负责人分身</h3><p>owner：销售负责人</p></div><div class="employee-facts"><div class="fact"><span>负责目标</span><b>本周新增账户</b></div><div class="fact"><span>可委派</span><b>GTM 研究</b></div><div class="fact"><span>需升级</span><b>高风险写入</b></div></div></button>
+            <button class="employee-card" type="button" data-view-target="organization"><div><span class="role-tag">分身 / 待命</span><h3>老板分身</h3><p>owner：邱总</p></div><div class="employee-facts"><div class="fact"><span>正在汇总</span><b>经营异常</b></div><div class="fact"><span>权限</span><b>建议与提醒</b></div><div class="fact"><span>禁止</span><b>替老板审批</b></div></div></button>
+          </div>
+        </section>
+
+        <section class="view" id="results" aria-labelledby="results-title">
+          <div class="view-header"><div><p class="eyebrow">成果、证据与审计</p><h2 id="results-title">结果可验收，过程可回放</h2></div><p class="context">ResultPackage res_00000001</p></div>
+          <div class="result-grid">
+            <article class="panel result-main"><span class="state-tag">已交付，等待验收</span><h3>GTM 目标账户研究成果包</h3><p>已完成合成账户分群建议、重点账户清单和建议写回差异。所有数据、费用和结果仅用于演示可信交付流程。</p><div class="criteria"><div><span>高匹配账户清单可审阅</span><b class="pass">通过</b></div><div><span>分群理由附带证据引用</span><b class="pass">通过</b></div><div><span>合成 CRM/CSV 写回完成</span><b class="pending" id="write-verdict">等待审批</b></div></div><div class="detail-grid" style="margin-top:18px"><section class="detail-block"><h4>证据</h4><ul><li>evi_00000001 · 合成账户资料</li><li>evi_00000002 · 分群计算摘要</li><li>SHA-256 已校验</li></ul></section><section class="detail-block"><h4>成本与回滚</h4><ul><li>模型 0.32 CNY，工具 0.10 CNY</li><li>风险：高，因受控写入</li><li>回滚：恢复 revision-17</li></ul></section></div></article>
+            <article class="panel"><div class="panel-head"><h3>审计时间线</h3><span class="hint">hash chain 完整</span></div><ul class="timeline"><li><time>09:02:11</time><span><span class="item-title">WorkOrder 已创建</span><span class="item-sub">human:boss_demo · evt_0001</span></span><span class="status">v0</span></li><li><time>09:03:42</time><span><span class="item-title">数字员工已启动</span><span class="item-sub">employee:gtm_researcher · evt_0005</span></span><span class="status">v3</span></li><li><time>09:05:16</time><span><span class="item-title">证据已记录</span><span class="item-sub">evi_00000001 · SHA-256</span></span><span class="status">v4</span></li><li><time>09:05:40</time><span><span class="item-title">高风险写入请求审批</span><span class="item-sub">approval.requested · evt_0008</span></span><span class="status waiting">等待</span></li></ul></article>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const pageMeta = {
+      dashboard: ['经营驾驶舱', '本周 GTM 目标的决策、交付与风险全貌'],
+      organization: ['组织全景', '用部门与数字员工状态导航，而不制造第二套数据'],
+      tasks: ['任务军令状', '让目标、责任、权限、预算和验收先于执行'],
+      approvals: ['审批中心', '人决定受控高风险动作，系统记录不可变理由'],
+      employees: ['员工工作台', '岗位、权限、能力和工作痕迹都可被管理'],
+      results: ['成果与证据', '交付可验收、依据可追溯、过程可回放']
+    };
+    const taskData = {
+      gtm: {
+        name: '优先级 GTM 目标账户研究', state: '等待高风险审批', version: 'wo_gtm_001 · v5',
+        responsibility: '责任链：老板 -> 销售负责人分身 -> GTM 研究员 -> CRM 助理',
+        goal: ['从合成资料中识别 20 个高匹配账户', '不读取真实客户数据，不外发信息', '截止：今天 17:00'],
+        criteria: ['账户清单和分群理由可审阅', '每项结论有证据引用', 'CSV 写回必须由真人批准'],
+        plan: ['读取合成账户与行业资料', '生成分群建议与证据', '请求合成 CRM/CSV 写回审批'],
+        facts: ['evi_00000001、evi_00000002', '8 个审计事件，链条完整', '可回滚至 fixture revision-17']
+      },
+      weekly: {
+        name: '销售线索周报复盘', state: '已交付，等待验收', version: 'wo_weekly_002 · v6',
+        responsibility: '责任链：销售负责人 -> 质检复盘员',
+        goal: ['汇总本周合成线索处理情况', '指出漏斗异常与下一步建议', '不发布到真实团队空间'],
+        criteria: ['周报可审阅', '每项异常附带数据来源', '验收人可驳回并要求返工'],
+        plan: ['汇总合成线索事件', '形成复盘与建议', '生成成果包并等待验收'],
+        facts: ['evi_00000009、evi_00000010、evi_00000011', '10 个审计事件，链条完整', '无写入动作']
+      },
+      content: {
+        name: '内容活动线索归因', state: '已阻塞，等待真人补资料', version: 'wo_content_003 · v2',
+        responsibility: '责任链：内容负责人 -> 内容运营员 -> 真人协作者',
+        goal: ['按活动归因合成线索', '识别缺失的渠道字段', '暂停所有后续判断'],
+        criteria: ['列出缺失材料', '不得猜测渠道来源', '补齐后允许重新计划'],
+        plan: ['检查合成活动记录', '发现字段缺失', '向真人协作者升级'],
+        facts: ['evi_00000012 · 缺失字段清单', '4 个审计事件，链条完整', '未消耗外部工具成本']
+      }
+    };
+    const toast = document.getElementById('toast');
+    let toastTimer;
+    function notify(message) {
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
+    }
+    function showView(id) {
+      document.querySelectorAll('.view').forEach((view) => view.classList.toggle('is-active', view.id === id));
+      document.querySelectorAll('[data-view-target]').forEach((button) => button.setAttribute('aria-current', button.closest('.nav') && button.dataset.viewTarget === id ? 'page' : 'false'));
+      document.getElementById('page-title').textContent = pageMeta[id][0];
+      document.getElementById('page-subtitle').textContent = pageMeta[id][1];
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    document.querySelectorAll('[data-view-target]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.viewTarget)));
+    document.querySelectorAll('[data-task]').forEach((button) => button.addEventListener('click', () => {
+      const task = taskData[button.dataset.task];
+      document.querySelectorAll('[data-task]').forEach((row) => row.classList.toggle('is-selected', row === button));
+      document.getElementById('task-name').textContent = task.name;
+      document.getElementById('task-state').textContent = task.state;
+      document.getElementById('task-version').textContent = task.version;
+      document.getElementById('task-responsibility').textContent = task.responsibility;
+      [['task-goal', task.goal], ['task-criteria', task.criteria], ['task-plan', task.plan], ['task-facts', task.facts]].forEach(([id, items]) => document.getElementById(id).innerHTML = items.map((item) => `<li>${item}</li>`).join(''));
+    }));
+    function decideApproval(decision) {
+      const approved = decision === 'approve';
+      document.querySelectorAll('[data-approval-action]').forEach((button) => { button.disabled = true; button.style.opacity = '.55'; });
+      document.getElementById('approval-count').textContent = '1 项待审批';
+      document.getElementById('write-verdict').textContent = approved ? '已批准，等待合成执行' : '已拒绝，不执行写回';
+      document.getElementById('write-verdict').className = approved ? 'pass' : 'pending';
+      notify(approved ? '演示：审批已批准。正式产品将写入 Approval 与 DomainEvent，并恢复受控运行。' : '演示：审批已拒绝。正式产品将阻止写入并保留不可变审计理由。');
+    }
+    document.querySelectorAll('[data-approval-action]').forEach((button) => button.addEventListener('click', () => decideApproval(button.dataset.approvalAction)));
+    document.querySelectorAll('[data-secondary-action]').forEach((button) => button.addEventListener('click', () => notify(`演示：周报发布已${button.dataset.secondaryAction === 'approve' ? '批准' : '拒绝'}。`)));
+    document.getElementById('create-order').addEventListener('click', () => { showView('tasks'); notify('演示：正式产品将在这里打开“目标、责任、验收、边界、出口动作”完整军令状表单。'); });
+  </script>
+</body>
+</html>

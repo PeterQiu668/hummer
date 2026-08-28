@@ -1,14 +1,31 @@
 {
-  "name": "lobster-factory-desktop",
+  "name": "hummer-enterprise-workspace",
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "Enterprise Agent Team OS - Cyberpunk Office Desktop Prototype",
+  "description": "Hummer human-AI collaboration workspace prototype",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test": "npm run test:unit && npm run test:ui",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:ui": "vitest run --config vitest.ui.config.ts",
+    "test:watch": "vitest --config vitest.ui.config.ts",
+    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "desktop:build": "npm run build -w @hummer/desktop",
+    "desktop:start": "npm run start -w @hummer/desktop",
+    "test:desktop:codex": "node scripts/e2e-desktop-codex.mjs",
+    "test:desktop:codex:app-server": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc",
+    "test:desktop:codex:approval": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc --approval",
+    "test:desktop:codex:steer": "node scripts/e2e-desktop-codex-controls.mjs --steer",
+    "test:desktop:codex:interrupt": "node scripts/e2e-desktop-codex-controls.mjs --interrupt",
+    "test:desktop:persistence": "node scripts/e2e-desktop-persistence.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -23,14 +40,20 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.171.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^30.0.1",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vitest": "^4.1.11"
   }
 }

@@ -66,10 +66,7 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    background:
-      radial-gradient(ellipse at 90% -10%, rgba(15, 112, 183, 0.04), transparent 60%),
-      radial-gradient(ellipse at -10% 110%, rgba(168, 85, 247, 0.025), transparent 55%),
-      var(--bg-app);
+    background: var(--bg-app);
   }
   ::-webkit-scrollbar {
     width: 10px;

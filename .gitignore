@@ -3,6 +3,9 @@ dist/
 .vite/
 *.log
 .DS_Store
+test-results/
+playwright-report/
+blob-report/
 
 # Build artifacts
 *.tsbuildinfo

@@ -1,231 +1,41 @@
-/**
- * LeftNav (v9) — 按角色过滤的导航（Phase 0 多角色）
- * boss / exec / staff / expert / auditor 各看到自己的工作台
- */
-import {
-  Building2, MessagesSquare, ListChecks, Users, Store, Wrench,
-  Cable, ShieldCheck, Sparkles, Settings2, BookOpen, FileBox,
-  Inbox, TrendingUp, LayoutDashboard, Bot, GraduationCap, ScrollText,
-} from 'lucide-react';
+import { useState } from 'react';
+import { Blocks, ChartNoAxesCombined, ChevronDown, LayoutPanelTop, Settings2, UsersRound } from 'lucide-react';
 import { useAppStore, type PageKey } from '../../store/useAppStore';
-import type { RoleKey } from '../../lib/types';
-import { channels, CHANNEL_GROUPS, ROLE_CHANNEL_ACCESS } from '../../data/feishu';
 
-type NavItem = {
-  key: PageKey | string;
-  label: string;
-  icon: any;
-  badge?: string;
-  badgeTone?: 'default' | 'brand' | 'warning' | 'error';
-  highlight?: 'market' | 'governance' | 'hermes';
-};
+const primaryNav: { key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'evidence'>; label: string; icon: typeof LayoutPanelTop; badge?: string }[] = [
+  { key: 'office', label: '工作台', icon: LayoutPanelTop },
+  { key: 'employees', label: '团队协作', icon: UsersRound, badge: '15' },
+  { key: 'connect', label: '能力与连接', icon: Blocks, badge: '7' },
+  { key: 'evidence', label: '成长与复盘', icon: ChartNoAxesCombined, badge: '3' },
+];
 
-type NavSection = { title: string; items: NavItem[] };
-
-const IT: Record<string, NavItem> = {
-  office:    { key: 'office',    label: '指挥中心',    icon: Building2 },
-  inbox:     { key: 'inbox',     label: '收件箱',      icon: Inbox, badge: '9', badgeTone: 'error' },
-  chat:      { key: 'chat',      label: '对话流',      icon: MessagesSquare, badge: '12' },
-  tasks:     { key: 'tasks',     label: '工作任务',    icon: ListChecks, badge: '8' },
-  evidence:  { key: 'evidence',  label: '交付物',      icon: FileBox, badge: '8' },
-  employees: { key: 'employees', label: '我的员工',    icon: Users, badge: '15' },
-  market:    { key: 'market',    label: '员工市场',    icon: Store, badge: '36', highlight: 'market' },
-  skills:    { key: 'skills',    label: '技能与工具',  icon: Wrench, badge: '128' },
-  connect:   { key: 'connect',   label: 'MCP 连接',    icon: Cable, badge: '12' },
-  roi:       { key: 'roi',       label: 'ROI 经营',    icon: TrendingUp },
-  kg:        { key: 'kg',        label: '知识中枢',    icon: BookOpen, badge: '9.6k' },
-  governance:{ key: 'governance',label: '审计与治理',  icon: ShieldCheck, highlight: 'governance' },
-  hermes:    { key: 'evolution', label: '进化中心',    icon: Sparkles, badge: '47' },
-  audit:     { key: 'audit',     label: '审计链',      icon: ScrollText },
-  execws:    { key: 'execws',    label: '高管工作台',  icon: LayoutDashboard },
-  myagents:  { key: 'myagents',  label: '我的 AI 同事', icon: Bot },
-  expertportal: { key: 'expertportal', label: '专家门户', icon: GraduationCap },
-};
-
-const ROLE_SECTIONS: Record<RoleKey, NavSection[]> = {
-  boss: [
-    { title: '工作', items: [IT.office, IT.inbox, IT.chat, IT.tasks, IT.evidence] },
-    { title: '员工', items: [IT.employees, IT.market, IT.skills, IT.connect] },
-    { title: '经营与治理', items: [IT.roi, IT.kg, IT.governance, IT.hermes] },
-  ],
-  exec: [
-    { title: '工作台', items: [IT.execws, IT.chat, IT.tasks, IT.evidence] },
-    { title: '团队', items: [IT.employees, IT.skills] },
-  ],
-  staff: [
-    { title: '工作台', items: [IT.myagents, IT.chat, IT.tasks] },
-    { title: '资源', items: [IT.evidence, IT.kg] },
-  ],
-  expert: [
-    { title: '专家', items: [IT.expertportal] },
-    { title: '市场', items: [IT.market] },
-  ],
-  auditor: [
-    { title: '审计', items: [IT.audit, IT.evidence, IT.governance] },
-  ],
-};
-
-const channelById = new Map(channels.map((c) => [c.id, c]));
+const tenants = ['蓝熙集团 · 总部', '蓝熙集团 · 华东事业部', 'Hummer 产品体验空间'];
 
 export default function LeftNav() {
-  const activePage = useAppStore((s) => s.activePage);
-  const setActivePage = useAppStore((s) => s.setActivePage);
-  const setLeftNav = useAppStore((s) => s.setLeftNav);
-  const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
-  const setShowGovernance = useAppStore((s) => s.setShowGovernance);
-  const setShowHermes = useAppStore((s) => s.setShowHermes);
-  const setActiveChannel = useAppStore((s) => s.setActiveChannel);
-  const currentRole = useAppStore((s) => s.currentRole);
+  const activePage = useAppStore((state) => state.activePage);
+  const setActivePage = useAppStore((state) => state.setActivePage);
+  const setLeftNav = useAppStore((state) => state.setLeftNav);
+  const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
+  const mcpApps = useAppStore((state) => state.mcpApps);
+  const [tenant, setTenant] = useState(tenants[0]);
+  const [tenantOpen, setTenantOpen] = useState(false);
+  const connected = Object.values(mcpApps).filter((app) => app.connected).length;
 
-  const sections = ROLE_SECTIONS[currentRole] ?? ROLE_SECTIONS.boss;
-
-  const onClick = (it: NavItem) => {
-    setLeftNav(it.key);
-    if (it.highlight === 'market') return setShowMarketplace(true);
-    if (it.highlight === 'governance') return setShowGovernance(true);
-    if (it.highlight === 'hermes') return setShowHermes(true);
-    setActivePage(it.key as PageKey);
-  };
+  const go = (key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'evidence'>) => { setActivePage(key); setLeftNav(key); };
 
   return (
-    <aside
-      className="absolute left-0 top-12 bottom-0 w-60 z-20 flex flex-col bg-neutral-25"
-      style={{ borderRight: '1px solid var(--border-subtle)' }}
-    >
-      {/* Tenant */}
-      <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100 transition group">
-          <div className="w-6 h-6 rounded-md bg-neutral-900 text-white grid place-items-center text-[11px] font-semibold">
-            蓝
-          </div>
-          <div className="flex-1 text-left leading-tight">
-            <div className="text-[12.5px] text-neutral-900 font-semibold">蓝血军团 · 总部</div>
-            <div className="text-[10px] text-neutral-500 font-mono">workspace · pro</div>
-          </div>
-          <Settings2 size={13} className="text-neutral-400 group-hover:text-neutral-700" />
-        </button>
-      </div>
-
-      {/* Sections */}
-      <nav className="flex-1 overflow-y-auto p-2 space-y-4">
-        {sections.map((sec) => (
-          <div key={sec.title}>
-            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-              {sec.title}
-            </div>
-            <div className="space-y-0.5">
-              {sec.items.map((it) => {
-                const Active = activePage === it.key;
-                const Icon = it.icon;
-                return (
-                  <button
-                    key={it.key}
-                    onClick={() => onClick(it)}
-                    className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition ${
-                      Active
-                        ? 'bg-neutral-100 text-neutral-900 font-medium'
-                        : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                    }`}
-                  >
-                    <Icon size={14} className={Active ? 'text-primary-600' : 'text-neutral-500 group-hover:text-neutral-700'} />
-                    <span className="flex-1 text-left">{it.label}</span>
-                    {it.badge && (
-                      <span className={`text-[10.5px] font-mono px-1.5 rounded ${
-                        it.badgeTone === 'brand' ? 'bg-primary-100 text-primary-700' :
-                        it.badgeTone === 'warning' ? 'bg-warning-soft text-warning' :
-                        it.badgeTone === 'error' ? 'bg-error-soft text-error' :
-                        'text-neutral-400 group-hover:text-neutral-600'
-                      }`}>
-                        {it.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {/* Active channels — 按 CHANNEL_GROUPS 顺序 + 角色权限过滤 */}
-        {(() => {
-          const access = ROLE_CHANNEL_ACCESS[currentRole] ?? {};
-          const visibleGroups = CHANNEL_GROUPS
-            .map((g) => ({
-              title: g.title,
-              items: g.ids
-                .filter((id) => access[id])
-                .map((id) => channelById.get(id))
-                .filter((c): c is NonNullable<typeof c> => Boolean(c)),
-            }))
-            .filter((g) => g.items.length > 0);
-          if (visibleGroups.length === 0) return null;
-          return (
-            <div>
-              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                活跃频道
-              </div>
-              <div className="space-y-2">
-                {visibleGroups.map((g) => (
-                  <div key={g.title}>
-                    <div className="px-2 pb-0.5 text-[9.5px] text-neutral-400 tracking-wide">{g.title}</div>
-                    <div className="space-y-0.5">
-                      {g.items.map((c) => {
-                        const acc = access[c.id];
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              setActiveChannel(c.id);
-                              setActivePage('chat');
-                              setLeftNav('chat');
-                            }}
-                            className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 transition"
-                          >
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{
-                                background:
-                                  c.type === 'incident' ? 'var(--error)' :
-                                  c.type === 'system' ? '#7E22CE' :
-                                  c.type === 'boss' || c.type === 'exec' ? 'var(--primary-600, #0F70B7)' :
-                                  'var(--success)',
-                              }}
-                            />
-                            <span className="flex-1 text-left text-[12px] text-neutral-700 truncate">{c.name}</span>
-                            {acc && !acc.write && (
-                              <span className="text-[9px] px-1 rounded bg-neutral-100 text-neutral-500 border border-neutral-200 shrink-0">
-                                只读
-                              </span>
-                            )}
-                            {acc?.note && acc.note !== '只读' && (
-                              <span className="text-[9px] px-1 rounded bg-warning-soft text-warning shrink-0" title={acc.note}>
-                                {acc.note}
-                              </span>
-                            )}
-                            {c.unread > 0 && (
-                              <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-1 rounded shrink-0">
-                                {c.unread}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-      </nav>
-
-      {/* Footer status */}
-      <div className="px-3 py-2.5" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-        <div className="flex items-center gap-2 text-[11px] text-neutral-600">
-          <span className="w-1.5 h-1.5 rounded-full hum-pulse" style={{ background: 'var(--success)' }} />
-          <span className="flex-1">Sandbox 已隔离 · 所有 Skill 已签名</span>
+    <>
+      <aside className="absolute bottom-0 left-0 top-12 z-20 hidden w-60 flex-col border-r border-neutral-200 bg-neutral-25 md:flex">
+        <div className="relative border-b border-neutral-200 p-3">
+          <button type="button" onClick={() => setTenantOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100"><div className="grid h-7 w-7 place-items-center rounded-md bg-neutral-900 text-[11px] font-semibold text-white">蓝</div><div className="min-w-0 flex-1 leading-tight"><div className="truncate text-[12.5px] font-semibold text-neutral-900">{tenant}</div><div className="mt-0.5 text-[10px] text-neutral-500">企业工作区</div></div><ChevronDown size={13} className={`text-neutral-400 transition ${tenantOpen ? 'rotate-180' : ''}`} /></button>
+          {tenantOpen && <div className="absolute left-3 right-3 top-[54px] z-40 rounded-md border border-neutral-200 bg-white p-1 shadow-lg">{tenants.map((item) => <button type="button" key={item} onClick={() => { setTenant(item); setTenantOpen(false); }} className={`w-full rounded px-2 py-2 text-left text-[11.5px] ${tenant === item ? 'bg-primary-50 text-primary-800' : 'text-neutral-600 hover:bg-neutral-50'}`}>{item}</button>)}</div>}
         </div>
-      </div>
-    </aside>
+
+        <nav className="flex-1 p-2" aria-label="主导航"><div className="px-2 pb-2 pt-1 text-[10px] font-semibold text-neutral-400">我的组织</div><div className="space-y-1">{primaryNav.map((item) => { const Icon = item.icon; const active = activePage === item.key; return <button type="button" key={item.key} onClick={() => go(item.key)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-[13px] transition ${active ? 'bg-neutral-900 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'}`}><Icon size={15} className={active ? 'text-white' : 'text-neutral-500'} /><span className="flex-1 text-left">{item.label}</span>{item.badge && <span className={`rounded px-1.5 text-[10px] ${active ? 'bg-white/15 text-white' : 'bg-neutral-100 text-neutral-500'}`}>{item.badge}</span>}</button>; })}</div></nav>
+
+        <div className="border-t border-neutral-200 p-3"><button type="button" onClick={() => go('connect')} className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100"><span className="h-1.5 w-1.5 rounded-full bg-success" /><span className="flex-1">{connected} 个工作应用已连接</span><Blocks size={13} className="text-neutral-400" /></button><button type="button" onClick={() => setSettingsOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100"><Settings2 size={13} className="text-neutral-400" /><span>个人偏好</span></button></div>
+      </aside>
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid h-12 grid-cols-4 border-t border-neutral-200 bg-white md:hidden" aria-label="移动端主导航">{primaryNav.map((item) => { const Icon = item.icon; const active = activePage === item.key; return <button type="button" key={item.key} onClick={() => go(item.key)} className={`flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-[9.5px] ${active ? 'text-primary-700' : 'text-neutral-500'}`}><Icon size={15} /><span className="max-w-full truncate">{item.label}</span></button>; })}</nav>
+    </>
   );
 }
