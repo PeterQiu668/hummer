@@ -1,0 +1,11 @@
+export { openPersistence, DesktopPersistence } from './database.js';
+export type {
+  AppliedMigration,
+  ApprovalProjection,
+  OpenPersistenceOptions,
+  ResultPackageProjection,
+  SessionProjection,
+} from './database.js';
+export type { DomainEventInput, IntegrityResult, StoredDomainEvent } from './domain-event-store.js';
+export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
+export type { PersistableRuntimeEvent, PersistedSessionDescriptor, RuntimeEventQuery, SaveRuntimeEventOptions } from './runtime-event-store.js';

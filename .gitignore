@@ -9,6 +9,12 @@ blob-report/
 
 # Build artifacts
 *.tsbuildinfo
+dist-swarm-final/
+dist-swarm-verify/
+
+# Local runtime facts and spike databases
+spikes/codex-runtime/.facts-*/
+spikes/m2-persistence/facts/
 
 # Local Claude Code config
 .claude/settings.local.json

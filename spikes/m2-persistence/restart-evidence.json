@@ -1,0 +1,104 @@
+{
+  "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m2-persistence\\facts",
+  "integrityBefore": {
+    "valid": true,
+    "checked": 8
+  },
+  "integrityAfter": {
+    "valid": true,
+    "checked": 8
+  },
+  "beforeRestart": [
+    {
+      "sequence": 1,
+      "kind": "delegation",
+      "text": "1目标下达：整理本周线索并生成跟进清单，写回客户管理系统前先给我确认你 · 已派给 雪·销售官 + 璇·数据官，按确认计划开始执行。可追溯"
+    },
+    {
+      "sequence": 2,
+      "kind": "tool",
+      "tool": "workspace.read",
+      "text": "2读取本次授权的工作资料雪 · 销售官 · 已读取 16 份演示资料，并建立任务输入索引。可追溯"
+    },
+    {
+      "sequence": 3,
+      "kind": "tool",
+      "tool": "browser.research",
+      "text": "3核验客户信息与关键联系人雪 · 销售官 · 完成第一轮处理，已形成可复核的中间结果。可追溯"
+    },
+    {
+      "sequence": 4,
+      "kind": "ai_to_human",
+      "text": "4AI 转交：确认受保护动作范围雪 · 销售官 · 已完成草稿；将在写回 CRM 之前停下来问你。可追溯"
+    },
+    {
+      "sequence": 5,
+      "kind": "approval",
+      "tool": "crm.write",
+      "text": "5客户管理系统更新等待确认雪 · 销售官 · 等待你确认待审"
+    },
+    {
+      "sequence": 6,
+      "kind": "human_to_ai",
+      "text": "6真人批准，交还 AI 执行你 · 批准本次合成 CRM 写回。可追溯"
+    },
+    {
+      "sequence": 7,
+      "kind": "tool",
+      "tool": "crm.write",
+      "text": "7提交已确认的客户管理系统更新雪 · 销售官 · 12 条演示记录更新成功，已生成撤回凭证。可追溯"
+    },
+    {
+      "sequence": 8,
+      "kind": "result",
+      "text": "8生成交付包雪 · 销售官 · 已交付：任务结果、证据与可回滚凭证均已打包。可追溯使用的能力协作记录耗时 / 成本0.36s / ¥0.0400工作范围当前步骤无需额外范围结果已交付：任务结果、证据与可回滚凭证均已打包。交付物任务交付报告可核验记录暂无 从这里重新尝试"
+    }
+  ],
+  "afterRestart": [
+    {
+      "sequence": 1,
+      "kind": "delegation",
+      "text": "1目标下达：整理本周线索并生成跟进清单，写回客户管理系统前先给我确认你 · 已派给 雪·销售官 + 璇·数据官，按确认计划开始执行。可追溯"
+    },
+    {
+      "sequence": 2,
+      "kind": "tool",
+      "tool": "workspace.read",
+      "text": "2读取本次授权的工作资料雪 · 销售官 · 已读取 16 份演示资料，并建立任务输入索引。可追溯"
+    },
+    {
+      "sequence": 3,
+      "kind": "tool",
+      "tool": "browser.research",
+      "text": "3核验客户信息与关键联系人雪 · 销售官 · 完成第一轮处理，已形成可复核的中间结果。可追溯"
+    },
+    {
+      "sequence": 4,
+      "kind": "ai_to_human",
+      "text": "4AI 转交：确认受保护动作范围雪 · 销售官 · 已完成草稿；将在写回 CRM 之前停下来问你。可追溯"
+    },
+    {
+      "sequence": 5,
+      "kind": "approval",
+      "tool": "crm.write",
+      "text": "5客户管理系统更新等待确认雪 · 销售官 · 等待你确认待审"
+    },
+    {
+      "sequence": 6,
+      "kind": "human_to_ai",
+      "text": "6真人批准，交还 AI 执行你 · 批准本次合成 CRM 写回。可追溯"
+    },
+    {
+      "sequence": 7,
+      "kind": "tool",
+      "tool": "crm.write",
+      "text": "7提交已确认的客户管理系统更新雪 · 销售官 · 12 条演示记录更新成功，已生成撤回凭证。可追溯"
+    },
+    {
+      "sequence": 8,
+      "kind": "result",
+      "text": "8生成交付包雪 · 销售官 · 已交付：任务结果、证据与可回滚凭证均已打包。可追溯使用的能力协作记录耗时 / 成本0.36s / ¥0.0400工作范围当前步骤无需额外范围结果已交付：任务结果、证据与可回滚凭证均已打包。交付物任务交付报告可核验记录暂无 从这里重新尝试"
+    }
+  ],
+  "screenshotPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\dist\\hummer-m2-restart.png"
+}
