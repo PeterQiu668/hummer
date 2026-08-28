@@ -114,6 +114,103 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX result_packages_session ON result_packages (session_id, created_at);
     `,
   },
+  {
+    version: 2,
+    name: 'm3_organization_responsibility_chain',
+    sql: `
+      CREATE TABLE human_users (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX human_users_tenant ON human_users (tenant_id, status);
+
+      CREATE TABLE departments (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        owner_human_id TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (owner_human_id) REFERENCES human_users(id)
+      );
+
+      CREATE INDEX departments_tenant ON departments (tenant_id, status);
+
+      CREATE TABLE digital_twins (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        owner_human_id TEXT NOT NULL,
+        department_id TEXT,
+        name TEXT NOT NULL,
+        authority_level TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (owner_human_id) REFERENCES human_users(id),
+        FOREIGN KEY (department_id) REFERENCES departments(id)
+      );
+
+      CREATE INDEX digital_twins_owner ON digital_twins (tenant_id, owner_human_id);
+
+      CREATE TABLE digital_employees (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        sponsor_actor_ref TEXT NOT NULL,
+        department_id TEXT,
+        name TEXT NOT NULL,
+        job_title TEXT NOT NULL,
+        runtime_profile TEXT NOT NULL,
+        autonomy_level TEXT NOT NULL,
+        status TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (department_id) REFERENCES departments(id)
+      );
+
+      CREATE INDEX digital_employees_tenant ON digital_employees (tenant_id, status);
+      CREATE INDEX digital_employees_department ON digital_employees (tenant_id, department_id);
+
+      CREATE TABLE approval_policies (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        action_pattern TEXT NOT NULL,
+        risk_level TEXT NOT NULL,
+        effect TEXT NOT NULL,
+        approver_actor_ref TEXT NOT NULL,
+        budget_limit_cny REAL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX approval_policies_match ON approval_policies (tenant_id, enabled, risk_level);
+
+      CREATE TABLE execution_nodes (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        runtime_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        cwd TEXT NOT NULL,
+        permission_scope TEXT NOT NULL,
+        current_session_id TEXT,
+        last_seen_at TEXT NOT NULL,
+        payload_json TEXT NOT NULL
+      );
+
+      CREATE INDEX execution_nodes_tenant ON execution_nodes (tenant_id, status);
+    `,
+  },
 ];
 
 export function applyMigrations(database: SqliteDatabase): void {

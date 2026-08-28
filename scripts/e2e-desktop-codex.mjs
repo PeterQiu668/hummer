@@ -46,6 +46,7 @@ try {
       HUMMER_CODEX_PATH: codexPath,
       HUMMER_CODEX_WIRE_LOG_PATH: wireLogPath,
       HUMMER_DATA_DIR: dataDirectory,
+      HUMMER_ENGINE_PROFILE: 'openai-codex-validation',
       ...(approvalFlow ? { HUMMER_CODEX_SANDBOX: 'read-only' } : {}),
     },
   });
@@ -56,7 +57,7 @@ try {
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   console.log('stage=workbench-visible');
   const node = page.getByLabel('执行节点状态');
-  await node.getByText('Codex 运行时', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  await node.getByText('HUMMER 执行内核', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
   if (!(await node.textContent())?.includes(workspace)) throw new Error('Workbench did not show the real Codex working directory');
   console.log('stage=codex-node-visible');
 
@@ -84,7 +85,7 @@ try {
       await page.locator('[data-runtime-tool="workspace.patch"]').waitFor({ state: 'visible', timeout: 120_000 });
       console.log('stage=file-change-visible');
     }
-    await page.getByText('Codex 运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 120_000 });
+    await page.getByText('任务运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 120_000 });
   } catch (error) {
     await page.screenshot({ path: resolve(root, 'dist/hummer-m1-codex-failure.png'), fullPage: true });
     console.error(`page-state=${(await page.locator('body').innerText()).slice(0, 6000)}`);

@@ -5,8 +5,10 @@ import { delimiter, join } from 'node:path';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { approvalResult, textInput, translateAppServerMessage } from './app-server-protocol.js';
 import { ApprovalContinuationWatchdog } from './approval-watchdog.js';
+import { buildCodexProviderArgs, engineProfileById, redactRuntimeSecrets } from './engine-profiles.js';
 import { JsonLineDecoder } from './jsonl.js';
 import { TextLineDecoder, WireLog } from './wire-log.js';
+import { listRuntimeConnectors, recordMcpStartupStatus } from './mcp-connector-registry.js';
 
 const START = 'hummer:codex:start';
 const REPLAY = 'hummer:codex:replay';
@@ -14,6 +16,8 @@ const STOP = 'hummer:codex:stop';
 const RESPOND_APPROVAL = 'hummer:codex:respond-approval';
 const STEER = 'hummer:codex:steer';
 const EVENT = 'hummer:codex:event';
+const CONNECTORS_LIST = 'hummer:runtime-connectors:list';
+const CONNECTORS_CHANGED = 'hummer:runtime-connectors:changed';
 
 interface Invocation {
   command: 'codex';
@@ -22,6 +26,7 @@ interface Invocation {
   stdin: string;
   initialPrompt: string;
   protocol: 'exec-jsonl' | 'app-server-jsonrpc';
+  engineProfileId: string;
 }
 
 interface EventEnvelope {
@@ -67,13 +72,16 @@ export function registerCodexHost(): void {
     respondToApproval(requireRun(processId), approvalId, approved);
   });
   ipcMain.handle(STEER, async (_event, processId: string, text: string) => steerRun(requireRun(processId), text));
+  ipcMain.handle(CONNECTORS_LIST, () => listRuntimeConnectors());
 }
 
-async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string }> {
+async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
   validateInvocation(request);
   const processId = randomUUID();
+  const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || request.engineProfileId);
+  const providerArgs = buildCodexProviderArgs(profile, process.env);
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, request.args, {
+  const child = spawn(executable, [...providerArgs, ...request.args], {
     cwd: request.cwd,
     env: process.env,
     windowsHide: true,
@@ -93,7 +101,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     owner: event.sender,
     decoder: new JsonLineDecoder(),
     stderrDecoder: new TextLineDecoder(),
-    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH),
+    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, process.env)),
     events: [],
     stderr: '',
     requestSequence: 0,
@@ -106,7 +114,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
 
   if (request.protocol === 'exec-jsonl') {
     child.stdin.end(request.stdin);
-    return { processId };
+    return { processId, engine: disclosure(profile, request) };
   }
 
   try {
@@ -132,7 +140,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     });
     state.turnId = nestedString(turnResult, 'turn', 'id');
     if (!state.turnId) throw new Error('Codex app-server turn/start did not return turn.id');
-    return { processId, nativeSessionId: state.threadId };
+    return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, request) };
   } catch (error) {
     if (!child.killed) child.kill();
     runs.delete(processId);
@@ -173,6 +181,10 @@ function attachProcess(state: RunState): void {
 
 function handleNativeMessage(state: RunState, message: unknown): void {
   state.wireLog.append('inbound', JSON.stringify(message));
+  const connector = recordMcpStartupStatus(message);
+  if (connector && !state.owner.isDestroyed()) {
+    state.owner.send(CONNECTORS_CHANGED, listRuntimeConnectors());
+  }
   if (state.protocol === 'exec-jsonl') {
     publish(state, message);
     return;
@@ -251,6 +263,26 @@ async function stopRun(state: RunState): Promise<void> {
     return;
   }
   if (!state.child.killed) state.child.kill();
+}
+
+export async function stopAllCodexRuns(): Promise<number> {
+  const active = [...runs.values()].filter((state) => !state.child.killed);
+  await Promise.allSettled(active.map((state) => stopRun(state)));
+  return active.length;
+}
+
+interface EngineDisclosure {
+  providerName: string;
+  modelName: string;
+  dataDomain: string;
+  sandbox: string;
+  tier: 'standard' | 'enhanced' | 'flagship';
+}
+
+function disclosure(profile: ReturnType<typeof engineProfileById>, request: Invocation): EngineDisclosure {
+  const sandboxIndex = request.args.indexOf('--sandbox');
+  const sandbox = sandboxIndex >= 0 ? request.args[sandboxIndex + 1] ?? 'workspace-write' : process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write';
+  return { providerName: profile.providerName, modelName: profile.model, dataDomain: profile.dataDomain, sandbox, tier: profile.tier };
 }
 
 function publish(state: RunState, message: unknown): void {

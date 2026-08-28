@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useAppStore, type PersonalSettings } from '../../store/useAppStore';
 
-const modelOptions: PersonalSettings['preferredModel'][] = ['智能选择', '高质量模型', '快速模型', '公司私有模型'];
+const modelOptions: PersonalSettings['preferredModel'][] = ['标准', '增强', '旗舰'];
 
 export default function MySettingsDrawer() {
   const settings = useAppStore((state) => state.personalSettings);
@@ -68,7 +68,7 @@ export default function MySettingsDrawer() {
               <label className="text-[11px] text-neutral-500">默认模型<select aria-label="默认模型" value={draft.preferredModel} onChange={(event) => patch('preferredModel', event.target.value as PersonalSettings['preferredModel'])} className="hum-input mt-1.5">{modelOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
               <label className="text-[11px] text-neutral-500">默认工作空间<select aria-label="默认工作空间" value={draft.defaultWorkspace} onChange={(event) => patch('defaultWorkspace', event.target.value as PersonalSettings['defaultWorkspace'])} className="hum-input mt-1.5"><option>我的工作空间</option><option>销售共享空间</option><option>公司知识库</option></select></label>
             </div>
-            <p className="mt-2 text-[10.5px] leading-4 text-neutral-500">“智能选择”会按任务质量、速度、数据边界和企业配额自动路由，运行前仍会在计划中回显。</p>
+            <p className="mt-2 text-[10.5px] leading-4 text-neutral-500">模型档位由企业管理员配置，运行前会在计划中回显；真实供应商、模型与数据域名可在审计详情中查询。</p>
           </SettingsSection>
 
           <SettingsSection icon={<ShieldCheck size={15} />} title="默认权限">

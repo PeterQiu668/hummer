@@ -37,7 +37,7 @@ export default function SessionPlanCard({
             </select>
           </PlanRow>
           <PlanRow label="模型" value={plan.modelProfile} action="更换" open={editing === 'model'} onToggle={() => setEditing(editing === 'model' ? null : 'model')}>
-            <select aria-label="修改模型" value={plan.modelProfile} onChange={(event) => { onChange({ ...plan, modelProfile: event.target.value }); setEditing(null); }} className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-[12px] outline-none"><option>智能选择</option><option>高质量模型</option><option>快速模型</option><option>公司私有模型</option></select>
+            <select aria-label="修改模型" value={plan.modelProfile} onChange={(event) => { onChange({ ...plan, modelProfile: event.target.value }); setEditing(null); }} className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-[12px] outline-none"><option>标准</option><option>增强</option><option>旗舰</option></select>
           </PlanRow>
           <PlanRow label="需要能力" value={plan.tools.join(' · ')} action="修改" open={editing === 'tools'} onToggle={() => setEditing(editing === 'tools' ? null : 'tools')}>
             <InlineText value={plan.tools.join('、')} label="修改工具" onCommit={(value) => onChange({ ...plan, tools: splitList(value) })} close={() => setEditing(null)} />

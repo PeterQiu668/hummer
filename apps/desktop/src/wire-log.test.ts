@@ -35,4 +35,19 @@ describe('Codex diagnostic wire log', () => {
       { channel: 'stderr', raw: 'server rejected response' },
     ]);
   });
+
+  it('applies the configured secret redactor before any channel reaches disk', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hummer-wire-redaction-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'wire.jsonl');
+    const secret = 'runtime-secret-value';
+    const log = new WireLog(path, (raw) => raw.replaceAll(secret, '[REDACTED]'));
+
+    log.append('outbound', `Authorization: Bearer ${secret}`);
+    log.append('stderr', `provider rejected ${secret}`);
+
+    const persisted = readFileSync(path, 'utf8');
+    expect(persisted).not.toContain(secret);
+    expect(persisted.match(/\[REDACTED\]/g)).toHaveLength(2);
+  });
 });

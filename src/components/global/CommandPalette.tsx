@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Blocks, BookOpen, ChartNoAxesCombined, LayoutPanelTop, ListChecks, Search, Users, Wrench } from 'lucide-react';
+import { ArrowRight, Blocks, BookOpen, ChartNoAxesCombined, LayoutPanelTop, ListChecks, MonitorCog, Search, Users, Wrench } from 'lucide-react';
 import { useAppStore, type PageKey } from '../../store/useAppStore';
 import { employees } from '../../data/employees';
 import { collabTasks } from '../../data/tasks';
@@ -11,19 +11,20 @@ type CmdResult = {
   label: string;
   sub: string;
   icon: typeof Search;
-  page?: Extract<PageKey, 'office' | 'employees' | 'connect' | 'evidence'>;
+  page?: Extract<PageKey, 'office' | 'employees' | 'connect' | 'nodes' | 'evidence'>;
 };
 
 const pages: CmdResult[] = [
   { kind: 'page', id: 'p-office', label: '工作台', sub: '目标、交办、任务和人机协作', icon: LayoutPanelTop, page: 'office' },
   { kind: 'page', id: 'p-employees', label: '团队协作', sub: '真人、分身、数字同事和组织关系', icon: Users, page: 'employees' },
   { kind: 'page', id: 'p-connect', label: '能力与连接', sub: '专家、技能、企业知识、模型和工作应用', icon: Blocks, page: 'connect' },
+  { kind: 'page', id: 'p-nodes', label: '执行节点', sub: '本地执行环境、会话与权限边界', icon: MonitorCog, page: 'nodes' },
   { kind: 'page', id: 'p-evidence', label: '成长与复盘', sub: '成果、质量、知识沉淀和持续改进', icon: ChartNoAxesCombined, page: 'evidence' },
 ];
 
 const capabilities: CmdResult[] = [
   { kind: 'skill', id: 'cap-leads', label: '线索整理与跟进', sub: '销售效率 · 已在 4 位数字同事中启用', icon: Wrench, page: 'connect' },
-  { kind: 'skill', id: 'cap-meeting', label: '会议纪要与行动项', sub: '知识协作 · 已连接飞书会议', icon: BookOpen, page: 'connect' },
+  { kind: 'skill', id: 'cap-meeting', label: '会议纪要与行动项', sub: '知识协作 · 会议内容整理', icon: BookOpen, page: 'connect' },
   { kind: 'skill', id: 'cap-contract', label: '合同条款检查', sub: '风险控制 · 需要法务确认后使用', icon: Wrench, page: 'connect' },
 ];
 

@@ -7,11 +7,12 @@
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "composite": true,
     "declaration": true,
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "src/**/*.json"]
 }

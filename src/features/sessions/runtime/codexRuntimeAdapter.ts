@@ -1,5 +1,5 @@
 import type { SessionPlan } from '../model/session';
-import type { RuntimeAdapter, RuntimeEvent, RuntimeHandle, RuntimeTokenUsage, Unsubscribe } from './adapter';
+import type { RuntimeAdapter, RuntimeEngineDisclosure, RuntimeEvent, RuntimeHandle, RuntimeTokenUsage, Unsubscribe } from './adapter';
 import { calculateRuntimeCostCny, type RuntimePricing } from './pricing';
 
 export interface CodexCliInvocation {
@@ -8,12 +8,14 @@ export interface CodexCliInvocation {
   cwd?: string;
   stdin: string;
   initialPrompt: string;
+  engineProfileId: string;
   protocol: 'exec-jsonl' | 'app-server-jsonrpc';
 }
 
 export interface CodexCliRun {
   processId: string;
   nativeSessionId?: string;
+  engine?: RuntimeEngineDisclosure;
 }
 
 export interface CodexCliHost {
@@ -68,6 +70,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
     const handle: RuntimeHandle = {
       runtimeId: this.id,
       sessionId: `codex_${plan.id}_${++this.sessionCounter}`,
+      engine: run.engine,
       nativeSessionId: run.nativeSessionId,
     };
     const state: CodexRuntimeState = {
@@ -161,6 +164,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       runtimeId: this.id,
       sessionId: `${handle.sessionId}_fork_${sequence}`,
       nativeSessionId: run.nativeSessionId,
+      engine: source.handle.engine,
     };
     const state: CodexRuntimeState = {
       handle: forkHandle,
@@ -215,6 +219,7 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
   const protocol = options.protocol ?? 'exec-jsonl';
   if (protocol === 'app-server-jsonrpc') {
     return {
+      engineProfileId: engineProfileIdForModelPolicy(plan.modelProfile),
       command: 'codex',
       args: ['app-server', '--listen', 'stdio://'],
       cwd: options.cwd,
@@ -226,11 +231,18 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
   return {
     command: 'codex',
     args: ['exec', '--json', '--sandbox', sandboxForPlan(plan), '-'],
+    engineProfileId: engineProfileIdForModelPolicy(plan.modelProfile),
     cwd: options.cwd,
     stdin: buildCodexPrompt(plan),
     initialPrompt: buildCodexPrompt(plan),
     protocol,
   };
+}
+
+export function engineProfileIdForModelPolicy(policy: string): string {
+  if (policy === '\u65d7\u8230' || policy === '\u9ad8\u8d28\u91cf\u6a21\u578b') return 'openai-flagship';
+  if (policy === '\u589e\u5f3a' || policy === '\u516c\u53f8\u79c1\u6709\u6a21\u578b') return 'zhipu-enhanced';
+  return 'deepseek-standard';
 }
 
 export function mapCodexMessage(message: unknown, lastAgentMessage?: string, metrics: {
@@ -261,7 +273,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
       category: 'system',
       status: 'running',
       actorRef: 'employee:codex',
-      title: 'Codex 开始执行',
+      title: '执行内核开始运行',
       result: '已建立非交互运行，等待结构化事件。',
       evidenceRefs: ['codex://turn/started'],
     }];
@@ -278,7 +290,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
         category: 'message',
         status: 'completed',
         actorRef: 'employee:codex',
-        title: 'Codex 更新',
+        title: '执行进展',
         result: text,
         evidenceRefs: [`codex://items/${itemId}`],
       }] : [];
@@ -331,9 +343,9 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
     return [{
       type: 'result',
       actorRef: 'employee:codex',
-      title: 'Codex 运行完成',
-      summary: lastAgentMessage || 'Codex 已完成运行；最终消息未出现在当前映射窗口。',
-      deliverables: [{ name: 'Codex 最终回复', kind: 'report' }],
+      title: '任务运行完成',
+      summary: lastAgentMessage || '执行内核已完成运行；最终消息未出现在当前映射窗口。',
+      deliverables: [{ name: '最终回复', kind: 'report' }],
       evidenceRefs: ['codex://turn/completed'],
       durationMs: metrics.durationMs ?? null,
       costCny: metrics.costCny ?? null,
@@ -348,7 +360,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
       type: 'status',
       status: 'blocked',
       actorRef: 'employee:codex',
-      reason: stringValue(error.message) || 'Codex 运行失败。',
+      reason: stringValue(error.message) || '执行内核运行失败。',
       evidenceRefs: ['codex://turn/failed'],
     }];
   }
@@ -360,7 +372,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
       type: 'approval_required',
       actorRef: 'employee:codex',
       approvalId,
-      title: 'Codex 请求执行命令',
+      title: '请求执行命令',
       message: stringValue(params.reason) || '命令需要真人批准后才能继续。',
       tool: 'shell.command',
       args: { itemId: params.itemId ?? null, kind: params.kind ?? null },

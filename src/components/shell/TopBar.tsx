@@ -6,6 +6,7 @@ const pageMeta: Record<string, { title: string; sub: string }> = {
   office: { title: '工作台', sub: '目标、交办与人机协作集中在这里' },
   employees: { title: '团队协作', sub: '真人、个人分身和数字同事共同承担工作' },
   connect: { title: '能力与连接', sub: '专家、技能、知识、模型和工作应用' },
+  nodes: { title: '执行节点', sub: '本地执行环境、会话与权限边界' },
   evidence: { title: '成长与复盘', sub: '从交付结果中沉淀知识和更好的工作方法' },
 };
 

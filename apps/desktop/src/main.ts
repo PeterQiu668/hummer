@@ -1,8 +1,9 @@
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow } from 'electron';
-import { registerCodexHost } from './codex-host.js';
+import { registerCodexHost, stopAllCodexRuns } from './codex-host.js';
 import { registerPersistenceHost, type PersistenceHostRegistration } from './persistence-host.js';
+import { registerClaudeHost, stopAllClaudeRuns } from './claude-host.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 let persistenceHost: PersistenceHostRegistration | undefined;
@@ -32,7 +33,8 @@ async function createWindow(): Promise<BrowserWindow> {
 
 app.whenReady().then(async () => {
   registerCodexHost();
-  persistenceHost = registerPersistenceHost();
+  persistenceHost = registerPersistenceHost({ stopAll: async () => (await stopAllCodexRuns()) + stopAllClaudeRuns() });
+  registerClaudeHost();
   await createWindow();
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();

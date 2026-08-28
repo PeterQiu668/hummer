@@ -27,6 +27,7 @@ export type PageKey =
   | 'skills'      // 技能库
   | 'lobster'     // 练虾系统（modal）
   | 'connect'     // MCP / 应用
+  | 'nodes'       // 本地执行节点
   | 'governance'  // HiClaw 治理舱（modal）
   | 'hermes'      // Hermes 进化（modal）
   | 'audit'       // 审计链
@@ -43,6 +44,7 @@ export function normalizeV3Page(value: unknown): PageKey {
   if (value === 'employees' || value === 'market') return 'employees';
   if (value === 'connect') return 'connect';
   if (value === 'evidence' || value === 'roi' || value === 'evolution' || value === 'audit') return 'evidence';
+  if (value === 'nodes') return 'nodes';
   return 'office';
 }
 
@@ -69,7 +71,7 @@ interface SkillState {
 }
 
 export interface PersonalSettings {
-  preferredModel: '智能选择' | '高质量模型' | '快速模型' | '公司私有模型';
+  preferredModel: '标准' | '增强' | '旗舰';
   defaultPermission: 'L1' | 'L2' | 'L3';
   defaultWorkspace: '我的工作空间' | '销售共享空间' | '公司知识库';
   twinName: string;
@@ -416,7 +418,7 @@ export const useAppStore = create<AppState>()(
       settingsOpen: false,
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       personalSettings: {
-        preferredModel: '智能选择',
+        preferredModel: '标准',
         defaultPermission: 'L2',
         defaultWorkspace: '我的工作空间',
         twinName: '昆仑助理',
@@ -504,11 +506,16 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'hummer-v6',
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as Record<string, unknown>;
         const activePage = normalizeV3Page(state.activePage);
-        return { ...state, activePage, leftNav: activePage } as any;
+        const settings = (state.personalSettings ?? {}) as Record<string, unknown>;
+        const legacyModel = settings.preferredModel;
+        const preferredModel = legacyModel === '高质量模型'
+          ? '旗舰'
+          : legacyModel === '公司私有模型' ? '增强' : '标准';
+        return { ...state, activePage, leftNav: activePage, personalSettings: { ...settings, preferredModel } } as any;
       },
       // Only persist user-state, not transient UI state (toasts/modals/slot-in/drawer)
       partialize: (s) => ({

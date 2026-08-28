@@ -30,6 +30,20 @@ describe('desktop persistence migrations', () => {
 
     persistence.close();
   });
+  it('adds M3 organization and responsibility tables through migration version 2', () => {
+    const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
+
+    expect(persistence.schemaVersion()).toBeGreaterThanOrEqual(2);
+    expect(persistence.listTables()).toEqual(expect.arrayContaining([
+      'human_users',
+      'digital_twins',
+      'digital_employees',
+      'departments',
+      'approval_policies',
+      'execution_nodes',
+    ]));
+    persistence.close();
+  });
 
   it('reopens the same database without rerunning or duplicating migrations', () => {
     const directory = temporaryDirectory();
@@ -44,6 +58,40 @@ describe('desktop persistence migrations', () => {
   });
 });
 
+describe('M3 organization persistence', () => {
+  it('keeps a hired employee under one durable id and appends the hire to the hash chain', () => {
+    const directory = temporaryDirectory();
+    const first = openPersistence({ dataDirectory: directory });
+    const hired = first.organization.hireDigitalEmployee({
+      id: 'employee_market-sales-01',
+      tenantId: 'tenant_demo',
+      sponsorActorRef: 'human:owner',
+      departmentId: 'department_sales',
+      name: '华东客户研究员',
+      jobTitle: '客户研究员',
+      runtimeProfile: 'standard',
+      autonomyLevel: 'L2',
+      idempotencyKey: 'hire-market-sales-01',
+    });
+
+    expect(hired.id).toBe('employee_market-sales-01');
+    expect(first.organization.listDigitalEmployees('tenant_demo')).toHaveLength(1);
+    expect(first.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
+    first.close();
+
+    const reopened = openPersistence({ dataDirectory: directory });
+    expect(reopened.organization.listDigitalEmployees('tenant_demo')).toEqual([
+      expect.objectContaining({
+        id: 'employee_market-sales-01',
+        sponsorActorRef: 'human:owner',
+        departmentId: 'department_sales',
+        runtimeProfile: 'standard',
+      }),
+    ]);
+    expect(reopened.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
+    reopened.close();
+  });
+});
 describe('append-only domain event ledger', () => {
   it('stores canonical JSON and chains each event to the previous event hash', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });

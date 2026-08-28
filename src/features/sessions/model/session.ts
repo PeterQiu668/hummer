@@ -10,7 +10,7 @@ import {
 } from '../../work-orders/model/workOrder';
 
 export type ApprovalMode = 'L1' | 'L2' | 'L3';
-export type SessionStatus = 'running' | 'awaiting_approval' | 'paused' | 'blocked' | 'delivered' | 'cancelled';
+export type SessionStatus = 'running' | 'awaiting_approval' | 'paused' | 'blocked' | 'delivered' | 'cancelled' | 'interrupted';
 export type TrajectoryStepKind = 'delegation' | 'tool' | 'ai_to_human' | 'human_to_ai' | 'approval' | 'result' | 'system';
 export type TrajectoryStepStatus = 'completed' | 'running' | 'awaiting_human' | 'blocked' | 'cancelled';
 
@@ -165,7 +165,7 @@ export function draftPlanFromPrompt(prompt: string, opts: {
     workspaceScope: opts.workContext ? `${opts.workContext}（仅限本次任务）` : template.workspaceScope,
     approvalMode: opts.approvalMode ?? 'L2',
     attachmentNames: [...(opts.attachmentNames ?? [])],
-    modelProfile: opts.modelProfile ?? '智能选择',
+    modelProfile: opts.modelProfile ?? '标准',
     workContext: opts.workContext ?? '我的工作空间',
   };
 }

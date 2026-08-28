@@ -27,7 +27,7 @@ describe('MockRuntimeAdapter', () => {
       expect(event.args).toBeTypeOf('object');
       expect(event.result).toBeTypeOf('string');
       expect(event.durationMs).toBeGreaterThanOrEqual(0);
-      expect(event.costCny).toBeGreaterThanOrEqual(0);
+      expect(event.costCny).toBeNull();
       expect(event.evidenceRefs).toBeInstanceOf(Array);
     }
   });

@@ -133,6 +133,35 @@ describe('RuntimeEvent persistence', () => {
     expect(reopened.listResultPackages('ses_restart')).toMatchObject([{ sessionId: 'ses_restart', status: 'delivered' }]);
     reopened.close();
   });
+
+  it('marks stale real runtime handles interrupted while preserving their prior trajectory', () => {
+    const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
+    persistence.runtimeEvents.saveSession({
+      sessionId: 'ses_stale_real', tenantId: 'tenant_demo', runtimeId: 'codex-cli',
+      startedAt: '2026-08-28T10:00:00.000Z', plan: { id: 'plan_real' }, handle: { runtimeId: 'codex-cli', sessionId: 'ses_stale_real', nativeSessionId: 'thread_dead' },
+    });
+    persistence.runtimeEvents.save({
+      sessionId: 'ses_stale_real', sequence: 1, occurredAt: '2026-08-28T10:00:01.000Z', actorRef: 'employee:codex',
+      type: 'tool', tool: 'shell.command', evidenceRefs: ['evidence://sha256/kept'],
+    }, { tenantId: 'tenant_demo', runtimeId: 'codex-cli', correlationId: 'corr_real' });
+    persistence.runtimeEvents.saveSession({
+      sessionId: 'ses_mock_active', tenantId: 'tenant_demo', runtimeId: 'mock-runtime',
+      startedAt: '2026-08-28T10:00:00.000Z', plan: { id: 'plan_mock' }, handle: { runtimeId: 'mock-runtime', sessionId: 'ses_mock_active' },
+    });
+    persistence.runtimeEvents.save({
+      sessionId: 'ses_mock_active', sequence: 1, occurredAt: '2026-08-28T10:00:01.000Z', actorRef: 'system:mock',
+      type: 'status', status: 'running', evidenceRefs: [],
+    }, { tenantId: 'tenant_demo', runtimeId: 'mock-runtime', correlationId: 'corr_mock' });
+
+    expect(persistence.runtimeEvents.interruptStaleRealSessions('2026-08-28T10:05:00.000Z')).toBe(1);
+    expect(persistence.runtimeEvents.listBySession('ses_stale_real')).toEqual([
+      expect.objectContaining({ sequence: 1, evidenceRefs: ['evidence://sha256/kept'] }),
+      expect.objectContaining({ sequence: 2, type: 'status', status: 'interrupted' }),
+    ]);
+    expect(persistence.getSession('ses_stale_real')).toMatchObject({ status: 'interrupted', lastSequence: 2 });
+    expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 3 });
+    persistence.close();
+  });
 });
 
 function temporaryDirectory(): string {

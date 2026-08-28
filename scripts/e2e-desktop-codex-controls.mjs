@@ -56,7 +56,7 @@ try {
     await followUp.fill('Change of plan: do not create original-summary.md. Instead read input.txt and use apply_patch to create steered-summary.md with the exact text STEER_ACCEPTED.');
     await followUp.press('Enter');
     await page.getByText('你补充了要求', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
-    await page.getByText('Codex 运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 180_000 });
+    await page.getByText('任务运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 180_000 });
     if (!existsSync(output)) throw new Error('Steer did not produce steered-summary.md');
     if (existsSync(forbidden)) throw new Error('Steer failed: original-summary.md was still produced');
     if (!readFileSync(output, 'utf8').includes('STEER_ACCEPTED')) throw new Error('Steered output did not contain the requested marker');

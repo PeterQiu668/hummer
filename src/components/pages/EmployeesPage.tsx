@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Bot,
@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { employees } from '../../data/employees';
+import { desktopOrganizationPort, type DigitalEmployeeRecord } from '../../features/organization/organizationClient';
 import { marketEmployees } from '../../data/marketplace';
 import { useAppStore } from '../../store/useAppStore';
 import AgentAvatar from '../ui/AgentAvatar';
@@ -40,30 +41,64 @@ export default function EmployeesPage() {
   const [query, setQuery] = useState('');
   const [hireOpen, setHireOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [hiredIds, setHiredIds] = useState<string[]>([]);
+  const [hiredEmployees, setHiredEmployees] = useState<DigitalEmployeeRecord[]>([]);
+  const [organizationError, setOrganizationError] = useState<string | null>(null);
   const settings = useAppStore((state) => state.personalSettings);
   const filtered = useMemo(() => employees.filter((employee) => !query || `${employee.name} ${employee.role} ${employee.currentTask ?? ''}`.includes(query)), [query]);
   const selected = employees.find((employee) => employee.id === selectedId);
 
+  useEffect(() => {
+    const organization = desktopOrganizationPort();
+    if (!organization) {
+      setOrganizationError('浏览器原型未连接本地组织事实源；请在 HUMMER 桌面版中管理团队。');
+      return;
+    }
+    let active = true;
+    void organization.listDigitalEmployees('tenant_demo').then((records) => {
+      if (active) setHiredEmployees(records);
+    }).catch((error: unknown) => {
+      if (active) setOrganizationError(error instanceof Error ? error.message : '读取团队事实源失败');
+    });
+    return () => { active = false; };
+  }, []);
+
+  const hireEmployee = async (candidateId: string) => {
+    const organization = desktopOrganizationPort();
+    const candidate = marketEmployees.find((item) => item.id === candidateId);
+    if (!organization || !candidate) {
+      setOrganizationError('当前环境没有可写的组织事实源，未创建数字同事。');
+      return;
+    }
+    try {
+      const record = await organization.hireDigitalEmployee({ id: `employee_${candidate.id}`, tenantId: 'tenant_demo', sponsorActorRef: 'human:owner', departmentId: candidate.category.includes('销售') ? 'department_sales' : 'department_operations', name: candidate.name, jobTitle: candidate.category, runtimeProfile: 'standard', autonomyLevel: 'L2', idempotencyKey: `hire-${candidate.id}` });
+      setHiredEmployees((current) => current.some((employee) => employee.id === record.id) ? current : [...current, record]);
+      setOrganizationError(null);
+      setHireOpen(false);
+    } catch (error) {
+      setOrganizationError(error instanceof Error ? error.message : '数字同事未能写入组织事实源');
+    }
+  };
+
   return <WorkspacePage title="团队协作" sub="看清真人、个人分身、数字同事与专家之间的责任和协作关系。" actions={<button type="button" onClick={() => setHireOpen(true)} className="hum-btn is-sm is-primary"><Plus size={12} /> 添加数字同事</button>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex flex-1 gap-1"><Tab active={tab === 'mine'} onClick={() => setTab('mine')} icon={<UsersRound size={12} />} label="我的团队" /><Tab active={tab === 'organization'} onClick={() => setTab('organization')} icon={<Building2 size={12} />} label="组织协作" /><Tab active={tab === 'relations'} onClick={() => setTab('relations')} icon={<Network size={12} />} label="协作关系" /></div><div className="relative w-full sm:w-72"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索团队成员" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索同事、职责或当前工作" className="hum-input pl-7" /></div></div>}>
     <div className="mx-auto max-w-[1320px] p-5">
-      {tab === 'mine' && <MyTeam twinName={settings.twinName} employees={filtered} hiredIds={hiredIds} onSelect={setSelectedId} />}
+      {organizationError && <div role="status" className="mb-4 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-[11px] text-neutral-700">{organizationError}</div>}
+      {tab === 'mine' && <MyTeam twinName={settings.twinName} employees={filtered} hiredEmployees={hiredEmployees} onSelect={setSelectedId} />}
       {tab === 'organization' && <OrganizationView />}
       {tab === 'relations' && <RelationsView />}
     </div>
     {selected && <MemberDrawer member={selected} onClose={() => setSelectedId(null)} />}
-    {hireOpen && <HireDrawer onClose={() => setHireOpen(false)} onHire={(id) => { setHiredIds((current) => current.includes(id) ? current : [...current, id]); setHireOpen(false); }} />}
+    {hireOpen && <HireDrawer onClose={() => setHireOpen(false)} onHire={(id) => { void hireEmployee(id); }} />}
   </WorkspacePage>;
 }
 
-function MyTeam({ twinName, employees: team, hiredIds, onSelect }: { twinName: string; employees: Array<(typeof employees)[number]>; hiredIds: string[]; onSelect: (id: string) => void }) {
+function MyTeam({ twinName, employees: team, hiredEmployees, onSelect }: { twinName: string; employees: Array<(typeof employees)[number]>; hiredEmployees: DigitalEmployeeRecord[]; onSelect: (id: string) => void }) {
   return <div className="space-y-6"><section className="grid overflow-hidden rounded-md border border-neutral-200 bg-white lg:grid-cols-[1.15fr_0.85fr]"><div className="p-5"><div className="flex items-start gap-4"><div className="grid h-12 w-12 place-items-center rounded-full bg-neutral-900 text-white"><Orbit size={21} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-[16px] font-semibold text-neutral-900">{twinName}</h2><span className="hum-chip is-success">我的分身 · 在线</span></div><p className="mt-1 text-[11.5px] text-neutral-500">代表你协调内部工作，也会根据目标和复盘给出职场建议。</p></div></div><div className="mt-5 grid grid-cols-3 divide-x divide-neutral-200 rounded-md border border-neutral-200 bg-neutral-25 text-center"><MiniMetric value="4" label="正在协调" /><MiniMetric value="2" label="等你确认" /><MiniMetric value="92%" label="建议采纳" /></div></div><div className="border-t border-neutral-200 bg-neutral-25 p-5 lg:border-l lg:border-t-0"><div className="text-[11px] font-medium text-neutral-500">当前代表范围</div><div className="mt-3 space-y-2">{['接受内部工作并安排优先级', '协调数字同事并汇总结果', '外发、付款和权限变化前必须问你'].map((item, index) => <div key={item} className="flex items-center gap-2 text-[11.5px] text-neutral-700">{index === 2 ? <ShieldCheck size={13} className="text-warning" /> : <Check size={13} className="text-success" />}{item}</div>)}</div><button type="button" className="hum-btn is-sm mt-4">调整代表范围</button></div></section>
 
     <section><SectionTitle icon={<CircleUserRound size={15} />} title="真人同事" detail="你仍然和真人共同负责结果，分身只承担明确授权的协调工作。" /><div className="grid grid-cols-1 gap-3 lg:grid-cols-3">{humanColleagues.map((person) => <div key={person.name} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-full bg-neutral-800 text-[11px] text-white">{person.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{person.name}</div><div className="text-[10.5px] text-neutral-500">{person.role} · {person.relation}</div></div></div><div className="mt-3 text-[11.5px] leading-5 text-neutral-600">{person.focus}</div><div className="mt-3 rounded-md bg-neutral-25 px-3 py-2 text-[10.5px] text-neutral-500">{person.work}</div></div>)}</div></section>
 
     <section><SectionTitle icon={<Bot size={15} />} title="数字同事" detail="每位数字同事都有岗位、负责人、能力范围和需要真人确认的事项。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{team.map((employee) => <button type="button" key={employee.id} onClick={() => onSelect(employee.id)} className="hum-card min-h-[156px] p-4 text-left transition hover:border-neutral-300 hover:shadow-sm"><div className="flex items-start gap-3"><AgentAvatar id={employee.id} size={40} status={employee.status} ringWidth={2} /><div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-[13px] font-semibold text-neutral-900">{employee.name}</span><span className={`hum-chip ${employee.status === 'working' ? 'is-brand' : 'is-muted'}`} style={{ padding: '1px 5px', fontSize: 10 }}>{employee.status === 'working' ? '工作中' : '待命'}</span></div><div className="mt-0.5 text-[11px] text-neutral-500">{employee.role}</div></div><ChevronRight size={14} className="mt-1 text-neutral-300" /></div><div className="mt-3 line-clamp-2 text-[11px] leading-4 text-neutral-700">{employee.currentTask ?? '等待新的工作安排'}</div><div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2.5 text-[10.5px] text-neutral-500"><span>负责人：昆仑</span><span>本周交付 {2 + employee.id.length % 5} 项</span></div></button>)}</div></section>
 
-    {hiredIds.length > 0 && <section><SectionTitle icon={<Sparkles size={15} />} title="试用中的数字同事" detail="试用期间只获得当前任务需要的最小权限。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{marketEmployees.filter((candidate) => hiredIds.includes(candidate.id)).map((candidate) => <div key={candidate.id} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-md text-white" style={{ background: candidate.color }}>{candidate.avatar}</div><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-semibold text-neutral-900">{candidate.name}</div><div className="text-[11px] text-neutral-500">{candidate.category} · 7 天试用</div></div><Check size={15} className="text-success" /></div></div>)}</div></section>}
+    {hiredEmployees.length > 0 && <section><SectionTitle icon={<Sparkles size={15} />} title="试用中的数字同事" detail="试用期间只获得当前任务需要的最小权限。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{hiredEmployees.map((employee) => <div key={employee.id} data-employee-id={employee.id} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-md bg-primary-600 text-white"><Bot size={16} /></div><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-semibold text-neutral-900">{employee.name}</div><div className="text-[11px] text-neutral-500">{employee.jobTitle} · 7 天试用</div><div className="mt-1 font-mono text-[9px] text-neutral-400">{employee.id}</div></div><Check size={15} className="text-success" /></div></div>)}</div></section>}
   </div>;
 }
 

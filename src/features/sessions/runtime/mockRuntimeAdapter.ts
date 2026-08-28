@@ -230,7 +230,7 @@ function buildInitialScript(plan: SessionPlan): RuntimeEventDraft[] {
       result: '已读取 16 份演示资料，并建立任务输入索引。',
       output: 'fixture://workspace/input-index.json',
       durationMs: 1_280,
-      costCny: 0.03,
+      costCny: null,
       evidenceRefs: ['evi://workspace/input-index'],
     },
     {
@@ -243,7 +243,7 @@ function buildInitialScript(plan: SessionPlan): RuntimeEventDraft[] {
       result: '完成第一轮处理，已形成可复核的中间结果。',
       output: 'fixture://workspace/working-draft.md',
       durationMs: 4_620,
-      costCny: 0.11,
+      costCny: null,
       evidenceRefs: ['evi://runtime/working-draft'],
     },
     {
@@ -279,7 +279,7 @@ function buildInitialScript(plan: SessionPlan): RuntimeEventDraft[] {
       result: '策略命中：外部系统写入需要真人批准。',
       diffRef: 'fixture://diffs/crm-writeback-v4.json',
       durationMs: 420,
-      costCny: 0.01,
+      costCny: null,
       evidenceRefs: ['evi://diffs/crm-writeback-v4', 'policy://crm/external-write'],
     },
   ];
@@ -298,7 +298,7 @@ function buildApprovedScript(plan: SessionPlan, replay = false): RuntimeEventDra
       result: replay ? '重新执行完成，结果与原结果相互独立。' : '12 条演示记录更新成功，已生成撤回凭证。',
       output: replay ? 'fixture://results/replay-report.md' : 'fixture://crm/receipt-v4.json',
       durationMs: replay ? 1_740 : 920,
-      costCny: replay ? 0.24 : 0.08,
+      costCny: null,
       evidenceRefs: replay ? ['evi://replay/result-diff'] : ['evi://crm/receipt-v4'],
     },
     {
@@ -309,7 +309,7 @@ function buildApprovedScript(plan: SessionPlan, replay = false): RuntimeEventDra
       deliverables: [{ name: replay ? '复跑差异报告' : '任务交付报告', kind: 'report', uri: replay ? 'fixture://results/replay-report.md' : 'fixture://results/task-report.md' }],
       evidenceRefs: replay ? ['evi://replay/result-diff'] : ['evi://workspace/input-index', 'evi://crm/receipt-v4'],
       durationMs: 360,
-      costCny: 0.04,
+      costCny: null,
       rollback: { supported: true, instructions: '使用合成连接器回滚凭证恢复到执行前版本。' },
     },
   ];

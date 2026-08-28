@@ -21,6 +21,7 @@
     "desktop:build": "npm run build -w @hummer/desktop",
     "desktop:start": "npm run start -w @hummer/desktop",
     "test:desktop:codex": "node scripts/e2e-desktop-codex.mjs",
+    "test:desktop:codex:restart": "node scripts/e2e-desktop-codex-restart.mjs",
     "test:desktop:codex:app-server": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc",
     "test:desktop:codex:approval": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc --approval",
     "test:desktop:codex:steer": "node scripts/e2e-desktop-codex-controls.mjs --steer",

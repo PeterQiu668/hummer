@@ -1,14 +1,23 @@
 import type { SessionPlan } from '../model/session';
 
+export interface RuntimeEngineDisclosure {
+  providerName: string;
+  modelName: string;
+  dataDomain: string;
+  sandbox: string;
+  tier: 'standard' | 'enhanced' | 'flagship' | 'demo';
+}
+
 export type Unsubscribe = () => void;
 
 export interface RuntimeHandle {
   runtimeId: string;
   sessionId: string;
   nativeSessionId?: string;
+  engine?: RuntimeEngineDisclosure;
 }
 
-export type RuntimeSessionStatus = 'running' | 'awaiting_approval' | 'paused' | 'blocked' | 'delivered' | 'cancelled';
+export type RuntimeSessionStatus = 'running' | 'awaiting_approval' | 'paused' | 'blocked' | 'delivered' | 'cancelled' | 'interrupted';
 export type RuntimeStepStatus = 'running' | 'completed' | 'awaiting_human' | 'blocked' | 'cancelled';
 
 interface RuntimeEventBase {

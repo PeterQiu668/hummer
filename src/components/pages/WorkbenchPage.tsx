@@ -38,8 +38,11 @@ import {
   type TrajectoryStep,
 } from '../../features/sessions/model/session';
 import type { RuntimeAdapter, RuntimeEvent, RuntimeHandle } from '../../features/sessions/runtime/adapter';
+import { desktopOrganizationPort } from '../../features/organization/organizationClient';
+import { desktopApprovalPolicyPort } from '../../features/approvals/approvalPolicyClient';
 import { projectRuntimeSession } from '../../features/sessions/runtime/projection';
 import { createDefaultRuntimeAdapter } from '../../features/sessions/runtime/runtimeFactory';
+import { actorDisplayName, runtimeDisplayName } from '../../features/sessions/runtime/runtimeDisplay';
 import { createDefaultSessionStore, type SessionStore } from '../../features/sessions/persistence/sessionStore';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -66,6 +69,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(personalSettings.defaultPermission);
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
   const [modelProfile, setModelProfile] = useState<string>(personalSettings.preferredModel);
+  const [organizationAssignees, setOrganizationAssignees] = useState<string[]>([]);
   const [workContext, setWorkContext] = useState<string>(personalSettings.defaultWorkspace);
   const [plan, setPlan] = useState<SessionPlan | null>(null);
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
@@ -77,6 +81,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [followUp, setFollowUp] = useState('');
   const [takeover, setTakeover] = useState(false);
   const [takeoverNote, setTakeoverNote] = useState('');
+  const [policyError, setPolicyError] = useState<string | null>(null);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
 
@@ -89,6 +94,18 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     });
     return () => { cancelled = true; };
   }, [store]);
+
+  useEffect(() => {
+    const organization = desktopOrganizationPort();
+    if (!organization) return;
+    let active = true;
+    void organization.listDigitalEmployees('tenant_demo').then((employees) => {
+      if (active) setOrganizationAssignees(employees.map((employee) => `${employee.name} · ${employee.id}`));
+    }).catch(() => {
+      if (active) setOrganizationAssignees([]);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => () => {
     subscriptions.current.forEach((unsubscribe) => unsubscribe());
@@ -112,7 +129,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
       runtimeId={runtime.id}
       directory={nodeDirectory}
       fallbackReason={runtime.fallbackReason}
-      canStop={Boolean(activeRecord && session?.status !== 'cancelled' && session?.status !== 'delivered')}
+      canStop={Boolean(activeRecord && session?.status !== 'cancelled' && session?.status !== 'delivered' && session?.status !== 'interrupted')}
       onStop={() => activeRecord ? runtime.stop(activeRecord.handle) : Promise.resolve()}
     />
   );
@@ -200,6 +217,33 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     setTakeover(false);
   };
 
+  const resolveApproval = async (approved: boolean) => {
+    if (!activeRecord || !pendingApproval) return;
+    try {
+      const policy = desktopApprovalPolicyPort();
+      let finalApproved = approved;
+      if (policy) {
+        const authorization = await policy.authorize({
+          tenantId: 'tenant_demo',
+          sessionId: activeRecord.handle.sessionId,
+          approvalId: pendingApproval.approvalId,
+          action: pendingApproval.tool,
+          requestedBy: pendingApproval.actorRef,
+          estimatedCostCny: pendingApproval.costCny,
+          approverActorRef: 'human:owner',
+          approved,
+          occurredAt: new Date().toISOString(),
+        });
+        finalApproved = authorization.approved;
+        if (approved && !finalApproved) setPolicyError(`企业审批策略已拒绝：${authorization.reason}`);
+      }
+      await runtime.respondToApproval(activeRecord.handle, pendingApproval.approvalId, finalApproved);
+      if (!approved || finalApproved) setPolicyError(null);
+    } catch (error) {
+      setPolicyError(error instanceof Error ? error.message : '审批策略校验失败，已停止回传');
+    }
+  };
+
   const sendFollowUp = async () => {
     if (!activeRecord || !followUp.trim()) return;
     const text = followUp.trim();
@@ -247,6 +291,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 onChange={setComposerText}
                 onSubmit={() => draftPlan()}
                 assignee={assignee}
+                assigneeOptions={organizationAssignees}
                 onAssigneeChange={setAssignee}
                 approvalMode={approvalMode}
                 onApprovalModeChange={setApprovalMode}
@@ -267,6 +312,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 onChange={setComposerText}
                 onSubmit={() => draftPlan()}
                 assignee={assignee}
+                assigneeOptions={organizationAssignees}
                 onAssigneeChange={setAssignee}
                 approvalMode={approvalMode}
                 onApprovalModeChange={setApprovalMode}
@@ -292,6 +338,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     blocked: '被策略阻断',
     delivered: '已交付',
     cancelled: '已停止',
+    interrupted: '已中断',
   }[session.status];
   const currentApproval = approvalModes[session.approvalMode];
 
@@ -306,7 +353,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
           <button
             type="button"
             onClick={() => activeRecord && runtime.stop(activeRecord.handle)}
-            disabled={session.status === 'cancelled' || session.status === 'delivered'}
+            disabled={session.status === 'cancelled' || session.status === 'delivered' || session.status === 'interrupted'}
             className="hum-btn is-sm is-danger disabled:opacity-50"
             aria-label="停止当前会话"
           >
@@ -319,7 +366,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
         <div className="mx-auto max-w-[1500px] space-y-3">
           {nodeBar}
           <section className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
-            <span className={`hum-chip ${session.status === 'blocked' || session.status === 'cancelled' ? 'is-error' : session.status === 'awaiting_approval' ? 'is-warning' : session.status === 'delivered' ? 'is-success' : 'is-brand'}`}>
+            <span className={`hum-chip ${session.status === 'blocked' || session.status === 'cancelled' || session.status === 'interrupted' ? 'is-error' : session.status === 'awaiting_approval' ? 'is-warning' : session.status === 'delivered' ? 'is-success' : 'is-brand'}`}>
               <span className="hum-dot" /> {sessionStateText}
             </span>
             <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-neutral-800">{activeRecord?.plan.prompt}</span>
@@ -371,6 +418,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                       <TrajectoryRow
                         key={item.id}
                         item={item}
+                        isPrototypeRuntime={isPrototypeRuntime}
                         expanded={selectedStep?.id === item.id}
                         onToggle={() => setSelectedStepId(selectedStep?.id === item.id ? '' : item.id)}
                         onFork={item.sequence >= 3 ? () => forkFrom(item.sequence) : undefined}
@@ -384,11 +432,12 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-medium text-neutral-800">{pendingApproval.title}</div>
                       <div className="mt-0.5 text-[11px] text-neutral-600">{pendingApproval.message}</div>
+                      {policyError && <div role="alert" className="mt-1 text-[10.5px] text-danger">{policyError}</div>}
                       {pendingApproval.diffRef && <div className="mt-1 text-[9.5px] text-neutral-400">已生成更新前后差异，可确认后继续</div>}
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => runtime.respondToApproval(activeRecord.handle, pendingApproval.approvalId, false)} className="hum-btn is-sm">打回</button>
-                      <button type="button" onClick={() => runtime.respondToApproval(activeRecord.handle, pendingApproval.approvalId, true)} className="hum-btn is-sm is-primary"><ClipboardCheck size={12} /> 确认更新</button>
+                      <button type="button" onClick={() => { void resolveApproval(false); }} className="hum-btn is-sm">打回</button>
+                      <button type="button" onClick={() => { void resolveApproval(true); }} className="hum-btn is-sm is-primary"><ClipboardCheck size={12} /> 确认更新</button>
                     </div>
                   </div>
                 )}
@@ -410,7 +459,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
 
               {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence - 2))} />}
 
-              <ExecutionComposer value={followUp} onChange={setFollowUp} onSubmit={sendFollowUp} disabled={session.status === 'cancelled' || session.status === 'delivered'} />
+              <ExecutionComposer value={followUp} onChange={setFollowUp} onSubmit={sendFollowUp} disabled={session.status === 'cancelled' || session.status === 'delivered' || session.status === 'interrupted'} />
             </main>
 
             {contextOpen && (
@@ -421,6 +470,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 onSopChange={setSopDraft}
                 onFork={() => forkFrom(Math.max(1, session.checkpointSequence))}
                 lastStep={lastStep}
+                modelProfile={activeRecord?.plan.modelProfile ?? '标准'}
               />
             )}
           </div>
@@ -436,8 +486,8 @@ function RuntimeNodeBar({ runtimeId, directory, fallbackReason, canStop, onStop 
     <section aria-label="执行节点状态" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-neutral-200 bg-white px-3 py-2.5 text-[10.5px] text-neutral-600">
       <div className="flex items-center gap-2 text-[11.5px] font-semibold text-neutral-900"><Monitor size={13} className="text-primary-600" /> 执行节点</div>
       <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" /> 节点在线</span>
-      <span className={`hum-chip ${isMock ? 'is-warning' : 'is-success'}`}>{isMock ? '演示运行时' : 'Codex 运行时'}</span>
-      {fallbackReason && <span className="text-warning">Codex 不可用，已切换演示运行时：{fallbackReason}</span>}
+      <span className={`hum-chip ${isMock ? 'is-warning' : 'is-success'}`}>{isMock ? '演示运行时' : runtimeDisplayName(runtimeId)}</span>
+      {fallbackReason && <span className="text-warning">真实执行内核暂不可用，已切换演示运行时：{fallbackReason}</span>}
       <span className="min-w-0 flex-1 truncate"><span className="text-neutral-400">当前目录：</span>{directory}</span>
       <button type="button" aria-label="停止执行节点" onClick={() => void onStop()} disabled={!canStop} className="hum-btn is-sm is-danger disabled:cursor-not-allowed disabled:opacity-40"><CircleStop size={11} /> 停止</button>
     </section>
@@ -474,7 +524,7 @@ function WorkdayContext({ onDelegate, mentorEnabled }: { onDelegate: (prompt: st
   );
 }
 
-function TrajectoryRow({ item, expanded, onToggle, onFork }: { item: TrajectoryStep; expanded: boolean; onToggle: () => void; onFork?: () => void }) {
+function TrajectoryRow({ item, expanded, isPrototypeRuntime, onToggle, onFork }: { item: TrajectoryStep; expanded: boolean; isPrototypeRuntime: boolean; onToggle: () => void; onFork?: () => void }) {
   const icon = item.kind === 'tool' ? <Bot size={14} /> : item.kind.includes('human') || item.kind === 'approval' ? <UserRound size={14} /> : item.kind === 'result' ? <FileText size={14} /> : <Workflow size={14} />;
   const statusClass = item.status === 'blocked' || item.status === 'cancelled' ? 'text-error bg-error-soft' : item.status === 'awaiting_human' ? 'text-warning bg-warning-soft' : 'text-success bg-success-soft';
   return (
@@ -492,7 +542,7 @@ function TrajectoryRow({ item, expanded, onToggle, onFork }: { item: TrajectoryS
       {expanded && (
         <div className="mx-4 mb-3 grid gap-2 rounded-md border border-neutral-200 bg-neutral-25 p-3 text-[11px] text-neutral-600 sm:grid-cols-2">
           <Detail label="使用的能力" value={toolName(item.tool)} />
-          <Detail label="耗时 / 成本" value={runtimeUsageText(item)} />
+          <Detail label="耗时 / 成本" value={runtimeUsageText(item, isPrototypeRuntime)} />
           <Detail label="工作范围" value={businessArgs(item.args)} />
           <Detail label="结果" value={item.result ?? '无'} />
           <Detail label="交付物" value={outputName(item.output)} />
@@ -504,13 +554,14 @@ function TrajectoryRow({ item, expanded, onToggle, onFork }: { item: TrajectoryS
   );
 }
 
-function ContextRail({ activeTab, onTabChange, sopDraft, onSopChange, onFork, lastStep }: {
+function ContextRail({ activeTab, onTabChange, sopDraft, onSopChange, onFork, lastStep, modelProfile }: {
   activeTab: 'collab' | 'capability' | 'sop';
   onTabChange: (tab: 'collab' | 'capability' | 'sop') => void;
   sopDraft: string;
   onSopChange: (value: string) => void;
   onFork: () => void;
   lastStep?: TrajectoryStep;
+  modelProfile: string;
 }) {
   return (
     <aside className="hum-card h-fit overflow-hidden xl:sticky xl:top-12">
@@ -527,7 +578,7 @@ function ContextRail({ activeTab, onTabChange, sopDraft, onSopChange, onFork, la
       )}
       {activeTab === 'capability' && (
         <div className="space-y-3 p-3">
-          <Capability title="模型" value="智能选择 · 以计划确认时的选择为准" />
+          <Capability title="模型" value={`${modelProfile}档 · 以计划确认时的选择为准`} />
           <Capability title="可用技能" value="客户研究 · 文档分析 · 跟进清单生成" />
           <Capability title="工作应用" value="工作空间 · 受控浏览器 · CRM" />
           <Capability title="当前环境" value="产品演示使用示例数据，不会访问真实文件或业务系统" />
@@ -611,9 +662,7 @@ function ExecutionComposer({ value, onChange, onSubmit, disabled }: { value: str
 
 function SandboxBadge({ icon, label }: { icon: React.ReactNode; label: string }) { return <span className="flex max-w-[260px] items-center gap-1 truncate rounded border border-neutral-200 bg-white px-2 py-1 text-neutral-600">{icon}<span className="truncate">{label}</span></span>; }
 function actorName(actorRef: string) {
-  if (actorRef.startsWith('human:')) return '你';
-  if (actorRef.startsWith('employee:')) return actorRef.slice('employee:'.length).replace(/-/g, ' · ') || '数字同事';
-  return '协作成员';
+  return actorDisplayName(actorRef);
 }
 function toolName(tool?: string) {
   const names: Record<string, string> = { 'workspace.read': '读取工作资料', 'document.analyze': '文档分析', 'browser.research': '网页研究', 'crm.write': '客户管理系统更新', 'agent.replay': '重新执行' };
@@ -635,8 +684,9 @@ function outputName(output?: string) {
   if (output.includes('task-report')) return '任务交付报告';
   return '本步骤产出记录';
 }
-function runtimeUsageText(item: TrajectoryStep) {
+function runtimeUsageText(item: TrajectoryStep, isPrototypeRuntime: boolean) {
   const duration = item.durationMs !== undefined ? `${(item.durationMs / 1000).toFixed(2)}s` : '--';
+  if (isPrototypeRuntime) return `${duration} / 演示数据`;
   if (item.costCny !== undefined) return `${duration} / ¥${item.costCny.toFixed(4)}`;
   if (item.usage) return `${duration} / ${item.usage.totalTokens.toLocaleString()} tokens · 价格未配置`;
   return `${duration} / 该 runtime 未提供用量`;

@@ -48,6 +48,13 @@ interface SessionDescriptorRow {
   started_at: string;
   payload_json: string;
 }
+interface StaleSessionRow {
+  id: string;
+  tenant_id: string;
+  work_order_id: string | null;
+  runtime_id: string;
+  last_sequence: number;
+}
 
 export class RuntimeEventStore {
   constructor(
@@ -95,6 +102,25 @@ export class RuntimeEventStore {
     });
   }
 
+  interruptStaleRealSessions(occurredAt: string): number {
+    const rows = this.database.prepare(`
+      SELECT id, tenant_id, work_order_id, runtime_id, last_sequence
+      FROM sessions
+      WHERE status IN ('running', 'awaiting_approval', 'paused') AND runtime_id NOT LIKE 'mock%'
+    `).all<StaleSessionRow>();
+    for (const row of rows) {
+      this.save({
+        sessionId: row.id,
+        sequence: row.last_sequence + 1,
+        occurredAt,
+        actorRef: 'system:desktop-host',
+        type: 'status', status: 'interrupted',
+        reason: '桌面宿主已重启，原执行进程和 RuntimeHandle 均已失效；历史步骤、审批与证据保持可回放。',
+        evidenceRefs: [],
+      }, { tenantId: row.tenant_id, runtimeId: row.runtime_id, correlationId: `corr_${row.id}`, workOrderId: row.work_order_id ?? undefined });
+    }
+    return rows.length;
+  }
   save(event: PersistableRuntimeEvent, options: SaveRuntimeEventOptions): void {
     validateRuntimeEvent(event, options);
     const eventJson = canonicalJson(event);

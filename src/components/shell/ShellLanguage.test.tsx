@@ -12,6 +12,7 @@ describe('commercial shell language', () => {
     expect(screen.getAllByText('成长与复盘').length).toBeGreaterThan(0);
     expect(screen.queryByText('机器')).not.toBeInTheDocument();
     expect(screen.queryByText(/Hermes|HiClaw|龙虾/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/个工作应用已连接/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '打开个人菜单' }));
     expect(screen.getByRole('button', { name: '我的设置' })).toBeInTheDocument();

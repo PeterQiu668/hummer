@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Blocks,
   BookOpen,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import WorkspacePage from './WorkspacePage';
 import { useAppStore } from '../../store/useAppStore';
+import { desktopRuntimeConnectorPort, type RuntimeConnectorRecord } from '../../features/connectors/runtimeConnectorClient';
 
 type CapabilityTab = 'apps' | 'experts' | 'skills' | 'knowledge' | 'models';
 
@@ -56,18 +57,30 @@ const knowledgeNodes = [
 export default function MCPAppsPage() {
   const [tab, setTab] = useState<CapabilityTab>('apps');
   const [query, setQuery] = useState('');
+  const [runtimeConnectors, setRuntimeConnectors] = useState<RuntimeConnectorRecord[]>([]);
   const mcpApps = useAppStore((state) => state.mcpApps);
-  const toggleApp = useAppStore((state) => state.toggleMCP);
   const installedSkills = useAppStore((state) => state.installedSkills);
   const installSkill = useAppStore((state) => state.installSkill);
   const toggleSkill = useAppStore((state) => state.toggleSkill);
   const settings = useAppStore((state) => state.personalSettings);
   const updateSettings = useAppStore((state) => state.updatePersonalSettings);
-  const connectedCount = Object.values(mcpApps).filter((app) => app.connected).length;
+  const connectorPort = desktopRuntimeConnectorPort();
+  const connectedCount = runtimeConnectors.filter((connector) => connector.status === 'connected').length;
 
-  return <WorkspacePage title="能力与连接" sub="把专家经验、可复用技能、企业知识、模型和日常工作应用装进团队。" actions={<span className="hum-chip is-success"><Check size={11} /> {connectedCount} 个工作应用已连接</span>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{tabs.map((item) => { const Icon = item.icon; return <button type="button" key={item.key} onClick={() => setTab(item.key)} className={`hum-btn is-sm ${tab === item.key ? 'is-primary' : ''}`}><Icon size={12} /> {item.label}</button>; })}</div><div className="relative w-full sm:w-64"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索能力与连接" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索专家、技能或应用" className="hum-input pl-7" /></div></div>}>
+  useEffect(() => {
+    if (!connectorPort) return;
+    let active = true;
+    void connectorPort.list().then((records) => { if (active) setRuntimeConnectors(records); });
+    const unsubscribe = connectorPort.subscribe((records) => { if (active) setRuntimeConnectors(records); });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [connectorPort]);
+
+  return <WorkspacePage title="能力与连接" sub="把专家经验、可复用技能、企业知识、模型和日常工作应用装进团队。" actions={<span className={`hum-chip ${connectedCount ? 'is-success' : 'is-muted'}`}><Check size={11} /> {connectedCount ? `${connectedCount} 个运行连接已验证` : '尚无已验证连接'}</span>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{tabs.map((item) => { const Icon = item.icon; return <button type="button" key={item.key} onClick={() => setTab(item.key)} className={`hum-btn is-sm ${tab === item.key ? 'is-primary' : ''}`}><Icon size={12} /> {item.label}</button>; })}</div><div className="relative w-full sm:w-64"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索能力与连接" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索专家、技能或应用" className="hum-input pl-7" /></div></div>}>
     <div className="mx-auto max-w-[1280px] p-5">
-      {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} onToggle={toggleApp} />}
+      {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} connectors={runtimeConnectors} hostAvailable={Boolean(connectorPort)} />}
       {tab === 'experts' && <ExpertsPanel query={query} />}
       {tab === 'skills' && <SkillsPanel query={query} installed={installedSkills} onInstall={installSkill} onToggle={toggleSkill} />}
       {tab === 'knowledge' && <KnowledgePanel query={query} />}
@@ -76,9 +89,40 @@ export default function MCPAppsPage() {
   </WorkspacePage>;
 }
 
-function AppsPanel({ query, apps, onToggle }: { query: string; apps: Record<string, { id: string; name: string; kind: string; connected: boolean; syncedAt?: string }>; onToggle: (id: string) => void }) {
+function AppsPanel({ query, apps, connectors, hostAvailable }: { query: string; apps: Record<string, { id: string; name: string; kind: string }>; connectors: RuntimeConnectorRecord[]; hostAvailable: boolean }) {
   const items = featuredAppIds.map((id) => apps[id]).filter(Boolean).filter((app) => matches(query, `${app.name} ${app.kind}`));
-  return <div className="space-y-5"><section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0"><Summary icon={<Link2 size={15} />} label="已连接" value={`${Object.values(apps).filter((app) => app.connected).length} 个`} detail="团队可在授权范围内使用" /><Summary icon={<ShieldCheck size={15} />} label="需要我确认" value="3 类操作" detail="外发、写回和权限变化" /><Summary icon={<BriefcaseBusiness size={15} />} label="覆盖工作" value="销售 · 交付 · 研发" detail="连接状态使用演示数据" /></section><section><SectionTitle icon={<Blocks size={15} />} title="工作应用" detail="连接后仍按人、任务和数据范围授权，不会默认开放全部数据。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map((app) => <div key={app.id} className="hum-card flex min-h-[132px] flex-col p-4"><div className="flex items-start gap-3"><AppMark name={app.name} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{app.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{app.kind}</div></div><span className={`hum-chip ${app.connected ? 'is-success' : 'is-muted'}`}>{app.connected ? '已连接' : '未连接'}</span></div><div className="mt-3 flex items-end gap-3"><div className="min-w-0 flex-1 text-[10.5px] leading-4 text-neutral-500">{app.connected ? `最近同步：${app.syncedAt ?? '刚刚'} · 权限可随时调整` : '连接前会先展示所需权限和数据范围'}</div><button type="button" onClick={() => onToggle(app.id)} className={`hum-btn is-sm ${app.connected ? '' : 'is-primary'}`}>{app.connected ? '管理' : '连接'}</button></div></div>)}</div></section></div>;
+  const visibleConnectors = connectors.filter((connector) => matches(query, `${connectorDisplayName(connector)} ${connector.technicalName} ${connector.runtimeId}`));
+  const verified = connectors.filter((connector) => connector.status === 'connected').length;
+  return <div className="space-y-5">
+    <section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0">
+      <Summary icon={<Link2 size={15} />} label="已验证连接" value={`${verified} 个`} detail={hostAvailable ? '来自桌面运行时的实际握手' : '浏览器原型未连接桌面宿主'} />
+      <Summary icon={<ShieldCheck size={15} />} label="需要我确认" value="3 类操作" detail="外发、写回和权限变化" />
+      <Summary icon={<BriefcaseBusiness size={15} />} label="可接入范围" value="销售 · 交付 · 研发" detail="未验证的应用不会显示为已连接" />
+    </section>
+    <section>
+      <SectionTitle icon={<Link2 size={15} />} title="运行连接" detail="这里只显示桌面执行内核实际观察到的 MCP 握手状态，技术名称保留用于安全审计。" />
+      {visibleConnectors.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleConnectors.map((connector) => <div key={connector.id} className="hum-card flex min-h-[132px] flex-col p-4">
+        <div className="flex items-start gap-3"><AppMark name={connectorDisplayName(connector)} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{connectorDisplayName(connector)}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">技术名称：{connector.technicalName} · {connector.transport.toUpperCase()}</div></div><span className={`hum-chip ${connector.status === 'connected' ? 'is-success' : connector.status === 'failed' ? 'is-danger' : 'is-muted'}`}>{connectorStatusLabel(connector.status)}</span></div>
+        <div className="mt-3 text-[10.5px] leading-4 text-neutral-500">运行时：{connector.runtimeId} · 核验时间：{new Date(connector.checkedAt).toLocaleString('zh-CN')}{connector.error ? ` · ${connector.error}` : ''}</div>
+      </div>)}</div> : <div className="rounded-md border border-dashed border-neutral-300 bg-white px-4 py-5 text-[11px] text-neutral-500">{hostAvailable ? '当前桌面运行时尚未完成连接握手。启动一次真实任务后，这里会刷新实际状态。' : '当前是浏览器原型，无法核验本机连接状态。'}</div>}
+    </section>
+    <section>
+      <SectionTitle icon={<Blocks size={15} />} title="工作应用目录" detail="这些是计划接入的工作环境；完成真实授权和握手前，统一标为待接入。" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map((app) => <div key={app.id} className="hum-card flex min-h-[132px] flex-col p-4"><div className="flex items-start gap-3"><AppMark name={app.name} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{app.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{app.kind}</div></div><span className="hum-chip is-muted">待接入</span></div><div className="mt-3 flex items-end gap-3"><div className="min-w-0 flex-1 text-[10.5px] leading-4 text-neutral-500">尚未建立真实授权与数据连接</div><button type="button" disabled className="hum-btn is-sm">待接入</button></div></div>)}</div>
+    </section>
+  </div>;
+}
+
+function connectorDisplayName(connector: RuntimeConnectorRecord): string {
+  if (connector.technicalName === 'node_repl') return '本地工具连接器';
+  if (connector.technicalName === 'codex_apps') return '企业应用连接器';
+  return '运行时连接器';
+}
+
+function connectorStatusLabel(status: RuntimeConnectorRecord['status']): string {
+  if (status === 'connected') return '已验证连接';
+  if (status === 'failed') return '连接失败';
+  return '正在核验';
 }
 
 function ExpertsPanel({ query }: { query: string }) {
@@ -96,8 +140,8 @@ function KnowledgePanel({ query }: { query: string }) {
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]"><section><SectionTitle icon={<Network size={15} />} title="组织知识关系" detail="目标、客户、项目、工作方法和团队能力彼此关联，分身会按当前任务找到有权限的上下文。" /><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{nodes.map((node, index) => <button type="button" key={node.id} onClick={() => setSelected(node.id)} className={`min-h-[120px] rounded-md border p-4 text-left transition ${selected === node.id ? 'border-primary-300 bg-primary-50' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}><div className="flex items-center gap-2"><span className={`grid h-7 w-7 place-items-center rounded-md ${index % 3 === 0 ? 'bg-primary-100 text-primary-700' : index % 3 === 1 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}><Network size={13} /></span><span className="text-[12.5px] font-semibold text-neutral-900">{node.name}</span></div><div className="mt-3 text-[18px] font-semibold text-neutral-900">{node.count}</div><div className="mt-1 text-[10.5px] leading-4 text-neutral-500">{node.detail}</div></button>)}</div></section><aside className="hum-card h-fit p-4 xl:sticky xl:top-3"><div className="text-[10.5px] font-medium text-primary-700">当前选中</div><div className="mt-1 text-[16px] font-semibold text-neutral-900">{active.name}</div><p className="mt-2 text-[11.5px] leading-5 text-neutral-600">{active.detail}</p><div className="mt-4 space-y-2">{['与公司目标相关', '最近 7 天有更新', '仅向已授权成员开放'].map((text) => <div key={text} className="flex items-center gap-2 rounded-md bg-neutral-25 px-3 py-2 text-[11px] text-neutral-600"><Check size={12} className="text-success" />{text}</div>)}</div><button type="button" className="hum-btn mt-4 w-full justify-center"><ChevronRight size={12} /> 查看相关内容</button></aside></div>;
 }
 
-function ModelsPanel({ selected, onSelect }: { selected: string; onSelect: (model: '智能选择' | '高质量模型' | '快速模型' | '公司私有模型') => void }) {
-  const models = [{ name: '智能选择' as const, detail: '按任务质量、速度、数据边界和企业配额自动选择。', use: '推荐作为默认' }, { name: '高质量模型' as const, detail: '适合复杂分析、方案和重要交付，耗时相对更长。', use: '策略与深度研究' }, { name: '快速模型' as const, detail: '适合整理、提取、分类和高频日常工作。', use: '日常办公' }, { name: '公司私有模型' as const, detail: '在企业专属环境中运行，适合指定的内部数据任务。', use: '敏感内部资料' }];
+function ModelsPanel({ selected, onSelect }: { selected: string; onSelect: (model: '标准' | '增强' | '旗舰') => void }) {
+  const models = [{ name: '标准' as const, detail: '适合整理、提取、分类和高频日常工作。', use: '默认档位' }, { name: '增强' as const, detail: '适合跨资料分析、方案起草与多步骤协作。', use: '复杂工作' }, { name: '旗舰' as const, detail: '适合重要决策、深度研究和高要求交付。', use: '关键成果' }];
   return <section><SectionTitle icon={<BrainCircuit size={15} />} title="模型策略" detail="选择的是企业模型策略，不把底层供应商和版本写死在员工工作方式中。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2">{models.map((model) => <button type="button" key={model.name} onClick={() => onSelect(model.name)} className={`rounded-md border p-4 text-left ${selected === model.name ? 'border-primary-300 bg-primary-50' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-900 text-white"><BrainCircuit size={16} /></div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{model.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{model.use}</div></div>{selected === model.name && <span className="hum-chip is-success"><Check size={10} /> 默认</span>}</div><p className="mt-3 text-[11.5px] leading-5 text-neutral-600">{model.detail}</p></button>)}</div></section>;
 }
 

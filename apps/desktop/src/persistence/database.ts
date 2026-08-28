@@ -1,8 +1,11 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ApprovalPolicyStore } from './approval-policy-store.js';
+import { ExecutionNodeStore } from './execution-node-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
 import { EvidenceStore, type StoredEvidence } from './evidence-store.js';
 import { applyMigrations } from './migrations.js';
+import { OrganizationStore } from './organization-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
 
@@ -86,6 +89,9 @@ export class DesktopPersistence {
   readonly runtimeEvents: RuntimeEventStore;
   readonly evidence: EvidenceStore;
   private readonly domainEvents: DomainEventStore;
+  readonly organization: OrganizationStore;
+  readonly approvalPolicies: ApprovalPolicyStore;
+  readonly executionNodes: ExecutionNodeStore;
 
   constructor(
     private readonly database: SqliteDatabase,
@@ -96,6 +102,9 @@ export class DesktopPersistence {
     this.domainEvents = new DomainEventStore(database);
     this.runtimeEvents = new RuntimeEventStore(database, this.domainEvents);
     this.evidence = new EvidenceStore(database, dataDirectory);
+    this.organization = new OrganizationStore(database);
+    this.approvalPolicies = new ApprovalPolicyStore(database);
+    this.executionNodes = new ExecutionNodeStore(database);
   }
 
   close(): void {

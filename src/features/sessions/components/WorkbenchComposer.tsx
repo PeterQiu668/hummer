@@ -16,6 +16,7 @@ export interface WorkbenchComposerProps {
   assignee: string;
   onAssigneeChange: (value: string) => void;
   approvalMode: ApprovalMode;
+  assigneeOptions?: string[];
   onApprovalModeChange: (value: ApprovalMode) => void;
   attachmentNames: string[];
   onAttachmentNamesChange: (names: string[]) => void;
@@ -28,7 +29,7 @@ export interface WorkbenchComposerProps {
 }
 
 export default function WorkbenchComposer(props: WorkbenchComposerProps) {
-  const { value, onChange, onSubmit, assignee, onAssigneeChange, approvalMode, onApprovalModeChange, attachmentNames, onAttachmentNamesChange, modelProfile, onModelProfileChange, workContext, onWorkContextChange, compact = false, onRecentSelect } = props;
+  const { value, onChange, onSubmit, assignee, assigneeOptions = [], onAssigneeChange, approvalMode, onApprovalModeChange, attachmentNames, onAttachmentNamesChange, modelProfile, onModelProfileChange, workContext, onWorkContextChange, compact = false, onRecentSelect } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -39,8 +40,8 @@ export default function WorkbenchComposer(props: WorkbenchComposerProps) {
     <div className={`overflow-hidden border bg-white shadow-sm ${compact ? 'rounded-md border-neutral-200' : 'rounded-lg border-neutral-300'}`}>
       <textarea ref={textArea} aria-label="任务描述" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} rows={compact ? 2 : 4} placeholder="比如：把这周的线索整理成跟进清单，写回 CRM 前先给我看" className={`w-full resize-none border-0 bg-white text-neutral-900 outline-none placeholder:text-neutral-400 ${compact ? 'px-4 py-3 text-[13px]' : 'px-5 py-5 text-[15px] leading-6'}`} />
       <div className="flex flex-wrap items-center gap-1 border-t border-neutral-100 bg-neutral-25 px-2 py-2">
-        <InlineSelect icon={<AtSign size={13} />} label="派给谁" value={assignee} onChange={onAssigneeChange} options={['自动推荐', '我的分身 · 昆仑助理', '雪·销售官', '岚·分析官', '苓·法务官', '璇·数据官']} />
-        <InlineSelect icon={<BrainCircuit size={13} />} label="选择模型" value={modelProfile} onChange={onModelProfileChange} options={['智能选择', '高质量模型', '快速模型', '公司私有模型']} />
+        <InlineSelect icon={<AtSign size={13} />} label="派给谁" value={assignee} onChange={onAssigneeChange} options={[...new Set(['自动推荐', '我的分身 · 昆仑助理', '雪·销售官', '岚·分析官', '苓·法务官', '璇·数据官', ...assigneeOptions])]} />
+        <InlineSelect icon={<BrainCircuit size={13} />} label="选择模型" value={modelProfile} onChange={onModelProfileChange} options={['标准', '增强', '旗舰']} />
         <InlineSelect icon={<FolderOpen size={13} />} label="选择工作空间" value={workContext} onChange={onWorkContextChange} options={['我的工作空间', '销售共享空间', '公司知识库']} />
         <label className="relative flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] text-neutral-600 hover:bg-white"><ShieldCheck size={13} /><span className="sr-only">任务权限</span><select aria-label="任务权限" value={approvalMode} onChange={(event) => onApprovalModeChange(event.target.value as ApprovalMode)} className="appearance-none bg-transparent pr-4 font-medium text-neutral-700 outline-none"><option value="L1">只查看</option><option value="L2">执行前确认</option><option value="L3">范围内自动</option></select><ChevronDown size={11} className="pointer-events-none absolute right-1.5" /></label>
         <button type="button" onClick={() => fileInput.current?.click()} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-neutral-600 hover:bg-white"><Paperclip size={13} /> {attachmentNames.length ? `${attachmentNames.length} 份资料` : '添加资料'}</button>

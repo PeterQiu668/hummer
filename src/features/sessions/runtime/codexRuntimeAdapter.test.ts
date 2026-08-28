@@ -9,8 +9,14 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
 
     expect(invocation.command).toBe('codex');
     expect(invocation.args).toEqual(['exec', '--json', '--sandbox', 'read-only', '-']);
+    expect(invocation.engineProfileId).toBe('deepseek-standard');
     expect(invocation.stdin).toContain('读取 README 并总结');
     expect(invocation.args).not.toContain('danger-full-access');
+  });
+
+  it('maps user-facing quality tiers to internal engine profile ids', () => {
+    const plan = draftPlanFromPrompt('complex analysis', { modelProfile: '\u65d7\u8230' });
+    expect(buildCodexInvocation(plan).engineProfileId).toBe('openai-flagship');
   });
 
   it('maps completed command and approval messages without importing Codex types', () => {

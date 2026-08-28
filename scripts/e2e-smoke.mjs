@@ -71,12 +71,12 @@ try {
   await mobile.getByRole('button', { name: '添加数字同事' }).click();
   await mobile.getByRole('heading', { name: '添加数字同事' }).waitFor({ state: 'visible', timeout: 5_000 });
   await mobile.getByRole('button', { name: '开始 7 天试用' }).first().click();
-  await mobile.getByText('试用中的数字同事', { exact: true }).waitFor({ state: 'visible', timeout: 5_000 });
+  await mobile.getByText('当前环境没有可写的组织事实源，未创建数字同事。', { exact: true }).waitFor({ state: 'visible', timeout: 5_000 });
   await mobile.screenshot({ path: 'dist/hummer-v5-mobile-smoke.png', fullPage: true });
   await mobile.close();
   if (browserErrors.length) throw new Error(`Browser console errors:\n${browserErrors.join('\n')}`);
   await browser.close();
-  console.log('E2E smoke passed: V5 workday context -> plan -> execution -> approval -> settings -> capabilities -> mobile team trial.');
+  console.log('E2E smoke passed: V5 workday context -> plan -> execution -> approval -> settings -> capabilities -> browser organization write refusal.');
 } finally {
   browserServer?.process()?.kill();
   vite.kill();

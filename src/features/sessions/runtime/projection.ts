@@ -49,7 +49,7 @@ export function projectRuntimeSession(
         rollback: resultEvent.rollback,
       }
     : undefined;
-  const workOrderStatus = status === 'paused' ? 'running' : status;
+  const workOrderStatus = status === 'paused' ? 'running' : status === 'interrupted' ? 'blocked' : status;
 
   return {
     session: {
@@ -71,11 +71,17 @@ export function findPendingApproval(events: RuntimeEvent[]): Extract<RuntimeEven
   const resolved = new Set(
     events.filter((event) => event.type === 'approval_resolved').map((event) => event.approvalId),
   );
-  return [...events]
+  const pending = [...events]
     .reverse()
     .find((event): event is Extract<RuntimeEvent, { type: 'approval_required' }> => (
       event.type === 'approval_required' && !resolved.has(event.approvalId)
     ));
+  if (!pending) return undefined;
+  const terminalAfterApproval = events.some((event) => event.sequence > pending.sequence && (
+    event.type === 'result'
+    || (event.type === 'status' && ['blocked', 'cancelled', 'interrupted', 'delivered'].includes(event.status))
+  ));
+  return terminalAfterApproval ? undefined : pending;
 }
 
 function eventToTrajectoryStep(sessionId: string, event: RuntimeEvent): TrajectoryStep | undefined {
@@ -142,7 +148,7 @@ function eventToTrajectoryStep(sessionId: string, event: RuntimeEvent): Trajecto
     return {
       ...common,
       kind: 'system',
-      status: event.status === 'cancelled' ? 'cancelled' : event.status === 'blocked' ? 'blocked' : 'completed',
+      status: event.status === 'cancelled' || event.status === 'interrupted' ? 'cancelled' : event.status === 'blocked' ? 'blocked' : 'completed',
       title: statusTitle(event.status),
       result: event.reason ?? '会话状态已更新。',
       evidenceRefs: event.evidenceRefs,
@@ -177,5 +183,6 @@ function statusTitle(status: Extract<RuntimeEvent, { type: 'status' }>['status']
     blocked: '会话被策略阻断',
     delivered: '会话已交付',
     cancelled: '已停止本次会话',
+    interrupted: '会话因桌面宿主重启而中断',
   }[status];
 }

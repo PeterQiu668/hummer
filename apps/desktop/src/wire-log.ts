@@ -21,12 +21,15 @@ export class TextLineDecoder {
 }
 
 export class WireLog {
-  constructor(private readonly path?: string) {
+  constructor(
+    private readonly path?: string,
+    private readonly redact: (raw: string) => string = (raw) => raw,
+  ) {
     if (path) mkdirSync(dirname(path), { recursive: true });
   }
 
   append(channel: WireLogChannel, raw: string): void {
     if (!this.path) return;
-    appendFileSync(this.path, `${JSON.stringify({ occurredAt: new Date().toISOString(), channel, raw })}\n`, 'utf8');
+    appendFileSync(this.path, `${JSON.stringify({ occurredAt: new Date().toISOString(), channel, raw: this.redact(raw) })}\n`, 'utf8');
   }
 }

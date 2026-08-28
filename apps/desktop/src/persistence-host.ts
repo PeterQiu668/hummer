@@ -1,7 +1,8 @@
 import { join, resolve } from 'node:path';
 import { app, ipcMain } from 'electron';
 import { enrichRuntimeEventEvidence } from './persistence-runtime.js';
-import { openPersistence, type DesktopPersistence } from './persistence/index.js';
+import { openPersistence, type DesktopPersistence, type HireDigitalEmployeeInput } from './persistence/index.js';
+import type { AuthorizeApprovalInput } from './persistence/approval-policy-store.js';
 import type { JsonValue } from './persistence/canonical-json.js';
 import type { PersistableRuntimeEvent } from './persistence/runtime-event-store.js';
 
@@ -18,18 +19,31 @@ export interface PersistenceHostRegistration {
   databasePath: string;
   close(): void;
 }
+export interface PersistenceHostOptions {
+  stopAll?: () => Promise<number>;
+}
+
 
 const CHANNELS = [
   'hummer:persistence:list-sessions',
   'hummer:persistence:save-session',
   'hummer:persistence:append-event',
   'hummer:persistence:verify-integrity',
+  'hummer:organization:list-employees',
+  'hummer:organization:hire-employee',
+  'hummer:approval-policy:authorize',
+  'hummer:execution-nodes:list',
+  'hummer:execution-nodes:kill-all',
 ] as const;
 
-export function registerPersistenceHost(): PersistenceHostRegistration {
+export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
   const dataDirectory = resolve(process.env.HUMMER_DATA_DIR ?? join(app.getPath('userData'), 'facts'));
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
   const persistence = openPersistence({ dataDirectory });
+  persistence.runtimeEvents.interruptStaleRealSessions(new Date().toISOString());
+  const nodeId = 'node_local';
+  const runtimeId = process.env.HUMMER_RUNTIME_SHELL === 'claude' ? 'claude-code' : 'codex-cli';
+  persistence.executionNodes.registerLocal({ id: nodeId, tenantId: 'tenant_demo', displayName: process.env.COMPUTERNAME ?? '本机执行节点', runtimeId, cwd: workspaceDirectory, permissionScope: `${process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write'}; approval-required`, lastSeenAt: new Date().toISOString() });
 
   ipcMain.handle('hummer:persistence:list-sessions', () => listSessions(persistence));
   ipcMain.handle('hummer:persistence:save-session', (_event, request: SessionRecordRequest) => {
@@ -48,11 +62,24 @@ export function registerPersistenceHost(): PersistenceHostRegistration {
     return persisted;
   });
   ipcMain.handle('hummer:persistence:verify-integrity', () => persistence.verifyDomainEventIntegrity());
+  ipcMain.handle('hummer:organization:list-employees', (_event, tenantId: string) => {
+    return persistence.organization.listDigitalEmployees(tenantId);
+  });
+  ipcMain.handle('hummer:organization:hire-employee', (_event, request: HireDigitalEmployeeInput) => persistence.organization.hireDigitalEmployee(request));
+  ipcMain.handle('hummer:approval-policy:authorize', (_event, request: AuthorizeApprovalInput) => {
+    return persistence.approvalPolicies.authorize(request);
+  });
+  ipcMain.handle('hummer:execution-nodes:list', (_event, tenantId: string) => persistence.executionNodes.list(tenantId));
+  ipcMain.handle('hummer:execution-nodes:kill-all', async () => {
+    const killed = await options.stopAll?.() ?? 0;
+    return { killed };
+  });
 
   return {
     databasePath: persistence.databasePath,
     close: () => {
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));
+      persistence.executionNodes.markOffline(nodeId, new Date().toISOString());
       persistence.close();
     },
   };

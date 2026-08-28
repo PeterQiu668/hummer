@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import WorkbenchPage from '../pages/WorkbenchPage';
 import EmployeesPage from '../pages/EmployeesPage';
 import MCPAppsPage from '../pages/MCPAppsPage';
+import ExecutionNodesPage from '../pages/ExecutionNodesPage';
 import EvidencePage from '../pages/EvidencePage';
 import CommandPalette from '../global/CommandPalette';
 import ToastContainer from '../global/ToastContainer';
@@ -29,6 +30,7 @@ export default function AppShell() {
         {currentPage === 'office' && <WorkbenchPage />}
         {currentPage === 'employees' && <EmployeesPage />}
         {currentPage === 'connect' && <MCPAppsPage />}
+        {currentPage === 'nodes' && <ExecutionNodesPage />}
         {currentPage === 'evidence' && <EvidencePage />}
       </div>
 
