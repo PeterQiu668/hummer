@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Bot,
+  BriefcaseBusiness,
   Building2,
   Check,
   ChevronRight,
@@ -22,7 +23,7 @@ import { useAppStore } from '../../store/useAppStore';
 import AgentAvatar from '../ui/AgentAvatar';
 import WorkspacePage from './WorkspacePage';
 
-type TeamTab = 'mine' | 'organization' | 'relations';
+type TeamTab = 'mine' | 'projects' | 'organization' | 'relations';
 
 const humanColleagues = [
   { name: '吴帆', role: '销售负责人', relation: '向你汇报', focus: '华东标杆客户与销售节奏', work: '2 项需要你确认' },
@@ -36,16 +37,29 @@ const departments = [
   { name: '组织与管理', owner: '昆仑', people: '3 位真人', twins: '3 个个人分身', digital: '2 位数字同事', current: 'Q3 经营复盘', health: '等待确认' },
 ];
 
+function employeeDisplayCopy(value: string | undefined): string | undefined {
+  return value
+    ?.replaceAll('Manager·', '')
+    .replaceAll('MCP Server', '工作连接')
+    .replaceAll('Worker', '数字同事')
+    .replaceAll('Agent', '数字同事')
+    .replaceAll('Skill', '岗位能力');
+}
+
+function employeeRoleLabel(value: string): string { return value.replace(' Worker', '执行').replace(' Manager', '统筹'); }
+
 export default function EmployeesPage() {
   const [tab, setTab] = useState<TeamTab>('mine');
   const [query, setQuery] = useState('');
   const [hireOpen, setHireOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hiredEmployees, setHiredEmployees] = useState<DigitalEmployeeRecord[]>([]);
   const [organizationError, setOrganizationError] = useState<string | null>(null);
   const settings = useAppStore((state) => state.personalSettings);
   const filtered = useMemo(() => employees.filter((employee) => !query || `${employee.name} ${employee.role} ${employee.currentTask ?? ''}`.includes(query)), [query]);
-  const selected = employees.find((employee) => employee.id === selectedId);
+  const displayEmployees = useMemo(() => filtered.map((employee) => ({ ...employee, name: employeeDisplayCopy(employee.name) ?? employee.name, role: employeeRoleLabel(employee.role), currentTask: employeeDisplayCopy(employee.currentTask) })), [filtered]);
+  const selected = displayEmployees.find((employee) => employee.id === selectedId);
 
   useEffect(() => {
     const organization = desktopOrganizationPort();
@@ -79,21 +93,24 @@ export default function EmployeesPage() {
     }
   };
 
-  return <WorkspacePage title="团队协作" sub="看清真人、个人分身、数字同事与专家之间的责任和协作关系。" actions={<button type="button" onClick={() => setHireOpen(true)} className="hum-btn is-sm is-primary"><Plus size={12} /> 添加数字同事</button>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex flex-1 gap-1"><Tab active={tab === 'mine'} onClick={() => setTab('mine')} icon={<UsersRound size={12} />} label="我的团队" /><Tab active={tab === 'organization'} onClick={() => setTab('organization')} icon={<Building2 size={12} />} label="组织协作" /><Tab active={tab === 'relations'} onClick={() => setTab('relations')} icon={<Network size={12} />} label="协作关系" /></div><div className="relative w-full sm:w-72"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索团队成员" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索同事、职责或当前工作" className="hum-input pl-7" /></div></div>}>
+  return <WorkspacePage title="团队协作" sub="真人与个人分身共同承担责任，数字同事按项目提供专业协作。" actions={<button type="button" onClick={() => setHireOpen(true)} className="hum-btn is-sm is-primary"><Plus size={12} /> 添加数字同事</button>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex flex-1 gap-1 overflow-x-auto"><Tab active={tab === 'mine'} onClick={() => setTab('mine')} icon={<UsersRound size={12} />} label="我的团队" /><Tab active={tab === 'projects'} onClick={() => setTab('projects')} icon={<BriefcaseBusiness size={12} />} label="项目小队" /><Tab active={tab === 'organization'} onClick={() => setTab('organization')} icon={<Building2 size={12} />} label="组织协作" /><Tab active={tab === 'relations'} onClick={() => setTab('relations')} icon={<Network size={12} />} label="协作关系" /></div><div className="relative w-full sm:w-72"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索团队成员" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索同事、职责或当前工作" className="hum-input pl-7" /></div></div>}>
     <div className="mx-auto max-w-[1320px] p-5">
       {organizationError && <div role="status" className="mb-4 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-[11px] text-neutral-700">{organizationError}</div>}
-      {tab === 'mine' && <MyTeam twinName={settings.twinName} employees={filtered} hiredEmployees={hiredEmployees} onSelect={setSelectedId} />}
+      {tab === 'mine' && <MyTeam twinName={settings.twinName} employees={displayEmployees} hiredEmployees={hiredEmployees} onSelect={setSelectedId} />}
+      {tab === 'projects' && <ProjectTeams onCreate={() => setProjectOpen(true)} />}
       {tab === 'organization' && <OrganizationView />}
       {tab === 'relations' && <RelationsView />}
     </div>
     {selected && <MemberDrawer member={selected} onClose={() => setSelectedId(null)} />}
     {hireOpen && <HireDrawer onClose={() => setHireOpen(false)} onHire={(id) => { void hireEmployee(id); }} />}
+    {projectOpen && <ProjectTeamDrawer twinName={settings.twinName} onClose={() => setProjectOpen(false)} />}
   </WorkspacePage>;
 }
 
 function MyTeam({ twinName, employees: team, hiredEmployees, onSelect }: { twinName: string; employees: Array<(typeof employees)[number]>; hiredEmployees: DigitalEmployeeRecord[]; onSelect: (id: string) => void }) {
   return <div className="space-y-6"><section className="grid overflow-hidden rounded-md border border-neutral-200 bg-white lg:grid-cols-[1.15fr_0.85fr]"><div className="p-5"><div className="flex items-start gap-4"><div className="grid h-12 w-12 place-items-center rounded-full bg-neutral-900 text-white"><Orbit size={21} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-[16px] font-semibold text-neutral-900">{twinName}</h2><span className="hum-chip is-success">我的分身 · 在线</span></div><p className="mt-1 text-[11.5px] text-neutral-500">代表你协调内部工作，也会根据目标和复盘给出职场建议。</p></div></div><div className="mt-5 grid grid-cols-3 divide-x divide-neutral-200 rounded-md border border-neutral-200 bg-neutral-25 text-center"><MiniMetric value="4" label="正在协调" /><MiniMetric value="2" label="等你确认" /><MiniMetric value="92%" label="建议采纳" /></div></div><div className="border-t border-neutral-200 bg-neutral-25 p-5 lg:border-l lg:border-t-0"><div className="text-[11px] font-medium text-neutral-500">当前代表范围</div><div className="mt-3 space-y-2">{['接受内部工作并安排优先级', '协调数字同事并汇总结果', '外发、付款和权限变化前必须问你'].map((item, index) => <div key={item} className="flex items-center gap-2 text-[11.5px] text-neutral-700">{index === 2 ? <ShieldCheck size={13} className="text-warning" /> : <Check size={13} className="text-success" />}{item}</div>)}</div><button type="button" className="hum-btn is-sm mt-4">调整代表范围</button></div></section>
 
+    <section className="rounded-md border border-primary-200 bg-primary-50 p-4"><div className="flex flex-wrap items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-full bg-neutral-900 text-white"><UsersRound size={15} /></div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">我和我的分身</div><div className="mt-0.5 text-[11px] text-neutral-600">真人负责结果，分身代表协同</div><div className="mt-1 text-[10px] text-primary-700">当前搭档：{twinName}</div></div><span className="hum-chip is-brand">固定责任搭档</span></div></section>
     <section><SectionTitle icon={<CircleUserRound size={15} />} title="真人同事" detail="你仍然和真人共同负责结果，分身只承担明确授权的协调工作。" /><div className="grid grid-cols-1 gap-3 lg:grid-cols-3">{humanColleagues.map((person) => <div key={person.name} className="hum-card p-4"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-full bg-neutral-800 text-[11px] text-white">{person.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{person.name}</div><div className="text-[10.5px] text-neutral-500">{person.role} · {person.relation}</div></div></div><div className="mt-3 text-[11.5px] leading-5 text-neutral-600">{person.focus}</div><div className="mt-3 rounded-md bg-neutral-25 px-3 py-2 text-[10.5px] text-neutral-500">{person.work}</div></div>)}</div></section>
 
     <section><SectionTitle icon={<Bot size={15} />} title="数字同事" detail="每位数字同事都有岗位、负责人、能力范围和需要真人确认的事项。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{team.map((employee) => <button type="button" key={employee.id} onClick={() => onSelect(employee.id)} className="hum-card min-h-[156px] p-4 text-left transition hover:border-neutral-300 hover:shadow-sm"><div className="flex items-start gap-3"><AgentAvatar id={employee.id} size={40} status={employee.status} ringWidth={2} /><div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-[13px] font-semibold text-neutral-900">{employee.name}</span><span className={`hum-chip ${employee.status === 'working' ? 'is-brand' : 'is-muted'}`} style={{ padding: '1px 5px', fontSize: 10 }}>{employee.status === 'working' ? '工作中' : '待命'}</span></div><div className="mt-0.5 text-[11px] text-neutral-500">{employee.role}</div></div><ChevronRight size={14} className="mt-1 text-neutral-300" /></div><div className="mt-3 line-clamp-2 text-[11px] leading-4 text-neutral-700">{employee.currentTask ?? '等待新的工作安排'}</div><div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2.5 text-[10.5px] text-neutral-500"><span>负责人：昆仑</span><span>本周交付 {2 + employee.id.length % 5} 项</span></div></button>)}</div></section>
@@ -102,6 +119,42 @@ function MyTeam({ twinName, employees: team, hiredEmployees, onSelect }: { twinN
   </div>;
 }
 
+function ProjectTeams({ onCreate }: { onCreate: () => void }) {
+  return <div className="space-y-5">
+    <section className="flex flex-col gap-3 rounded-md border border-neutral-200 bg-white p-4 sm:flex-row sm:items-center">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-neutral-900 text-white"><BriefcaseBusiness size={17} /></div>
+      <div className="min-w-0 flex-1"><h2 className="text-[14px] font-semibold text-neutral-900">按项目组队，不改组织编制</h2><p className="mt-1 text-[11px] leading-4 text-neutral-500">邀请真人时默认带上其个人分身；数字同事以临时助手身份加入，项目结束后自动释放权限。</p></div>
+      <button type="button" onClick={onCreate} className="hum-btn is-sm is-primary"><Plus size={12} /> 组建项目小队</button>
+    </section>
+    <section>
+      <SectionTitle icon={<UsersRound size={15} />} title="正在推进的项目" detail="每个项目只有一个真人最终负责人，个人分身负责协调与跟进。" />
+      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+        <article className="hum-card p-4"><div className="flex items-start gap-3"><div className="grid h-9 w-9 place-items-center rounded-md bg-primary-50 text-primary-700"><BriefcaseBusiness size={15} /></div><div className="min-w-0 flex-1"><h3 className="text-[13px] font-semibold text-neutral-900">华东标杆客户计划</h3><p className="mt-0.5 text-[10.5px] text-neutral-500">本周完成客户分层与首轮跟进方案</p></div><span className="hum-chip is-success">推进中</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><ProjectRole title="结果责任" value="昆仑 + 昆仑助理" note="真人验收 · 分身协调" /><ProjectRole title="协作责任" value="吴帆 + 吴帆分身" note="负责销售判断" /><ProjectRole title="临时助手" value="雪·销售官 · 岚·分析官" note="只执行已分配工作" /><ProjectRole title="必须确认" value="客户外发 · CRM 写回" note="指定真人审批" /></div></article>
+        <article className="hum-card p-4"><div className="flex items-start gap-3"><div className="grid h-9 w-9 place-items-center rounded-md bg-success-soft text-success"><BriefcaseBusiness size={15} /></div><div className="min-w-0 flex-1"><h3 className="text-[13px] font-semibold text-neutral-900">客户实施验收</h3><p className="mt-0.5 text-[10.5px] text-neutral-500">统一交付标准并关闭 3 项风险</p></div><span className="hum-chip is-warning">待确认</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><ProjectRole title="结果责任" value="陈若澜 + 陈若澜分身" note="真人验收 · 分身跟进" /><ProjectRole title="协作责任" value="昆仑 + 昆仑助理" note="确认经营影响" /><ProjectRole title="临时助手" value="苓·法务官" note="合同检查助手" /><ProjectRole title="必须确认" value="验收结论 · 客户通知" note="项目负责人审批" /></div></article>
+      </div>
+    </section>
+  </div>;
+}
+
+function ProjectTeamDrawer({ twinName, onClose }: { twinName: string; onClose: () => void }) {
+  const [selectedHumans, setSelectedHumans] = useState<string[]>([]);
+  const [selectedAssistants, setSelectedAssistants] = useState<string[]>(['雪·销售官']);
+  const toggle = (value: string, values: string[], update: (next: string[]) => void) => update(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  return <div className="absolute inset-0 z-40 bg-white/70" onClick={onClose}><aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[520px] flex-col border-l border-neutral-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+    <div className="flex items-start gap-3 border-b border-neutral-200 p-5"><div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-900 text-white"><BriefcaseBusiness size={16} /></div><div className="min-w-0 flex-1"><h2 className="text-[16px] font-semibold text-neutral-900">组建项目小队</h2><p className="mt-1 text-[11px] text-neutral-500">先确定谁对结果负责，再补齐协作者和临时助手。</p></div><button type="button" aria-label="关闭组建项目小队" onClick={onClose} className="text-neutral-400"><X size={18} /></button></div>
+    <div className="flex-1 space-y-5 overflow-y-auto p-5">
+      <section><div className="text-[11px] font-semibold text-neutral-800">最终责任</div><div className="mt-2 rounded-md border border-primary-200 bg-primary-50 p-3"><div className="text-[12.5px] font-semibold text-neutral-900">昆仑（最终负责人） + {twinName}</div><div className="mt-1 text-[10.5px] text-neutral-600">你做最终判断；分身代表你收集进展、协调工作并提醒风险。</div></div></section>
+      <section><div className="text-[11px] font-semibold text-neutral-800">邀请真人协作者</div><p className="mt-1 text-[10.5px] text-neutral-500">选中真人时，其个人分身同步加入项目上下文。</p><div className="mt-2 space-y-2">{humanColleagues.slice(0, 2).map((person) => { const selected = selectedHumans.includes(person.name); return <button type="button" aria-label={'邀请' + person.name} key={person.name} onClick={() => toggle(person.name, selectedHumans, setSelectedHumans)} className={`flex w-full items-center gap-3 rounded-md border p-3 text-left ${selected ? 'border-primary-300 bg-primary-50' : 'border-neutral-200'}`}><span className="grid h-8 w-8 place-items-center rounded-full bg-neutral-800 text-[11px] text-white">{person.name.slice(0, 1)}</span><span className="min-w-0 flex-1"><span className="block text-[12px] font-medium text-neutral-800">{person.name} + {person.name}分身</span><span className="mt-0.5 block text-[10px] text-neutral-500">{person.role} · 共同承担分工结果</span></span>{selected && <Check size={14} className="text-success" />}</button>; })}</div></section>
+      <section><div className="text-[11px] font-semibold text-neutral-800">添加数字助手</div><p className="mt-1 text-[10.5px] text-neutral-500">按能力临时加入，只拿到当前项目的最小权限。</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{['雪·销售官', '岚·分析官', '苓·法务官'].map((name) => { const selected = selectedAssistants.includes(name); return <button type="button" key={name} onClick={() => toggle(name, selectedAssistants, setSelectedAssistants)} className={`rounded-md border p-3 text-left ${selected ? 'border-success/40 bg-success-soft' : 'border-neutral-200'}`}><span className="block text-[12px] font-medium text-neutral-800">{name}</span><span className="mt-1 block text-[10px] text-neutral-500">临时助手 · 不承担最终责任</span></button>; })}</div></section>
+      {selectedHumans.length > 0 && <section className="rounded-md border border-neutral-200 bg-neutral-25 p-3"><div className="text-[10px] text-neutral-400">已加入的责任搭档</div><div className="mt-2 flex flex-wrap gap-2">{selectedHumans.map((name) => <span key={name} className="hum-chip is-brand">{name} + {name}分身</span>)}</div></section>}
+    </div>
+    <div className="border-t border-neutral-200 p-4"><button type="button" onClick={onClose} className="hum-btn is-primary w-full justify-center">创建小队并进入项目</button></div>
+  </aside></div>;
+}
+
+function ProjectRole({ title, value, note }: { title: string; value: string; note: string }) {
+  return <div className="rounded-md border border-neutral-200 bg-neutral-25 p-3"><div className="text-[9.5px] text-neutral-400">{title}</div><div className="mt-1 text-[11.5px] font-medium text-neutral-800">{value}</div><div className="mt-1 text-[10px] text-neutral-500">{note}</div></div>;
+}
 function OrganizationView() {
   return <div className="space-y-5"><section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0"><MiniMetric value="13" label="真人成员" /><MiniMetric value="12" label="个人分身" /><MiniMetric value="11" label="数字同事" /></section><section><SectionTitle icon={<Building2 size={15} />} title="部门协作" detail="部门负责人对结果负责，分身负责跨团队协调，数字同事承担可验收工作。" /><div className="space-y-3">{departments.map((department) => <div key={department.name} className="hum-card grid gap-4 p-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-center"><div><div className="text-[13px] font-semibold text-neutral-900">{department.name}</div><div className="mt-1 text-[10.5px] text-neutral-500">负责人：{department.owner}</div></div><div><div className="flex flex-wrap gap-2 text-[10.5px]"><span className="hum-chip">{department.people}</span><span className="hum-chip is-brand">{department.twins}</span><span className="hum-chip is-success">{department.digital}</span></div><div className="mt-2 text-[11px] text-neutral-600">当前重点：{department.current}</div></div><span className={`hum-chip ${department.health.includes('风险') ? 'is-warning' : department.health.includes('等待') ? 'is-brand' : 'is-success'}`}>{department.health}</span></div>)}</div></section></div>;
 }

@@ -44,7 +44,41 @@ function Quality() {
 
 function Growth({ onRetry }: { onRetry: () => void }) {
   const [published, setPublished] = useState(false);
-  return <div className="space-y-5"><section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0"><SummaryStep number="01" title="发现问题" detail="从验收、打回和人工接管中识别改进机会" done /><SummaryStep number="02" title="验证新方法" detail="用相同资料和标准重新尝试" done /><SummaryStep number="03" title="推广给团队" detail="真人确认后才成为新的工作方法" done={published} /></section><div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_380px]"><section className="hum-card p-4"><SectionTitle icon={<GitFork size={15} />} title="工作方法改进" detail="每次改进都有来源、验证结果和适用范围。" /><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-md border border-neutral-200 p-4"><div className="text-[10px] text-neutral-400">原来的方法</div><p className="mt-2 text-[12px] leading-5 text-neutral-700">主要按资料完整度筛选客户，再生成跟进清单。</p></div><div className="rounded-md border border-primary-200 bg-primary-50 p-4"><div className="text-[10px] text-primary-600">验证后的方法</div><p className="mt-2 text-[12px] leading-5 text-primary-900">先考虑行业优先级和近期业务信号，再检查资料完整度。</p></div></div><div className="mt-4 rounded-md border border-neutral-200 bg-neutral-25 p-4"><div className="flex items-center gap-2"><TrendingUp size={14} className="text-success" /><span className="text-[12px] font-medium text-neutral-800">验证结果</span></div><div className="mt-3 grid grid-cols-3 divide-x divide-neutral-200 text-center"><SmallMetric label="准确率" value="94%" /><SmallMetric label="提升" value="+13%" /><SmallMetric label="额外时间" value="+42s" /></div></div><div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" onClick={onRetry} className="hum-btn is-sm"><RotateCcw size={12} /> 再验证一次</button><button type="button" onClick={() => setPublished(true)} className="hum-btn is-sm is-primary"><Sparkles size={12} /> {published ? '已推广' : '推广给销售团队'}</button></div></section><aside className="hum-card p-4"><SectionTitle icon={<LineChart size={15} />} title="我的成长建议" detail="分身结合近期工作和复盘给你的职场建议。" /><div className="mt-4 space-y-3">{[{ title: '把确认点提前', text: '你上周两次在临近截止时才发现数据缺口。建议在任务过半时安排一次快速检查。' }, { title: '减少亲自整理', text: '客户资料归并已经稳定，可以继续交给分身；你更适合把时间留给关键客户判断。' }, { title: '补强销售方法', text: '建议本周与林知远专家做一次 30 分钟账户策略复盘。' }].map((item, index) => <div key={item.title} className="rounded-md border border-neutral-200 p-3"><div className="flex items-center gap-2 text-[11.5px] font-medium text-neutral-800"><span className="grid h-5 w-5 place-items-center rounded-full bg-primary-50 text-[9px] text-primary-700">{index + 1}</span>{item.title}</div><p className="mt-1.5 text-[10.5px] leading-4 text-neutral-500">{item.text}</p></div>)}</div></aside></div></div>;
+  const [target, setTarget] = useState<'twin' | 'employee' | 'team'>('twin');
+  const targetCopy = {
+    twin: { title: '个人分身学习你的判断与协作偏好', detail: '从你确认、打回、接管和项目复盘中提出偏好候选；由你确认后才写入个人工作方法。', scope: '仅你和你的分身可用' },
+    employee: { title: '岗位数字员工训练可复用的 SOP 与工具能力', detail: '坏例绑定真实轨迹，修改 SOP 后从检查点复跑；通过项目验收后才能升版。', scope: '先限当前数字员工' },
+    team: { title: '验证通过后再推广，绝不自动污染全组织', detail: '先在原任务对照评测，再由岗位负责人决定推广到项目、部门或全组织。', scope: '推广前保持私有' },
+  } as const;
+  const active = targetCopy[target];
+
+  return <div className="space-y-5">
+    <section className="hum-card p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1"><h2 className="text-[14px] font-semibold text-neutral-900">谁在成长</h2><p className="mt-1 text-[10.5px] text-neutral-500">同一次项目复盘，可以分别改善真人与分身的协作、数字员工的岗位能力和团队方法。</p></div>
+        <div className="flex gap-1 overflow-x-auto">{([['twin', '我的分身'], ['employee', '数字员工'], ['team', '团队方法']] as const).map(([key, label]) => <button type="button" key={key} onClick={() => setTarget(key)} className={`hum-btn is-sm ${target === key ? 'is-primary' : ''}`}>{label}</button>)}</div>
+      </div>
+      <div className="mt-4 grid gap-3 rounded-md border border-primary-200 bg-primary-50 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><div className="text-[13px] font-semibold text-neutral-900">{active.title}</div><p className="mt-1.5 text-[11px] leading-5 text-neutral-600">{active.detail}</p></div><span className="hum-chip is-brand">{active.scope}</span></div>
+    </section>
+    <section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-4 md:divide-x md:divide-y-0">
+      <SummaryStep number="01" title="捕获真实坏例" detail="只从验收、打回和人工接管中建训练样本" done />
+      <SummaryStep number="02" title="修改一处方法" detail="SOP 与能力版本保留差异和来源" done />
+      <SummaryStep number="03" title="原任务对照复跑" detail="同一检查点比较质量、耗时与风险" done />
+      <SummaryStep number="04" title="真人决定推广" detail="未确认前只影响当前训练对象" done={published} />
+    </section>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_380px]">
+      <section className="hum-card p-4">
+        <SectionTitle icon={<GitFork size={15} />} title="本次训练记录" detail="华东重点客户项目 · 来自吴帆打回的排序坏例" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-md border border-neutral-200 p-4"><div className="text-[10px] text-neutral-400">原来的方法 · v2.3</div><p className="mt-2 text-[12px] leading-5 text-neutral-700">主要按资料完整度筛选客户，再生成跟进清单。</p></div><div className="rounded-md border border-primary-200 bg-primary-50 p-4"><div className="text-[10px] text-primary-600">候选方法 · v2.4-rc1</div><p className="mt-2 text-[12px] leading-5 text-primary-900">先考虑行业优先级和近期业务信号，再检查资料完整度。</p></div></div>
+        <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-25 p-4"><div className="flex items-center gap-2"><TrendingUp size={14} className="text-success" /><span className="text-[12px] font-medium text-neutral-800">同一任务对照结果</span></div><div className="mt-3 grid grid-cols-3 divide-x divide-neutral-200 text-center"><SmallMetric label="准确率" value="94%" /><SmallMetric label="提升" value="+13%" /><SmallMetric label="额外时间" value="+42s" /></div><div className="mt-3 text-[10.5px] text-neutral-500">通过项目验收后才能升版</div></div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" onClick={onRetry} className="hum-btn is-sm"><RotateCcw size={12} /> 从坏例再验证</button><button type="button" onClick={() => setPublished(true)} className="hum-btn is-sm is-primary"><Sparkles size={12} /> {published ? '已按范围推广' : '确认升版与推广范围'}</button></div>
+      </section>
+      <aside className="space-y-4">
+        <section className="hum-card p-4"><SectionTitle icon={<LineChart size={15} />} title="分身给我的职场建议" detail="这是对真人的辅导，不会改写数字员工 SOP。" /><div className="mt-4 space-y-3">{[{ title: '把确认点提前', text: '两次项目都在临近截止时才发现数据缺口，建议在任务过半时快速检查。' }, { title: '把整理交给助手', text: '资料归并已经稳定，你更适合把时间留给关键客户判断。' }].map((item) => <div key={item.title} className="rounded-md border border-neutral-200 p-3"><div className="text-[11.5px] font-medium text-neutral-800">{item.title}</div><p className="mt-1.5 text-[10.5px] leading-4 text-neutral-500">{item.text}</p></div>)}</div></section>
+        <section className="hum-card p-4"><SectionTitle icon={<ShieldCheck size={15} />} title="训练边界" detail="项目数据与个人偏好分开保存。" /><div className="mt-3 space-y-2 text-[10.5px] text-neutral-600">{['个人偏好不自动共享给同事分身', '数字员工只学习已授权的项目样本', '组织方法必须由岗位负责人确认推广'].map((item) => <div key={item} className="flex items-center gap-2"><Check size={12} className="text-success" />{item}</div>)}</div></section>
+      </aside>
+    </div>
+  </div>;
 }
 
 function Knowledge() {

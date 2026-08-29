@@ -41,4 +41,26 @@ describe('EmployeesPage organization facts', () => {
     expect(await screen.findByText(hiredEmployee.id)).toBeInTheDocument();
     expect(container.querySelector(`[data-employee-id="${hiredEmployee.id}"]`)).not.toBeNull();
   });
+
+  it('builds project teams from accountable human-twin pairs and temporary digital assistants', async () => {
+    const organization: OrganizationPort = {
+      listDigitalEmployees: vi.fn().mockResolvedValue([]),
+      hireDigitalEmployee: vi.fn(),
+    };
+    window.hummerOrganization = organization;
+
+    const { container } = render(<EmployeesPage />);
+    expect(container.textContent).not.toMatch(/Worker|Manager|Agent|Skill/);
+    expect(screen.getByText('我和我的分身')).toBeInTheDocument();
+    expect(screen.getByText('真人负责结果，分身代表协同')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '项目小队' }));
+    fireEvent.click(screen.getByRole('button', { name: '组建项目小队' }));
+    expect(screen.getByRole('heading', { name: '组建项目小队' })).toBeInTheDocument();
+    expect(screen.getByText(/昆仑.*最终负责人/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /邀请吴帆/ }));
+    expect(screen.getAllByText('吴帆 + 吴帆分身').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('临时助手 · 不承担最终责任').length).toBeGreaterThan(0);
+  });
 });

@@ -82,6 +82,48 @@ type DomainEvent<T = Record<string, unknown>> = {
 
 The event log is append-only. Current state is a replaceable projection and must be rebuildable from the event log for the MVP data set. Each state-changing command supplies `idempotencyKey` and `expectedVersion`; a duplicate key returns the original result and a stale version fails without emitting a new event.
 
+## 7. M4 human-twin project extension proposal
+
+This section is a target extension, not part of the frozen Wave 1 OpenAPI contract. Implementing it requires an ADR, an API version decision, and SQLite migration v3; migrations v1 and v2 remain unchanged.
+
+### Responsibility pair
+
+- A `HumanUser` has at most one active `DigitalTwin`; historical twins remain auditable.
+- The UI presents a human and active twin as one responsibility pair, while events retain separate actorRefs.
+- Only a human can be the final accountable project owner or protected-action approver.
+- A twin's authority derives from its owner and can only be narrower.
+
+### Project objects
+
+| Object | Responsibility | MVP minimum |
+| --- | --- | --- |
+| `Project` | durable collaboration context above WorkOrders | `id`, `tenantId`, `goal`, `accountableHumanId`, `coordinatorTwinId`, `status` |
+| `ProjectMembership` | scoped human/twin/expert participation | `projectId`, `actorRef`, `role`, `scope`, `expiresAt` |
+| `WorkerAssignment` | temporary digital employee labor | `projectId`, `workOrderId`, `employeeId`, `sponsorHumanId`, `permissionScope`, `expiresAt` |
+
+Allowed membership roles are:
+
+- `accountable_human`
+- `coordinator_twin`
+- `collaborating_human`
+- `collaborator_twin`
+- `digital_assistant`
+- `temporary_specialist`
+- `external_expert`
+
+`digital_assistant` and `temporary_specialist` cannot be accountable owners or approval decision makers.
+
+### Growth ownership
+
+M4 keeps three learning scopes separate:
+
+1. Personal twin memory and coaching belong to one human-twin pair and require owner confirmation.
+2. Digital employee SOP revisions belong to one target actor until a BadCase replay and Evaluation pass.
+3. Team methods require a separate human promotion decision with project, department, or organization scope and rollback metadata.
+
+The target evolution chain is:
+
+
 ## 5. RuntimeAdapter boundary
 
 ```ts

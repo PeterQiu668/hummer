@@ -246,12 +246,14 @@ spike 通过后，剩余一周做 `app-server` JSON-RPC 路径：thread/turn 生
 | 交付物 |
 |---|
 | 领域对象：`BadCase` `SopRevision` `Evaluation` `MemoryCandidate` |
+| 领域对象：`Project` `ProjectMembership` `WorkerAssignment`；真人 + 个人分身是责任搭档 |
+| 项目组队：邀请真人时可同步其分身；数字员工只能作为助手/临时专家，权限随项目结束 |
 | 验收驳回 → 自动建 `BadCase`，带 trajectory 引用 |
 | 改 SOP → `forkFromCheckpoint` 复跑 → 两条分支结果 diff |
-| 复跑通过 → SOP 升版 → 该岗位其他员工可见 |
+| 复跑通过 → SOP 升版 → 真人选择仅当前员工 / 项目 / 部门 / 组织的推广范围 |
 | 任务结束一个「记住这个」按钮 → `MemoryCandidate`（Hermes 机制，但只做最简版） |
 
-**验收：** 打回一次 → 改一行 SOP → 复跑 → 结果不同 → 版本入库 → 成长页能回溯到那次坏例。
+**验收：** 组建含两组真人-分身责任搭档与一位临时数字助手的项目 → 打回一次 → 改一行 SOP → 从真实检查点复跑 → 结果不同 → 人工选择推广范围 → 版本入库 → 成长页能回溯到坏例、两次运行和责任人。详细规则见 `docs/product/2026-08-human-twin-project-collaboration.md`。
 
 ---
 
