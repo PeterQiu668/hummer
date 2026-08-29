@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Bell,
   Bot,
@@ -10,8 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore, type PersonalSettings } from '../../store/useAppStore';
-
-const modelOptions: PersonalSettings['preferredModel'][] = ['标准', '增强', '旗舰'];
+import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../engines/engineProfileClient';
 
 export default function MySettingsDrawer() {
   const settings = useAppStore((state) => state.personalSettings);
@@ -19,6 +18,16 @@ export default function MySettingsDrawer() {
   const setOpen = useAppStore((state) => state.setSettingsOpen);
   const pushToast = useAppStore((state) => state.pushToast);
   const [draft, setDraft] = useState(settings);
+  const [engineProfiles, setEngineProfiles] = useState<readonly CustomerEngineProfile[]>(browserEngineProfiles);
+  const selectedProfile = engineProfileForLabel(engineProfiles, draft.preferredModel);
+
+  useEffect(() => {
+    let active = true;
+    void listEngineProfiles().then((profiles) => {
+      if (active && profiles.length) setEngineProfiles(profiles);
+    });
+    return () => { active = false; };
+  }, []);
 
   const patch = <Key extends keyof PersonalSettings>(key: Key, value: PersonalSettings[Key]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -65,11 +74,13 @@ export default function MySettingsDrawer() {
 
           <SettingsSection icon={<BrainCircuit size={15} />} title="模型与工作空间">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-[11px] text-neutral-500">默认模型<select aria-label="默认模型" value={draft.preferredModel} onChange={(event) => patch('preferredModel', event.target.value as PersonalSettings['preferredModel'])} className="hum-input mt-1.5">{modelOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+              <label className="text-[11px] text-neutral-500">默认模型<select aria-label="默认模型" value={selectedProfile.label} onChange={(event) => patch('preferredModel', event.target.value as PersonalSettings['preferredModel'])} className="hum-input mt-1.5">{engineProfiles.map((profile) => <option key={profile.id} value={profile.label} disabled={!profile.available}>{profile.label}{profile.available ? '' : ' · 暂不可用'}</option>)}</select></label>
               <label className="text-[11px] text-neutral-500">默认工作空间<select aria-label="默认工作空间" value={draft.defaultWorkspace} onChange={(event) => patch('defaultWorkspace', event.target.value as PersonalSettings['defaultWorkspace'])} className="hum-input mt-1.5"><option>我的工作空间</option><option>销售共享空间</option><option>公司知识库</option></select></label>
             </div>
             <p className="mt-2 text-[10.5px] leading-4 text-neutral-500">模型档位由企业管理员配置，运行前会在计划中回显；真实供应商、模型与数据域名可在审计详情中查询。</p>
           </SettingsSection>
+            <p className="mt-1 text-[10.5px] text-neutral-500">数据流向：{selectedProfile.dataDomain}</p>
+            {engineProfiles.filter((profile) => !profile.available).map((profile) => <p key={profile.id} className="mt-1 text-[10.5px] leading-4 text-warning">{profile.label}暂不可用：{profile.compatibilityNote}</p>)}
 
           <SettingsSection icon={<ShieldCheck size={15} />} title="默认权限">
             <label className="block text-[11px] text-neutral-500">新任务默认权限<select aria-label="默认任务权限" value={draft.defaultPermission} onChange={(event) => patch('defaultPermission', event.target.value as PersonalSettings['defaultPermission'])} className="hum-input mt-1.5"><option value="L1">只查看和起草</option><option value="L2">执行前向我确认</option><option value="L3">在约定范围内自动完成</option></select></label>

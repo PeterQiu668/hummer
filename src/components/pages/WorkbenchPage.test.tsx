@@ -28,6 +28,11 @@ describe('WorkbenchPage V5', () => {
     expect(screen.getByText('交给我的工作')).toBeInTheDocument();
     expect(screen.getByText('分身建议')).toBeInTheDocument();
     expect(screen.getByLabelText('选择模型')).toHaveValue('标准');
+    expect(screen.getByText('数据流向：')).toBeInTheDocument();
+    expect(screen.getByText('api.deepseek.com')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '增强 · 暂不可用' })).toBeDisabled();
+    expect(screen.getByText(/增强暂不可用/)).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /openai-codex-validation/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText('选择工作空间')).toHaveValue('我的工作空间');
     expect(screen.getByLabelText('任务权限')).toHaveValue('L2');
     expect(screen.queryByText('预算')).not.toBeInTheDocument();

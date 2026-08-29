@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
-import { approvalResult, textInput, translateAppServerMessage } from './app-server-protocol.js';
+import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 import { ApprovalContinuationWatchdog } from './approval-watchdog.js';
-import { buildCodexProviderArgs, engineProfileById, redactRuntimeSecrets } from './engine-profiles.js';
+import { buildCodexProviderArgs, customerEngineProfiles, engineProfileById, redactRuntimeSecrets } from './engine-profiles.js';
 import { JsonLineDecoder } from './jsonl.js';
 import { TextLineDecoder, WireLog } from './wire-log.js';
 import { listRuntimeConnectors, recordMcpStartupStatus } from './mcp-connector-registry.js';
@@ -16,8 +16,10 @@ const STOP = 'hummer:codex:stop';
 const RESPOND_APPROVAL = 'hummer:codex:respond-approval';
 const STEER = 'hummer:codex:steer';
 const EVENT = 'hummer:codex:event';
+const FORK = 'hummer:codex:fork';
 const CONNECTORS_LIST = 'hummer:runtime-connectors:list';
 const CONNECTORS_CHANGED = 'hummer:runtime-connectors:changed';
+const ENGINE_PROFILES_LIST = 'hummer:engine-profiles:list';
 
 interface Invocation {
   command: 'codex';
@@ -56,6 +58,7 @@ interface RunState {
   approvalRequests: Map<string, string | number>;
   approvalWatchdog: ApprovalContinuationWatchdog;
   threadId?: string;
+  invocation: Invocation;
   turnId?: string;
 }
 
@@ -72,7 +75,9 @@ export function registerCodexHost(): void {
     respondToApproval(requireRun(processId), approvalId, approved);
   });
   ipcMain.handle(STEER, async (_event, processId: string, text: string) => steerRun(requireRun(processId), text));
+  ipcMain.handle(FORK, (event, processId: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => forkCodex(event, requireRun(processId), checkpoint, sop));
   ipcMain.handle(CONNECTORS_LIST, () => listRuntimeConnectors());
+  ipcMain.handle(ENGINE_PROFILES_LIST, () => customerEngineProfiles());
 }
 
 async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
@@ -108,6 +113,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     pending: new Map(),
     approvalRequests: new Map(),
     approvalWatchdog,
+    invocation: request,
   };
   runs.set(processId, state);
   attachProcess(state);
@@ -127,7 +133,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
       cwd: request.cwd ?? null,
       approvalPolicy: 'on-request',
       sandbox: process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write',
-      ephemeral: true,
+      ephemeral: false,
     });
     state.threadId = nestedString(threadResult, 'thread', 'id');
     if (!state.threadId) throw new Error('Codex app-server thread/start did not return thread.id');
@@ -148,6 +154,98 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
   }
 }
 
+async function forkCodex(
+  event: IpcMainInvokeEvent,
+  source: RunState,
+  checkpoint: { sequence: number; nativeTurnId: string },
+  sop?: string,
+): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
+  if (source.protocol !== 'app-server-jsonrpc' || !source.threadId) {
+    throw new Error('Codex thread/fork requires a persistent app-server source thread');
+  }
+  if (!Number.isInteger(checkpoint.sequence) || checkpoint.sequence < 1 || !checkpoint.nativeTurnId) {
+    throw new Error('Codex thread/fork requires a valid HUMMER sequence and native turn id');
+  }
+
+  const request = source.invocation;
+  validateInvocation(request);
+  const processId = randomUUID();
+  const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || request.engineProfileId);
+  const providerArgs = buildCodexProviderArgs(profile, process.env);
+  const executable = resolveCodexExecutable();
+  const child = spawn(executable, [...providerArgs, ...request.args], {
+    cwd: request.cwd,
+    env: process.env,
+    windowsHide: true,
+    shell: process.platform === 'win32' && executable.endsWith('.cmd'),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  let state!: RunState;
+  const approvalWatchdog = new ApprovalContinuationWatchdog(approvalTimeoutMs(), (approvalId) => {
+    const message = 'Approval continuation timed out for forked runtime request ' + approvalId;
+    publishStderr(state, message);
+    publish(state, hostError(message));
+  });
+  state = {
+    processId,
+    protocol: request.protocol,
+    child,
+    owner: event.sender,
+    decoder: new JsonLineDecoder(),
+    stderrDecoder: new TextLineDecoder(),
+    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, process.env)),
+    events: [],
+    stderr: '',
+    requestSequence: 0,
+    pending: new Map(),
+    approvalRequests: new Map(),
+    approvalWatchdog,
+    invocation: request,
+  };
+  runs.set(processId, state);
+  attachProcess(state);
+
+  try {
+    await requestRpc(state, 'initialize', {
+      clientInfo: { name: 'hummer-desktop', title: 'HUMMER Desktop', version: '0.0.0' },
+      capabilities: null,
+    });
+    notify(state, 'initialized');
+    const forkResult = await requestRpc(state, 'thread/fork', {
+      threadId: source.threadId,
+      lastTurnId: checkpoint.nativeTurnId,
+      cwd: request.cwd ?? null,
+      approvalPolicy: 'on-request',
+      sandbox: process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write',
+      ephemeral: false,
+    });
+    state.threadId = nestedString(forkResult, 'thread', 'id');
+    if (!state.threadId) throw new Error('Codex app-server thread/fork did not return thread.id');
+    publish(state, { type: 'thread.started', thread_id: state.threadId });
+
+    const turnResult = await requestRpc(state, 'turn/start', {
+      threadId: state.threadId,
+      input: textInput(forkPrompt(checkpoint.sequence, sop)),
+      cwd: request.cwd ?? null,
+    });
+    state.turnId = nestedString(turnResult, 'turn', 'id');
+    if (!state.turnId) throw new Error('Codex app-server branch turn/start did not return turn.id');
+    return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, request) };
+  } catch (error) {
+    if (!child.killed) child.kill();
+    runs.delete(processId);
+    throw error;
+  }
+}
+
+function forkPrompt(sequence: number, sop?: string): string {
+  const instruction = sop?.trim()
+    ? 'Apply this revised SOP to the forked conversation:\n' + sop.trim()
+    : 'Produce an alternative result that can be compared with the source conversation.';
+  return 'Continue from HUMMER checkpoint sequence ' + sequence + ' in a forked conversation. '
+    + 'This is a runtime session fork, not a Git branch: do not create, switch, or modify any Git branch.\n'
+    + instruction;
+}
 function attachProcess(state: RunState): void {
   state.child.stdout.on('data', (chunk: Buffer) => {
     try {
@@ -203,10 +301,10 @@ function handleNativeMessage(state: RunState, message: unknown): void {
   }
 
   const method = typeof message.method === 'string' ? message.method : '';
-  if ((method === 'item/commandExecution/requestApproval' || method === 'item/fileChange/requestApproval') && message.id !== undefined) {
-    const params = isRecord(message.params) ? message.params : {};
-    const approvalId = typeof params.approvalId === 'string' && params.approvalId ? params.approvalId : String(message.id);
-    state.approvalRequests.set(approvalId, message.id as string | number);
+  const approval = scopeAppServerApproval(message, state.threadId ?? state.processId);
+  if (approval) {
+    state.approvalRequests.set(approval.approvalId, approval.requestId);
+    message = approval.message;
   }
   if (method === 'turn/started') state.turnId = nestedString(message, 'params', 'turn', 'id') ?? state.turnId;
   translateAppServerMessage(message).forEach((translated) => publish(state, translated));

@@ -163,6 +163,31 @@ describe('RuntimeEvent persistence', () => {
     persistence.close();
   });
 });
+  it('replays inherited approval facts into a fork without duplicating the approval projection', () => {
+    const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
+    const options = { tenantId: 'tenant_demo', runtimeId: 'codex-cli', correlationId: 'corr_fork' };
+    const required: PersistableRuntimeEvent = {
+      sessionId: 'ses_source', sequence: 1, occurredAt: '2026-08-28T15:00:00.000Z', actorRef: 'employee:codex',
+      type: 'approval_required', approvalId: 'apr_shared', title: 'write file', message: 'wait',
+      tool: 'shell.command', args: {}, result: 'pending', durationMs: null, costCny: null, evidenceRefs: [],
+    };
+    const resolved: PersistableRuntimeEvent = {
+      sessionId: 'ses_source', sequence: 2, occurredAt: '2026-08-28T15:00:01.000Z', actorRef: 'human:owner',
+      type: 'approval_resolved', approvalId: 'apr_shared', approved: true, result: 'approved', evidenceRefs: [],
+    };
+
+    persistence.runtimeEvents.save(required, options);
+    persistence.runtimeEvents.save(resolved, options);
+    persistence.runtimeEvents.save({ ...required, sessionId: 'ses_fork' }, options);
+    persistence.runtimeEvents.save({ ...resolved, sessionId: 'ses_fork' }, options);
+
+    expect(persistence.runtimeEvents.listBySession('ses_fork')).toHaveLength(2);
+    expect(persistence.listApprovals('ses_source')).toMatchObject([{ id: 'apr_shared', status: 'approved' }]);
+    expect(persistence.listApprovals('ses_fork')).toEqual([]);
+    expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 4 });
+    persistence.close();
+  });
+
 
 function temporaryDirectory(): string {
   const directory = mkdtempSync(join(tmpdir(), 'hummer-runtime-store-'));

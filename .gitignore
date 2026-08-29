@@ -14,6 +14,7 @@ dist-swarm-verify/
 
 # Local runtime facts and spike databases
 spikes/codex-runtime/.facts-*/
+spikes/**/.facts-*/
 spikes/m2-persistence/facts/
 spikes/**/facts/
 

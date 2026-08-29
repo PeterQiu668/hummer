@@ -1,6 +1,23 @@
 {
   "currency": "CNY",
-  "verifiedAt": null,
-  "models": {},
-  "note": "No model price is configured until its billing route and official CNY-equivalent price are verified."
+  "verifiedAt": "2026-08-29",
+  "sourceUrl": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "models": {
+    "deepseek-v4-flash": {
+      "inputCnyPerMillion": 1.5,
+      "cachedInputCnyPerMillion": 0.05,
+      "outputCnyPerMillion": 4.5,
+      "peak": {
+        "inputCnyPerMillion": 3,
+        "cachedInputCnyPerMillion": 0.1,
+        "outputCnyPerMillion": 9
+      },
+      "peakSchedule": {
+        "timeZone": "Asia/Shanghai",
+        "weekdays": [1, 2, 3, 4, 5],
+        "windows": [["09:00", "12:00"], ["14:00", "18:00"]]
+      }
+    }
+  },
+  "note": "Official CNY prices per 1M tokens. Off-peak is the base band; peak applies on weekdays in the configured Asia/Shanghai windows."
 }

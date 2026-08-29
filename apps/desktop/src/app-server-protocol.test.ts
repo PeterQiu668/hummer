@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalResult, textInput, translateAppServerMessage } from './app-server-protocol.js';
+import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 
 describe('Codex app-server protocol boundary', () => {
   it('translates v2 item notifications to the exec JSONL shape consumed by the existing adapter', () => {
@@ -32,5 +32,26 @@ describe('Codex app-server protocol boundary', () => {
       type: 'usage.updated',
       usage: { totalTokens: 12, inputTokens: 8, cachedInputTokens: 2, cacheWriteInputTokens: 0, outputTokens: 4, reasoningOutputTokens: 1 },
     }]);
+  });
+
+  it('retains native turn ids so a HUMMER checkpoint can use Codex thread/fork', () => {
+    expect(translateAppServerMessage({
+      method: 'turn/started',
+      params: { turn: { id: 'turn-source' } },
+    })).toEqual([{ type: 'turn.started', turn_id: 'turn-source' }]);
+    expect(translateAppServerMessage({
+      method: 'turn/completed',
+      params: { turn: { id: 'turn-source', status: 'completed' } },
+    })).toEqual([{ type: 'turn.completed', turn_id: 'turn-source' }]);
+  });
+
+  it('scopes app-server local approval ids by native thread', () => {
+    const request = { id: 0, method: 'item/commandExecution/requestApproval', params: { reason: 'write' } };
+    expect(scopeAppServerApproval(request, 'thread-a')).toMatchObject({
+      approvalId: 'thread-a:0',
+      requestId: 0,
+      message: { params: { approvalId: 'thread-a:0' } },
+    });
+    expect(scopeAppServerApproval(request, 'thread-b')?.approvalId).toBe('thread-b:0');
   });
 });

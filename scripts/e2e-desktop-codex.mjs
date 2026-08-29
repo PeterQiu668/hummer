@@ -7,18 +7,22 @@ import { _electron as electron } from 'playwright';
 const root = process.cwd();
 const protocol = process.argv.find((argument) => argument.startsWith('--protocol='))?.split('=')[1] ?? 'exec-jsonl';
 const approvalFlow = process.argv.includes('--approval');
+const forkFlow = process.argv.includes('--fork');
 if (!['exec-jsonl', 'app-server-jsonrpc'].includes(protocol)) throw new Error(`Unsupported test protocol ${protocol}`);
+const engineProfile = process.argv.find((argument) => argument.startsWith('--engine-profile='))?.split('=')[1] ?? 'openai-codex-validation';
 if (approvalFlow && protocol !== 'app-server-jsonrpc') throw new Error('Approval smoke requires app-server-jsonrpc');
-const workspace = resolve(root, 'spikes/codex-runtime');
+const workspace = resolve(root, engineProfile === 'openai-codex-validation' ? 'spikes/codex-runtime' : 'spikes/' + engineProfile);
 const output = resolve(workspace, approvalFlow ? 'summary-approved.md' : 'summary.md');
+const branchOutput = resolve(workspace, 'branch-summary.md');
 const baseUrl = 'http://127.0.0.1:4176';
 const codexPath = resolve(process.env.LOCALAPPDATA, 'hermes/node/codex.cmd');
-const wireLogPath = resolve(workspace, approvalFlow ? 'app-server-approval-wire.jsonl' : `${protocol}-wire.jsonl`);
-const dataDirectory = resolve(workspace, `.facts-${approvalFlow ? 'approval' : protocol}`);
+const wireLogPath = resolve(workspace, forkFlow ? 'app-server-fork-wire.jsonl' : approvalFlow ? 'app-server-approval-wire.jsonl' : `${protocol}-wire.jsonl`);
+const dataDirectory = resolve(workspace, `.facts-${forkFlow ? 'fork' : approvalFlow ? 'approval' : protocol}`);
 
 if (!existsSync(codexPath)) throw new Error(`npm Codex shim not found at ${codexPath}`);
 if (existsSync(output)) rmSync(output);
 if (existsSync(wireLogPath)) rmSync(wireLogPath);
+if (forkFlow && existsSync(branchOutput)) rmSync(branchOutput);
 if (existsSync(dataDirectory)) rmSync(dataDirectory, { recursive: true, force: true });
 
 const vite = spawn(
@@ -46,7 +50,7 @@ try {
       HUMMER_CODEX_PATH: codexPath,
       HUMMER_CODEX_WIRE_LOG_PATH: wireLogPath,
       HUMMER_DATA_DIR: dataDirectory,
-      HUMMER_ENGINE_PROFILE: 'openai-codex-validation',
+      HUMMER_ENGINE_PROFILE: engineProfile,
       ...(approvalFlow ? { HUMMER_CODEX_SANDBOX: 'read-only' } : {}),
     },
   });
@@ -54,7 +58,20 @@ try {
   console.log('stage=electron-launched');
   const page = await app.firstWindow();
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[renderer] ${message.text()}`); });
-  await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+  await page.evaluate(() => localStorage.removeItem('hummer-v6'));
+  const workbenchHeading = page.getByRole('heading', { name: '工作台' });
+  if (!(await workbenchHeading.isVisible())) {
+    await page.getByRole('button', { name: '工作台', exact: true }).click();
+  }
+  try {
+    await workbenchHeading.waitFor({ state: 'visible', timeout: 30_000 });
+  } catch (error) {
+    await page.screenshot({ path: resolve(root, 'dist/hummer-desktop-startup-failure.png'), fullPage: true });
+    console.error('startup-url=' + page.url());
+    console.error('startup-title=' + await page.title());
+    console.error('startup-body=' + (await page.locator('body').innerText()).slice(0, 6000));
+    throw error;
+  }
   console.log('stage=workbench-visible');
   const node = page.getByLabel('执行节点状态');
   await node.getByText('HUMMER 执行内核', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
@@ -93,6 +110,49 @@ try {
     throw error;
   }
   if (!existsSync(output)) throw new Error('Codex trajectory reported a file change but summary.md does not exist');
+  let forkEvidence;
+  if (forkFlow) {
+    if (!approvalFlow) throw new Error('Fork E2E requires the approval flow');
+    const sourceSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
+    const sourceSession = sourceSessions.find((session) => session.events.some((event) => event.type === 'result'));
+    const sourceResults = sourceSession?.events.filter((event) => event.type === 'result') ?? [];
+    const sourceCheckpoint = sourceResults.at(-1)?.sequence;
+    if (!sourceSession?.handle.nativeSessionId || !sourceCheckpoint) {
+      throw new Error('Fork source session did not persist a native thread id and completed checkpoint');
+    }
+    if (existsSync(branchOutput)) rmSync(branchOutput);
+    await page.getByRole('button', { name: '展开协作与能力' }).click();
+    await page.getByRole('button', { name: '工作方法', exact: true }).click();
+    await page.getByLabel('本次工作方法').fill('Read input.txt again. Run a PowerShell Set-Content command to create branch-summary.md with exactly six words. Do not modify summary-approved.md or any other file.');
+    await page.getByRole('button', { name: '保存并重新尝试' }).click();
+    console.log('stage=fork-requested');
+    const branchApprove = page.getByRole('button', { name: '确认更新' });
+    await branchApprove.waitFor({ state: 'visible', timeout: 120_000 });
+    if (existsSync(branchOutput)) throw new Error('Fork output existed before HUMMER approval');
+    await branchApprove.click();
+    console.log('stage=fork-approval-accepted');
+    await waitForFile(branchOutput, 120_000);
+    await delay(1_000);
+    const forkSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
+    const nativeSessionIds = forkSessions.map((session) => session.handle.nativeSessionId).filter(Boolean);
+    if (new Set(nativeSessionIds).size < 2) throw new Error('Fork did not persist two distinct native Codex thread ids');
+    const integrity = await page.evaluate(() => window.hummerPersistence?.verifyIntegrity());
+    if (!integrity?.valid) throw new Error('Fork persistence hash chain is invalid');
+    forkEvidence = {
+      occurredAt: new Date().toISOString(),
+      checkpointSequence: sourceCheckpoint,
+      sourceNativeSessionId: sourceSession.handle.nativeSessionId,
+      sourceOutput: readFileSync(output, 'utf8').trim(),
+      branchOutput: readFileSync(branchOutput, 'utf8').trim(),
+      nativeSessionIds,
+      persistedSessionCount: forkSessions.length,
+      integrity,
+    };
+    if (forkEvidence.sourceOutput === forkEvidence.branchOutput) throw new Error('Fork outputs are not different');
+    writeFileSync(resolve(workspace, 'fork-evidence.json'), JSON.stringify(forkEvidence, null, 2) + '\n', 'utf8');
+    console.log('stage=fork-completed');
+  }
+
 
   const persistedSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
   const persistedEvents = persistedSessions.flatMap((session) => session.events);
@@ -107,11 +167,11 @@ try {
     tool: node.getAttribute('data-runtime-tool') || undefined,
     text: node.textContent?.replace(/\s+/g, ' ').trim(),
   })));
-  const artifactStem = approvalFlow ? 'app-server-approval-trajectory' : protocol === 'app-server-jsonrpc' ? 'app-server-trajectory' : 'desktop-trajectory';
+  const artifactStem = forkFlow ? 'app-server-fork-trajectory' : approvalFlow ? 'app-server-approval-trajectory' : protocol === 'app-server-jsonrpc' ? 'app-server-trajectory' : 'desktop-trajectory';
   if (approvalFlow) assertApprovalSequence(trajectory);
   writeFileSync(resolve(workspace, `${artifactStem}.json`), `${JSON.stringify(trajectory, null, 2)}\n`, 'utf8');
   await page.screenshot({ path: resolve(root, `dist/hummer-m1-codex-${protocol}.png`), fullPage: true });
-  console.log(JSON.stringify({ protocol, approvalFlow, workspace, output, persistedFileChange, trajectory }, null, 2));
+  console.log(JSON.stringify({ protocol, approvalFlow, forkFlow, engineProfile, workspace, output, branchOutput: forkFlow ? branchOutput : undefined, forkEvidence, persistedFileChange, trajectory }, null, 2));
 } finally {
   if (app) {
     const electronProcess = app.process();
@@ -121,7 +181,17 @@ try {
   vite.kill();
 }
 
+async function waitForFile(path, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (existsSync(path)) return;
+    await delay(250);
+  }
+  throw new Error('Timed out waiting for file ' + path);
+}
+
 async function waitForServer(url) {
+
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     try {

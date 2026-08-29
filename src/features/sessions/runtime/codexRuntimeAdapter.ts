@@ -18,6 +18,11 @@ export interface CodexCliRun {
   engine?: RuntimeEngineDisclosure;
 }
 
+export interface CodexCliCheckpoint {
+  sequence: number;
+  nativeTurnId: string;
+}
+
 export interface CodexCliHost {
   start(request: CodexCliInvocation): Promise<CodexCliRun>;
   subscribe(run: CodexCliRun, callback: (message: unknown) => void): Unsubscribe;
@@ -26,7 +31,7 @@ export interface CodexCliHost {
   pause?(run: CodexCliRun): Promise<void>;
   resume?(run: CodexCliRun): Promise<void>;
   stop(run: CodexCliRun): Promise<void>;
-  fork?(run: CodexCliRun, sequence: number, sop?: string): Promise<CodexCliRun>;
+  fork?(run: CodexCliRun, checkpoint: CodexCliCheckpoint, sop?: string): Promise<CodexCliRun>;
 }
 
 type RuntimeEventDraft = RuntimeEvent extends infer Event
@@ -45,6 +50,7 @@ interface CodexRuntimeState {
   startedAtMs?: number;
   usage?: RuntimeTokenUsage;
   modelProfile: string;
+  completedTurnIds: Map<number, string>;
 }
 
 export class CodexRuntimeAdapter implements RuntimeAdapter {
@@ -80,6 +86,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       subscribers: new Set(),
       unsubscribeHost: () => undefined,
       modelProfile: plan.modelProfile,
+      completedTurnIds: new Map(),
     };
     state.unsubscribeHost = this.options.host!.subscribe(run, (message) => {
       const nativeSessionId = extractCodexThreadId(message);
@@ -90,12 +97,14 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       const costCny = state.usage && this.options.pricing
         ? calculateRuntimeCostCny(state.modelProfile, state.usage, this.options.pricing)
         : null;
+      const completedTurnId = isCodexMessageType(message, 'turn.completed') ? extractCodexTurnId(message) : undefined;
       for (const draft of mapCodexMessage(message, state.lastAgentMessage, { usage: state.usage, durationMs, costCny })) {
         if (draft.type === 'step' && draft.actorRef === 'employee:codex' && draft.category === 'message') {
           state.lastAgentMessage = draft.result;
         }
         this.emit(state, draft);
       }
+      if (completedTurnId) state.completedTurnIds.set(state.log.length, completedTurnId);
     });
     this.states.set(handle.sessionId, state);
     return handle;
@@ -159,7 +168,9 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
   async forkFromCheckpoint(handle: RuntimeHandle, sequence: number, sop?: string): Promise<RuntimeHandle> {
     const source = this.requireState(handle);
     if (!this.options.host?.fork) throw new Error('Fork requires an app-server host that can map a HUMMER checkpoint to a Codex thread fork');
-    const run = await this.options.host.fork(source.run, sequence, sop);
+    const nativeTurnId = source.completedTurnIds.get(sequence);
+    if (!nativeTurnId) throw new Error('Codex can only fork a HUMMER checkpoint mapped to a completed native turn; sequence ' + sequence + ' is not forkable');
+    const run = await this.options.host.fork(source.run, { sequence, nativeTurnId }, sop);
     const forkHandle: RuntimeHandle = {
       runtimeId: this.id,
       sessionId: `${handle.sessionId}_fork_${sequence}`,
@@ -172,6 +183,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       log: source.log.filter((event) => event.sequence <= sequence).map((event) => ({ ...event, sessionId: forkHandle.sessionId })),
       subscribers: new Set(),
       unsubscribeHost: () => undefined,
+      completedTurnIds: new Map([...source.completedTurnIds].filter(([checkpointSequence]) => checkpointSequence <= sequence)),
       modelProfile: source.modelProfile,
     };
     state.unsubscribeHost = this.options.host.subscribe(run, (message) => {
@@ -183,7 +195,9 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       const costCny = state.usage && this.options.pricing
         ? calculateRuntimeCostCny(state.modelProfile, state.usage, this.options.pricing)
         : null;
+      const completedTurnId = isCodexMessageType(message, 'turn.completed') ? extractCodexTurnId(message) : undefined;
       mapCodexMessage(message, state.lastAgentMessage, { usage: state.usage, durationMs, costCny }).forEach((draft) => this.emit(state, draft));
+      if (completedTurnId) state.completedTurnIds.set(state.log.length, completedTurnId);
     });
     this.states.set(forkHandle.sessionId, state);
     return forkHandle;
@@ -385,6 +399,13 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
 
   return [];
 }
+
+export function extractCodexTurnId(message: unknown): string | undefined {
+  const raw = parseMessage(message);
+  if (!raw || !/^turn\.(started|completed|failed)$/.test(stringValue(raw.type))) return undefined;
+  return stringValue(raw.turn_id) || stringValue(raw.turnId) || undefined;
+}
+
 
 export function extractCodexThreadId(message: unknown): string | undefined {
   const raw = parseMessage(message);

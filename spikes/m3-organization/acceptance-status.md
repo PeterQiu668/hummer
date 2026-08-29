@@ -21,3 +21,14 @@ Generated on 2026-08-28 (Asia/Shanghai). Evidence strength is stated per item.
 - Claude Code: CLI 2.1.248 is installed but logged out; the real attempt returned `authentication_failed` before any tool or approval event.
 
 Therefore the exact requested end-to-end path using the default DeepSeek product profile is **not complete**. The organization, policy, persistence and result-package chain is verified locally, while the real shell/approval/restart chain is verified with the explicitly non-product `openai-codex-validation` profile. These two evidence classes must not be merged into a production claim.
+
+## M3.5 status update - 2026-08-29
+
+This section supersedes the DeepSeek-key blocker and conclusion above; the other blocked-profile statements remain current.
+
+- The `deepseek-standard` product profile completed a real read, command approval, approved write, result readback, `thread/fork`, second approval, second write and completion run ending at 2026-08-29 00:28:52 (Asia/Shanghai).
+- Native source thread: `01a04933-50fc-7793-96cb-759f42c6fbda`; fork thread: `01a04933-a2c5-71d0-aa86-a61356401614`; HUMMER checkpoint sequence: 16.
+- Source and fork produced different artifacts, two sessions were persisted, and the domain hash chain verified as `valid=true, checked=50`.
+- Evidence: `spikes/deepseek-standard/fork-evidence.json`, `app-server-fork-wire.jsonl`, `app-server-fork-trajectory.json`, `summary-approved.md`, and `branch-summary.md`.
+- The secret was process-local and is not stored in argv, logs, trajectories, evidence files, documentation, or source. Repository redaction assertions remain mandatory.
+- This proves the DeepSeek runtime, approval and fork path. The organization hire and this runtime session are still separate acceptance runs, so the complete hire-to-result product flow is not yet a single E2E proof.

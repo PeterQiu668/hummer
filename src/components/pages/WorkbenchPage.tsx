@@ -45,6 +45,7 @@ import { createDefaultRuntimeAdapter } from '../../features/sessions/runtime/run
 import { actorDisplayName, runtimeDisplayName } from '../../features/sessions/runtime/runtimeDisplay';
 import { createDefaultSessionStore, type SessionStore } from '../../features/sessions/persistence/sessionStore';
 import { useAppStore } from '../../store/useAppStore';
+import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../../features/engines/engineProfileClient';
 
 const DEFAULT_RUNTIME = createDefaultRuntimeAdapter();
 
@@ -69,6 +70,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(personalSettings.defaultPermission);
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
   const [modelProfile, setModelProfile] = useState<string>(personalSettings.preferredModel);
+  const [engineProfiles, setEngineProfiles] = useState<readonly CustomerEngineProfile[]>(browserEngineProfiles);
   const [organizationAssignees, setOrganizationAssignees] = useState<string[]>([]);
   const [workContext, setWorkContext] = useState<string>(personalSettings.defaultWorkspace);
   const [plan, setPlan] = useState<SessionPlan | null>(null);
@@ -94,6 +96,16 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     });
     return () => { cancelled = true; };
   }, [store]);
+
+  useEffect(() => {
+    let active = true;
+    void listEngineProfiles().then((profiles) => {
+      if (!active || !profiles.length) return;
+      setEngineProfiles(profiles);
+      setModelProfile((current) => engineProfileForLabel(profiles, current).label);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const organization = desktopOrganizationPort();
@@ -124,6 +136,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const hasDesktopAction = activeRecord?.events.some((event) => event.type === 'tool' && /browser|desktop/i.test(event.tool)) ?? false;
   const isPrototypeRuntime = runtime.id.startsWith('mock');
   const nodeDirectory = isPrototypeRuntime ? '演示工作区' : window.hummerDesktop?.cwd ?? activeRecord?.plan.workContext ?? '桌面宿主工作目录';
+  const activeEngineProfile = engineProfileForLabel(engineProfiles, activeRecord?.plan.modelProfile ?? modelProfile);
   const nodeBar = (
     <RuntimeNodeBar
       runtimeId={runtime.id}
@@ -282,6 +295,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
               <SessionPlanCard
                 plan={plan}
                 onChange={setPlan}
+                engineProfiles={engineProfiles}
                 onRevise={() => setPlan(null)}
                 onStart={startPlannedSession}
               />
@@ -299,6 +313,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 onAttachmentNamesChange={setAttachmentNames}
                 modelProfile={modelProfile}
                 onModelProfileChange={setModelProfile}
+                engineProfiles={engineProfiles}
                 workContext={workContext}
                 onWorkContextChange={setWorkContext}
               />
@@ -320,6 +335,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 onAttachmentNamesChange={setAttachmentNames}
                 modelProfile={modelProfile}
                 onModelProfileChange={setModelProfile}
+                engineProfiles={engineProfiles}
                 workContext={workContext}
                 onWorkContextChange={setWorkContext}
                 onRecentSelect={draftPlan}
@@ -396,6 +412,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                     <SandboxBadge icon={<ShieldCheck size={11} />} label={isPrototypeRuntime ? '示例数据' : '本地授权目录'} />
                     <span className="rounded border border-neutral-200 bg-neutral-25 px-2 py-1 text-neutral-500">已记录 {session.checkpointSequence} 步</span>
                     <span className="rounded border border-neutral-200 bg-neutral-25 px-2 py-1 text-neutral-500">费用上限 ¥{session.sandbox.budgetCny}</span>
+                    <SandboxBadge icon={<Orbit size={11} />} label={'数据流向：' + activeEngineProfile.dataDomain} />
                     {session.status === 'running' && <button type="button" onClick={() => activeRecord && runtime.pause(activeRecord.handle)} className="hum-btn is-sm"><Pause size={11} /> 暂停</button>}
                     {session.status === 'paused' && <button type="button" onClick={() => activeRecord && runtime.resume(activeRecord.handle)} className="hum-btn is-sm is-primary"><Play size={11} /> 恢复</button>}
                   </div>
@@ -457,7 +474,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 </section>
               )}
 
-              {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence - 2))} />}
+              {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence))} />}
 
               <ExecutionComposer value={followUp} onChange={setFollowUp} onSubmit={sendFollowUp} disabled={session.status === 'cancelled' || session.status === 'delivered' || session.status === 'interrupted'} />
             </main>

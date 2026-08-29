@@ -382,3 +382,14 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 2. 真实 shell 审批、MCP 握手和重启中断是 openai-codex-validation 外壳验证事实。
 
 默认 DeepSeek 产品档因为本机没有 DEEPSEEK_API_KEY，尚未完成“雇员工后用默认 DeepSeek 派真任务”的整链验收，不能把上述两种证据拼接成已完成声明。完整状态见 spikes/m3-organization/acceptance-status.md。
+
+## 13. M3.5 DeepSeek checkpoint 分叉复验（2026-08-29）
+
+本节取代 11、12 节中“DeepSeek key 缺失”“checkpoint fork 尚未核实”和“价格表为空”的旧状态描述。
+
+- 运行结束：2026-08-29 00:28:52（Asia/Shanghai）。档位 `deepseek-standard`，模型 `deepseek-v4-flash`，数据域 `api.deepseek.com`。
+- source 原生 thread `01a04933-50fc-7793-96cb-759f42c6fbda`，fork thread `01a04933-a2c5-71d0-aa86-a61356401614`，审计检查点 sequence 16。Codex 实际恢复粒度仍是原生 thread，不承诺回滚其内部状态到任意单条事件。
+- 两条分支产生不同文本产物，均经过真实 command approval；持久化会话数 2，hash chain `valid=true, checked=50`。证据位于 `spikes/deepseek-standard/`。
+- app-server approval request id 会在不同原生 thread 内从 0 重新计数。宿主现以原生 thread id 命名空间化 HUMMER approvalId，再映射回 server 原始 request id，避免 source 已批准 id 遮蔽 fork 待批 id。
+- `runtime-pricing.json` 已按 DeepSeek 官方人民币价配置 `deepseek-v4-flash` 工作日高峰/空闲时段；来源 `https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`，核实日 2026-08-29。未知模型或缺失 usage 继续返回 `null`。
+- 兼容性边界：本次仍观察到 Codex model manager 无法解析 DeepSeek `/models` 返回形状，以及 PowerShell shell snapshot 不支持。任务实际完成，但不证明所有辅助网络请求都只访问 DeepSeek 域。

@@ -204,6 +204,8 @@ export class RuntimeEventStore {
         UPDATE approvals SET status = ?, resolved_at = ?, payload_json = ? WHERE id = ? AND session_id = ?
       `).run(approved ? 'approved' : 'declined', event.occurredAt, canonicalJson(event), approvalId, event.sessionId);
       if (changed.changes === 0) {
+        const inherited = this.database.prepare('SELECT id FROM approvals WHERE id = ?').get<{ id: string }>(approvalId);
+        if (inherited) return;
         this.database.prepare(`
           INSERT INTO approvals (id, session_id, sequence, status, requested_at, resolved_at, payload_json)
           VALUES (?, ?, ?, ?, ?, ?, ?)

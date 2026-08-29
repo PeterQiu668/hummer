@@ -1,0 +1,3 @@
+HUMMER delegates bounded work to digital employees.
+Protected writes must stop for a named human approver.
+Every accepted result keeps evidence, usage, cost, and an integrity chain.

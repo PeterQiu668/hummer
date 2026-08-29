@@ -1,0 +1,16 @@
+{
+  "occurredAt": "2026-08-28T16:28:52.083Z",
+  "checkpointSequence": 16,
+  "sourceNativeSessionId": "01a04933-50fc-7793-96cb-759f42c6fbda",
+  "sourceOutput": "HUMMER delegates bounded work to digital employees, gates protected writes behind a named human approver, and keeps evidence, usage, cost, and an integrity chain for every accepted result.",
+  "branchOutput": "HUMMER delegates; named humans approve writes.",
+  "nativeSessionIds": [
+    "01a04933-a2c5-71d0-aa86-a61356401614",
+    "01a04933-50fc-7793-96cb-759f42c6fbda"
+  ],
+  "persistedSessionCount": 2,
+  "integrity": {
+    "valid": true,
+    "checked": 50
+  }
+}

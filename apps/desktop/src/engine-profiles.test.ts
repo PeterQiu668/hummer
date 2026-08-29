@@ -1,12 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCodexProviderArgs,
+  customerEngineProfiles,
   defaultEngineProfile,
   engineProfileById,
   redactRuntimeSecrets,
 } from './engine-profiles.js';
 
 describe('desktop engine profiles', () => {
+  it('exposes only customer profiles with availability and data-domain disclosure', () => {
+    const profiles = customerEngineProfiles();
+
+    expect(profiles.map((profile) => profile.id)).toEqual([
+      'deepseek-standard',
+      'zhipu-enhanced',
+      'openai-flagship',
+    ]);
+    expect(profiles.some((profile) => profile.id === 'openai-codex-validation')).toBe(false);
+    expect(profiles.find((profile) => profile.id === 'deepseek-standard')).toMatchObject({
+      label: '\u6807\u51c6',
+      available: true,
+      dataDomain: 'api.deepseek.com',
+    });
+    expect(profiles.find((profile) => profile.id === 'zhipu-enhanced')).toMatchObject({
+      label: '\u589e\u5f3a',
+      available: false,
+      dataDomain: 'open.bigmodel.cn',
+      compatibilityNote: expect.stringMatching(/Responses/),
+    });
+  });
+
   it('uses the DeepSeek-backed standard tier by default', () => {
     expect(defaultEngineProfile()).toMatchObject({
       id: 'deepseek-standard',

@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('hummerCodexCliHost', {
   respondToApproval: (run: Run, id: string, approved: boolean) => ipcRenderer.invoke('hummer:codex:respond-approval', run.processId, id, approved),
   sendHumanMessage: (run: Run, text: string) => ipcRenderer.invoke('hummer:codex:steer', run.processId, text),
   stop: (run: Run) => ipcRenderer.invoke('hummer:codex:stop', run.processId),
+  fork: (run: Run, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => ipcRenderer.invoke('hummer:codex:fork', run.processId, checkpoint, sop),
 });
 
 contextBridge.exposeInMainWorld('hummerClaudeCliHost', {
@@ -63,6 +64,10 @@ contextBridge.exposeInMainWorld('hummerClaudeCliHost', {
   respondToApproval: (run: Run, id: string, approved: boolean) => ipcRenderer.invoke('hummer:claude:respond-approval', run.processId, id, approved),
   sendHumanMessage: (run: Run, text: string) => ipcRenderer.invoke('hummer:claude:steer', run.processId, text),
   stop: (run: Run) => ipcRenderer.invoke('hummer:claude:stop', run.processId),
+});
+
+contextBridge.exposeInMainWorld('hummerEngineProfiles', {
+  list: () => ipcRenderer.invoke('hummer:engine-profiles:list'),
 });
 contextBridge.exposeInMainWorld('hummerDesktop', {
   platform: process.platform,

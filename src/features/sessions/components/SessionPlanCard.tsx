@@ -1,19 +1,23 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, Pencil, Sparkles } from 'lucide-react';
 import type { SessionPlan } from '../model/session';
+import { engineProfileForLabel, type CustomerEngineProfile } from '../../engines/engineProfileClient';
 
 export default function SessionPlanCard({
   plan,
   onChange,
+  engineProfiles,
   onRevise,
   onStart,
 }: {
   plan: SessionPlan;
   onChange: (plan: SessionPlan) => void;
+  engineProfiles: readonly CustomerEngineProfile[];
   onRevise: () => void;
   onStart: () => void;
 }) {
   const [editing, setEditing] = useState<'assignees' | 'model' | 'tools' | 'scope' | 'gates' | 'estimate' | null>(null);
+  const selectedProfile = engineProfileForLabel(engineProfiles, plan.modelProfile);
   return (
     <form onSubmit={(event) => { event.preventDefault(); onStart(); }} className="hum-card mx-auto w-full max-w-[820px] overflow-visible border-neutral-300 shadow-sm">
       <div className="flex items-center gap-2 border-b border-neutral-100 px-5 py-4">
@@ -36,8 +40,11 @@ export default function SessionPlanCard({
               <option>我的分身 · 昆仑助理</option><option>雪·销售官</option><option>岚·分析官</option><option>苓·法务官</option><option>璇·数据官</option>
             </select>
           </PlanRow>
-          <PlanRow label="模型" value={plan.modelProfile} action="更换" open={editing === 'model'} onToggle={() => setEditing(editing === 'model' ? null : 'model')}>
-            <select aria-label="修改模型" value={plan.modelProfile} onChange={(event) => { onChange({ ...plan, modelProfile: event.target.value }); setEditing(null); }} className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-[12px] outline-none"><option>标准</option><option>增强</option><option>旗舰</option></select>
+          <PlanRow label="模型" value={selectedProfile.label + ' · 数据流向 ' + selectedProfile.dataDomain} action="更换" open={editing === 'model'} onToggle={() => setEditing(editing === 'model' ? null : 'model')}>
+            <select aria-label="修改模型" value={selectedProfile.label} onChange={(event) => { onChange({ ...plan, modelProfile: event.target.value }); setEditing(null); }} className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-[12px] outline-none">
+              {engineProfiles.map((profile) => <option key={profile.id} value={profile.label} disabled={!profile.available}>{profile.label}{profile.available ? ' · ' + profile.dataDomain : ' · 暂不可用'}</option>)}
+            </select>
+            {engineProfiles.filter((profile) => !profile.available).map((profile) => <p key={profile.id} className="mt-2 text-[10.5px] leading-4 text-warning">{profile.label}暂不可用：{profile.compatibilityNote}</p>)}
           </PlanRow>
           <PlanRow label="需要能力" value={plan.tools.join(' · ')} action="修改" open={editing === 'tools'} onToggle={() => setEditing(editing === 'tools' ? null : 'tools')}>
             <InlineText value={plan.tools.join('、')} label="修改工具" onCommit={(value) => onChange({ ...plan, tools: splitList(value) })} close={() => setEditing(null)} />

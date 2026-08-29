@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { draftPlanFromPrompt } from '../model/session';
 import type { RuntimeEvent } from './adapter';
 import { buildCodexInvocation, CodexRuntimeAdapter, extractCodexThreadId, extractCodexUsage, mapCodexMessage, type CodexCliHost } from './codexRuntimeAdapter';
@@ -99,6 +99,34 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
       title: '你补充了要求',
       result: '改为只生成 steered-summary.md',
     });
+  });
+
+  it('forks through the host from an exact checkpoint and keeps branches separate', async () => {
+    let onMessage: ((message: unknown) => void) | undefined;
+    const fork = vi.fn().mockResolvedValue({ processId: 'process-fork', nativeSessionId: 'thread-fork' });
+    const host: CodexCliHost = {
+      start: async () => ({ processId: 'process-source', nativeSessionId: 'thread-source' }),
+      subscribe: (run, callback) => {
+        if (run.processId === 'process-source') onMessage = callback;
+        return () => undefined;
+      },
+      stop: async () => undefined,
+      fork,
+    };
+    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc' });
+    const source = await runtime.startSession(draftPlanFromPrompt('summarize the folder'));
+    onMessage?.({ type: 'item.completed', item: { type: 'agent_message', text: 'source result' } });
+    onMessage?.({ type: 'turn.completed', turn_id: 'turn-source' });
+
+    const branch = await runtime.forkFromCheckpoint(source, 2, 'Prefer concise output');
+    expect(fork).toHaveBeenCalledWith(expect.objectContaining({ nativeSessionId: 'thread-source' }), { sequence: 2, nativeTurnId: 'turn-source' }, 'Prefer concise output');
+    expect(branch).toMatchObject({ nativeSessionId: 'thread-fork', runtimeId: runtime.id });
+    expect(branch.sessionId).not.toBe(source.sessionId);
+
+    const branchEvents: RuntimeEvent[] = [];
+    runtime.subscribe(branch, (event) => branchEvents.push(event));
+    expect(branchEvents).toHaveLength(2);
+    expect(branchEvents[1]).toMatchObject({ sessionId: branch.sessionId, sequence: 2 });
   });
 
   it('extracts real token usage without inventing a price', () => {

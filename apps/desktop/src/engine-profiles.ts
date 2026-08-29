@@ -17,12 +17,32 @@ export interface EngineProfile {
   dataDomain: string;
   requiresOpenAiAuth: boolean;
   compatibilityNote?: string;
+  available?: boolean;
+  customerVisible?: boolean;
   providerMode?: 'custom' | 'codex-login';
+}
+
+export interface CustomerEngineProfile {
+  id: string;
+  tier: EngineTier;
+  label: string;
+  available: boolean;
+  dataDomain: string;
+  compatibilityNote?: string;
 }
 
 const profiles = (config.profiles as EngineProfile[]).map(validateProfile);
 
 export function listEngineProfiles(): readonly EngineProfile[] { return profiles; }
+export function customerEngineProfiles(): readonly CustomerEngineProfile[] {
+  return profiles
+    .filter((profile) => profile.customerVisible !== false)
+    .map((profile) => Object.freeze({
+      id: profile.id, tier: profile.tier, label: tierLabel(profile.tier),
+      available: profile.available !== false, dataDomain: profile.dataDomain,
+      ...(profile.compatibilityNote ? { compatibilityNote: profile.compatibilityNote } : {}),
+    }));
+}
 export function defaultEngineProfile(): EngineProfile { return engineProfileById(config.defaultProfileId); }
 
 export function engineProfileById(id: string | undefined): EngineProfile {
@@ -72,6 +92,12 @@ function validateProfile(profile: EngineProfile): EngineProfile {
   if (!/^https:\/\//.test(profile.baseUrl)) throw new TypeError(`Engine profile ${profile.id} requires an HTTPS base URL`);
   if (!/^[A-Z][A-Z0-9_]+$/.test(profile.envKey)) throw new TypeError(`Engine profile ${profile.id} has an invalid environment key name`);
   return Object.freeze({ ...profile });
+}
+
+function tierLabel(tier: EngineTier): string {
+  if (tier === 'standard') return '\u6807\u51c6';
+  if (tier === 'enhanced') return '\u589e\u5f3a';
+  return '\u65d7\u8230';
 }
 
 function tomlString(value: string): string { return JSON.stringify(value); }

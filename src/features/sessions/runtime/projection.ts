@@ -68,20 +68,22 @@ export function projectRuntimeSession(
 }
 
 export function findPendingApproval(events: RuntimeEvent[]): Extract<RuntimeEvent, { type: 'approval_required' }> | undefined {
-  const resolved = new Set(
-    events.filter((event) => event.type === 'approval_resolved').map((event) => event.approvalId),
-  );
-  const pending = [...events]
-    .reverse()
-    .find((event): event is Extract<RuntimeEvent, { type: 'approval_required' }> => (
-      event.type === 'approval_required' && !resolved.has(event.approvalId)
+  const resolvedAfter = new Set<string>();
+  const reversed = [...events].sort((left, right) => right.sequence - left.sequence);
+  for (const event of reversed) {
+    if (event.type === 'approval_resolved') {
+      resolvedAfter.add(event.approvalId);
+      continue;
+    }
+    if (event.type !== 'approval_required') continue;
+    if (resolvedAfter.delete(event.approvalId)) continue;
+    const terminalAfterApproval = events.some((candidate) => candidate.sequence > event.sequence && (
+      candidate.type === 'result'
+      || (candidate.type === 'status' && ['blocked', 'cancelled', 'interrupted', 'delivered'].includes(candidate.status))
     ));
-  if (!pending) return undefined;
-  const terminalAfterApproval = events.some((event) => event.sequence > pending.sequence && (
-    event.type === 'result'
-    || (event.type === 'status' && ['blocked', 'cancelled', 'interrupted', 'delivered'].includes(event.status))
-  ));
-  return terminalAfterApproval ? undefined : pending;
+    return terminalAfterApproval ? undefined : event;
+  }
+  return undefined;
 }
 
 function eventToTrajectoryStep(sessionId: string, event: RuntimeEvent): TrajectoryStep | undefined {

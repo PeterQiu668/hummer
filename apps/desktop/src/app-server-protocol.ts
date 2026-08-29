@@ -6,6 +6,30 @@ export function approvalResult(approved: boolean): { decision: 'accept' | 'decli
   return { decision: approved ? 'accept' : 'decline' };
 }
 
+export interface ScopedApprovalRequest {
+  approvalId: string;
+  requestId: string | number;
+  message: Record<string, unknown>;
+}
+
+export function scopeAppServerApproval(message: unknown, scope: string): ScopedApprovalRequest | undefined {
+  if (!isRecord(message)) return undefined;
+  const method = stringValue(message.method);
+  if (method !== 'item/commandExecution/requestApproval' && method !== 'item/fileChange/requestApproval') return undefined;
+  if (message.id === undefined || (typeof message.id !== 'string' && typeof message.id !== 'number')) return undefined;
+  const params = isRecord(message.params) ? message.params : {};
+  const localApprovalId = stringValue(params.approvalId) || String(message.id);
+  const approvalId = scope + ':' + localApprovalId;
+  return {
+    approvalId,
+    requestId: message.id,
+    message: {
+      ...message,
+      params: { ...params, approvalId },
+    },
+  };
+}
+
 export function translateAppServerMessage(message: unknown): unknown[] {
   if (!isRecord(message)) return [];
   const method = stringValue(message.method);
@@ -14,13 +38,13 @@ export function translateAppServerMessage(message: unknown): unknown[] {
   if (method === 'thread/started' && isRecord(params.thread)) {
     return [{ type: 'thread.started', thread_id: stringValue(params.thread.id) }];
   }
-  if (method === 'turn/started') return [{ type: 'turn.started' }];
+  if (method === 'turn/started') return [{ type: 'turn.started', turn_id: nestedString(params, 'turn', 'id') }];
   if (method === 'turn/completed') {
     const turn = isRecord(params.turn) ? params.turn : {};
     if (turn.status === 'failed' || turn.status === 'interrupted') {
-      return [{ type: 'turn.failed', error: { message: turn.status === 'interrupted' ? 'Codex turn was interrupted.' : errorMessage(turn.error) } }];
+      return [{ type: 'turn.failed', turn_id: stringValue(turn.id), error: { message: turn.status === 'interrupted' ? 'Codex turn was interrupted.' : errorMessage(turn.error) } }];
     }
-    return [{ type: 'turn.completed' }];
+    return [{ type: 'turn.completed', turn_id: stringValue(turn.id) }];
   }
   if (method === 'thread/tokenUsage/updated') {
     const tokenUsage = isRecord(params.tokenUsage) ? params.tokenUsage : {};
@@ -70,6 +94,15 @@ function errorMessage(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+
+}
+function nestedString(value: unknown, ...path: string[]): string {
+  let current = value;
+  for (const key of path) {
+    if (!isRecord(current)) return '';
+    current = current[key];
+  }
+  return stringValue(current);
 }
 
 function stringValue(value: unknown): string {
