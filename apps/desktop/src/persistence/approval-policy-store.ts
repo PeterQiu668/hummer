@@ -17,6 +17,22 @@ export interface ApprovalAuthorization extends ApprovalPolicyDecision {
   approved: boolean;
 }
 
+export interface ApprovalEvidence {
+  id: string;
+  sessionId: string;
+  status: 'pending' | 'approved' | 'declined';
+  requestedAt: string;
+  decidedAt: string | null;
+  action: string;
+  requestedBy: string;
+  estimatedCostCny: number | null;
+  policyId: string | null;
+  approverActorRef: string | null;
+  decisionActorRef: string | null;
+  decisionEventType: string | null;
+  eventHash: string | null;
+}
+
 interface PolicyRow {
   id: string;
   action_pattern: string;
@@ -28,8 +44,12 @@ interface PolicyRow {
 }
 
 interface ApprovalRow {
+  id: string;
+  session_id: string;
   sequence: number;
+  status: 'pending' | 'approved' | 'declined';
   requested_at: string;
+  resolved_at: string | null;
   payload_json: string;
 }
 
@@ -50,7 +70,7 @@ export class ApprovalPolicyStore {
     this.events = new DomainEventStore(database);
   }
 
-  ensureDefaults(tenantId: string, approverActorRef = 'human:owner'): void {
+  ensureDefaults(tenantId: string, approverActorRef: string): void {
     const now = new Date().toISOString();
     const insert = this.database.prepare(`
       INSERT OR IGNORE INTO approval_policies
@@ -81,15 +101,49 @@ export class ApprovalPolicyStore {
     }));
   }
 
+  preview(tenantId: string, input: ApprovalPolicyRequest): ApprovalPolicyDecision {
+    return evaluateApprovalPolicy(this.list(tenantId), input);
+  }
+
+  getEvidence(tenantId: string, sessionId: string, approvalId: string): ApprovalEvidence | undefined {
+    const row = this.database.prepare(`
+      SELECT a.id, a.session_id, a.sequence, a.status, a.requested_at, a.resolved_at, a.payload_json
+      FROM approvals a
+      JOIN sessions s ON s.id = a.session_id
+      WHERE a.id = ? AND a.session_id = ? AND s.tenant_id = ?
+    `).get<ApprovalRow>(approvalId, sessionId, tenantId);
+    if (!row) return undefined;
+    const payload = parsePayload(row.payload_json);
+    const authorization = objectField(payload, 'policyAuthorization');
+    const request = objectField(payload, 'approvalRequest');
+    const decision = this.events.listByTenant(tenantId)
+      .filter((event) => event.aggregateType === 'approval' && event.aggregateId === approvalId)
+      .at(-1);
+    return {
+      id: row.id,
+      sessionId: row.session_id,
+      status: row.status,
+      requestedAt: row.requested_at,
+      decidedAt: row.resolved_at,
+      action: stringField(request, 'action') ?? stringField(payload, 'tool') ?? 'unknown',
+      requestedBy: stringField(request, 'requestedBy') ?? stringField(payload, 'actorRef') ?? 'unknown',
+      estimatedCostCny: numberField(request, 'estimatedCostCny') ?? numberField(payload, 'costCny'),
+      policyId: stringField(authorization, 'policyId') ?? null,
+      approverActorRef: stringField(payload, 'approverActorRef') ?? stringField(authorization, 'approverActorRef') ?? null,
+      decisionActorRef: decision?.actorRef ?? null,
+      decisionEventType: decision?.type ?? null,
+      eventHash: decision?.hash ?? null,
+    };
+  }
+
   authorize(input: AuthorizeApprovalInput): ApprovalAuthorization {
-    this.ensureDefaults(input.tenantId);
     const decision = evaluateApprovalPolicy(this.list(input.tenantId), input);
     const approverMatches = decision.effect !== 'require_approval' || decision.approverActorRef === input.approverActorRef;
     const approved = input.approved && decision.effect !== 'deny' && approverMatches;
     const authorization: ApprovalAuthorization = { ...decision, approved };
     const run = this.database.transaction(() => {
       const current = this.database.prepare(`
-        SELECT sequence, requested_at, payload_json FROM approvals WHERE id = ? AND session_id = ?
+        SELECT id, session_id, sequence, status, requested_at, resolved_at, payload_json FROM approvals WHERE id = ? AND session_id = ?
       `).get<ApprovalRow>(input.approvalId, input.sessionId);
       if (!current) throw new Error(`Approval ${input.approvalId} is not pending for session ${input.sessionId}`);
       const payload = parsePayload(current.payload_json);
@@ -98,7 +152,12 @@ export class ApprovalPolicyStore {
       `).run(
         approved ? 'approved' : 'declined',
         input.occurredAt,
-        canonicalJson({ ...payload, policyAuthorization: authorization, approverActorRef: input.approverActorRef }),
+        canonicalJson({
+          ...payload,
+          approvalRequest: { action: input.action, requestedBy: input.requestedBy, estimatedCostCny: input.estimatedCostCny },
+          policyAuthorization: authorization,
+          approverActorRef: input.approverActorRef,
+        }),
         input.approvalId,
         input.sessionId,
       );
@@ -107,7 +166,7 @@ export class ApprovalPolicyStore {
         tenantId: input.tenantId,
         aggregateType: 'approval',
         aggregateId: input.approvalId,
-        type: approved ? 'approval.authorized' : 'approval.denied',
+        type: approved ? 'approval.authorized' : input.approved ? 'approval.denied' : 'approval.rejected',
         occurredAt: input.occurredAt,
         actorRef: input.approverActorRef,
         correlationId: `corr_${input.sessionId}`,
@@ -129,4 +188,19 @@ export class ApprovalPolicyStore {
 function parsePayload(value: string): Record<string, JsonValue> {
   const parsed = JSON.parse(value) as JsonValue;
   return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : {};
+}
+
+function objectField(value: Record<string, JsonValue>, key: string): Record<string, JsonValue> {
+  const candidate = value[key];
+  return typeof candidate === 'object' && candidate !== null && !Array.isArray(candidate) ? candidate : {};
+}
+
+function stringField(value: Record<string, JsonValue>, key: string): string | undefined {
+  const candidate = value[key];
+  return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
+}
+
+function numberField(value: Record<string, JsonValue>, key: string): number | null {
+  const candidate = value[key];
+  return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
 }

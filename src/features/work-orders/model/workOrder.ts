@@ -76,7 +76,7 @@ export type WorkOrderTransitionResult =
 export function createDemoWorkOrder(input: Pick<WorkOrder, 'id' | 'title' | 'goal' | 'ownerActorRef' | 'assignedEmployeeId'>): WorkOrder {
   return {
     ...input,
-    tenantId: 'tenant_demo',
+    tenantId: 'tenant_fixture',
     status: 'draft',
     version: 0,
     commandReceipts: {},

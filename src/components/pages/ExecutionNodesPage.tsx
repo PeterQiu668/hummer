@@ -19,7 +19,7 @@ export default function ExecutionNodesPage() {
     }
     setLoading(true);
     try {
-      setNodes(await port.list('tenant_demo'));
+      setNodes(await port.list());
       setMessage('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '无法读取执行节点状态');

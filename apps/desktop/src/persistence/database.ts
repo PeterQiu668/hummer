@@ -4,14 +4,17 @@ import { ApprovalPolicyStore } from './approval-policy-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
 import { EvidenceStore, type StoredEvidence } from './evidence-store.js';
+import { IdentityStore } from './identity-store.js';
 import { applyMigrations } from './migrations.js';
 import { OrganizationStore } from './organization-store.js';
+import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
 
 export interface OpenPersistenceOptions {
   dataDirectory: string;
   databasePath?: string;
+  now?: () => Date;
 }
 
 export interface AppliedMigration {
@@ -92,11 +95,14 @@ export class DesktopPersistence {
   readonly organization: OrganizationStore;
   readonly approvalPolicies: ApprovalPolicyStore;
   readonly executionNodes: ExecutionNodeStore;
+  readonly identity: IdentityStore;
+  readonly projects: ProjectStore;
 
   constructor(
     private readonly database: SqliteDatabase,
     dataDirectory: string,
     databasePath: string,
+    now: () => Date,
   ) {
     this.databasePath = databasePath;
     this.domainEvents = new DomainEventStore(database);
@@ -105,6 +111,8 @@ export class DesktopPersistence {
     this.organization = new OrganizationStore(database);
     this.approvalPolicies = new ApprovalPolicyStore(database);
     this.executionNodes = new ExecutionNodeStore(database);
+    this.identity = new IdentityStore(database, now);
+    this.projects = new ProjectStore(database, now);
   }
 
   close(): void {
@@ -129,6 +137,10 @@ export class DesktopPersistence {
 
   appendDomainEvent(input: DomainEventInput): StoredDomainEvent {
     return this.domainEvents.append(input);
+  }
+
+  listDomainEvents(sessionToken: string): StoredDomainEvent[] {
+    return this.domainEvents.listByTenant(this.identity.currentTenantId(sessionToken));
   }
 
   verifyDomainEventIntegrity(): IntegrityResult {
@@ -187,7 +199,7 @@ export function openPersistence(options: OpenPersistenceOptions): DesktopPersist
   const database = openSqlite(databasePath);
   try {
     applyMigrations(database);
-    return new DesktopPersistence(database, options.dataDirectory, databasePath);
+    return new DesktopPersistence(database, options.dataDirectory, databasePath, options.now ?? (() => new Date()));
   } catch (error) {
     database.close();
     throw error;

@@ -23,8 +23,11 @@ try {
 
   await page.addInitScript(() => {
     localStorage.removeItem('hummer-v6');
+    localStorage.removeItem('hummer.auth.session');
+    localStorage.removeItem('hummer.auth.session.browser');
   });
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+  await ensureIdentity(page, 'desktop');
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 15_000 });
   const composer = page.getByRole('textbox', { name: '任务描述' });
   await composer.waitFor({ state: 'visible', timeout: 5_000 });
@@ -63,6 +66,7 @@ try {
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mobile.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+  await ensureIdentity(mobile, 'mobile');
   await mobile.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 5_000 });
   await delay(800);
   await mobile.screenshot({ path: 'dist/hummer-v5-mobile-workbench.png', fullPage: true });
@@ -82,6 +86,15 @@ try {
   vite.kill();
 }
 
+async function ensureIdentity(page, suffix) {
+  const gate = page.getByRole('heading', { name: '进入 HUMMER' });
+  if (!await gate.count()) return;
+  await page.getByLabel('公司名称').fill(`HUMMER 验收企业 ${suffix}`);
+  await page.getByLabel('你的姓名').fill('自动化验收员');
+  await page.getByLabel('邮箱或手机').fill(`acceptance-${suffix}@example.test`);
+  await page.getByRole('button', { name: '创建并进入' }).click();
+  await gate.waitFor({ state: 'hidden', timeout: 5_000 });
+}
 async function waitForServer(url) {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {

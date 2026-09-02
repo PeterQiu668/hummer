@@ -7,6 +7,7 @@ export function enrichRuntimeEventEvidence(
   persistence: DesktopPersistence,
   event: PersistableRuntimeEvent,
   workspaceDirectory: string,
+  tenantId: string,
 ): PersistableRuntimeEvent {
   const evidenceRefs = event.evidenceRefs.filter((ref) => !/^(?:evi|fixture):\/\//.test(ref));
   if (event.type === 'tool' && event.tool === 'workspace.patch') {
@@ -14,7 +15,7 @@ export function enrichRuntimeEventEvidence(
       const path = resolve(workspaceDirectory, relativePath);
       if (!isInside(workspaceDirectory, path) || !existsSync(path)) continue;
       const stored = persistence.evidence.put(readFileSync(path), {
-        tenantId: 'tenant_demo',
+        tenantId,
         sessionId: event.sessionId,
         mediaType: mediaType(path),
         name: relativePath,

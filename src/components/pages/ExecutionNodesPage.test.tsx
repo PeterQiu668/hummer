@@ -2,10 +2,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ExecutionNodesPage from './ExecutionNodesPage';
 
-afterEach(() => { delete window.hummerExecutionNodes; });
+afterEach(() => {
+  delete window.hummerExecutionNodes;
+  localStorage.removeItem('hummer.auth.session');
+});
 
 describe('ExecutionNodesPage', () => {
   it('shows host-backed node facts and sends the real kill-all command', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-node-test');
     const killAll = vi.fn().mockResolvedValue({ killed: 1 });
     window.hummerExecutionNodes = {
       list: vi.fn().mockResolvedValue([{ id: 'node_local', tenantId: 'tenant_demo', displayName: 'H4-480', runtimeId: 'codex-cli', status: 'online', cwd: 'C:\\workspace', permissionScope: 'workspace-write; approval-required', currentSessionId: 'ses_live', lastSeenAt: '2026-08-28T11:00:00.000Z' }]),

@@ -1,19 +1,28 @@
 import { join, resolve } from 'node:path';
 import { app, ipcMain } from 'electron';
 import { enrichRuntimeEventEvidence } from './persistence-runtime.js';
-import { openPersistence, type DesktopPersistence, type HireDigitalEmployeeInput } from './persistence/index.js';
+import {
+  openPersistence,
+  type CreateCompanyInput,
+  type DesktopPersistence,
+  type HireDigitalEmployeeInput,
+} from './persistence/index.js';
 import type { AuthorizeApprovalInput } from './persistence/approval-policy-store.js';
 import type { JsonValue } from './persistence/canonical-json.js';
 import type { PersistableRuntimeEvent } from './persistence/runtime-event-store.js';
 
 interface SessionRecordRequest {
+  token: string;
   plan: Record<string, unknown>;
   handle: Record<string, unknown>;
 }
-
-interface AppendEventRequest extends SessionRecordRequest {
-  event: Record<string, unknown>;
+interface AppendEventRequest extends SessionRecordRequest { event: Record<string, unknown> }
+interface Authenticated<T> { token: string; input: T }
+interface InvitationRequest {
+  token: string;
+  input: { contactType: 'email' | 'phone'; contactValue: string; role: 'admin' | 'member' };
 }
+interface AcceptInvitationRequest { token: string; displayName: string; email?: string; phone?: string }
 
 export interface PersistenceHostRegistration {
   databasePath: string;
@@ -25,13 +34,26 @@ export interface PersistenceHostOptions {
 
 
 const CHANNELS = [
+  'hummer:identity:create-company',
+  'hummer:identity:accept-invitation',
+  'hummer:identity:resume',
+  'hummer:identity:list-tenants',
+  'hummer:identity:switch-tenant',
+  'hummer:identity:list-members',
+  'hummer:identity:create-invitation',
   'hummer:persistence:list-sessions',
   'hummer:persistence:save-session',
   'hummer:persistence:append-event',
   'hummer:persistence:verify-integrity',
   'hummer:organization:list-employees',
   'hummer:organization:hire-employee',
+  'hummer:projects:list',
+  'hummer:projects:create',
+  'hummer:projects:growth-chain',
+  'hummer:projects:record-growth-review',
+  'hummer:approval-policy:preview',
   'hummer:approval-policy:authorize',
+  'hummer:approval-policy:evidence',
   'hummer:execution-nodes:list',
   'hummer:execution-nodes:kill-all',
 ] as const;
@@ -41,18 +63,23 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
   const persistence = openPersistence({ dataDirectory });
   persistence.runtimeEvents.interruptStaleRealSessions(new Date().toISOString());
-  const nodeId = 'node_local';
   const runtimeId = process.env.HUMMER_RUNTIME_SHELL === 'claude' ? 'claude-code' : 'codex-cli';
-  persistence.executionNodes.registerLocal({ id: nodeId, tenantId: 'tenant_demo', displayName: process.env.COMPUTERNAME ?? '本机执行节点', runtimeId, cwd: workspaceDirectory, permissionScope: `${process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write'}; approval-required`, lastSeenAt: new Date().toISOString() });
+  const nodeIds = new Set<string>();
 
-  ipcMain.handle('hummer:persistence:list-sessions', () => listSessions(persistence));
-  ipcMain.handle('hummer:persistence:save-session', (_event, request: SessionRecordRequest) => {
-    saveSession(persistence, request);
-  });
+  ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
+  ipcMain.handle('hummer:identity:accept-invitation', (_event, input: AcceptInvitationRequest) => persistence.identity.acceptInvitation(input));
+  ipcMain.handle('hummer:identity:resume', (_event, token: string) => persistence.identity.resumeSession(token));
+  ipcMain.handle('hummer:identity:list-tenants', (_event, token: string) => persistence.identity.listTenants(token));
+  ipcMain.handle('hummer:identity:switch-tenant', (_event, request: { token: string; tenantId: string }) => persistence.identity.switchTenant(request.token, request.tenantId));
+  ipcMain.handle('hummer:identity:list-members', (_event, token: string) => persistence.identity.listMembers(token));
+  ipcMain.handle('hummer:identity:create-invitation', (_event, request: InvitationRequest) => persistence.identity.createInvitation(request.token, request.input));
+
+  ipcMain.handle('hummer:persistence:list-sessions', (_event, token: string) => listSessions(persistence, token));
+  ipcMain.handle('hummer:persistence:save-session', (_event, request: SessionRecordRequest) => saveSession(persistence, request));
   ipcMain.handle('hummer:persistence:append-event', (_event, request: AppendEventRequest) => {
-    const descriptor = descriptorFromRequest(request);
+    const descriptor = descriptorFromRequest(persistence, request);
     const event = asRuntimeEvent(request.event);
-    const persisted = enrichRuntimeEventEvidence(persistence, event, workspaceDirectory);
+    const persisted = enrichRuntimeEventEvidence(persistence, event, workspaceDirectory, descriptor.tenantId);
     persistence.runtimeEvents.save(persisted, {
       tenantId: descriptor.tenantId,
       runtimeId: descriptor.runtimeId,
@@ -61,32 +88,104 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     });
     return persisted;
   });
-  ipcMain.handle('hummer:persistence:verify-integrity', () => persistence.verifyDomainEventIntegrity());
-  ipcMain.handle('hummer:organization:list-employees', (_event, tenantId: string) => {
-    return persistence.organization.listDigitalEmployees(tenantId);
+  ipcMain.handle('hummer:persistence:verify-integrity', (_event, token: string) => {
+    persistence.identity.currentTenantId(token);
+    return persistence.verifyDomainEventIntegrity();
   });
-  ipcMain.handle('hummer:organization:hire-employee', (_event, request: HireDigitalEmployeeInput) => persistence.organization.hireDigitalEmployee(request));
-  ipcMain.handle('hummer:approval-policy:authorize', (_event, request: AuthorizeApprovalInput) => {
-    return persistence.approvalPolicies.authorize(request);
+  ipcMain.handle('hummer:organization:list-employees', (_event, token: string) => {
+    return persistence.organization.listDigitalEmployees(persistence.identity.currentTenantId(token));
   });
-  ipcMain.handle('hummer:execution-nodes:list', (_event, tenantId: string) => persistence.executionNodes.list(tenantId));
-  ipcMain.handle('hummer:execution-nodes:kill-all', async () => {
-    const killed = await options.stopAll?.() ?? 0;
-    return { killed };
+  ipcMain.handle('hummer:organization:hire-employee', (_event, request: Authenticated<Omit<HireDigitalEmployeeInput, 'tenantId' | 'sponsorActorRef'>>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const tenantSuffix = context.tenant.id.replace(/^tenant_/, '').slice(0, 12);
+    return persistence.organization.hireDigitalEmployee({
+      ...request.input,
+      id: `${request.input.id}_${tenantSuffix}`,
+      departmentId: `${request.input.departmentId}_${tenantSuffix}`,
+      tenantId: context.tenant.id,
+      sponsorActorRef: `human:${context.membership.humanUserId}`,
+    });
+  });
+  ipcMain.handle('hummer:projects:list', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    persistence.projects.releaseExpiredAssignments(tenantId);
+    return persistence.projects.list(tenantId);
+  });
+  ipcMain.handle('hummer:projects:create', (_event, request: Authenticated<{
+    title: string; goal: string; coordinatorTwinId: string;
+    collaborators: Array<{ humanUserId: string; twinId: string }>;
+    assignments: Array<{ employeeId: string; sponsorHumanId: string; permissionScope: string; expiresAt: string; workOrderId?: string }>;
+    idempotencyKey: string;
+  }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.projects.create({ ...request.input, tenantId: context.tenant.id, actorRef: `account:${context.account.id}`, accountableHumanId: context.membership.humanUserId });
+  });
+  ipcMain.handle('hummer:projects:growth-chain', (_event, request: Authenticated<{ projectId: string }>) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return persistence.projects.getGrowthChain(tenantId, request.input.projectId);
+  });
+  ipcMain.handle('hummer:projects:record-growth-review', (_event, request: Authenticated<{
+    projectId: string; workOrderId?: string; trajectoryRef: string; failedCriteria: string; targetActorRef: string;
+    baseVersion: string; candidateVersion: string; diff: string; sourceRunId: string; candidateRunId: string;
+    criteria: string; metrics: JsonValue; verdict: 'passed' | 'failed' | 'inconclusive'; promotionScope: 'private' | 'project' | 'department' | 'organization'; idempotencyKey: string;
+  }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const actorRef = `account:${context.account.id}`;
+    const badCase = persistence.projects.recordBadCase({ tenantId: context.tenant.id, projectId: request.input.projectId, workOrderId: request.input.workOrderId, trajectoryRef: request.input.trajectoryRef, reportedBy: actorRef, failedCriteria: request.input.failedCriteria, idempotencyKey: `${request.input.idempotencyKey}:badcase` });
+    const revision = persistence.projects.createSopRevision({ tenantId: context.tenant.id, projectId: request.input.projectId, badCaseId: badCase.id, targetActorRef: request.input.targetActorRef, baseVersion: request.input.baseVersion, candidateVersion: request.input.candidateVersion, diff: request.input.diff, scope: 'project', actorRef, idempotencyKey: `${request.input.idempotencyKey}:revision` });
+    const evaluation = persistence.projects.recordEvaluation({ tenantId: context.tenant.id, projectId: request.input.projectId, sopRevisionId: revision.id, sourceRunId: request.input.sourceRunId, candidateRunId: request.input.candidateRunId, criteria: request.input.criteria, metrics: request.input.metrics, verdict: request.input.verdict, actorRef, idempotencyKey: `${request.input.idempotencyKey}:evaluation` });
+    const promoted = request.input.verdict === 'passed' ? persistence.projects.promoteSopRevision({ tenantId: context.tenant.id, projectId: request.input.projectId, sopRevisionId: revision.id, promotionScope: request.input.promotionScope, actorRef, idempotencyKey: `${request.input.idempotencyKey}:promotion` }) : revision;
+    return { badCase, revision: promoted, evaluation };
+  });  ipcMain.handle('hummer:approval-policy:preview', (_event, request: Authenticated<{ action: string; requestedBy: string; estimatedCostCny: number | null }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const decision = persistence.approvalPolicies.preview(context.tenant.id, request.input);
+    const approver = decision.approverActorRef ? persistence.identity.resolveActor(request.token, decision.approverActorRef) : undefined;
+    return { ...decision, approverDisplayName: approver?.displayName ?? null };
+  });  ipcMain.handle('hummer:approval-policy:authorize', (_event, request: Authenticated<Omit<AuthorizeApprovalInput, 'tenantId' | 'approverActorRef'>>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.approvalPolicies.authorize({
+      ...request.input,
+      tenantId: context.tenant.id,
+      approverActorRef: `account:${context.account.id}`,
+    });
+  });
+  ipcMain.handle('hummer:approval-policy:evidence', (_event, request: Authenticated<{ sessionId: string; approvalId: string }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const evidence = persistence.approvalPolicies.getEvidence(context.tenant.id, request.input.sessionId, request.input.approvalId);
+    if (!evidence) throw new Error('Approval evidence is unavailable in the current tenant');
+    const approver = evidence.approverActorRef ? persistence.identity.resolveActor(request.token, evidence.approverActorRef) : undefined;
+    const decisionActor = evidence.decisionActorRef ? persistence.identity.resolveActor(request.token, evidence.decisionActorRef) : undefined;
+    return { ...evidence, approverDisplayName: approver?.displayName ?? null, decisionActorDisplayName: decisionActor?.displayName ?? null };
+  });  ipcMain.handle('hummer:execution-nodes:list', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    const nodeId = `node_local_${tenantId.replace(/^tenant_/, '').slice(0, 12)}`;
+    persistence.executionNodes.registerLocal({
+      id: nodeId, tenantId, displayName: process.env.COMPUTERNAME ?? '本地执行节点', runtimeId,
+      cwd: workspaceDirectory,
+      permissionScope: `${process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write'}; approval-required`,
+      lastSeenAt: new Date().toISOString(),
+    });
+    nodeIds.add(nodeId);
+    return persistence.executionNodes.list(tenantId);
+  });
+  ipcMain.handle('hummer:execution-nodes:kill-all', async (_event, token: string) => {
+    persistence.identity.currentTenantId(token);
+    return { killed: await options.stopAll?.() ?? 0 };
   });
 
   return {
     databasePath: persistence.databasePath,
     close: () => {
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));
-      persistence.executionNodes.markOffline(nodeId, new Date().toISOString());
+      nodeIds.forEach((nodeId) => persistence.executionNodes.markOffline(nodeId, new Date().toISOString()));
       persistence.close();
     },
   };
 }
 
-function listSessions(persistence: DesktopPersistence): Array<Record<string, JsonValue>> {
-  return persistence.runtimeEvents.listSessions().map((descriptor) => ({
+function listSessions(persistence: DesktopPersistence, token: string): Array<Record<string, JsonValue>> {
+  const tenantId = persistence.identity.currentTenantId(token);
+  return persistence.runtimeEvents.listSessions().filter((descriptor) => descriptor.tenantId === tenantId).map((descriptor) => ({
     plan: descriptor.plan,
     handle: descriptor.handle,
     events: persistence.runtimeEvents.listBySession(descriptor.sessionId) as JsonValue,
@@ -94,7 +193,7 @@ function listSessions(persistence: DesktopPersistence): Array<Record<string, Jso
 }
 
 function saveSession(persistence: DesktopPersistence, request: SessionRecordRequest): void {
-  const descriptor = descriptorFromRequest(request);
+  const descriptor = descriptorFromRequest(persistence, request);
   persistence.runtimeEvents.saveSession({
     ...descriptor,
     startedAt: new Date().toISOString(),
@@ -103,14 +202,14 @@ function saveSession(persistence: DesktopPersistence, request: SessionRecordRequ
   });
 }
 
-function descriptorFromRequest(request: SessionRecordRequest) {
+function descriptorFromRequest(persistence: DesktopPersistence, request: SessionRecordRequest) {
   const sessionId = requiredString(request.handle, 'sessionId');
   const runtimeId = requiredString(request.handle, 'runtimeId');
   const planId = requiredString(request.plan, 'id');
   return {
     sessionId,
     runtimeId,
-    tenantId: 'tenant_demo',
+    tenantId: persistence.identity.currentTenantId(request.token),
     workOrderId: `wo_${planId.replace(/^plan_/, '')}`,
   };
 }

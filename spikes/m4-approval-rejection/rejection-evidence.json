@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-09-01T14:32:52.378Z",
+  "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m4-approval-rejection\\facts",
+  "integrity": {
+    "valid": true,
+    "checked": 9
+  },
+  "evidenceText": "审批证据该记录来自当前租户的不可篡改事件账本。结论事件approval.rejected作出决定审批验收人适用策略tenant_9d0a049d64614338985f7c3ccfff77e0_policy_crm_write指定审批人审批验收人动作crm.write账本哈希83a1febc8d93949202e57ef51b2bb46a621d968e121b1c6ffc8f87e728a2f7df",
+  "screenshotPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\dist\\hummer-m4-approval-rejection.png"
+}

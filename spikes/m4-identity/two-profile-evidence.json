@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-09-01T14:30:34.246Z",
+  "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m4-identity\\facts",
+  "ownerProfile": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m4-identity\\profile-owner",
+  "memberProfile": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m4-identity\\profile-member",
+  "tenantId": "tenant_c6bc12d73733487b9746b552e0e1f626",
+  "ownerAccountId": "account_581c75d2f8b74cd188e56114e674ac42",
+  "memberAccountId": "account_1d296d785ddc4de7a3f3f6382b699c1e",
+  "memberRows": [
+    {
+      "membershipId": "membership_faf295b9f780439aa7999bd612306f39",
+      "accountId": "account_581c75d2f8b74cd188e56114e674ac42",
+      "humanUserId": "human_7487dad851d64ce9846d08c710f13b36",
+      "twinId": "twin_93d09c9b49054da3aa29f75b91689a55",
+      "displayName": "企业所有者",
+      "role": "owner",
+      "email": "owner-two-profile@example.test",
+      "phone": null
+    },
+    {
+      "membershipId": "membership_255835fb24a347ae905146b02fe066c1",
+      "accountId": "account_1d296d785ddc4de7a3f3f6382b699c1e",
+      "humanUserId": "human_1a241cae508f420fa38166a78af9420c",
+      "twinId": "twin_71f0bfe65a424208971b46f865cb5bd3",
+      "displayName": "受邀同事",
+      "role": "member",
+      "email": "member-two-profile@example.test",
+      "phone": null
+    }
+  ],
+  "uniqueActiveTwinCount": 2,
+  "restartRetained": true,
+  "screenshotPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\dist\\hummer-m4-identity-two-profile.png"
+}

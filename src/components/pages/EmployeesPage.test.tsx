@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DigitalEmployeeRecord, OrganizationPort } from '../../features/organization/organizationClient';
+import type { DesktopOrganizationHost, DigitalEmployeeRecord } from '../../features/organization/organizationClient';
 import EmployeesPage from './EmployeesPage';
 
 const hiredEmployee: DigitalEmployeeRecord = {
@@ -18,12 +18,14 @@ const hiredEmployee: DigitalEmployeeRecord = {
 };
 
 afterEach(() => {
+  localStorage.removeItem('hummer.auth.session');
   delete window.hummerOrganization;
 });
 
 describe('EmployeesPage organization facts', () => {
   it('renders the durable employee id returned by the desktop organization port', async () => {
-    const organization: OrganizationPort = {
+    localStorage.setItem('hummer.auth.session', 'auth-test-token');
+    const organization: DesktopOrganizationHost = {
       listDigitalEmployees: vi.fn().mockResolvedValue([]),
       hireDigitalEmployee: vi.fn().mockResolvedValue(hiredEmployee),
     };
@@ -33,17 +35,19 @@ describe('EmployeesPage organization facts', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加数字同事' }));
     fireEvent.click(screen.getAllByRole('button', { name: /开始 7 天试用/ })[0]);
 
-    await waitFor(() => expect(organization.hireDigitalEmployee).toHaveBeenCalledWith(expect.objectContaining({
-      id: hiredEmployee.id,
-      tenantId: hiredEmployee.tenantId,
-      sponsorActorRef: hiredEmployee.sponsorActorRef,
-    })));
+    await waitFor(() => expect(organization.hireDigitalEmployee).toHaveBeenCalledWith({
+      token: 'auth-test-token',
+      input: expect.objectContaining({
+        id: hiredEmployee.id,
+      }),
+    }));
     expect(await screen.findByText(hiredEmployee.id)).toBeInTheDocument();
     expect(container.querySelector(`[data-employee-id="${hiredEmployee.id}"]`)).not.toBeNull();
   });
 
   it('builds project teams from accountable human-twin pairs and temporary digital assistants', async () => {
-    const organization: OrganizationPort = {
+    localStorage.setItem('hummer.auth.session', 'auth-test-token');
+    const organization: DesktopOrganizationHost = {
       listDigitalEmployees: vi.fn().mockResolvedValue([]),
       hireDigitalEmployee: vi.fn(),
     };
@@ -57,10 +61,9 @@ describe('EmployeesPage organization facts', () => {
     fireEvent.click(screen.getByRole('button', { name: '项目小队' }));
     fireEvent.click(screen.getByRole('button', { name: '组建项目小队' }));
     expect(screen.getByRole('heading', { name: '组建项目小队' })).toBeInTheDocument();
-    expect(screen.getByText(/昆仑.*最终负责人/)).toBeInTheDocument();
+    expect(screen.getByText(/我（最终负责人）/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /邀请吴帆/ }));
-    expect(screen.getAllByText('吴帆 + 吴帆分身').length).toBeGreaterThan(1);
-    expect(screen.getAllByText('临时助手 · 不承担最终责任').length).toBeGreaterThan(0);
+    expect(screen.getByText(/邀请真人同事后会在这里出现/)).toBeInTheDocument();
+    expect(screen.getByText(/先添加数字同事，再分配项目临时工作/)).toBeInTheDocument();
   });
 });

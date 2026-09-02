@@ -75,25 +75,43 @@ contextBridge.exposeInMainWorld('hummerDesktop', {
   cwd: process.env.HUMMER_RUNTIME_SHELL === 'claude' ? process.env.HUMMER_CLAUDE_CWD ?? process.cwd() : process.env.HUMMER_CODEX_CWD ?? process.cwd(),
 });
 
+contextBridge.exposeInMainWorld('hummerIdentity', {
+  createCompany: (input: unknown) => ipcRenderer.invoke('hummer:identity:create-company', input),
+  acceptInvitation: (input: unknown) => ipcRenderer.invoke('hummer:identity:accept-invitation', input),
+  resumeSession: (token: string) => ipcRenderer.invoke('hummer:identity:resume', token),
+  listTenants: (token: string) => ipcRenderer.invoke('hummer:identity:list-tenants', token),
+  switchTenant: (token: string, tenantId: string) => ipcRenderer.invoke('hummer:identity:switch-tenant', { token, tenantId }),
+  listMembers: (token: string) => ipcRenderer.invoke('hummer:identity:list-members', token),
+  createInvitation: (token: string, input: unknown) => ipcRenderer.invoke('hummer:identity:create-invitation', { token, input }),
+});
+
 contextBridge.exposeInMainWorld('hummerPersistence', {
-  listSessions: () => ipcRenderer.invoke('hummer:persistence:list-sessions'),
+  listSessions: (token: string) => ipcRenderer.invoke('hummer:persistence:list-sessions', token),
   saveSession: (record: unknown) => ipcRenderer.invoke('hummer:persistence:save-session', record),
   appendEvent: (record: unknown) => ipcRenderer.invoke('hummer:persistence:append-event', record),
-  verifyIntegrity: () => ipcRenderer.invoke('hummer:persistence:verify-integrity'),
+  verifyIntegrity: (token: string) => ipcRenderer.invoke('hummer:persistence:verify-integrity', token),
 });
 
 contextBridge.exposeInMainWorld('hummerOrganization', {
-  listDigitalEmployees: (tenantId: string) => ipcRenderer.invoke('hummer:organization:list-employees', tenantId),
+  listDigitalEmployees: (token: string) => ipcRenderer.invoke('hummer:organization:list-employees', token),
   hireDigitalEmployee: (request: unknown) => ipcRenderer.invoke('hummer:organization:hire-employee', request),
 });
 
+contextBridge.exposeInMainWorld('hummerProjects', {
+  list: (token: string) => ipcRenderer.invoke('hummer:projects:list', token),
+  create: (request: unknown) => ipcRenderer.invoke('hummer:projects:create', request),
+  growthChain: (request: unknown) => ipcRenderer.invoke('hummer:projects:growth-chain', request),
+  recordGrowthReview: (request: unknown) => ipcRenderer.invoke('hummer:projects:record-growth-review', request),
+});
 contextBridge.exposeInMainWorld('hummerApprovalPolicy', {
+  preview: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:preview', request),
   authorize: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:authorize', request),
+  evidence: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:evidence', request),
 });
 
 contextBridge.exposeInMainWorld('hummerExecutionNodes', {
-  list: (tenantId: string) => ipcRenderer.invoke('hummer:execution-nodes:list', tenantId),
-  killAll: () => ipcRenderer.invoke('hummer:execution-nodes:kill-all'),
+  list: (token: string) => ipcRenderer.invoke('hummer:execution-nodes:list', token),
+  killAll: (token: string) => ipcRenderer.invoke('hummer:execution-nodes:kill-all', token),
 });
 
 contextBridge.exposeInMainWorld('hummerRuntimeConnectors', {

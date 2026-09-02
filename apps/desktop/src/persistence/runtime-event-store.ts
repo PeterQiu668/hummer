@@ -39,6 +39,9 @@ export interface PersistedSessionDescriptor {
 interface StepRow {
   event_json: string;
 }
+interface ApprovalPayloadRow {
+  payload_json: string;
+}
 
 interface SessionDescriptorRow {
   id: string;
@@ -200,9 +203,17 @@ export class RuntimeEventStore {
     }
     if (event.type === 'approval_resolved') {
       const approved = event.approved === true;
+      const existingApproval = this.database.prepare('SELECT payload_json FROM approvals WHERE id = ? AND session_id = ?')
+        .get<ApprovalPayloadRow>(approvalId, event.sessionId);
       const changed = this.database.prepare(`
         UPDATE approvals SET status = ?, resolved_at = ?, payload_json = ? WHERE id = ? AND session_id = ?
-      `).run(approved ? 'approved' : 'declined', event.occurredAt, canonicalJson(event), approvalId, event.sessionId);
+      `).run(
+        approved ? 'approved' : 'declined',
+        event.occurredAt,
+        mergeApprovalPayload(existingApproval?.payload_json, event),
+        approvalId,
+        event.sessionId,
+      );
       if (changed.changes === 0) {
         const inherited = this.database.prepare('SELECT id FROM approvals WHERE id = ?').get<{ id: string }>(approvalId);
         if (inherited) return;
@@ -226,6 +237,17 @@ export class RuntimeEventStore {
       ON CONFLICT(id) DO NOTHING
     `).run(id, options.tenantId, event.sessionId, options.workOrderId ?? null, eventJson, event.occurredAt);
   }
+}
+
+function mergeApprovalPayload(existing: string | undefined, resolution: PersistableRuntimeEvent): string {
+  if (!existing) return canonicalJson(resolution);
+  try {
+    const parsed = JSON.parse(existing) as unknown;
+    if (isJsonObject(parsed)) return canonicalJson({ ...parsed, runtimeResolution: resolution });
+  } catch {
+    // A malformed legacy projection must not prevent the immutable runtime event from being persisted.
+  }
+  return canonicalJson(resolution);
 }
 
 function isJsonObject(value: unknown): value is Record<string, JsonValue> {

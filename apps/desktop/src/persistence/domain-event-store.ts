@@ -90,6 +90,11 @@ export class DomainEventStore {
     return this.database.prepare('SELECT * FROM domain_events ORDER BY position').all<DomainEventRow>().map(mapRow);
   }
 
+  listByTenant(tenantId: string): StoredDomainEvent[] {
+    return this.database.prepare('SELECT * FROM domain_events WHERE tenant_id = ? ORDER BY position')
+      .all<DomainEventRow>(tenantId).map(mapRow);
+  }
+
   verifyIntegrity(): IntegrityResult {
     const rows = this.database.prepare('SELECT * FROM domain_events ORDER BY position').all<DomainEventRow>();
     let expectedPreviousHash: string | null = null;

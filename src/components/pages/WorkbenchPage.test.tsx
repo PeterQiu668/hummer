@@ -10,8 +10,9 @@ function renderWorkbench(store = new MemorySessionStore()) {
 }
 afterEach(() => {
   delete window.hummerOrganization;
-});
   delete window.hummerApprovalPolicy;
+  localStorage.removeItem('hummer.auth.session');
+});
 
 
 describe('WorkbenchPage V5', () => {
@@ -42,6 +43,7 @@ describe('WorkbenchPage V5', () => {
     expect(screen.queryByLabelText('任务 SOP')).not.toBeInTheDocument();
   });
   it('offers a persisted digital employee as the same durable assignee id', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-workbench-test');
     window.hummerOrganization = {
       listDigitalEmployees: vi.fn().mockResolvedValue([{
         id: 'employee_m-1',
@@ -102,8 +104,11 @@ describe('WorkbenchPage V5', () => {
   });
 
   it('checks the enterprise approval policy before replying to the runtime', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-workbench-test');
     const authorize = vi.fn().mockResolvedValue({ approved: true, effect: 'require_approval', policyId: 'tenant_demo_policy_shell_command', approverActorRef: 'human:owner', reason: 'matched_rule' });
-    window.hummerApprovalPolicy = { authorize };
+    const preview = vi.fn().mockResolvedValue({ effect: 'require_approval', policyId: 'tenant_demo_policy_shell_command', approverActorRef: 'human:owner', approverDisplayName: '负责人', reason: 'matched_rule' });
+    const evidence = vi.fn().mockResolvedValue({});
+    window.hummerApprovalPolicy = { authorize, preview, evidence };
     const runtime = new MockRuntimeAdapter({ stepDelayMs: 1 });
     const respond = vi.spyOn(runtime, 'respondToApproval');
     render(<WorkbenchPage runtime={runtime} sessionStore={new MemorySessionStore()} />);
@@ -114,14 +119,35 @@ describe('WorkbenchPage V5', () => {
     await screen.findAllByText('客户管理系统更新等待确认');
     fireEvent.click(screen.getByRole('button', { name: '确认更新' }));
 
-    await waitFor(() => expect(authorize).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: 'tenant_demo',
-      approverActorRef: 'human:owner',
-      approved: true,
-    })));
+    await waitFor(() => expect(authorize).toHaveBeenCalledWith({
+      token: 'auth-workbench-test',
+      input: expect.objectContaining({ approved: true }),
+    }));
     expect(respond).toHaveBeenCalledWith(expect.objectContaining({ runtimeId: runtime.id }), expect.any(String), true);
   });
 
+  it('shows the responsible people, policy and durable evidence after rejecting a protected action', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-workbench-test');
+    const authorize = vi.fn().mockResolvedValue({ approved: false, effect: 'require_approval', policyId: 'tenant_demo_policy_crm_write', approverActorRef: 'account_owner', reason: 'matched_rule' });
+    const preview = vi.fn().mockResolvedValue({ effect: 'require_approval', policyId: 'tenant_demo_policy_crm_write', approverActorRef: 'account_owner', approverDisplayName: '王经理', reason: 'matched_rule' });
+    const evidence = vi.fn().mockResolvedValue({ id: 'approval_plan', sessionId: 'mock_plan_1', status: 'declined', action: 'crm.write', requestedBy: 'employee:researcher', estimatedCostCny: null, policyId: 'tenant_demo_policy_crm_write', approverActorRef: 'account_owner', approverDisplayName: '王经理', decisionActorRef: 'account_owner', decisionActorDisplayName: '王经理', decisionEventType: 'approval.rejected', decidedAt: '2026-09-01T09:00:00.000Z', eventHash: 'abc123' });
+    window.hummerApprovalPolicy = { authorize, preview, evidence };
+    renderWorkbench();
+    const composer = screen.getByRole('textbox', { name: '任务描述' });
+    fireEvent.change(composer, { target: { value: '整理本周线索' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(await screen.findByRole('button', { name: '开始干' }));
+
+    expect(await screen.findByText('王经理')).toBeInTheDocument();
+    expect(screen.getByText('tenant_demo_policy_crm_write')).toBeInTheDocument();
+    expect(screen.getByText('未提供')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '拒绝本次操作' }));
+
+    expect(await screen.findByText('已被拒绝')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '查看审批证据' }));
+    expect(await screen.findByRole('dialog', { name: '审批证据' })).toHaveTextContent('approval.rejected');
+    expect(screen.getByRole('dialog', { name: '审批证据' })).toHaveTextContent('王经理');
+  });
   it('keeps a bottom composer and records an operator interruption in the trajectory', async () => {
     renderWorkbench();
     const composer = screen.getByRole('textbox', { name: '任务描述' });

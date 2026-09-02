@@ -26,6 +26,7 @@ import {
   Target,
   UserRound,
   Workflow,
+  X,
 } from 'lucide-react';
 import WorkspacePage from './WorkspacePage';
 import SessionPlanCard from '../../features/sessions/components/SessionPlanCard';
@@ -39,7 +40,7 @@ import {
 } from '../../features/sessions/model/session';
 import type { RuntimeAdapter, RuntimeEvent, RuntimeHandle } from '../../features/sessions/runtime/adapter';
 import { desktopOrganizationPort } from '../../features/organization/organizationClient';
-import { desktopApprovalPolicyPort } from '../../features/approvals/approvalPolicyClient';
+import { desktopApprovalPolicyPort, type ApprovalEvidence, type ApprovalPreviewResult } from '../../features/approvals/approvalPolicyClient';
 import { projectRuntimeSession } from '../../features/sessions/runtime/projection';
 import { createDefaultRuntimeAdapter } from '../../features/sessions/runtime/runtimeFactory';
 import { actorDisplayName, runtimeDisplayName } from '../../features/sessions/runtime/runtimeDisplay';
@@ -84,6 +85,9 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [takeover, setTakeover] = useState(false);
   const [takeoverNote, setTakeoverNote] = useState('');
   const [policyError, setPolicyError] = useState<string | null>(null);
+  const [approvalPreview, setApprovalPreview] = useState<ApprovalPreviewResult | null>(null);
+  const [approvalEvidence, setApprovalEvidence] = useState<ApprovalEvidence | null>(null);
+  const [approvalEvidenceOpen, setApprovalEvidenceOpen] = useState(false);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
 
@@ -111,7 +115,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     const organization = desktopOrganizationPort();
     if (!organization) return;
     let active = true;
-    void organization.listDigitalEmployees('tenant_demo').then((employees) => {
+    void organization.listDigitalEmployees().then((employees) => {
       if (active) setOrganizationAssignees(employees.map((employee) => `${employee.name} · ${employee.id}`));
     }).catch(() => {
       if (active) setOrganizationAssignees([]);
@@ -131,6 +135,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   );
   const session = projection?.session;
   const pendingApproval = projection?.pendingApproval;
+  const lastApprovalResolution = [...(activeRecord?.events ?? [])].reverse().find((event): event is Extract<RuntimeEvent, { type: 'approval_resolved' }> => event.type === 'approval_resolved');
   const lastStep = session?.steps.at(-1);
   const selectedStep = session?.steps.find((item) => item.id === selectedStepId) ?? lastStep;
   const hasDesktopAction = activeRecord?.events.some((event) => event.type === 'tool' && /browser|desktop/i.test(event.tool)) ?? false;
@@ -146,6 +151,29 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
       onStop={() => activeRecord ? runtime.stop(activeRecord.handle) : Promise.resolve()}
     />
   );
+
+  useEffect(() => {
+    if (!activeRecord || !pendingApproval) {
+      setApprovalPreview(null);
+      return;
+    }
+    const policy = desktopApprovalPolicyPort();
+    if (!policy) {
+      setApprovalPreview(null);
+      return;
+    }
+    let active = true;
+    void policy.preview({
+      action: pendingApproval.tool,
+      requestedBy: pendingApproval.actorRef,
+      estimatedCostCny: pendingApproval.costCny,
+    }).then((preview) => {
+      if (active) setApprovalPreview(preview);
+    }).catch((error) => {
+      if (active) setPolicyError(error instanceof Error ? error.message : '未能读取审批策略');
+    });
+    return () => { active = false; };
+  }, [activeRecord?.handle.sessionId, pendingApproval?.approvalId]);
 
   useEffect(() => {
     if (lastStep) setSelectedStepId(lastStep.id);
@@ -237,13 +265,11 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
       let finalApproved = approved;
       if (policy) {
         const authorization = await policy.authorize({
-          tenantId: 'tenant_demo',
           sessionId: activeRecord.handle.sessionId,
           approvalId: pendingApproval.approvalId,
           action: pendingApproval.tool,
           requestedBy: pendingApproval.actorRef,
           estimatedCostCny: pendingApproval.costCny,
-          approverActorRef: 'human:owner',
           approved,
           occurredAt: new Date().toISOString(),
         });
@@ -251,9 +277,26 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
         if (approved && !finalApproved) setPolicyError(`企业审批策略已拒绝：${authorization.reason}`);
       }
       await runtime.respondToApproval(activeRecord.handle, pendingApproval.approvalId, finalApproved);
+      if (policy) void openApprovalEvidence(pendingApproval.approvalId);
       if (!approved || finalApproved) setPolicyError(null);
     } catch (error) {
       setPolicyError(error instanceof Error ? error.message : '审批策略校验失败，已停止回传');
+    }
+  };
+
+  const openApprovalEvidence = async (approvalId: string) => {
+    if (!activeRecord) return;
+    const policy = desktopApprovalPolicyPort();
+    if (!policy) {
+      setPolicyError('当前为演示运行时，未连接企业审批证据账本');
+      return;
+    }
+    try {
+      const evidence = await policy.evidence({ sessionId: activeRecord.handle.sessionId, approvalId });
+      setApprovalEvidence(evidence);
+      setApprovalEvidenceOpen(true);
+    } catch (error) {
+      setPolicyError(error instanceof Error ? error.message : '审批证据读取失败');
     }
   };
 
@@ -351,7 +394,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     running: '执行中',
     awaiting_approval: '等待确认',
     paused: '已暂停',
-    blocked: '被策略阻断',
+    blocked: lastApprovalResolution?.approved === false ? '已被拒绝' : '被策略阻断',
     delivered: '已交付',
     cancelled: '已停止',
     interrupted: '已中断',
@@ -444,18 +487,32 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                   </div>
                 )}
                 {pendingApproval && activeRecord && (
-                  <div className="m-3 flex flex-col gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 sm:flex-row sm:items-center">
-                    <AlertTriangle size={15} className="shrink-0 text-warning" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-medium text-neutral-800">{pendingApproval.title}</div>
-                      <div className="mt-0.5 text-[11px] text-neutral-600">{pendingApproval.message}</div>
-                      {policyError && <div role="alert" className="mt-1 text-[10.5px] text-danger">{policyError}</div>}
-                      {pendingApproval.diffRef && <div className="mt-1 text-[9.5px] text-neutral-400">已生成更新前后差异，可确认后继续</div>}
+                  <div className="m-3 flex flex-col gap-3 rounded-md border border-warning/40 bg-warning-soft p-3">
+                    <div className="flex min-w-0 gap-2">
+                      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-neutral-800">{pendingApproval.title}</div>
+                        <div className="mt-0.5 text-[11px] text-neutral-600">{pendingApproval.message}</div>
+                        {pendingApproval.diffRef && <div className="mt-1 text-[9.5px] text-neutral-400">已生成更新前后差异，可确认后继续</div>}
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => { void resolveApproval(false); }} className="hum-btn is-sm">打回</button>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10.5px] text-neutral-600 sm:grid-cols-4">
+                      <div><dt className="text-neutral-400">请求人</dt><dd>{actorDisplayName(pendingApproval.actorRef)}</dd></div>
+                      <div><dt className="text-neutral-400">必须批准</dt><dd>{approvalPreview?.approverDisplayName ?? (approvalPreview?.approverActorRef ? actorDisplayName(approvalPreview.approverActorRef) : '正在确认')}</dd></div>
+                      <div><dt className="text-neutral-400">审批策略</dt><dd className="truncate" title={approvalPreview?.policyId ?? undefined}>{approvalPreview?.policyId ?? '正在确认'}</dd></div>
+                      <div><dt className="text-neutral-400">预估费用</dt><dd>{pendingApproval.costCny === null ? '未提供' : `¥${pendingApproval.costCny.toFixed(4)}`}</dd></div>
+                    </dl>
+                    {policyError && <div role="alert" className="text-[10.5px] text-danger">{policyError}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => { void resolveApproval(false); }} className="hum-btn is-sm is-danger">拒绝本次操作</button>
                       <button type="button" onClick={() => { void resolveApproval(true); }} className="hum-btn is-sm is-primary"><ClipboardCheck size={12} /> 确认更新</button>
                     </div>
+                  </div>
+                )}
+                {lastApprovalResolution?.approved === false && (
+                  <div className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-[11px] text-danger">
+                    <span>本次受保护操作已被拒绝，执行已停止。</span>
+                    <button type="button" onClick={() => { void openApprovalEvidence(lastApprovalResolution.approvalId); }} className="hum-btn is-sm">查看审批证据</button>
                   </div>
                 )}
               </section>
@@ -474,6 +531,22 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 </section>
               )}
 
+              {approvalEvidenceOpen && approvalEvidence && (
+                <section role="dialog" aria-modal="true" aria-label="审批证据" className="hum-card border-neutral-300 p-4 shadow-lg">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><div className="text-[13px] font-semibold text-neutral-900">审批证据</div><div className="mt-0.5 text-[10.5px] text-neutral-500">该记录来自当前租户的不可篡改事件账本。</div></div>
+                    <button type="button" aria-label="关闭审批证据" onClick={() => setApprovalEvidenceOpen(false)} className="hum-btn is-sm"><X size={13} /></button>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-1 gap-x-5 gap-y-2 text-[11px] text-neutral-700 sm:grid-cols-2">
+                    <div><dt className="text-neutral-400">结论事件</dt><dd>{approvalEvidence.decisionEventType ?? '等待记录'}</dd></div>
+                    <div><dt className="text-neutral-400">作出决定</dt><dd>{approvalEvidence.decisionActorDisplayName ?? approvalEvidence.decisionActorRef ?? '未知'}</dd></div>
+                    <div><dt className="text-neutral-400">适用策略</dt><dd>{approvalEvidence.policyId ?? '默认拒绝'}</dd></div>
+                    <div><dt className="text-neutral-400">指定审批人</dt><dd>{approvalEvidence.approverDisplayName ?? approvalEvidence.approverActorRef ?? '未知'}</dd></div>
+                    <div><dt className="text-neutral-400">动作</dt><dd>{approvalEvidence.action}</dd></div>
+                    <div><dt className="text-neutral-400">账本哈希</dt><dd className="truncate font-mono text-[10px]" title={approvalEvidence.eventHash ?? undefined}>{approvalEvidence.eventHash ?? '等待记录'}</dd></div>
+                  </dl>
+                </section>
+              )}
               {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence))} />}
 
               <ExecutionComposer value={followUp} onChange={setFollowUp} onSubmit={sendFollowUp} disabled={session.status === 'cancelled' || session.status === 'delivered' || session.status === 'interrupted'} />
@@ -652,7 +725,7 @@ function ResultPanel({ session, onFork }: { session: ExecutionSession; onFork: (
           <p className="text-[12px] leading-5 text-neutral-700">{result.summary}</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2"><Detail label="交付物" value={result.deliverables[0]?.name ?? '--'} /><Detail label="证据与回滚" value={`${result.evidenceRefs.length} 条证据 · ${result.rollback.supported ? '支持回滚' : '不支持回滚'}`} /></div>
         </div>
-        <div className="flex items-end gap-2"><button type="button" className="hum-btn is-sm flex-1">通过验收</button><button type="button" onClick={onFork} className="hum-btn is-sm flex-1"><GitFork size={12} /> 打回复跑</button></div>
+        <div className="flex items-end gap-2"><button type="button" onClick={onFork} className="hum-btn is-sm flex-1"><GitFork size={12} /> 打回复跑</button></div>
       </div>
     </section>
   );

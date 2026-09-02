@@ -9,4 +9,17 @@ export type {
 export type { DomainEventInput, IntegrityResult, StoredDomainEvent } from './domain-event-store.js';
 export type { DigitalEmployeeRecord, HireDigitalEmployeeInput } from './organization-store.js';
 export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
+export type {
+  AccountRecord,
+  AuthSessionRecord,
+  CreateCompanyInput,
+  IdentityContext,
+  InvitationRecord,
+  MemberRecord,
+  MembershipRecord,
+  MembershipRole,
+  TenantRecord,
+} from './identity-store.js';
 export type { PersistableRuntimeEvent, PersistedSessionDescriptor, RuntimeEventQuery, SaveRuntimeEventOptions } from './runtime-event-store.js';
+
+export type { BadCaseRecord, CreateProjectInput, EvaluationRecord, ProjectGrowthChain, ProjectMembershipRecord, ProjectRecord, SopRevisionRecord, WorkerAssignmentRecord } from './project-store.js';

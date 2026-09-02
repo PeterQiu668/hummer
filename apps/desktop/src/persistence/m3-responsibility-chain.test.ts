@@ -35,6 +35,7 @@ describe('M3 responsibility chain', () => {
       const options = { tenantId: 'tenant_demo', runtimeId: 'codex-cli', correlationId: 'corr_m3_chain', workOrderId: 'wo_m3_chain' };
       persistence.runtimeEvents.save({ sessionId, sequence: 1, occurredAt: '2026-08-28T14:10:01.000Z', actorRef: 'human:owner', type: 'delegation', assigneeRef: employee.id, evidenceRefs: [] }, options);
       persistence.runtimeEvents.save({ sessionId, sequence: 2, occurredAt: '2026-08-28T14:10:02.000Z', actorRef: employee.id, type: 'approval_required', approvalId, tool: 'crm.write.accounts', evidenceRefs: [] }, options);
+      persistence.approvalPolicies.ensureDefaults('tenant_demo', 'human:owner');
       const authorization = persistence.approvalPolicies.authorize({
         tenantId: 'tenant_demo', sessionId, approvalId, action: 'crm.write.accounts',
         requestedBy: employee.id, estimatedCostCny: 2, approverActorRef: 'human:owner',

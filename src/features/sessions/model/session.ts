@@ -179,7 +179,7 @@ export function createSessionFromPlan(plan: SessionPlan): ExecutionSession {
   );
   return {
     id: `ses_${plan.id}`,
-    tenantId: 'tenant_demo',
+    tenantId: 'tenant_fixture',
     branchId: 'main',
     status: 'running',
     approvalMode: plan.approvalMode,
@@ -212,7 +212,7 @@ export function createDemoSession(): ExecutionSession {
 
   return {
     id: 'ses_gtm_q3_001',
-    tenantId: 'tenant_demo',
+    tenantId: 'tenant_fixture',
     branchId: 'main',
     status: 'running',
     approvalMode: 'L2',

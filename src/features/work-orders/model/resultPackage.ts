@@ -71,7 +71,7 @@ export function createDemoResultPackage(input: CreateDemoResultPackageInput = {}
 
   return {
     id: input.id ?? 'res_demo_001',
-    tenantId: input.tenantId ?? 'tenant_demo',
+    tenantId: input.tenantId ?? 'tenant_fixture',
     workOrderId: input.workOrderId ?? 'wo_demo_001',
     status: 'delivered',
     summary: 'Synthetic GTM research package with prioritized accounts and next-step recommendations.',

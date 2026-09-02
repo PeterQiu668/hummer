@@ -211,8 +211,149 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX execution_nodes_tenant ON execution_nodes (tenant_id, status);
     `,
   },
-];
+  {
+    version: 3,
+    name: 'm4a_identity_and_tenant_boundary',
+    sql: `
+      CREATE TABLE tenants (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
 
+      CREATE TABLE accounts (
+        id TEXT PRIMARY KEY,
+        email TEXT,
+        phone TEXT,
+        display_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE UNIQUE INDEX accounts_email_unique ON accounts (email) WHERE email IS NOT NULL;
+      CREATE UNIQUE INDEX accounts_phone_unique ON accounts (phone) WHERE phone IS NOT NULL;
+
+      ALTER TABLE human_users ADD COLUMN account_id TEXT REFERENCES accounts(id);
+      CREATE UNIQUE INDEX human_users_active_account
+        ON human_users (tenant_id, account_id) WHERE status = 'active' AND account_id IS NOT NULL;
+      CREATE UNIQUE INDEX digital_twins_one_active_per_human
+        ON digital_twins (tenant_id, owner_human_id) WHERE status = 'active';
+
+      CREATE TABLE memberships (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        human_user_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, account_id),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (account_id) REFERENCES accounts(id),
+        FOREIGN KEY (human_user_id) REFERENCES human_users(id)
+      );
+
+      CREATE INDEX memberships_account ON memberships (account_id, status);
+      CREATE INDEX memberships_tenant ON memberships (tenant_id, status);
+
+      CREATE TABLE invitations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        contact_type TEXT NOT NULL CHECK (contact_type IN ('email', 'phone')),
+        contact_value TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'member')),
+        token_hash TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        invited_by_account_id TEXT NOT NULL,
+        accepted_by_account_id TEXT,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        accepted_at TEXT,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (invited_by_account_id) REFERENCES accounts(id),
+        FOREIGN KEY (accepted_by_account_id) REFERENCES accounts(id)
+      );
+
+      CREATE INDEX invitations_tenant_status ON invitations (tenant_id, status);
+
+      CREATE TABLE sessions_auth (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        current_tenant_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts(id),
+        FOREIGN KEY (current_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE INDEX sessions_auth_account_status ON sessions_auth (account_id, status);
+    `,
+  },
+  {
+    version: 4,
+    name: 'm4c_projects_and_evolution',
+    sql: `
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        goal TEXT NOT NULL,
+        accountable_human_id TEXT NOT NULL,
+        coordinator_twin_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (accountable_human_id) REFERENCES human_users(id),
+        FOREIGN KEY (coordinator_twin_id) REFERENCES digital_twins(id)
+      );
+      CREATE INDEX projects_tenant_status ON projects (tenant_id, status, created_at);
+      CREATE TABLE project_memberships (
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, actor_ref TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('accountable_human', 'coordinator_twin', 'collaborating_human', 'collaborator_twin', 'digital_assistant', 'temporary_specialist', 'external_expert')),
+        scope TEXT NOT NULL, joined_at TEXT NOT NULL, expires_at TEXT, status TEXT NOT NULL DEFAULT 'active',
+        UNIQUE (project_id, actor_ref), FOREIGN KEY (project_id) REFERENCES projects(id)
+      );
+      CREATE INDEX project_memberships_tenant_project ON project_memberships (tenant_id, project_id, status);
+      CREATE TABLE worker_assignments (
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, work_order_id TEXT,
+        employee_id TEXT NOT NULL, sponsor_human_id TEXT NOT NULL, permission_scope TEXT NOT NULL,
+        expires_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, released_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id), FOREIGN KEY (employee_id) REFERENCES digital_employees(id),
+        FOREIGN KEY (sponsor_human_id) REFERENCES human_users(id)
+      );
+      CREATE INDEX worker_assignments_expiry ON worker_assignments (tenant_id, status, expires_at);
+      CREATE TABLE bad_cases (
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, work_order_id TEXT,
+        trajectory_ref TEXT NOT NULL, reported_by TEXT NOT NULL, failed_criteria TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL, FOREIGN KEY (project_id) REFERENCES projects(id)
+      );
+      CREATE INDEX bad_cases_project ON bad_cases (tenant_id, project_id, created_at);
+      CREATE TABLE sop_revisions (
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, bad_case_id TEXT NOT NULL,
+        target_actor_ref TEXT NOT NULL, base_version TEXT NOT NULL, candidate_version TEXT NOT NULL, diff TEXT NOT NULL,
+        scope TEXT NOT NULL CHECK (scope IN ('private', 'project', 'department', 'organization')),
+        status TEXT NOT NULL DEFAULT 'candidate', promoted_scope TEXT, created_at TEXT NOT NULL, promoted_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id), FOREIGN KEY (bad_case_id) REFERENCES bad_cases(id)
+      );
+      CREATE INDEX sop_revisions_project ON sop_revisions (tenant_id, project_id, created_at);
+      CREATE TABLE evaluations (
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, sop_revision_id TEXT NOT NULL,
+        source_run_id TEXT NOT NULL, candidate_run_id TEXT NOT NULL, criteria TEXT NOT NULL, metrics_json TEXT NOT NULL,
+        verdict TEXT NOT NULL CHECK (verdict IN ('passed', 'failed', 'inconclusive')), created_at TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id), FOREIGN KEY (sop_revision_id) REFERENCES sop_revisions(id)
+      );
+      CREATE INDEX evaluations_revision ON evaluations (tenant_id, sop_revision_id, created_at);
+    `,
+  },
+];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -227,7 +368,6 @@ export function applyMigrations(database: SqliteDatabase): void {
     database.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
       .run(migration.version, migration.name, new Date().toISOString());
   });
-
   for (const migration of migrations) {
     if (!applied.has(migration.version)) apply(migration);
   }

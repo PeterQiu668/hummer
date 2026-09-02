@@ -2,11 +2,11 @@
   "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m2-persistence\\facts",
   "integrityBefore": {
     "valid": true,
-    "checked": 9
+    "checked": 10
   },
   "integrityAfter": {
     "valid": true,
-    "checked": 9
+    "checked": 10
   },
   "beforeRestart": [
     {

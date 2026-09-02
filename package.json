@@ -26,7 +26,10 @@
     "test:desktop:codex:approval": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc --approval",
     "test:desktop:codex:steer": "node scripts/e2e-desktop-codex-controls.mjs --steer",
     "test:desktop:codex:interrupt": "node scripts/e2e-desktop-codex-controls.mjs --interrupt",
-    "test:desktop:persistence": "node scripts/e2e-desktop-persistence.mjs"
+    "test:desktop:persistence": "node scripts/e2e-desktop-persistence.mjs",
+    "test:desktop:identity": "node scripts/e2e-desktop-identity.mjs",
+    "test:desktop:approval-rejection": "node scripts/e2e-desktop-approval-rejection.mjs",
+    "test:desktop:projects": "node scripts/e2e-desktop-projects.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

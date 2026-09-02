@@ -19,7 +19,7 @@ describe('runtime artifact evidence', () => {
       sessionId: 'ses_1', sequence: 2, occurredAt: '2026-08-28T03:00:00.000Z', actorRef: 'employee:codex',
       type: 'tool', tool: 'workspace.patch', args: { changes: [{ path: 'summary.md' }] }, result: 'completed',
       status: 'completed', durationMs: null, costCny: null, evidenceRefs: ['evi://fake'], title: 'file change',
-    }, root);
+    }, root, 'tenant_demo');
 
     expect(event.evidenceRefs).toHaveLength(1);
     expect(event.evidenceRefs[0]).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);

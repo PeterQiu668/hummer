@@ -1,3 +1,4 @@
+import { currentSessionToken } from '../../identity/identityClient';
 import type { SessionPlan } from '../model/session';
 import type { RuntimeEvent, RuntimeHandle } from '../runtime/adapter';
 
@@ -14,10 +15,10 @@ export interface SessionStore {
 }
 
 interface DesktopPersistenceHost {
-  listSessions(): Promise<PersistedSessionRecord[]>;
-  saveSession(record: { plan: SessionPlan; handle: RuntimeHandle }): Promise<void>;
-  appendEvent(record: { plan: SessionPlan; handle: RuntimeHandle; event: RuntimeEvent }): Promise<RuntimeEvent>;
-  verifyIntegrity(): Promise<{ valid: boolean; checked: number; brokenEventId?: string; reason?: string }>;
+  listSessions(token: string): Promise<PersistedSessionRecord[]>;
+  saveSession(record: { token: string; plan: SessionPlan; handle: RuntimeHandle }): Promise<void>;
+  appendEvent(record: { token: string; plan: SessionPlan; handle: RuntimeHandle; event: RuntimeEvent }): Promise<RuntimeEvent>;
+  verifyIntegrity(token: string): Promise<{ valid: boolean; checked: number; brokenEventId?: string; reason?: string }>;
 }
 
 declare global {
@@ -56,16 +57,22 @@ class DesktopSessionStore implements SessionStore {
   constructor(private readonly host: DesktopPersistenceHost) {}
 
   listSessions(): Promise<PersistedSessionRecord[]> {
-    return this.host.listSessions();
+    return this.host.listSessions(requireSessionToken());
   }
 
   saveSession(plan: SessionPlan, handle: RuntimeHandle): Promise<void> {
-    return this.host.saveSession({ plan, handle });
+    return this.host.saveSession({ token: requireSessionToken(), plan, handle });
   }
 
   appendEvent(handle: RuntimeHandle, plan: SessionPlan, event: RuntimeEvent): Promise<RuntimeEvent> {
-    return this.host.appendEvent({ plan, handle, event });
+    return this.host.appendEvent({ token: requireSessionToken(), plan, handle, event });
   }
+}
+
+function requireSessionToken(): string {
+  const token = currentSessionToken();
+  if (!token) throw new Error('Desktop persistence requires an authenticated session');
+  return token;
 }
 
 function cloneRecord(record: PersistedSessionRecord): PersistedSessionRecord {
