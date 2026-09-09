@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-09-09T17:43:13.560Z",
+  "created": {
+    "id": "project_ebc2c8153ff9475caaf0dada80047e02",
+    "tenantId": "tenant_f34d281670a64c7bbd82e9d83755c343",
+    "title": "M4-C 重启验收项目",
+    "goal": "验证项目事实跨桌面重启保留",
+    "accountableHumanId": "human_19d80892248b4b8f9d21667b915da3b5",
+    "coordinatorTwinId": "twin_c3f2cd0a5fe9426f81824125c7524dbd",
+    "status": "active",
+    "memberCount": 2,
+    "activeAssignmentCount": 0,
+    "createdAt": "2026-09-09T17:43:08.789Z",
+    "updatedAt": "2026-09-09T17:43:08.789Z"
+  },
+  "beforeRestart": [
+    {
+      "id": "project_ebc2c8153ff9475caaf0dada80047e02",
+      "tenantId": "tenant_f34d281670a64c7bbd82e9d83755c343",
+      "title": "M4-C 重启验收项目",
+      "goal": "验证项目事实跨桌面重启保留",
+      "accountableHumanId": "human_19d80892248b4b8f9d21667b915da3b5",
+      "coordinatorTwinId": "twin_c3f2cd0a5fe9426f81824125c7524dbd",
+      "status": "active",
+      "memberCount": 2,
+      "activeAssignmentCount": 0,
+      "createdAt": "2026-09-09T17:43:08.789Z",
+      "updatedAt": "2026-09-09T17:43:08.789Z"
+    }
+  ],
+  "afterRestart": {
+    "projects": [
+      {
+        "id": "project_ebc2c8153ff9475caaf0dada80047e02",
+        "tenantId": "tenant_f34d281670a64c7bbd82e9d83755c343",
+        "title": "M4-C 重启验收项目",
+        "goal": "验证项目事实跨桌面重启保留",
+        "accountableHumanId": "human_19d80892248b4b8f9d21667b915da3b5",
+        "coordinatorTwinId": "twin_c3f2cd0a5fe9426f81824125c7524dbd",
+        "status": "active",
+        "memberCount": 2,
+        "activeAssignmentCount": 0,
+        "createdAt": "2026-09-09T17:43:08.789Z",
+        "updatedAt": "2026-09-09T17:43:08.789Z"
+      }
+    ],
+    "integrity": {
+      "valid": true,
+      "checked": 2
+    }
+  },
+  "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m4c-projects\\facts"
+}
