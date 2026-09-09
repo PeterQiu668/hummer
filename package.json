@@ -9,11 +9,16 @@
     "packages/*"
   ],
   "scripts": {
+    "config:generate": "node packages/config/scripts/generate.mjs",
+    "config:check": "node packages/config/scripts/generate.mjs --check",
+    "prebuild": "npm run config:generate",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "pretypecheck": "npm run config:generate",
     "typecheck": "tsc -b --noEmit",
     "test": "npm run test:unit && npm run test:ui",
+    "pretest:unit": "npm run config:check",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:ui": "vitest run --config vitest.ui.config.ts",
     "test:watch": "vitest --config vitest.ui.config.ts",

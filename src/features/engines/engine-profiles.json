@@ -1,0 +1,27 @@
+{
+  "defaultProfileId": "deepseek-standard",
+  "profiles": [
+    {
+      "id": "deepseek-standard",
+      "tier": "standard",
+      "label": "标准",
+      "available": true,
+      "dataDomain": "api.deepseek.com"
+    },
+    {
+      "id": "zhipu-enhanced",
+      "tier": "enhanced",
+      "label": "增强",
+      "available": false,
+      "dataDomain": "open.bigmodel.cn",
+      "compatibilityNote": "Codex CLI 0.150.1 requires a Responses-compatible endpoint. This tier is temporarily unavailable until the provider or a supported HUMMER shell supplies one."
+    },
+    {
+      "id": "openai-flagship",
+      "tier": "flagship",
+      "label": "旗舰",
+      "available": true,
+      "dataDomain": "api.openai.com"
+    }
+  ]
+}

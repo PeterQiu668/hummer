@@ -1,3 +1,5 @@
+import config from './engine-profiles.json';
+
 export type EngineTier = 'standard' | 'enhanced' | 'flagship';
 
 export interface CustomerEngineProfile {
@@ -19,21 +21,9 @@ declare global {
   }
 }
 
-const browserPrototypeProfiles: readonly CustomerEngineProfile[] = Object.freeze([
-  Object.freeze({
-    id: 'deepseek-standard', tier: 'standard', label: '\u6807\u51c6',
-    available: true, dataDomain: 'api.deepseek.com',
-  }),
-  Object.freeze({
-    id: 'zhipu-enhanced', tier: 'enhanced', label: '\u589e\u5f3a',
-    available: false, dataDomain: 'open.bigmodel.cn',
-    compatibilityNote: 'Codex CLI 0.150.1 requires a Responses-compatible endpoint. This tier is temporarily unavailable.',
-  }),
-  Object.freeze({
-    id: 'openai-flagship', tier: 'flagship', label: '\u65d7\u8230',
-    available: true, dataDomain: 'api.openai.com',
-  }),
-]);
+const browserPrototypeProfiles: readonly CustomerEngineProfile[] = Object.freeze(
+  (config.profiles as CustomerEngineProfile[]).map((profile) => Object.freeze({ ...profile })),
+);
 
 export function browserEngineProfiles(): readonly CustomerEngineProfile[] {
   return browserPrototypeProfiles;

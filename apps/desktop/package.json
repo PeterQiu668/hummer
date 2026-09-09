@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
+    "prebuild": "node ../../packages/config/scripts/generate.mjs",
     "build": "tsc -b",
     "start": "electron dist/main.js",
     "package:dir": "electron-builder --dir"
