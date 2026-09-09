@@ -10,7 +10,7 @@ export interface SessionCostSummary { totalCostCny: number | null; entryCount: n
 export interface OutcomeReceipt { generatedAt: string; tenantId: string; outcome: OutcomeEventRecord; definition: OutcomeDefinitionRecord; costs: CostLedgerRecord[]; totalCostCny: number; approval: unknown; chainIntegrity: { valid: boolean; checked: number }; receiptJson: string }
 export interface DefineOutcomeCommand { actionPattern: string; title: string; acceptanceCriteria: string; unitPriceCny?: number | null; riskLevel: OutcomeRiskLevel; idempotencyKey: string }
 export interface RecordOutcomeCommand { outcomeDefinitionId: string; workOrderId?: string; sessionId: string; approvalId?: string; verdict: OutcomeVerdict; evidenceRef?: string; occurredAt: string; idempotencyKey: string }
-export interface RecordCostCommand { sessionId: string; outcomeEventId?: string; engineProfileId: string; model: string; usage: RuntimeUsage; occurredAt: string; idempotencyKey: string }
+export interface RecordCostCommand { sessionId: string; outcomeEventId?: string; engineProfileId: string; model: string; usage: RuntimeUsage; pricingSource?: 'planning'; occurredAt: string; idempotencyKey: string }
 
 interface DesktopOutcomeHost {
   define(request: { token: string; input: DefineOutcomeCommand }): Promise<OutcomeDefinitionRecord>;

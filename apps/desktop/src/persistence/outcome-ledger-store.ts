@@ -83,6 +83,7 @@ export interface RecordCostInput {
   engineProfileId: string;
   model: string;
   usage: RuntimeUsage;
+  pricingSource?: 'planning';
   occurredAt: string;
   actorRef: string;
   idempotencyKey: string;
@@ -203,13 +204,13 @@ export class OutcomeLedgerStore {
       `).run(
         id, input.tenantId, input.sessionId, input.outcomeEventId ?? null, input.engineProfileId, input.model,
         input.usage.inputTokens, input.usage.cachedInputTokens, input.usage.outputTokens,
-        priced.costCny, priced.pricingSource, priced.pricingVerifiedAt, computedAt, input.idempotencyKey,
+        priced.costCny, input.pricingSource ?? priced.pricingSource, priced.pricingVerifiedAt, computedAt, input.idempotencyKey,
       );
       this.event(input.tenantId, 'cost_ledger', id, 'cost.recorded', input.actorRef, input.idempotencyKey, {
         sessionId: input.sessionId, outcomeEventId: input.outcomeEventId ?? null, engineProfileId: input.engineProfileId,
         model: input.model,
         usage: { inputTokens: input.usage.inputTokens, cachedInputTokens: input.usage.cachedInputTokens, outputTokens: input.usage.outputTokens } as JsonValue,
-        costCny: priced.costCny, pricingSource: priced.pricingSource,
+        costCny: priced.costCny, pricingSource: input.pricingSource ?? priced.pricingSource,
       });
       return this.requireCost(input.tenantId, id);
     })();

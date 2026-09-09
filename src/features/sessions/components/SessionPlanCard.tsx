@@ -23,6 +23,9 @@ export default function SessionPlanCard({
       <div className="flex items-center gap-2 border-b border-neutral-100 px-5 py-4">
         <span className="grid h-8 w-8 place-items-center rounded-md bg-neutral-900 text-white"><Sparkles size={15} /></span>
         <h2 className="text-[14px] font-semibold text-neutral-900">我理解你要做的是：</h2>
+        <span className={`ml-auto hum-chip ${plan.planning?.source === 'runtime' ? 'is-success' : 'is-warning'}`} title={plan.planning?.fallbackReason ?? plan.planning?.costUnavailableReason}>
+          {plan.planning?.label ?? '演示计划 · 未经模型生成'}
+        </span>
       </div>
       <div className="px-5 py-4">
         <ol className="space-y-2.5">
@@ -61,6 +64,7 @@ export default function SessionPlanCard({
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
+          {plan.planning?.source === 'runtime' && <span className="mr-auto self-center text-[10.5px] text-neutral-500">规划成本：{plan.planning.costCny === undefined ? plan.planning.costUnavailableReason ?? '未提供' : `¥${plan.planning.costCny.toFixed(4)}`}</span>}
           <button type="button" onClick={onRevise} className="hum-btn"><Pencil size={13} /> 改一下</button>
           <button type="submit" autoFocus className="hum-btn is-primary"><span>开始干</span><ArrowRight size={13} /></button>
         </div>

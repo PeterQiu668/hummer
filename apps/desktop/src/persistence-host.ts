@@ -147,8 +147,15 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   });  ipcMain.handle('hummer:approval-policy:preview', (_event, request: Authenticated<{ action: string; requestedBy: string; estimatedCostCny: number | null }>) => {
     const context = persistence.identity.resumeSession(request.token);
     const decision = persistence.approvalPolicies.preview(context.tenant.id, request.input);
+    const rule = decision.policyId ? persistence.approvalPolicies.list(context.tenant.id).find((candidate) => candidate.id === decision.policyId) : undefined;
     const approver = decision.approverActorRef ? persistence.identity.resolveActor(request.token, decision.approverActorRef) : undefined;
-    return { ...decision, approverDisplayName: approver?.displayName ?? null };
+    return {
+      ...decision,
+      approverDisplayName: approver?.displayName ?? null,
+      actionPattern: rule?.actionPattern ?? null,
+      riskLevel: rule?.riskLevel ?? null,
+      budgetLimitCny: rule?.budgetLimitCny ?? null,
+    };
   });  ipcMain.handle('hummer:approval-policy:authorize', (_event, request: Authenticated<Omit<AuthorizeApprovalInput, 'tenantId' | 'approverActorRef'>>) => {
     const context = persistence.identity.resumeSession(request.token);
     return persistence.approvalPolicies.authorize({

@@ -35,7 +35,9 @@
     "test:desktop:identity": "node scripts/e2e-desktop-identity.mjs",
     "test:desktop:approval-rejection": "node scripts/e2e-desktop-approval-rejection.mjs",
     "test:desktop:projects": "node scripts/e2e-desktop-projects.mjs",
-    "test:desktop:outcome-receipt": "node scripts/e2e-desktop-outcome-receipt.mjs"
+    "test:desktop:outcome-receipt": "node scripts/e2e-desktop-outcome-receipt.mjs",
+    "test:desktop:planner": "node scripts/e2e-desktop-planner.mjs",
+    "test:desktop:planner:deepseek": "node scripts/e2e-desktop-planner.mjs --engine-profile=deepseek-standard"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

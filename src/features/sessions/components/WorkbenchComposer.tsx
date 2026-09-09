@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AtSign, BrainCircuit, ChevronDown, Clock3, FolderOpen, Paperclip, Send, ShieldCheck } from 'lucide-react';
+import { AtSign, BrainCircuit, ChevronDown, Clock3, FolderOpen, LoaderCircle, Paperclip, Send, ShieldCheck } from 'lucide-react';
 import type { ApprovalMode } from '../model/session';
 import { engineProfileForLabel, type CustomerEngineProfile } from '../../engines/engineProfileClient';
 
@@ -28,15 +28,16 @@ export interface WorkbenchComposerProps {
   onWorkContextChange: (value: string) => void;
   compact?: boolean;
   onRecentSelect?: (prompt: string) => void;
+  busy?: boolean;
 }
 
 export default function WorkbenchComposer(props: WorkbenchComposerProps) {
-  const { value, onChange, onSubmit, assignee, assigneeOptions = [], onAssigneeChange, approvalMode, onApprovalModeChange, attachmentNames, onAttachmentNamesChange, modelProfile, engineProfiles, onModelProfileChange, workContext, onWorkContextChange, compact = false, onRecentSelect } = props;
+  const { value, onChange, onSubmit, assignee, assigneeOptions = [], onAssigneeChange, approvalMode, onApprovalModeChange, attachmentNames, onAttachmentNamesChange, modelProfile, engineProfiles, onModelProfileChange, workContext, onWorkContextChange, compact = false, onRecentSelect, busy = false } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const selectedProfile = engineProfileForLabel(engineProfiles, modelProfile);
-  const submit = () => { if (value.trim()) onSubmit(); };
+  const submit = () => { if (value.trim() && !busy) onSubmit(); };
 
   return <div className={compact ? 'w-full' : 'mx-auto w-full max-w-[920px]'}>
     {!compact && <div className="mb-5 text-center"><h2 className="text-[24px] font-semibold text-neutral-900">昆仑，今天想推进什么？</h2><p className="mt-1.5 text-[12px] text-neutral-500">你可以自己处理，也可以交给分身或数字同事一起完成。</p></div>}
@@ -49,7 +50,8 @@ export default function WorkbenchComposer(props: WorkbenchComposerProps) {
         <label className="relative flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] text-neutral-600 hover:bg-white"><ShieldCheck size={13} /><span className="sr-only">任务权限</span><select aria-label="任务权限" value={approvalMode} onChange={(event) => onApprovalModeChange(event.target.value as ApprovalMode)} className="appearance-none bg-transparent pr-4 font-medium text-neutral-700 outline-none"><option value="L1">只查看</option><option value="L2">执行前确认</option><option value="L3">范围内自动</option></select><ChevronDown size={11} className="pointer-events-none absolute right-1.5" /></label>
         <button type="button" onClick={() => fileInput.current?.click()} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-neutral-600 hover:bg-white"><Paperclip size={13} /> {attachmentNames.length ? `${attachmentNames.length} 份资料` : '添加资料'}</button>
         <input ref={fileInput} type="file" multiple className="hidden" aria-label="选择参考资料" onChange={(event) => onAttachmentNamesChange(Array.from(event.target.files ?? []).map((file) => file.name))} />
-        <button type="button" onClick={submit} disabled={!value.trim()} aria-label="提交任务" className="ml-auto grid h-8 w-8 place-items-center rounded-md bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30"><Send size={14} /></button>
+        {busy && <span role="status" className="ml-auto flex items-center gap-1.5 text-[10.5px] text-neutral-500"><LoaderCircle size={12} className="animate-spin" /> 正在生成计划</span>}
+        <button type="button" onClick={submit} disabled={!value.trim() || busy} aria-label={busy ? '正在生成计划' : '提交任务'} className={`${busy ? '' : 'ml-auto'} grid h-8 w-8 place-items-center rounded-md bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30`}>{busy ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />}</button>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-neutral-100 bg-white px-3 py-1.5 text-[10.5px] text-neutral-500">
         <span>数据流向：<strong className="font-medium text-neutral-700">{selectedProfile.dataDomain}</strong></span>

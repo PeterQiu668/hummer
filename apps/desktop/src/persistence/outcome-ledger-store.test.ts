@@ -146,4 +146,28 @@ describe('OutcomeLedgerStore', () => {
     expect(receipt.totalCostCny).toBe(0);
     persistence.close();
   });
+
+  it('includes a planning cost linked to its accepted planning outcome in the receipt', () => {
+    const persistence = openPersistence({ dataDirectory: tmpDir() });
+    const owner = persistence.identity.createCompany({ companyName: '甲公司', displayName: '甲', email: 'planning@example.test' });
+    const sessionId = 'ses_planning_receipt';
+    const definition = persistence.outcomes.defineOutcome({
+      tenantId: owner.tenant.id, actionPattern: 'file.write.report', title: '报告验收', acceptanceCriteria: '内容完整',
+      riskLevel: 'high', actorRef: `account:${owner.account.id}`, idempotencyKey: 'planning-def-001',
+    });
+    const outcome = persistence.outcomes.recordOutcome({
+      tenantId: owner.tenant.id, outcomeDefinitionId: definition.id, sessionId, verdict: 'accepted',
+      acceptedBy: `account:${owner.account.id}`, occurredAt: '2026-09-02T09:10:00.000Z', idempotencyKey: 'planning-outcome-001',
+    });
+    const planningCost = persistence.outcomes.recordCost({
+      tenantId: owner.tenant.id, sessionId, outcomeEventId: outcome.id, engineProfileId: 'deepseek-standard', model: 'deepseek-v4-flash',
+      usage: { inputTokens: 1000, cachedInputTokens: 100, outputTokens: 200 }, pricingSource: 'planning',
+      occurredAt: '2026-09-02T09:10:01.000Z', actorRef: `account:${owner.account.id}`, idempotencyKey: 'planning-cost-001',
+    });
+
+    const receipt = persistence.buildOutcomeReceipt(owner.tenant.id, outcome.id);
+    expect(receipt.costs).toEqual([expect.objectContaining({ id: planningCost.id, pricingSource: 'planning' })]);
+    expect(receipt.totalCostCny).toBe(planningCost.costCny);
+    persistence.close();
+  });
 });

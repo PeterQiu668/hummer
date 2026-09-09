@@ -71,3 +71,25 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
   SKIP because the browser prototype has no local fact store. `scripts/ops-simulation-2.mjs` retains
   one pre-existing FAIL for inbound channel triggering. That finding is outside W1/M5-B and is not
   changed because this work order explicitly prohibits channel implementation.
+
+## M5-B status update - 2026-09-10
+
+### Planner boundary and policy gates
+
+- Added runtime-neutral `Planner`, `TemplatePlanner`, and `RuntimePlanner`; both implementations pass the same contract suite.
+- Runtime planning reuses the existing RuntimeAdapter method set. No provider or desktop type entered the product domain.
+- Codex app-server planning uses protocol-level `turn/start.outputSchema` and a read-only sandbox. A failed prompt-only run was retained as a failed acceptance observation; the successful run was generated at 2026-09-10 03:55:57 (Asia/Shanghai).
+- `humanGates` are derived from the current tenant's seven persisted approval policies. Model-authored gates are ignored. Policy lookup failure defaults protected actions to denied.
+
+### Real external runtime evidence
+
+- `spikes/m5b-planner/openai-codex-validation-evidence.json`: five task classes, five distinct understanding arrays, no fallback sentence, five accepted planning outcomes, five valid hash-chain receipts.
+- `spikes/m5b-planner/openai-codex-validation-wire.jsonl`: five schema-constrained turn starts and zero command execution, file change, or approval request messages.
+- Local screenshots are in `dist/hummer-m5b-plan-{excel,contract,external-send,delete,hiring}.png`; the delete screenshot contains the critical `data.delete*` gate.
+- The post-planning Codex execution regression completed at 2026-09-10 04:14:34 (Asia/Shanghai): read command, file-change approval, UI approval response, `workspace.patch`, real `summary.md`, and `turn.completed` all appeared in one run.
+
+### Blocked product-profile evidence
+
+- `DEEPSEEK_API_KEY` was absent from the process environment at verification time. The default `deepseek-standard` E2E was not run and is not claimed.
+- The internal validation model is not in the verified CNY price catalog. Planning outcomes and valid receipts exist, but their cost lists are empty and the UI reports that cost is unavailable. The priced planning-cost receipt gate remains blocked until `npm run test:desktop:planner:deepseek` passes with a safely injected key.
+- No Feishu, channel adapter, or inbound/outbound messaging work was started.

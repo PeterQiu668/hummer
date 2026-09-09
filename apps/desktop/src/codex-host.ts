@@ -29,6 +29,8 @@ interface Invocation {
   initialPrompt: string;
   protocol: 'exec-jsonl' | 'app-server-jsonrpc';
   engineProfileId: string;
+  sandbox: 'read-only' | 'workspace-write';
+  outputSchema?: Record<string, unknown>;
 }
 
 interface EventEnvelope {
@@ -60,6 +62,7 @@ interface RunState {
   threadId?: string;
   invocation: Invocation;
   turnId?: string;
+  turnActive: boolean;
 }
 
 const runs = new Map<string, RunState>();
@@ -115,6 +118,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     approvalRequests: new Map(),
     approvalWatchdog,
     invocation: request,
+    turnActive: false,
   };
   runs.set(processId, state);
   attachProcess(state);
@@ -133,7 +137,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     const threadResult = await requestRpc(state, 'thread/start', {
       cwd: request.cwd ?? null,
       approvalPolicy: 'on-request',
-      sandbox: process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write',
+      sandbox: request.sandbox,
       ephemeral: false,
     });
     state.threadId = nestedString(threadResult, 'thread', 'id');
@@ -144,9 +148,11 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
       threadId: state.threadId,
       input: textInput(request.initialPrompt),
       cwd: request.cwd ?? null,
+      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
     });
     state.turnId = nestedString(turnResult, 'turn', 'id');
     if (!state.turnId) throw new Error('Codex app-server turn/start did not return turn.id');
+    state.turnActive = true;
     return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, request) };
   } catch (error) {
     if (!child.killed) child.kill();
@@ -202,6 +208,7 @@ async function forkCodex(
     approvalRequests: new Map(),
     approvalWatchdog,
     invocation: request,
+    turnActive: false,
   };
   runs.set(processId, state);
   attachProcess(state);
@@ -228,9 +235,11 @@ async function forkCodex(
       threadId: state.threadId,
       input: textInput(forkPrompt(checkpoint.sequence, sop)),
       cwd: request.cwd ?? null,
+      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
     });
     state.turnId = nestedString(turnResult, 'turn', 'id');
     if (!state.turnId) throw new Error('Codex app-server branch turn/start did not return turn.id');
+    state.turnActive = true;
     return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, request) };
   } catch (error) {
     if (!child.killed) child.kill();
@@ -307,7 +316,11 @@ function handleNativeMessage(state: RunState, message: unknown): void {
     state.approvalRequests.set(approval.approvalId, approval.requestId);
     message = approval.message;
   }
-  if (method === 'turn/started') state.turnId = nestedString(message, 'params', 'turn', 'id') ?? state.turnId;
+  if (method === 'turn/started') {
+    state.turnId = nestedString(message, 'params', 'turn', 'id') ?? state.turnId;
+    state.turnActive = true;
+  }
+  if (method === 'turn/completed') state.turnActive = false;
   translateAppServerMessage(message).forEach((translated) => publish(state, translated));
 }
 
@@ -342,7 +355,7 @@ function respondToApproval(state: RunState, approvalId: string, approved: boolea
 }
 
 async function steerRun(state: RunState, text: string): Promise<void> {
-  if (state.protocol !== 'app-server-jsonrpc' || !state.threadId || !state.turnId) {
+  if (state.protocol !== 'app-server-jsonrpc' || !state.threadId || !state.turnId || !state.turnActive) {
     throw new Error('Steer requires an active app-server turn');
   }
   await requestRpc(state, 'turn/steer', {
@@ -353,7 +366,7 @@ async function steerRun(state: RunState, text: string): Promise<void> {
 }
 
 async function stopRun(state: RunState): Promise<void> {
-  if (state.protocol === 'app-server-jsonrpc' && state.threadId && state.turnId && !state.child.killed) {
+  if (state.protocol === 'app-server-jsonrpc' && state.threadId && state.turnId && state.turnActive && !state.child.killed) {
     try {
       await requestRpc(state, 'turn/interrupt', { threadId: state.threadId, turnId: state.turnId });
     } finally {
@@ -380,7 +393,7 @@ interface EngineDisclosure {
 
 function disclosure(profile: ReturnType<typeof engineProfileById>, request: Invocation): EngineDisclosure {
   const sandboxIndex = request.args.indexOf('--sandbox');
-  const sandbox = sandboxIndex >= 0 ? request.args[sandboxIndex + 1] ?? 'workspace-write' : process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write';
+  const sandbox = sandboxIndex >= 0 ? request.args[sandboxIndex + 1] ?? request.sandbox : request.sandbox;
   return { providerName: profile.providerName, modelName: profile.model, dataDomain: profile.dataDomain, sandbox, tier: profile.tier };
 }
 

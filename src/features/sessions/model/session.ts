@@ -14,6 +14,17 @@ export type SessionStatus = 'running' | 'awaiting_approval' | 'paused' | 'blocke
 export type TrajectoryStepKind = 'delegation' | 'tool' | 'ai_to_human' | 'human_to_ai' | 'approval' | 'result' | 'system';
 export type TrajectoryStepStatus = 'completed' | 'running' | 'awaiting_human' | 'blocked' | 'cancelled';
 
+export interface PlanGeneration {
+  source: 'runtime' | 'template';
+  label: '模型生成计划' | '演示计划 · 未经模型生成';
+  runtimeId?: string;
+  planningSessionId?: string;
+  receiptOutcomeEventId?: string;
+  costCny?: number;
+  fallbackReason?: string;
+  costUnavailableReason?: string;
+}
+
 export interface SessionPlan {
   id: string;
   prompt: string;
@@ -27,6 +38,8 @@ export interface SessionPlan {
   attachmentNames: string[];
   modelProfile: string;
   workContext: string;
+  responseSchema?: Record<string, unknown>;
+  planning?: PlanGeneration;
 }
 
 export interface SandboxScope {

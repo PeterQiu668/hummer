@@ -23,6 +23,9 @@ export interface ApprovalAuthorizationResult {
 }
 export interface ApprovalPreviewResult extends Omit<ApprovalAuthorizationResult, 'approved'> {
   approverDisplayName: string | null;
+  actionPattern: string | null;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical' | null;
+  budgetLimitCny: number | null;
 }
 export interface ApprovalEvidence {
   id: string;

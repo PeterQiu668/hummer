@@ -68,7 +68,7 @@ describe('WorkbenchPage V5', () => {
     fireEvent.change(screen.getByLabelText('派给谁'), { target: { value: '高客单 BD 顾问 · employee_m-1' } });
     fireEvent.change(screen.getByRole('textbox', { name: '任务描述' }), { target: { value: '整理客户资料' } });
     fireEvent.keyDown(screen.getByRole('textbox', { name: '任务描述' }), { key: 'Enter', code: 'Enter' });
-    expect((await screen.findAllByText('高客单 BD 顾问 · employee_m-1')).length).toBeGreaterThan(1);
+    await waitFor(() => expect(screen.getAllByText('高客单 BD 顾问 · employee_m-1').length).toBeGreaterThan(1));
   });
 
 
@@ -91,6 +91,7 @@ describe('WorkbenchPage V5', () => {
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
 
     expect(await screen.findByText('我理解你要做的是：')).toBeInTheDocument();
+    expect(screen.getByText('演示计划 · 未经模型生成')).toBeInTheDocument();
     expect(screen.getAllByText(/线索/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '开始干' }));
 
@@ -166,6 +167,24 @@ describe('WorkbenchPage V5', () => {
     fireEvent.click(await screen.findByRole('button', { name: '开始干' }));
 
     expect(await screen.findByText('¥0.0182')).toBeInTheDocument();
+  });
+  it('marks an offline plan as demonstration output and never records a planning cost', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-workbench-offline');
+    const recordCost = vi.fn();
+    window.hummerOutcomes = {
+      define: vi.fn(),
+      record: vi.fn(),
+      recordCost,
+      receipt: vi.fn(),
+      sessionCost: vi.fn(),
+    };
+    renderWorkbench();
+    const composer = screen.getByRole('textbox', { name: '任务描述' });
+    fireEvent.change(composer, { target: { value: '断网时起草一份合同审查计划' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByText('演示计划 · 未经模型生成')).toBeInTheDocument();
+    expect(recordCost).not.toHaveBeenCalled();
   });
   it('keeps a bottom composer and records an operator interruption in the trajectory', async () => {
     renderWorkbench();

@@ -5,9 +5,26 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openPersistence } from './database.js';
 
 const directories: string[] = [];
+function tmpDir(): string {
+  const directory = mkdtempSync(join(tmpdir(), 'hummer-policy-'));
+  directories.push(directory);
+  return directory;
+}
+
 afterEach(() => directories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true })));
 
 describe('ApprovalPolicyStore', () => {
+  it('seeds exactly seven enterprise safety policies including critical data deletion', () => {
+    const persistence = openPersistence({ dataDirectory: tmpDir() });
+    const identity = persistence.identity.createCompany({ companyName: '策略验收公司', displayName: '审批人', email: 'policy-seven@example.test' });
+    const policies = persistence.approvalPolicies.list(identity.tenant.id);
+
+    expect(policies).toHaveLength(7);
+    expect(policies).toContainEqual(expect.objectContaining({ actionPattern: 'data.delete*', riskLevel: 'critical', effect: 'require_approval' }));
+    expect(persistence.approvalPolicies.preview(identity.tenant.id, { action: 'data.delete.records', requestedBy: 'planner:runtime', estimatedCostCny: null }))
+      .toEqual(expect.objectContaining({ policyId: `${identity.tenant.id}_policy_data_delete`, effect: 'require_approval' }));
+    persistence.close();
+  });
   it('authorizes only the assigned approver and records the decision in the hash chain', () => {
     const directory = mkdtempSync(join(tmpdir(), 'hummer-policy-'));
     directories.push(directory);

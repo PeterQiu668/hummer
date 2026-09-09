@@ -32,7 +32,6 @@ import WorkspacePage from './WorkspacePage';
 import SessionPlanCard from '../../features/sessions/components/SessionPlanCard';
 import WorkbenchComposer from '../../features/sessions/components/WorkbenchComposer';
 import {
-  draftPlanFromPrompt,
   type ApprovalMode,
   type ExecutionSession,
   type SessionPlan,
@@ -48,6 +47,8 @@ import { createDefaultSessionStore, type SessionStore } from '../../features/ses
 import { useAppStore } from '../../store/useAppStore';
 import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../../features/engines/engineProfileClient';
 import { desktopOutcomePort } from '../../features/outcomes/outcomeClient';
+import type { Planner } from '../../features/planning/planner';
+import { createDefaultPlanner } from '../../features/planning/plannerFactory';
 
 const DEFAULT_RUNTIME = createDefaultRuntimeAdapter();
 
@@ -63,7 +64,7 @@ interface RuntimeRecord {
   events: RuntimeEvent[];
 }
 
-export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore }) {
+export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore, planner }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore; planner?: Planner }) {
   const [defaultSessionStore] = useState(createDefaultSessionStore);
   const store = sessionStore ?? defaultSessionStore;
   const personalSettings = useAppStore((state) => state.personalSettings);
@@ -90,8 +91,10 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [approvalEvidence, setApprovalEvidence] = useState<ApprovalEvidence | null>(null);
   const [approvalEvidenceOpen, setApprovalEvidenceOpen] = useState(false);
   const [approvalLedgerCostCny, setApprovalLedgerCostCny] = useState<number | null>(null);
+  const [planningBusy, setPlanningBusy] = useState(false);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
+  const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,10 +241,16 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
     attached = true;
   };
 
-  const draftPlan = (prompt = composerText) => {
-    if (!prompt.trim()) return;
+  const draftPlan = async (prompt = composerText) => {
+    if (!prompt.trim() || planningBusy) return;
     setComposerText(prompt);
-    setPlan(draftPlanFromPrompt(prompt, { assignee, approvalMode, attachmentNames, modelProfile, workContext }));
+    setPlanningBusy(true);
+    try {
+      const profile = engineProfileForLabel(engineProfiles, modelProfile);
+      setPlan(await activePlanner.draft({ input: prompt, assignee, approvalMode, attachmentNames, modelProfile, engineProfileId: profile.id, workContext }));
+    } finally {
+      setPlanningBusy(false);
+    }
   };
 
   const delegateToTwin = (prompt: string) => {
@@ -362,7 +371,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 compact
                 value={composerText}
                 onChange={setComposerText}
-                onSubmit={() => draftPlan()}
+                onSubmit={() => { void draftPlan(); }}
                 assignee={assignee}
                 assigneeOptions={organizationAssignees}
                 onAssigneeChange={setAssignee}
@@ -375,6 +384,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 engineProfiles={engineProfiles}
                 workContext={workContext}
                 onWorkContextChange={setWorkContext}
+                busy={planningBusy}
               />
             </div>
           ) : (
@@ -384,7 +394,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
               <WorkbenchComposer
                 value={composerText}
                 onChange={setComposerText}
-                onSubmit={() => draftPlan()}
+                onSubmit={() => { void draftPlan(); }}
                 assignee={assignee}
                 assigneeOptions={organizationAssignees}
                 onAssigneeChange={setAssignee}
@@ -397,7 +407,8 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                 engineProfiles={engineProfiles}
                 workContext={workContext}
                 onWorkContextChange={setWorkContext}
-                onRecentSelect={draftPlan}
+                onRecentSelect={(prompt) => { void draftPlan(prompt); }}
+                busy={planningBusy}
               />
             </div>
           )}

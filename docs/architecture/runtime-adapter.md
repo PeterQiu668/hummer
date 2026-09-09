@@ -400,4 +400,18 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 - 升级后复验：npm Codex CLI `0.153.4`，同一脚本在加入主进程版本校验后于 2026-09-10 02:22:31（Asia/Shanghai）完成。证据为 `spikes/codex-runtime/app-server-jsonrpc-wire-0.153.4.jsonl` 和 `app-server-trajectory-0.153.4.json`。
 - 两次 wire 的方法集一致，都包含 `initialize`、`thread/start`、`turn/start`、`item/started`、`item/completed`、`thread/tokenUsage/updated` 和 `turn/completed`；item 类型都包含 `userMessage`、`reasoning`、`commandExecution`、`fileChange` 和 `agentMessage`。本次不需要修改 `CodexRuntimeAdapter` 的映射。
 - npm registry 在下载 134 MB Windows 平台包时多次 `ECONNRESET`；最终使用官方 tarball 的可续传下载完成安装。`npm ls -g --depth=0` 显示主包 `@openai/codex@0.153.4` 与平台包 `@openai/codex-win32-x64@0.153.4-win32-x64`，平台包不再指向临时目录。
+
+## 15. M5-B 规划层复用 RuntimeAdapter（2026-09-10）
+
+`Planner` 是产品域契约，`RuntimePlanner` 通过现有 `RuntimeAdapter.startSession / subscribe / stop` 发起只读规划轮。接入没有新增 RuntimeAdapter 方法，也没有让产品域 import Codex、Electron、SQLite 或任何模型 SDK 类型。`TemplatePlanner` 与 `RuntimePlanner` 通过同一套契约测试。
+
+规划轮新增运行时中立的 `SessionPlan.responseSchema`。Codex adapter 将其映射为 app-server `turn/start.outputSchema`；其他 runtime 可以映射到自己的结构化输出能力，不能支持时应明确失败并触发带来源标识的模板降级。规划轮使用 `L1`，Codex host 映射为 `read-only`。UI 收到任何 tool、approval_required、blocked、cancelled、interrupted 或超时事件都会拒绝该轮结果，因此规划不能借机执行文件或外部动作。
+
+2026-09-10 03:55:57（Asia/Shanghai）的内部真实运行生成 5 份不同计划。`spikes/m5b-planner/openai-codex-validation-wire.jsonl` 包含 5 个带 `outputSchema` 的 `turn/start`，并且 command execution、file change、approval request 均为 0。结果见 `openai-codex-validation-evidence.json`。此前同日一次失败运行证明仅靠 prompt 会被模型忽略 schema，故最终采用协议字段而非延长等待时间。
+
+模型返回的 `humanGates` 不进入产品决策。HUMMER 用模型工具候选和输入语义推导动作，再查询当前租户的 7 条审批策略；high/critical 规则形成关口，策略不可用则对受保护动作默认禁止。有效规划作为 `planning.session-plan` outcome 入账，规划成本以 `pricing_source=planning` 关联该 outcome，沿用 M5-A receipt。
+
+当前未闭合项：`DEEPSEEK_API_KEY` 在本轮进程环境中不存在，因此默认 DeepSeek 档未运行，真实人民币规划成本与带成本 receipt 尚未获得外部证据。内部验证模型没有已核实的 CNY 价格，保持 `null`/未提供，没有估算或伪造。DeepSeek 验收命令为 `npm run test:desktop:planner:deepseek`。
+
+规划接入后，原有 app-server 文件执行 E2E 于 2026-09-10 04:14:34（Asia/Shanghai）复跑通过。Codex 0.153.4 对 `apply_patch` 产生真实 file-change approval；测试在确认文件尚未写入后由 UI 回传批准，随后观察到 `workspace.patch` 和 `turn.completed`。主进程新增活动 turn 状态，已完成 turn 的 `stop()` 只清理进程，不再发送会被 server 拒绝的重复 interrupt。
 - 升级前首次复跑暴露了两个 E2E 脚本债务：M4 身份门禁未处理，以及新的持久化查询未传 session token。脚本已使用独立 Electron profile、真实登录 token 修复，不改变生产协议。

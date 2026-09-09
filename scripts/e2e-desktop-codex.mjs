@@ -92,12 +92,23 @@ try {
   if (!(await node.textContent())?.includes(workspace)) throw new Error('Workbench did not show the real Codex working directory');
   console.log('stage=codex-node-visible');
 
+  if (engineProfile === 'openai-codex-validation') await page.getByLabel('选择模型').selectOption({ label: '旗舰' });
   const composer = page.getByRole('textbox', { name: '任务描述' });
-  await composer.fill(approvalFlow
+  const runtimeTask = approvalFlow
     ? 'Read input.txt. Do not use apply_patch. Run a PowerShell Set-Content command to create summary-approved.md with one concise sentence summarizing the file. Do not modify any other file.'
-    : 'Read input.txt with a local command. Then use apply_patch to create summary.md containing one concise sentence that summarizes the file. Do not modify any other file.');
-  await composer.press('Enter');
-  await page.getByText('我理解你要做的是：', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+    : 'Read input.txt with a local command. Then use apply_patch to create summary.md containing one concise sentence that summarizes the file. Do not modify any other file.';
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await composer.fill(runtimeTask);
+    await composer.press('Enter');
+    const planHeading = page.getByText('我理解你要做的是：', { exact: true });
+    await planHeading.waitFor({ state: 'visible', timeout: 150_000 });
+    if (await page.getByText('模型生成计划', { exact: true }).count()) break;
+    if (attempt === 2) throw new Error('Runtime planning fell back twice during the Codex execution E2E');
+    console.log('stage=planner-fallback-retry');
+    await page.getByRole('button', { name: '改一下' }).click();
+    await planHeading.waitFor({ state: 'hidden', timeout: 10_000 });
+  }
+  await page.getByText('模型生成计划', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
   await page.getByRole('button', { name: '开始干' }).click();
   console.log('stage=session-started');
 
@@ -113,6 +124,12 @@ try {
     await page.locator('[data-runtime-event-kind="tool"][data-runtime-tool="shell.command"]').last().waitFor({ state: 'visible', timeout: 120_000 });
     console.log('stage=command-event-visible');
     if (!approvalFlow) {
+      const approve = page.getByRole('button', { name: '确认更新' });
+      await approve.waitFor({ state: 'visible', timeout: 120_000 });
+      if (existsSync(output)) throw new Error('Protected file output existed before HUMMER approval');
+      console.log('stage=file-change-approval-visible');
+      await approve.click();
+      console.log('stage=file-change-approval-accepted');
       await page.locator('[data-runtime-tool="workspace.patch"]').waitFor({ state: 'visible', timeout: 120_000 });
       console.log('stage=file-change-visible');
     }

@@ -19,6 +19,17 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     expect(buildCodexInvocation(plan).engineProfileId).toBe('openai-flagship');
   });
 
+  it('passes a runtime-neutral response schema to the app-server host', () => {
+    const plan = draftPlanFromPrompt('structured plan');
+    plan.responseSchema = {
+      type: 'object',
+      required: ['understanding'],
+      properties: { understanding: { type: 'array', items: { type: 'string' } } },
+    };
+
+    expect(buildCodexInvocation(plan, { protocol: 'app-server-jsonrpc' }).outputSchema).toEqual(plan.responseSchema);
+  });
+
   it('maps completed command and approval messages without importing Codex types', () => {
     const tool = mapCodexMessage({
       type: 'item.completed',

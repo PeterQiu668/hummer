@@ -10,6 +10,8 @@ export interface CodexCliInvocation {
   initialPrompt: string;
   engineProfileId: string;
   protocol: 'exec-jsonl' | 'app-server-jsonrpc';
+  sandbox: 'read-only' | 'workspace-write';
+  outputSchema?: Record<string, unknown>;
 }
 
 export interface CodexCliRun {
@@ -240,6 +242,8 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
       stdin: '',
       initialPrompt: buildCodexPrompt(plan),
       protocol,
+      sandbox: sandboxForPlan(plan),
+      outputSchema: plan.responseSchema,
     };
   }
   return {
@@ -250,6 +254,8 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
     stdin: buildCodexPrompt(plan),
     initialPrompt: buildCodexPrompt(plan),
     protocol,
+    sandbox: sandboxForPlan(plan),
+    outputSchema: plan.responseSchema,
   };
 }
 
