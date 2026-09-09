@@ -57,6 +57,10 @@ describe('OutcomeLedgerStore', () => {
     expect(cost.costCny).toBeGreaterThan(0);
     expect(cost.pricingVerifiedAt).toBe('2026-08-29');
     expect(persistence.outcomes.totalCostCny(owner.tenant.id, outcome.id)).toBeCloseTo(cost.costCny, 6);
+    expect(persistence.outcomes.sessionCostSummary(owner.tenant.id, sessionId)).toEqual({
+      totalCostCny: cost.costCny,
+      entryCount: 1,
+    });
 
     const receipt = persistence.buildOutcomeReceipt(owner.tenant.id, outcome.id, { DEEPSEEK_API_KEY: 'sk-super-secret-value' });
     expect(receipt.outcome.id).toBe(outcome.id);
@@ -116,6 +120,7 @@ describe('OutcomeLedgerStore', () => {
     });
     expect(persistence.outcomes.getDefinition(second.tenant.id, definition.id)).toBeUndefined();
     expect(persistence.outcomes.getEvent(second.tenant.id, outcome.id)).toBeUndefined();
+    expect(persistence.outcomes.sessionCostSummary(second.tenant.id, 'ses_tenant_a')).toEqual({ totalCostCny: null, entryCount: 0 });
     expect(() => persistence.buildOutcomeReceipt(second.tenant.id, outcome.id)).toThrow(/unavailable in the current tenant/);
     expect(() => persistence.outcomes.recordOutcome({
       tenantId: second.tenant.id, outcomeDefinitionId: definition.id, sessionId: 'ses_tenant_b', verdict: 'accepted',

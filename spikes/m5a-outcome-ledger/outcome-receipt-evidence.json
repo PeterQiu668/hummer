@@ -1,0 +1,131 @@
+{
+  "generatedAt": "2026-09-09T18:38:11.460Z",
+  "sessionId": "session_m5a_receipt",
+  "workOrderId": "work_order_m5a_receipt",
+  "definition": {
+    "id": "outcome_def_81921089710d45ccbf8e7f25a374fb08",
+    "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+    "actionPattern": "external.send.summary",
+    "title": "客户摘要外发验收",
+    "acceptanceCriteria": "负责人已确认内容与收件范围",
+    "unitPriceCny": null,
+    "riskLevel": "high",
+    "enabled": true,
+    "createdAt": "2026-09-09T18:38:11.417Z",
+    "updatedAt": "2026-09-09T18:38:11.417Z"
+  },
+  "approval": {
+    "effect": "require_approval",
+    "policyId": "tenant_802e6189126a49cfa36698b320ecbe51_policy_external_send",
+    "approverActorRef": "account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e",
+    "reason": "matched_rule",
+    "approved": true
+  },
+  "outcome": {
+    "id": "outcome_evt_9a32332f5bda4084b377e9b45cf620b9",
+    "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+    "outcomeDefinitionId": "outcome_def_81921089710d45ccbf8e7f25a374fb08",
+    "workOrderId": "work_order_m5a_receipt",
+    "sessionId": "session_m5a_receipt",
+    "approvalId": "approval_m5a_receipt",
+    "verdict": "accepted",
+    "acceptedBy": "account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e",
+    "evidenceRef": "evidence://sha256/m5a-accepted-summary",
+    "occurredAt": "2026-09-10T02:32:00.000Z"
+  },
+  "cost": {
+    "id": "cost_9e8015ee44284813a173277e9367e4bb",
+    "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+    "sessionId": "session_m5a_receipt",
+    "outcomeEventId": "outcome_evt_9a32332f5bda4084b377e9b45cf620b9",
+    "engineProfileId": "deepseek-standard",
+    "model": "deepseek-v4-flash",
+    "usage": {
+      "inputTokens": 4200,
+      "cachedInputTokens": 800,
+      "outputTokens": 950
+    },
+    "costCny": 0.01883,
+    "pricingSource": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    "pricingVerifiedAt": "2026-08-29",
+    "computedAt": "2026-09-09T18:38:11.450Z"
+  },
+  "sessionCost": {
+    "totalCostCny": 0.01883,
+    "entryCount": 1
+  },
+  "receipt": {
+    "generatedAt": "2026-09-09T18:38:11.457Z",
+    "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+    "outcome": {
+      "id": "outcome_evt_9a32332f5bda4084b377e9b45cf620b9",
+      "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+      "outcomeDefinitionId": "outcome_def_81921089710d45ccbf8e7f25a374fb08",
+      "workOrderId": "work_order_m5a_receipt",
+      "sessionId": "session_m5a_receipt",
+      "approvalId": "approval_m5a_receipt",
+      "verdict": "accepted",
+      "acceptedBy": "account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e",
+      "evidenceRef": "evidence://sha256/m5a-accepted-summary",
+      "occurredAt": "2026-09-10T02:32:00.000Z"
+    },
+    "definition": {
+      "id": "outcome_def_81921089710d45ccbf8e7f25a374fb08",
+      "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+      "actionPattern": "external.send.summary",
+      "title": "客户摘要外发验收",
+      "acceptanceCriteria": "负责人已确认内容与收件范围",
+      "unitPriceCny": null,
+      "riskLevel": "high",
+      "enabled": true,
+      "createdAt": "2026-09-09T18:38:11.417Z",
+      "updatedAt": "2026-09-09T18:38:11.417Z"
+    },
+    "costs": [
+      {
+        "id": "cost_9e8015ee44284813a173277e9367e4bb",
+        "tenantId": "tenant_802e6189126a49cfa36698b320ecbe51",
+        "sessionId": "session_m5a_receipt",
+        "outcomeEventId": "outcome_evt_9a32332f5bda4084b377e9b45cf620b9",
+        "engineProfileId": "deepseek-standard",
+        "model": "deepseek-v4-flash",
+        "usage": {
+          "inputTokens": 4200,
+          "cachedInputTokens": 800,
+          "outputTokens": 950
+        },
+        "costCny": 0.01883,
+        "pricingSource": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+        "pricingVerifiedAt": "2026-08-29",
+        "computedAt": "2026-09-09T18:38:11.450Z"
+      }
+    ],
+    "totalCostCny": 0.01883,
+    "approval": {
+      "id": "approval_m5a_receipt",
+      "sessionId": "session_m5a_receipt",
+      "status": "approved",
+      "requestedAt": "2026-09-10T02:30:00.000Z",
+      "decidedAt": "2026-09-10T02:31:00.000Z",
+      "action": "external.send.summary",
+      "requestedBy": "employee:receipt-e2e",
+      "estimatedCostCny": null,
+      "policyId": "tenant_802e6189126a49cfa36698b320ecbe51_policy_external_send",
+      "approverActorRef": "account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e",
+      "decisionActorRef": "account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e",
+      "decisionEventType": "approval.authorized",
+      "eventHash": "f9ded0f581ae393092e7d518c9dd235748476c6e504a3e2a292619b311f329ce"
+    },
+    "chainIntegrity": {
+      "valid": true,
+      "checked": 6
+    },
+    "receiptJson": "{\"approval\":{\"action\":\"external.send.summary\",\"approverActorRef\":\"account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e\",\"decidedAt\":\"2026-09-10T02:31:00.000Z\",\"decisionActorRef\":\"account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e\",\"decisionEventType\":\"approval.authorized\",\"estimatedCostCny\":null,\"eventHash\":\"f9ded0f581ae393092e7d518c9dd235748476c6e504a3e2a292619b311f329ce\",\"id\":\"approval_m5a_receipt\",\"policyId\":\"tenant_802e6189126a49cfa36698b320ecbe51_policy_external_send\",\"requestedAt\":\"2026-09-10T02:30:00.000Z\",\"requestedBy\":\"employee:receipt-e2e\",\"sessionId\":\"session_m5a_receipt\",\"status\":\"approved\"},\"chainIntegrity\":{\"checked\":6,\"valid\":true},\"costs\":[{\"computedAt\":\"2026-09-09T18:38:11.450Z\",\"costCny\":0.01883,\"engineProfileId\":\"deepseek-standard\",\"id\":\"cost_9e8015ee44284813a173277e9367e4bb\",\"model\":\"deepseek-v4-flash\",\"outcomeEventId\":\"outcome_evt_9a32332f5bda4084b377e9b45cf620b9\",\"pricingSource\":\"https://api-docs.deepseek.com/zh-cn/quick_start/pricing/\",\"pricingVerifiedAt\":\"2026-08-29\",\"sessionId\":\"session_m5a_receipt\",\"tenantId\":\"tenant_802e6189126a49cfa36698b320ecbe51\",\"usage\":{\"cachedInputTokens\":800,\"inputTokens\":4200,\"outputTokens\":950}}],\"definition\":{\"acceptanceCriteria\":\"负责人已确认内容与收件范围\",\"actionPattern\":\"external.send.summary\",\"createdAt\":\"2026-09-09T18:38:11.417Z\",\"enabled\":true,\"id\":\"outcome_def_81921089710d45ccbf8e7f25a374fb08\",\"riskLevel\":\"high\",\"tenantId\":\"tenant_802e6189126a49cfa36698b320ecbe51\",\"title\":\"客户摘要外发验收\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-09T18:38:11.417Z\"},\"generatedAt\":\"2026-09-09T18:38:11.457Z\",\"outcome\":{\"acceptedBy\":\"account:account_2ec829f9b7864ceaa67fb64fe3b9dc5e\",\"approvalId\":\"approval_m5a_receipt\",\"evidenceRef\":\"evidence://sha256/m5a-accepted-summary\",\"id\":\"outcome_evt_9a32332f5bda4084b377e9b45cf620b9\",\"occurredAt\":\"2026-09-10T02:32:00.000Z\",\"outcomeDefinitionId\":\"outcome_def_81921089710d45ccbf8e7f25a374fb08\",\"sessionId\":\"session_m5a_receipt\",\"tenantId\":\"tenant_802e6189126a49cfa36698b320ecbe51\",\"verdict\":\"accepted\",\"workOrderId\":\"work_order_m5a_receipt\"},\"tenantId\":\"tenant_802e6189126a49cfa36698b320ecbe51\",\"totalCostCny\":0.01883}"
+  },
+  "integrity": {
+    "valid": true,
+    "checked": 6
+  },
+  "evidencePath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5a-outcome-ledger\\outcome-receipt-evidence.json",
+  "dataDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5a-outcome-ledger\\facts"
+}

@@ -47,6 +47,7 @@ import { actorDisplayName, runtimeDisplayName } from '../../features/sessions/ru
 import { createDefaultSessionStore, type SessionStore } from '../../features/sessions/persistence/sessionStore';
 import { useAppStore } from '../../store/useAppStore';
 import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../../features/engines/engineProfileClient';
+import { desktopOutcomePort } from '../../features/outcomes/outcomeClient';
 
 const DEFAULT_RUNTIME = createDefaultRuntimeAdapter();
 
@@ -88,6 +89,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
   const [approvalPreview, setApprovalPreview] = useState<ApprovalPreviewResult | null>(null);
   const [approvalEvidence, setApprovalEvidence] = useState<ApprovalEvidence | null>(null);
   const [approvalEvidenceOpen, setApprovalEvidenceOpen] = useState(false);
+  const [approvalLedgerCostCny, setApprovalLedgerCostCny] = useState<number | null>(null);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
 
@@ -171,6 +173,20 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
       if (active) setApprovalPreview(preview);
     }).catch((error) => {
       if (active) setPolicyError(error instanceof Error ? error.message : '未能读取审批策略');
+    });
+    return () => { active = false; };
+  }, [activeRecord?.handle.sessionId, pendingApproval?.approvalId]);
+
+  useEffect(() => {
+    setApprovalLedgerCostCny(null);
+    if (!activeRecord || !pendingApproval) return;
+    const outcomes = desktopOutcomePort();
+    if (!outcomes) return;
+    let active = true;
+    void outcomes.sessionCost(activeRecord.handle.sessionId).then((summary) => {
+      if (active) setApprovalLedgerCostCny(summary.totalCostCny);
+    }).catch(() => {
+      if (active) setApprovalLedgerCostCny(null);
     });
     return () => { active = false; };
   }, [activeRecord?.handle.sessionId, pendingApproval?.approvalId]);
@@ -269,7 +285,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
           approvalId: pendingApproval.approvalId,
           action: pendingApproval.tool,
           requestedBy: pendingApproval.actorRef,
-          estimatedCostCny: pendingApproval.costCny,
+          estimatedCostCny: approvalLedgerCostCny,
           approved,
           occurredAt: new Date().toISOString(),
         });
@@ -500,7 +516,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore 
                       <div><dt className="text-neutral-400">请求人</dt><dd>{actorDisplayName(pendingApproval.actorRef)}</dd></div>
                       <div><dt className="text-neutral-400">必须批准</dt><dd>{approvalPreview?.approverDisplayName ?? (approvalPreview?.approverActorRef ? actorDisplayName(approvalPreview.approverActorRef) : '正在确认')}</dd></div>
                       <div><dt className="text-neutral-400">审批策略</dt><dd className="truncate" title={approvalPreview?.policyId ?? undefined}>{approvalPreview?.policyId ?? '正在确认'}</dd></div>
-                      <div><dt className="text-neutral-400">预估费用</dt><dd>{pendingApproval.costCny === null ? '未提供' : `¥${pendingApproval.costCny.toFixed(4)}`}</dd></div>
+                      <div><dt className="text-neutral-400">预估费用</dt><dd>{approvalLedgerCostCny === null ? '未提供' : `¥${approvalLedgerCostCny.toFixed(4)}`}</dd></div>
                     </dl>
                     {policyError && <div role="alert" className="text-[10.5px] text-danger">{policyError}</div>}
                     <div className="flex flex-wrap gap-2">

@@ -32,3 +32,42 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - Evidence: `spikes/deepseek-standard/fork-evidence.json`, `app-server-fork-wire.jsonl`, `app-server-fork-trajectory.json`, `summary-approved.md`, and `branch-summary.md`.
 - The secret was process-local and is not stored in argv, logs, trajectories, evidence files, documentation, or source. Repository redaction assertions remain mandatory.
 - This proves the DeepSeek runtime, approval and fork path. The organization hire and this runtime session are still separate acceptance runs, so the complete hire-to-result product flow is not yet a single E2E proof.
+
+## W1 status update - 2026-09-10
+
+### Real external runtime compatibility evidence
+
+- Codex CLI 0.150.1 completed the app-server read/approved-write flow with command execution,
+  `fileChange`, and `turn/completed`. Evidence: `spikes/codex-runtime/app-server-jsonrpc-wire-0.150.1.jsonl`
+  and `app-server-trajectory-0.150.1.json`.
+- Codex CLI 0.153.4 completed the same flow on 2026-09-10 at 02:22:31 (Asia/Shanghai), using
+  20,411 tokens in 34.52 seconds. The JSON-RPC method set and item-type set matched 0.150.1, so no
+  `CodexRuntimeAdapter` event mapping change was required. Evidence:
+  `spikes/codex-runtime/app-server-jsonrpc-wire-0.153.4.jsonl` and
+  `app-server-trajectory-0.153.4.json`.
+- The desktop host now checks `codex --version` and refuses a binary that does not match the
+  canonical 0.153.4 pin. This is a compatibility guard, not a silent fallback.
+
+### Local desktop product-chain evidence
+
+- `scripts/e2e-desktop-outcome-receipt.mjs` ran in Electron and produced
+  `spikes/m5a-outcome-ledger/outcome-receipt-evidence.json` at 2026-09-10 02:38:11
+  (Asia/Shanghai). One authenticated tenant defined an outcome, matched an approval policy,
+  approved and accepted it, recorded CNY 0.01883 from real usage fields against the verified price
+  catalog, assembled the receipt, passed the secret-shaped-value assertion, and verified the
+  domain hash chain as `valid=true, checked=6`.
+- This is local product-chain evidence with deterministic usage input. It is not evidence of an
+  external provider call and is not described as one.
+
+### Configuration and regression evidence
+
+- `packages/config` is the authored source for engine profiles and runtime pricing. Generated
+  desktop/renderer files are checked byte-for-byte by `tests/config-single-source.test.ts`; internal
+  profile `openai-codex-validation` remains absent from the customer catalog.
+- W1 gate passed: `npm run typecheck`; `npm run test:unit` (127); `npm run test:ui` (26);
+  `npm run build`; `npm run desktop:build`; `npm run test:e2e`;
+  `npm run test:desktop:persistence`; and `npm run test:desktop:outcome-receipt`.
+- `scripts/ops-simulation.mjs` completes with no FAIL or ERROR; browser-only writes are explicit
+  SKIP because the browser prototype has no local fact store. `scripts/ops-simulation-2.mjs` retains
+  one pre-existing FAIL for inbound channel triggering. That finding is outside W1/M5-B and is not
+  changed because this work order explicitly prohibits channel implementation.

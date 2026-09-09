@@ -6,6 +6,9 @@ import {
   type CreateCompanyInput,
   type DesktopPersistence,
   type HireDigitalEmployeeInput,
+  type DefineOutcomeInput,
+  type RecordCostInput,
+  type RecordOutcomeInput,
 } from './persistence/index.js';
 import type { AuthorizeApprovalInput } from './persistence/approval-policy-store.js';
 import type { JsonValue } from './persistence/canonical-json.js';
@@ -56,6 +59,11 @@ const CHANNELS = [
   'hummer:approval-policy:evidence',
   'hummer:execution-nodes:list',
   'hummer:execution-nodes:kill-all',
+  'hummer:outcomes:define',
+  'hummer:outcomes:record',
+  'hummer:outcomes:record-cost',
+  'hummer:outcomes:receipt',
+  'hummer:outcomes:session-cost',
 ] as const;
 
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
@@ -171,6 +179,38 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   ipcMain.handle('hummer:execution-nodes:kill-all', async (_event, token: string) => {
     persistence.identity.currentTenantId(token);
     return { killed: await options.stopAll?.() ?? 0 };
+  });
+  ipcMain.handle('hummer:outcomes:define', (_event, request: Authenticated<Omit<DefineOutcomeInput, 'tenantId' | 'actorRef'>>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.outcomes.defineOutcome({
+      ...request.input,
+      tenantId: context.tenant.id,
+      actorRef: `account:${context.account.id}`,
+    });
+  });
+  ipcMain.handle('hummer:outcomes:record', (_event, request: Authenticated<Omit<RecordOutcomeInput, 'tenantId' | 'acceptedBy'>>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.outcomes.recordOutcome({
+      ...request.input,
+      tenantId: context.tenant.id,
+      acceptedBy: `account:${context.account.id}`,
+    });
+  });
+  ipcMain.handle('hummer:outcomes:record-cost', (_event, request: Authenticated<Omit<RecordCostInput, 'tenantId' | 'actorRef'>>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.outcomes.recordCost({
+      ...request.input,
+      tenantId: context.tenant.id,
+      actorRef: `account:${context.account.id}`,
+    });
+  });
+  ipcMain.handle('hummer:outcomes:receipt', (_event, request: Authenticated<{ outcomeEventId: string }>) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return persistence.buildOutcomeReceipt(tenantId, request.input.outcomeEventId);
+  });
+  ipcMain.handle('hummer:outcomes:session-cost', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return persistence.outcomes.sessionCostSummary(tenantId, request.input.sessionId);
   });
 
   return {

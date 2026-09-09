@@ -71,6 +71,11 @@ export interface CostLedgerRecord {
   computedAt: string;
 }
 
+export interface SessionCostSummary {
+  totalCostCny: number | null;
+  entryCount: number;
+}
+
 export interface RecordCostInput {
   tenantId: string;
   sessionId: string;
@@ -217,6 +222,18 @@ export class OutcomeLedgerStore {
 
   totalCostCny(tenantId: string, outcomeEventId: string): number {
     return this.listCosts(tenantId, outcomeEventId).reduce((sum, entry) => sum + entry.costCny, 0);
+  }
+
+  sessionCostSummary(tenantId: string, sessionId: string): SessionCostSummary {
+    const row = this.database.prepare(`
+      SELECT COUNT(*) AS entry_count, SUM(cost_cny) AS total_cost_cny
+      FROM cost_ledger
+      WHERE tenant_id = ? AND session_id = ?
+    `).get<{ entry_count: number; total_cost_cny: number | null }>(tenantId, sessionId);
+    return {
+      totalCostCny: row?.entry_count ? row.total_cost_cny : null,
+      entryCount: row?.entry_count ?? 0,
+    };
   }
 
   private requireDefinition(tenantId: string, id: string): OutcomeDefinitionRecord {

@@ -34,7 +34,8 @@
     "test:desktop:persistence": "node scripts/e2e-desktop-persistence.mjs",
     "test:desktop:identity": "node scripts/e2e-desktop-identity.mjs",
     "test:desktop:approval-rejection": "node scripts/e2e-desktop-approval-rejection.mjs",
-    "test:desktop:projects": "node scripts/e2e-desktop-projects.mjs"
+    "test:desktop:projects": "node scripts/e2e-desktop-projects.mjs",
+    "test:desktop:outcome-receipt": "node scripts/e2e-desktop-outcome-receipt.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

@@ -22,7 +22,8 @@ try {
 
   // H 渠道与连接
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: '工作台' }).waitFor({ timeout: 15_000 });
+  await ensureIdentity(page, 'ops-2');
+  await openWorkbench(page);
   await page.getByRole('button', { name: /能力与连接/ }).first().click();
   await page.waitForTimeout(1000);
   const conn = await page.locator('body').innerText();
@@ -36,7 +37,7 @@ try {
 
   // I 引擎档位
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: '工作台' }).waitFor({ timeout: 15_000 });
+  await openWorkbench(page);
   const sel = page.getByLabel('选择模型');
   const opts = await sel.locator('option').allInnerTexts().catch(() => []);
   log('I 引擎档位', '客户可见档位列表', 'INFO', `选项=${JSON.stringify(opts)}`);
@@ -46,7 +47,7 @@ try {
 
   // J 桌面操作与工具调用
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: '工作台' }).waitFor({ timeout: 15_000 });
+  await openWorkbench(page);
   await page.getByRole('textbox', { name: '任务描述' }).fill('打开本机 Excel，把上月销售明细汇总成部门月报并发到销售群');
   await page.getByRole('textbox', { name: '任务描述' }).press('Enter');
   await page.waitForTimeout(1500);
@@ -56,6 +57,23 @@ try {
   log('X 控制台', '浏览器控制台错误', errors.length === 0 ? 'PASS' : 'FAIL', errors.slice(0, 3).join(' | ') || '无');
   await browser.close();
 } catch (e) {
-  log('!!', '中断', 'ERROR', String(e).split('\n')[0]);
+  log('!!', '中断', 'ERROR', e instanceof Error ? (e.stack ?? e.message).split('\n').slice(0, 4).join(' | ') : String(e));
 } finally { bs?.process()?.kill(); vite.kill(); }
 console.log('\n=== 第二轮模拟 ===\n' + report.join('\n'));
+
+async function ensureIdentity(page, suffix) {
+  await page.waitForFunction(() => document.body.innerText.includes('进入 HUMMER') || document.body.innerText.includes('工作台'));
+  const gate = page.getByRole('heading', { name: '进入 HUMMER' });
+  if (!await gate.count()) return;
+  await page.getByLabel('公司名称').fill(`HUMMER 运营模拟 ${suffix}`);
+  await page.getByLabel('你的姓名').fill('运营验收员');
+  await page.getByLabel('邮箱或手机').fill(`${suffix}@example.test`);
+  await page.getByRole('button', { name: '创建并进入' }).click();
+  await gate.waitFor({ state: 'hidden', timeout: 5_000 });
+}
+
+async function openWorkbench(page) {
+  const heading = page.getByRole('heading', { name: '工作台' });
+  if (!await heading.count()) await page.getByRole('button', { name: '工作台' }).first().click();
+  await heading.waitFor({ timeout: 15_000 });
+}

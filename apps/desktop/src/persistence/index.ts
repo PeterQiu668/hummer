@@ -33,6 +33,7 @@ export type {
   OutcomeVerdict,
   RecordCostInput,
   RecordOutcomeInput,
+  SessionCostSummary,
 } from './outcome-ledger-store.js';
 export type { OutcomeReceipt } from './outcome-receipt.js';
 export type { PricedCost, RuntimeUsage } from '../pricing/deepseek-pricing.js';

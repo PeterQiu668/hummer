@@ -11,6 +11,7 @@ function renderWorkbench(store = new MemorySessionStore()) {
 afterEach(() => {
   delete window.hummerOrganization;
   delete window.hummerApprovalPolicy;
+  delete window.hummerOutcomes;
   localStorage.removeItem('hummer.auth.session');
 });
 
@@ -147,6 +148,24 @@ describe('WorkbenchPage V5', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看审批证据' }));
     expect(await screen.findByRole('dialog', { name: '审批证据' })).toHaveTextContent('approval.rejected');
     expect(screen.getByRole('dialog', { name: '审批证据' })).toHaveTextContent('王经理');
+  });
+  it('shows the real session cost ledger value on the approval card', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-workbench-cost');
+    window.hummerOutcomes = {
+      define: vi.fn(),
+      record: vi.fn(),
+      recordCost: vi.fn(),
+      receipt: vi.fn(),
+      sessionCost: vi.fn().mockResolvedValue({ totalCostCny: 0.0182, entryCount: 1 }),
+    };
+
+    renderWorkbench();
+    const composer = screen.getByRole('textbox', { name: '任务描述' });
+    fireEvent.change(composer, { target: { value: '整理本周线索' } });
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(await screen.findByRole('button', { name: '开始干' }));
+
+    expect(await screen.findByText('¥0.0182')).toBeInTheDocument();
   });
   it('keeps a bottom composer and records an operator interruption in the trajectory', async () => {
     renderWorkbench();

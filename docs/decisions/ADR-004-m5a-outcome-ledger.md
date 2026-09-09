@@ -1,7 +1,7 @@
 # ADR-004: The outcome ledger is the billing and receipt unit
 
 Date: 2026-09-02
-Status: Accepted (persistence layer only; see Scope below)
+Status: Accepted (local desktop product chain; see Scope below)
 
 ## Context
 
@@ -34,7 +34,7 @@ every mutation appends a domain event to the existing hash chain, and cross-tena
 `undefined` rather than another tenant's row.
 
 `calculateOutcomeCostCny` (`apps/desktop/src/pricing/deepseek-pricing.ts`) fails closed. If a model
-has no verified CNY price in `apps/desktop/src/config/deepseek-pricing.json`, it throws instead of
+has no verified CNY price in the generated `apps/desktop/src/config/deepseek-pricing.json`, it throws instead of
 recording a zero or invented cost. This is the same "the UI does not invent a cost" rule from
 ADR-003, enforced one layer down at the ledger instead of only at render time.
 
@@ -45,15 +45,13 @@ JSON bundle. The bundle is passed through the existing `redactRuntimeSecrets` be
 returned, so a secret accidentally captured in a text field (an evidence ref, a note) cannot leave
 this function unredacted.
 
-### Known duplication
+### Generated single source of truth
 
-`apps/desktop/src/config/deepseek-pricing.json` duplicates
-`src/features/sessions/runtime/runtime-pricing.json`. `apps/desktop` is a separate TypeScript
-project (see `tsconfig.json` references) and must not reach into the renderer product domain, so
-the pricing table is copied rather than imported. Both files must be updated together until a
-future milestone unifies them behind one source of truth (for example, generating both from a
-single config at build time). This is tracked debt, not an oversight; flagging it here follows the
-same discipline as the earlier flagged duplication in `src/features/engines/engineProfileClient.ts`.
+`packages/config/src/runtime-pricing.json` and `packages/config/src/engine-profiles.json` are the
+only authored catalogs. `packages/config/scripts/generate.mjs` generates the desktop and renderer
+copies before typecheck, build, and unit tests. The browser catalog excludes internal profiles at
+generation time. `tests/config-single-source.test.ts` regenerates into a temporary directory and
+compares every committed output byte-for-byte, so editing either generated copy directly fails CI.
 
 ## Consequences
 
@@ -70,20 +68,20 @@ Done, with test evidence:
 - `calculateOutcomeCostCny`: verified off-peak/peak DeepSeek pricing, fails closed for unpriced models.
 - `assembleOutcomeReceipt` / `buildOutcomeReceipt`: composed receipt with redaction and integrity check.
 - Wired into `DesktopPersistence` and `persistence/index.ts` exports.
+- Authenticated IPC for define, record, record-cost, receipt, and tenant-scoped session-cost reads.
+- A runtime-neutral renderer port exposed through `preload.cts`; tenant and actor identity remain
+  derived in the Electron main process from the authenticated session.
+- The workbench approval card reads its displayed estimate from `cost_ledger`. Missing ledger data
+  still renders `未提供`; runtime event or mock costs are never substituted.
+- A real Electron product-chain E2E covering definition, policy match, approval, accepted outcome,
+  priced token usage, receipt assembly, secret redaction, and a valid six-event hash chain.
 
 Not done, and not claimed as done:
 
-- No IPC exposure (`preload.cts` / `persistence-host.ts` do not yet expose outcomes or receipts to
-  the renderer).
-- No UI. The workbench approval card still shows `预估费用 未提供` for any profile without a linked
-  cost entry; it does not yet read from `cost_ledger`.
-- No Electron end-to-end evidence run (no `spikes/m5-outcome-ledger/` wire log or screenshot). Every
-  claim in this ADR is backed by `apps/desktop/src/persistence/outcome-ledger-store.test.ts` and
-  `apps/desktop/src/pricing/deepseek-pricing.test.ts` running against a temporary SQLite file — the
-  same evidentiary class as "local product-chain evidence" in `spikes/m3-organization/acceptance-status.md`,
-  not the class of a real packaged-app run. These two evidence classes must not be merged.
 - No settlement, invoicing, or payment capture. `unit_price_cny` on `outcome_definitions` is stored
   for a future pricing feature to read; nothing computes an invoice from it yet.
+- This E2E supplies deterministic local product-chain evidence. It does not call an external model
+  provider and must not be presented as real external runtime evidence.
 
 ## Acceptance evidence
 
@@ -96,5 +94,13 @@ Not done, and not claimed as done:
   idempotent replay of definition/outcome/cost keys; (3) fail-closed cost recording for an unpriced
   model; (4) cross-tenant isolation for definitions, events, and receipts; (5) a rejected outcome
   with no linked approval or cost, producing a receipt with `approval: null` and `totalCostCny: 0`.
-- `npm run typecheck`, `npm run test:unit` (124/124), and `npm run desktop:build` all pass on this
-  change with no other files modified.
+- `src/features/outcomes/outcomeClient.test.tsx` proves the renderer port forwards the authenticated
+  token and preserves unavailable-host behavior.
+- `src/components/pages/WorkbenchPage.test.tsx` proves the approval card displays the tenant/session
+  cost aggregate and does not use mock runtime cost as a fallback.
+- `scripts/e2e-desktop-outcome-receipt.mjs` produced
+  `spikes/m5a-outcome-ledger/outcome-receipt-evidence.json` on 2026-09-10 02:38:11
+  (Asia/Shanghai): cost CNY 0.01883, approved outcome, redaction assertion passed, hash chain
+  `valid=true, checked=6`.
+- W1 acceptance: `typecheck`, 127 unit tests, 26 UI tests, renderer build, desktop build, browser E2E,
+  desktop persistence E2E, and outcome receipt E2E passed.

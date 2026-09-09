@@ -114,6 +114,14 @@ contextBridge.exposeInMainWorld('hummerExecutionNodes', {
   killAll: (token: string) => ipcRenderer.invoke('hummer:execution-nodes:kill-all', token),
 });
 
+contextBridge.exposeInMainWorld('hummerOutcomes', {
+  define: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:define', request),
+  record: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:record', request),
+  recordCost: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:record-cost', request),
+  receipt: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:receipt', request),
+  sessionCost: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:session-cost', request),
+});
+
 contextBridge.exposeInMainWorld('hummerRuntimeConnectors', {
   list: () => ipcRenderer.invoke('hummer:runtime-connectors:list'),
   subscribe: (callback: (records: unknown[]) => void) => {
