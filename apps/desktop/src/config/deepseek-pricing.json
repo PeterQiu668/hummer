@@ -1,0 +1,23 @@
+{
+  "currency": "CNY",
+  "verifiedAt": "2026-08-29",
+  "sourceUrl": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "models": {
+    "deepseek-v4-flash": {
+      "inputCnyPerMillion": 1.5,
+      "cachedInputCnyPerMillion": 0.05,
+      "outputCnyPerMillion": 4.5,
+      "peak": {
+        "inputCnyPerMillion": 3,
+        "cachedInputCnyPerMillion": 0.1,
+        "outputCnyPerMillion": 9
+      },
+      "peakSchedule": {
+        "timeZone": "Asia/Shanghai",
+        "weekdays": [1, 2, 3, 4, 5],
+        "windows": [["09:00", "12:00"], ["14:00", "18:00"]]
+      }
+    }
+  },
+  "note": "Duplicated from src/features/sessions/runtime/runtime-pricing.json because apps/desktop is a separate TypeScript project and must not reach across the workspace boundary into the renderer product domain. Both files must be updated together until M5-B unifies them behind a single source of truth (see ADR-004)."
+}

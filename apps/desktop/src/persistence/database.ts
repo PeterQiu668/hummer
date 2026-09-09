@@ -7,6 +7,8 @@ import { EvidenceStore, type StoredEvidence } from './evidence-store.js';
 import { IdentityStore } from './identity-store.js';
 import { applyMigrations } from './migrations.js';
 import { OrganizationStore } from './organization-store.js';
+import { OutcomeLedgerStore } from './outcome-ledger-store.js';
+import { assembleOutcomeReceipt, type OutcomeReceipt } from './outcome-receipt.js';
 import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
@@ -97,6 +99,7 @@ export class DesktopPersistence {
   readonly executionNodes: ExecutionNodeStore;
   readonly identity: IdentityStore;
   readonly projects: ProjectStore;
+  readonly outcomes: OutcomeLedgerStore;
 
   constructor(
     private readonly database: SqliteDatabase,
@@ -113,6 +116,7 @@ export class DesktopPersistence {
     this.executionNodes = new ExecutionNodeStore(database);
     this.identity = new IdentityStore(database, now);
     this.projects = new ProjectStore(database, now);
+    this.outcomes = new OutcomeLedgerStore(database, now);
   }
 
   close(): void {
@@ -145,6 +149,28 @@ export class DesktopPersistence {
 
   verifyDomainEventIntegrity(): IntegrityResult {
     return this.domainEvents.verifyIntegrity();
+  }
+
+  /**
+   * Assembles a verifiable receipt for one outcome event: the outcome, its acceptance criteria,
+   * every cost entry billed against it, the governing approval (if any), and a hash-chain
+   * integrity check. Throws if the outcome does not exist in the given tenant.
+   */
+  buildOutcomeReceipt(tenantId: string, outcomeEventId: string, environment: NodeJS.ProcessEnv = process.env): OutcomeReceipt {
+    const outcome = this.outcomes.getEvent(tenantId, outcomeEventId);
+    if (!outcome) throw new Error('Outcome event is unavailable in the current tenant');
+    const definition = this.outcomes.getDefinition(tenantId, outcome.outcomeDefinitionId);
+    if (!definition) throw new Error('Outcome definition is unavailable in the current tenant');
+    const costs = this.outcomes.listCosts(tenantId, outcomeEventId);
+    const approval = outcome.approvalId
+      ? this.approvalPolicies.getEvidence(tenantId, outcome.sessionId, outcome.approvalId) ?? null
+      : null;
+    return assembleOutcomeReceipt({
+      tenantId, outcome, definition, costs, approval,
+      chainIntegrity: this.verifyDomainEventIntegrity(),
+      generatedAt: new Date().toISOString(),
+      environment,
+    });
   }
 
   replaceDomainEvent(_eventId: string, _replacement: unknown): never {

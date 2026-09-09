@@ -353,6 +353,69 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX evaluations_revision ON evaluations (tenant_id, sop_revision_id, created_at);
     `,
   },
+  {
+    version: 5,
+    name: 'm5a_outcome_ledger',
+    sql: `
+      CREATE TABLE outcome_definitions (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        action_pattern TEXT NOT NULL,
+        title TEXT NOT NULL,
+        acceptance_criteria TEXT NOT NULL,
+        unit_price_cny REAL,
+        risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, action_pattern)
+      );
+
+      CREATE INDEX outcome_definitions_tenant ON outcome_definitions (tenant_id, enabled);
+
+      CREATE TABLE outcome_events (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        outcome_definition_id TEXT NOT NULL,
+        work_order_id TEXT,
+        session_id TEXT NOT NULL,
+        approval_id TEXT,
+        verdict TEXT NOT NULL CHECK (verdict IN ('accepted', 'rejected')),
+        accepted_by TEXT NOT NULL,
+        evidence_ref TEXT,
+        occurred_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (outcome_definition_id) REFERENCES outcome_definitions(id)
+      );
+
+      CREATE INDEX outcome_events_tenant ON outcome_events (tenant_id, occurred_at);
+      CREATE INDEX outcome_events_session ON outcome_events (session_id);
+      CREATE INDEX outcome_events_definition ON outcome_events (outcome_definition_id);
+
+      CREATE TABLE cost_ledger (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        outcome_event_id TEXT,
+        engine_profile_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_cny REAL NOT NULL,
+        pricing_source TEXT NOT NULL,
+        pricing_verified_at TEXT NOT NULL,
+        computed_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (outcome_event_id) REFERENCES outcome_events(id)
+      );
+
+      CREATE INDEX cost_ledger_session ON cost_ledger (session_id);
+      CREATE INDEX cost_ledger_outcome ON cost_ledger (outcome_event_id);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

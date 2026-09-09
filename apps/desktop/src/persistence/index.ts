@@ -23,3 +23,16 @@ export type {
 export type { PersistableRuntimeEvent, PersistedSessionDescriptor, RuntimeEventQuery, SaveRuntimeEventOptions } from './runtime-event-store.js';
 
 export type { BadCaseRecord, CreateProjectInput, EvaluationRecord, ProjectGrowthChain, ProjectMembershipRecord, ProjectRecord, SopRevisionRecord, WorkerAssignmentRecord } from './project-store.js';
+
+export type {
+  CostLedgerRecord,
+  DefineOutcomeInput,
+  OutcomeDefinitionRecord,
+  OutcomeEventRecord,
+  OutcomeRiskLevel,
+  OutcomeVerdict,
+  RecordCostInput,
+  RecordOutcomeInput,
+} from './outcome-ledger-store.js';
+export type { OutcomeReceipt } from './outcome-receipt.js';
+export type { PricedCost, RuntimeUsage } from '../pricing/deepseek-pricing.js';
