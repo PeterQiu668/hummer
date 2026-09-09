@@ -393,3 +393,11 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 - app-server approval request id 会在不同原生 thread 内从 0 重新计数。宿主现以原生 thread id 命名空间化 HUMMER approvalId，再映射回 server 原始 request id，避免 source 已批准 id 遮蔽 fork 待批 id。
 - `runtime-pricing.json` 已按 DeepSeek 官方人民币价配置 `deepseek-v4-flash` 工作日高峰/空闲时段；来源 `https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`，核实日 2026-08-29。未知模型或缺失 usage 继续返回 `null`。
 - 兼容性边界：本次仍观察到 Codex model manager 无法解析 DeepSeek `/models` 返回形状，以及 PowerShell shell snapshot 不支持。任务实际完成，但不证明所有辅助网络请求都只访问 DeepSeek 域。
+
+## 14. W1 Codex CLI 0.153.4 升级复验（2026-09-10）
+
+- 升级前基线：npm Codex CLI `0.150.1`，运行 `npm run test:desktop:codex:app-server`，于 2026-09-10 02:02:22（Asia/Shanghai）完成。真实 trajectory 包含 `shell.command` 和 `workspace.patch`，最终 `turn/completed`；证据为 `spikes/codex-runtime/app-server-jsonrpc-wire-0.150.1.jsonl` 和 `app-server-trajectory-0.150.1.json`。
+- 升级后复验：npm Codex CLI `0.153.4`，同一脚本在加入主进程版本校验后于 2026-09-10 02:22:31（Asia/Shanghai）完成。证据为 `spikes/codex-runtime/app-server-jsonrpc-wire-0.153.4.jsonl` 和 `app-server-trajectory-0.153.4.json`。
+- 两次 wire 的方法集一致，都包含 `initialize`、`thread/start`、`turn/start`、`item/started`、`item/completed`、`thread/tokenUsage/updated` 和 `turn/completed`；item 类型都包含 `userMessage`、`reasoning`、`commandExecution`、`fileChange` 和 `agentMessage`。本次不需要修改 `CodexRuntimeAdapter` 的映射。
+- npm registry 在下载 134 MB Windows 平台包时多次 `ECONNRESET`；最终使用官方 tarball 的可续传下载完成安装。`npm ls -g --depth=0` 显示主包 `@openai/codex@0.153.4` 与平台包 `@openai/codex-win32-x64@0.153.4-win32-x64`，平台包不再指向临时目录。
+- 升级前首次复跑暴露了两个 E2E 脚本债务：M4 身份门禁未处理，以及新的持久化查询未传 session token。脚本已使用独立 Electron profile、真实登录 token 修复，不改变生产协议。

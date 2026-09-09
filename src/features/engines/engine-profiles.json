@@ -14,7 +14,7 @@
       "label": "增强",
       "available": false,
       "dataDomain": "open.bigmodel.cn",
-      "compatibilityNote": "Codex CLI 0.150.1 requires a Responses-compatible endpoint. This tier is temporarily unavailable until the provider or a supported HUMMER shell supplies one."
+      "compatibilityNote": "Codex CLI 0.153.4 requires a Responses-compatible endpoint. This tier is temporarily unavailable until the provider or a supported HUMMER shell supplies one."
     },
     {
       "id": "openai-flagship",

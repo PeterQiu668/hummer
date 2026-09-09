@@ -1,11 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 import { ApprovalContinuationWatchdog } from './approval-watchdog.js';
-import { buildCodexProviderArgs, customerEngineProfiles, engineProfileById, redactRuntimeSecrets } from './engine-profiles.js';
+import { buildCodexProviderArgs, customerEngineProfiles, engineProfileById, redactRuntimeSecrets, requiredCodexCliVersion } from './engine-profiles.js';
 import { JsonLineDecoder } from './jsonl.js';
 import { TextLineDecoder, WireLog } from './wire-log.js';
 import { listRuntimeConnectors, recordMcpStartupStatus } from './mcp-connector-registry.js';
@@ -64,6 +64,7 @@ interface RunState {
 
 const runs = new Map<string, RunState>();
 let registered = false;
+let verifiedCodexExecutable: string | undefined;
 
 export function registerCodexHost(): void {
   if (registered) return;
@@ -409,15 +410,37 @@ function validateInvocation(request: Invocation): void {
 }
 
 function resolveCodexExecutable(): string {
+  let executable: string;
   if (process.env.HUMMER_CODEX_PATH) {
     if (!existsSync(process.env.HUMMER_CODEX_PATH)) throw new Error(`Configured Codex executable does not exist: ${process.env.HUMMER_CODEX_PATH}`);
-    return process.env.HUMMER_CODEX_PATH;
+    executable = process.env.HUMMER_CODEX_PATH;
+  } else if (process.platform !== 'win32') {
+    executable = 'codex';
+  } else {
+    const candidates = (process.env.PATH ?? '').split(delimiter).map((entry) => join(entry, 'codex.cmd'));
+    const candidate = candidates.find(existsSync);
+    if (!candidate) throw new Error('Codex CLI is unavailable. Install @openai/codex with npm or set HUMMER_CODEX_PATH.');
+    executable = candidate;
   }
-  if (process.platform !== 'win32') return 'codex';
-  const candidates = (process.env.PATH ?? '').split(delimiter).map((entry) => join(entry, 'codex.cmd'));
-  const executable = candidates.find(existsSync);
-  if (!executable) throw new Error('Codex CLI is unavailable. Install @openai/codex with npm or set HUMMER_CODEX_PATH.');
+  verifyCodexCliVersion(executable);
   return executable;
+}
+
+function verifyCodexCliVersion(executable: string): void {
+  if (verifiedCodexExecutable === executable) return;
+  const result = spawnSync(executable, ['--version'], {
+    encoding: 'utf8',
+    windowsHide: true,
+    shell: process.platform === 'win32' && executable.endsWith('.cmd'),
+    timeout: 30_000,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(`Unable to verify Codex CLI version: ${result.error?.message ?? result.stderr.trim()}`);
+  }
+  const actual = /codex-cli\s+(\S+)/.exec(result.stdout)?.[1];
+  const expected = requiredCodexCliVersion();
+  if (actual !== expected) throw new Error(`HUMMER requires Codex CLI ${expected}; found ${actual ?? 'an unknown version'}.`);
+  verifiedCodexExecutable = executable;
 }
 
 function nestedString(value: unknown, ...path: string[]): string | undefined {

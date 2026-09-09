@@ -18,12 +18,14 @@ const baseUrl = 'http://127.0.0.1:4176';
 const codexPath = resolve(process.env.LOCALAPPDATA, 'hermes/node/codex.cmd');
 const wireLogPath = resolve(workspace, forkFlow ? 'app-server-fork-wire.jsonl' : approvalFlow ? 'app-server-approval-wire.jsonl' : `${protocol}-wire.jsonl`);
 const dataDirectory = resolve(workspace, `.facts-${forkFlow ? 'fork' : approvalFlow ? 'approval' : protocol}`);
+const profileDirectory = resolve(workspace, `profile-${forkFlow ? 'fork' : approvalFlow ? 'approval' : protocol}`);
 
 if (!existsSync(codexPath)) throw new Error(`npm Codex shim not found at ${codexPath}`);
 if (existsSync(output)) rmSync(output);
 if (existsSync(wireLogPath)) rmSync(wireLogPath);
 if (forkFlow && existsSync(branchOutput)) rmSync(branchOutput);
 if (existsSync(dataDirectory)) rmSync(dataDirectory, { recursive: true, force: true });
+if (existsSync(profileDirectory)) rmSync(profileDirectory, { recursive: true, force: true });
 
 const vite = spawn(
   process.execPath,
@@ -41,7 +43,7 @@ try {
   await waitForServer(baseUrl);
   console.log(`stage=vite-ready protocol=${protocol}`);
   app = await electron.launch({
-    args: [resolve(root, 'apps/desktop/dist/main.js'), '--disable-gpu'],
+    args: [resolve(root, 'apps/desktop/dist/main.js'), '--disable-gpu', `--user-data-dir=${profileDirectory}`],
     env: {
       ...process.env,
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
@@ -59,7 +61,19 @@ try {
   const page = await app.firstWindow();
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[renderer] ${message.text()}`); });
   await page.evaluate(() => localStorage.removeItem('hummer-v6'));
+  const identityGate = page.getByRole('heading', { name: '进入 HUMMER' });
   const workbenchHeading = page.getByRole('heading', { name: '工作台' });
+  await Promise.race([
+    identityGate.waitFor({ state: 'visible', timeout: 30_000 }),
+    workbenchHeading.waitFor({ state: 'visible', timeout: 30_000 }),
+  ]);
+  if (await identityGate.isVisible()) {
+    await page.getByLabel('公司名称').fill('HUMMER Runtime 验收企业');
+    await page.getByLabel('你的姓名').fill('运行时验收人');
+    await page.getByLabel('邮箱或手机').fill('runtime-e2e@example.test');
+    await page.getByRole('button', { name: '创建并进入' }).click();
+    await identityGate.waitFor({ state: 'hidden', timeout: 15_000 });
+  }
   if (!(await workbenchHeading.isVisible())) {
     await page.getByRole('button', { name: '工作台', exact: true }).click();
   }
@@ -113,7 +127,7 @@ try {
   let forkEvidence;
   if (forkFlow) {
     if (!approvalFlow) throw new Error('Fork E2E requires the approval flow');
-    const sourceSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
+    const sourceSessions = await page.evaluate(() => window.hummerPersistence?.listSessions(localStorage.getItem('hummer.auth.session') ?? '') ?? []);
     const sourceSession = sourceSessions.find((session) => session.events.some((event) => event.type === 'result'));
     const sourceResults = sourceSession?.events.filter((event) => event.type === 'result') ?? [];
     const sourceCheckpoint = sourceResults.at(-1)?.sequence;
@@ -133,10 +147,10 @@ try {
     console.log('stage=fork-approval-accepted');
     await waitForFile(branchOutput, 120_000);
     await delay(1_000);
-    const forkSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
+    const forkSessions = await page.evaluate(() => window.hummerPersistence?.listSessions(localStorage.getItem('hummer.auth.session') ?? '') ?? []);
     const nativeSessionIds = forkSessions.map((session) => session.handle.nativeSessionId).filter(Boolean);
     if (new Set(nativeSessionIds).size < 2) throw new Error('Fork did not persist two distinct native Codex thread ids');
-    const integrity = await page.evaluate(() => window.hummerPersistence?.verifyIntegrity());
+    const integrity = await page.evaluate(() => window.hummerPersistence?.verifyIntegrity(localStorage.getItem('hummer.auth.session') ?? ''));
     if (!integrity?.valid) throw new Error('Fork persistence hash chain is invalid');
     forkEvidence = {
       occurredAt: new Date().toISOString(),
@@ -154,7 +168,7 @@ try {
   }
 
 
-  const persistedSessions = await page.evaluate(() => window.hummerPersistence?.listSessions() ?? []);
+  const persistedSessions = await page.evaluate(() => window.hummerPersistence?.listSessions(localStorage.getItem('hummer.auth.session') ?? '') ?? []);
   const persistedEvents = persistedSessions.flatMap((session) => session.events);
   const persistedFileChange = persistedEvents.find((event) => event.type === 'tool' && event.tool === 'workspace.patch');
   if (!approvalFlow && !persistedFileChange?.evidenceRefs.some((ref) => ref.startsWith('evidence://sha256/'))) {

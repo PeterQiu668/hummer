@@ -18,6 +18,7 @@ spikes/**/.facts-*/
 spikes/m2-persistence/facts/
 spikes/**/facts/
 spikes/**/profile*/
+spikes/**/.profile*/
 
 # Local Claude Code config
 .claude/settings.local.json

@@ -33,6 +33,7 @@ export interface CustomerEngineProfile {
 
 const profiles = (config.profiles as EngineProfile[]).map(validateProfile);
 
+export function requiredCodexCliVersion(): string { return config.codexCliVersion; }
 export function listEngineProfiles(): readonly EngineProfile[] { return profiles; }
 export function customerEngineProfiles(): readonly CustomerEngineProfile[] {
   return profiles
@@ -55,7 +56,7 @@ export function engineProfileById(id: string | undefined): EngineProfile {
 export function buildCodexProviderArgs(profile: EngineProfile, environment: NodeJS.ProcessEnv): string[] {
   if (profile.shell !== 'codex') throw new Error(`Engine profile ${profile.id} does not use the Codex shell`);
   if (profile.wireApi === 'chat') {
-    throw new Error(`Codex CLI 0.150.1 no longer supports wire_api="chat"; ${profile.providerName} cannot run through this shell until it offers a Responses-compatible endpoint.`);
+    throw new Error(`Codex CLI 0.153.4 does not support wire_api="chat"; ${profile.providerName} cannot run through this shell until it offers a Responses-compatible endpoint.`);
   }
   const providerPath = `model_providers.${profile.providerId}`;
   const runtimeSafetyArgs = ['--disable', 'remote_plugin', '--disable', 'plugins', '--disable', 'recommended_plugins'];

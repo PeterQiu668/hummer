@@ -4,10 +4,15 @@ import {
   customerEngineProfiles,
   defaultEngineProfile,
   engineProfileById,
+  requiredCodexCliVersion,
   redactRuntimeSecrets,
 } from './engine-profiles.js';
 
 describe('desktop engine profiles', () => {
+  it('pins the supported Codex CLI protocol version', () => {
+    expect(requiredCodexCliVersion()).toBe('0.153.4');
+  });
+
   it('exposes only customer profiles with availability and data-domain disclosure', () => {
     const profiles = customerEngineProfiles();
 
@@ -74,7 +79,7 @@ describe('desktop engine profiles', () => {
 
   it('fails explicitly when the configured provider only supports removed chat completions', () => {
     const profile = engineProfileById('zhipu-enhanced');
-    expect(() => buildCodexProviderArgs(profile, {})).toThrow(/Codex CLI 0\.150\.1.*chat/i);
+    expect(() => buildCodexProviderArgs(profile, {})).toThrow(/Codex CLI 0\.153\.4.*chat/i);
   });
 
   it('redacts configured runtime keys from logs and serialized evidence', () => {
