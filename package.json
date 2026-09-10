@@ -25,7 +25,8 @@
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "desktop:build": "npm run build -w @hummer/desktop",
     "desktop:start": "npm run start -w @hummer/desktop",
-    "test:desktop:codex": "node scripts/e2e-desktop-codex.mjs",
+    "desktop:package:win": "npm run build && npm run desktop:build && npm run package:win -w @hummer/desktop",
+    "test:desktop:codex": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc",
     "test:desktop:codex:restart": "node scripts/e2e-desktop-codex-restart.mjs",
     "test:desktop:codex:app-server": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc",
     "test:desktop:codex:approval": "node scripts/e2e-desktop-codex.mjs --protocol=app-server-jsonrpc --approval",
@@ -37,7 +38,10 @@
     "test:desktop:projects": "node scripts/e2e-desktop-projects.mjs",
     "test:desktop:outcome-receipt": "node scripts/e2e-desktop-outcome-receipt.mjs",
     "test:desktop:planner": "node scripts/e2e-desktop-planner.mjs",
-    "test:desktop:planner:deepseek": "node scripts/e2e-desktop-planner.mjs --engine-profile=deepseek-standard"
+    "test:desktop:planner:deepseek": "node scripts/e2e-desktop-planner.mjs --engine-profile=deepseek-standard",
+    "test:desktop:credentials": "node scripts/e2e-desktop-credentials.mjs",
+    "test:desktop:packaged": "node scripts/e2e-desktop-packaged.mjs",
+    "test:desktop:wedge": "node scripts/e2e-desktop-wedge-external-send.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

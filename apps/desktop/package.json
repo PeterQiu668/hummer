@@ -2,25 +2,34 @@
   "name": "@hummer/desktop",
   "private": true,
   "version": "0.0.0",
+  "description": "HUMMER trusted enterprise agent desktop",
+  "author": "HUMMER",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
     "prebuild": "node ../../packages/config/scripts/generate.mjs",
     "build": "tsc -b",
     "start": "electron dist/main.js",
-    "package:dir": "electron-builder --dir"
+    "package:dir": "electron-builder --dir",
+    "package:win": "electron-builder --win nsis"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "electron": "^38.0.0",
-    "electron-builder": "^26.0.12"
+    "electron": "38.8.6",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.hummer.desktop",
     "productName": "HUMMER",
+    "directories": {
+      "output": "../../release/m5c"
+    },
+    "electronDist": "../../node_modules/electron/dist",
     "asar": true,
+    "npmRebuild": false,
     "files": [
-      "dist/**/*"
+      "dist/**/*",
+      "!dist/win-unpacked*/**/*"
     ],
     "extraResources": [
       {
@@ -29,7 +38,14 @@
       }
     ],
     "win": {
-      "target": "dir"
+      "target": ["nsis"],
+      "artifactName": "HUMMER-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "dependencies": {
