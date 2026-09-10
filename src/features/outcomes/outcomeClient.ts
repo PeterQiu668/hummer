@@ -8,6 +8,7 @@ export interface OutcomeEventRecord { id: string; tenantId: string; outcomeDefin
 export interface CostLedgerRecord { id: string; tenantId: string; sessionId: string; outcomeEventId: string | null; engineProfileId: string; model: string; usage: RuntimeUsage; costCny: number; pricingSource: string; pricingVerifiedAt: string; computedAt: string }
 export interface SessionCostSummary { totalCostCny: number | null; entryCount: number }
 export interface OutcomeReceipt { generatedAt: string; tenantId: string; outcome: OutcomeEventRecord; definition: OutcomeDefinitionRecord; costs: CostLedgerRecord[]; totalCostCny: number; approval: unknown; chainIntegrity: { valid: boolean; checked: number }; receiptJson: string }
+export interface OutcomeLedgerEntry { outcome: OutcomeEventRecord; definition: OutcomeDefinitionRecord; totalCostCny: number; costCount: number }
 export interface DefineOutcomeCommand { actionPattern: string; title: string; acceptanceCriteria: string; unitPriceCny?: number | null; riskLevel: OutcomeRiskLevel; idempotencyKey: string }
 export interface RecordOutcomeCommand { outcomeDefinitionId: string; workOrderId?: string; sessionId: string; approvalId?: string; verdict: OutcomeVerdict; evidenceRef?: string; occurredAt: string; idempotencyKey: string }
 export interface RecordCostCommand { sessionId: string; outcomeEventId?: string; engineProfileId: string; model: string; usage: RuntimeUsage; pricingSource?: 'planning'; occurredAt: string; idempotencyKey: string }
@@ -18,6 +19,8 @@ interface DesktopOutcomeHost {
   recordCost(request: { token: string; input: RecordCostCommand }): Promise<CostLedgerRecord>;
   receipt(request: { token: string; input: { outcomeEventId: string } }): Promise<OutcomeReceipt>;
   sessionCost(request: { token: string; input: { sessionId: string } }): Promise<SessionCostSummary>;
+  list(token: string): Promise<OutcomeLedgerEntry[]>;
+  exportReceipt(request: { token: string; input: { outcomeEventId: string } }): Promise<string>;
 }
 export interface OutcomePort {
   define(command: DefineOutcomeCommand): Promise<OutcomeDefinitionRecord>;
@@ -25,6 +28,8 @@ export interface OutcomePort {
   recordCost(command: RecordCostCommand): Promise<CostLedgerRecord>;
   receipt(outcomeEventId: string): Promise<OutcomeReceipt>;
   sessionCost(sessionId: string): Promise<SessionCostSummary>;
+  list(): Promise<OutcomeLedgerEntry[]>;
+  exportReceipt(outcomeEventId: string): Promise<string>;
 }
 
 declare global { interface Window { hummerOutcomes?: DesktopOutcomeHost } }
@@ -38,6 +43,8 @@ export function desktopOutcomePort(): OutcomePort | undefined {
     recordCost: (input) => host.recordCost({ token: token(), input }),
     receipt: (outcomeEventId) => host.receipt({ token: token(), input: { outcomeEventId } }),
     sessionCost: (sessionId) => host.sessionCost({ token: token(), input: { sessionId } }),
+    list: () => host.list(token()),
+    exportReceipt: (outcomeEventId) => host.exportReceipt({ token: token(), input: { outcomeEventId } }),
   };
 }
 

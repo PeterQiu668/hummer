@@ -158,6 +158,8 @@ describe('WorkbenchPage V5', () => {
       recordCost: vi.fn(),
       receipt: vi.fn(),
       sessionCost: vi.fn().mockResolvedValue({ totalCostCny: 0.0182, entryCount: 1 }),
+      list: vi.fn().mockResolvedValue([]),
+      exportReceipt: vi.fn(),
     };
 
     renderWorkbench();
@@ -177,6 +179,8 @@ describe('WorkbenchPage V5', () => {
       recordCost,
       receipt: vi.fn(),
       sessionCost: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
+      exportReceipt: vi.fn(),
     };
     renderWorkbench();
     const composer = screen.getByRole('textbox', { name: '任务描述' });

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
+import { configureInternalValidationDisplay, ensureE2eIdentity } from './support/configure-e2e-engine.mjs';
 
 const root = process.cwd();
 const workspace = resolve(root, 'spikes/codex-runtime');
@@ -32,6 +33,9 @@ try {
   await waitForServer(baseUrl);
   app = await launchDesktop();
   let page = await app.firstWindow();
+  await ensureE2eIdentity(page, 'restart-acceptance');
+  await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+  await configureInternalValidationDisplay(page);
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   const composer = page.getByRole('textbox', { name: '任务描述' });
   await composer.fill(prompt);
@@ -53,6 +57,7 @@ try {
 
   app = await launchDesktop();
   page = await app.firstWindow();
+  await ensureE2eIdentity(page, 'restart-acceptance');
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   await page.getByText('已中断', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
   const after = await readPersistedState(page);
@@ -112,10 +117,14 @@ async function closeDesktop(desktop) {
 }
 
 async function readPersistedState(page) {
-  return page.evaluate(async () => ({
-    sessions: await window.hummerPersistence?.listSessions() ?? [],
-    integrity: await window.hummerPersistence?.verifyIntegrity(),
-  }));
+  return page.evaluate(async () => {
+    const token = localStorage.getItem('hummer.auth.session');
+    if (!token || !window.hummerPersistence) throw new Error('Authenticated persistence bridge is unavailable');
+    return {
+      sessions: await window.hummerPersistence.listSessions(token),
+      integrity: await window.hummerPersistence.verifyIntegrity(token),
+    };
+  });
 }
 
 async function waitForServer(url) {

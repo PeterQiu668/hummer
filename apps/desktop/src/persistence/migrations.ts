@@ -416,6 +416,25 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX cost_ledger_outcome ON cost_ledger (outcome_event_id);
     `,
   },
+  {
+    version: 6,
+    name: 'm5c_encrypted_engine_credentials',
+    sql: `
+      CREATE TABLE engine_credentials (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        engine_profile_id TEXT NOT NULL,
+        env_key TEXT NOT NULL,
+        encrypted_value TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, engine_profile_id)
+      );
+
+      CREATE INDEX engine_credentials_tenant
+        ON engine_credentials (tenant_id, engine_profile_id);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

@@ -29,20 +29,28 @@ export interface CustomerEngineProfile {
   available: boolean;
   dataDomain: string;
   compatibilityNote?: string;
+  credentialStatus: 'configured' | 'not_configured' | 'managed';
 }
 
 const profiles = (config.profiles as EngineProfile[]).map(validateProfile);
 
 export function requiredCodexCliVersion(): string { return config.codexCliVersion; }
 export function listEngineProfiles(): readonly EngineProfile[] { return profiles; }
-export function customerEngineProfiles(): readonly CustomerEngineProfile[] {
+export function customerEngineProfiles(configuredEnvKeys: ReadonlySet<string> = configuredEnvironmentKeys(process.env)): readonly CustomerEngineProfile[] {
   return profiles
     .filter((profile) => profile.customerVisible !== false)
-    .map((profile) => Object.freeze({
-      id: profile.id, tier: profile.tier, label: tierLabel(profile.tier),
-      available: profile.available !== false, dataDomain: profile.dataDomain,
-      ...(profile.compatibilityNote ? { compatibilityNote: profile.compatibilityNote } : {}),
-    }));
+    .map((profile) => {
+      const managed = profile.providerMode === 'codex-login';
+      const configured = managed || configuredEnvKeys.has(profile.envKey);
+      const compatible = profile.available !== false;
+      return Object.freeze({
+        id: profile.id, tier: profile.tier, label: tierLabel(profile.tier),
+        available: compatible && configured, dataDomain: profile.dataDomain,
+        credentialStatus: managed ? 'managed' as const : configured ? 'configured' as const : 'not_configured' as const,
+        ...(profile.compatibilityNote ? { compatibilityNote: profile.compatibilityNote }
+          : !configured ? { compatibilityNote: '未配置密钥' } : {}),
+      });
+    });
 }
 export function defaultEngineProfile(): EngineProfile { return engineProfileById(config.defaultProfileId); }
 
@@ -99,6 +107,10 @@ function tierLabel(tier: EngineTier): string {
   if (tier === 'standard') return '\u6807\u51c6';
   if (tier === 'enhanced') return '\u589e\u5f3a';
   return '\u65d7\u8230';
+}
+
+function configuredEnvironmentKeys(environment: NodeJS.ProcessEnv): Set<string> {
+  return new Set(profiles.map((profile) => profile.envKey).filter((envKey) => Boolean(environment[envKey])));
 }
 
 function tomlString(value: string): string { return JSON.stringify(value); }

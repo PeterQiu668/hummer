@@ -3,10 +3,11 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
+import { configureInternalValidationDisplay } from './support/configure-e2e-engine.mjs';
 
 const root = process.cwd();
-const protocol = process.argv.find((argument) => argument.startsWith('--protocol='))?.split('=')[1] ?? 'exec-jsonl';
-const approvalFlow = process.argv.includes('--approval');
+const protocol = process.argv.find((argument) => argument.startsWith('--protocol='))?.split('=')[1] ?? 'app-server-jsonrpc';
+const approvalFlow = process.argv.includes('--approval') || !process.argv.includes('--without-approval');
 const forkFlow = process.argv.includes('--fork');
 if (!['exec-jsonl', 'app-server-jsonrpc'].includes(protocol)) throw new Error(`Unsupported test protocol ${protocol}`);
 const engineProfile = process.argv.find((argument) => argument.startsWith('--engine-profile='))?.split('=')[1] ?? 'openai-codex-validation';
@@ -92,7 +93,11 @@ try {
   if (!(await node.textContent())?.includes(workspace)) throw new Error('Workbench did not show the real Codex working directory');
   console.log('stage=codex-node-visible');
 
-  if (engineProfile === 'openai-codex-validation') await page.getByLabel('选择模型').selectOption({ label: '旗舰' });
+  if (engineProfile === 'openai-codex-validation') {
+    await configureInternalValidationDisplay(page);
+    await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.getByLabel('选择模型').selectOption({ label: '旗舰' });
+  }
   const composer = page.getByRole('textbox', { name: '任务描述' });
   const runtimeTask = approvalFlow
     ? 'Read input.txt. Do not use apply_patch. Run a PowerShell Set-Content command to create summary-approved.md with one concise sentence summarizing the file. Do not modify any other file.'

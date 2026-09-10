@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
@@ -10,6 +10,8 @@ const spikeRoot = resolve(root, 'spikes/m5a-outcome-ledger');
 const dataDirectory = resolve(spikeRoot, 'facts');
 const profileDirectory = resolve(spikeRoot, 'profile');
 const evidencePath = resolve(spikeRoot, 'outcome-receipt-evidence.json');
+const exportedReceiptPath = resolve(spikeRoot, 'verifiable-outcome-receipt.json');
+const tamperedReceiptPath = resolve(spikeRoot, 'tampered-outcome-receipt.json');
 
 for (const directory of [dataDirectory, profileDirectory]) {
   if (!directory.startsWith(spikeRoot)) throw new Error('Refusing to clean outside M5-A evidence directory');
@@ -122,8 +124,9 @@ try {
     });
     const sessionCost = await window.hummerOutcomes.sessionCost({ token, input: { sessionId } });
     const receipt = await window.hummerOutcomes.receipt({ token, input: { outcomeEventId: outcome.id } });
+    const exportedReceipt = await window.hummerOutcomes.exportReceipt({ token, input: { outcomeEventId: outcome.id } });
     const integrity = await window.hummerPersistence.verifyIntegrity(token);
-    return { generatedAt: new Date().toISOString(), sessionId, workOrderId, definition, approval, outcome, cost, sessionCost, receipt, integrity };
+    return { generatedAt: new Date().toISOString(), sessionId, workOrderId, definition, approval, outcome, cost, sessionCost, receipt, exportedReceipt, integrity };
   }, { token });
 
   if (evidence.outcome.verdict !== 'accepted') throw new Error('Outcome acceptance was not persisted');
@@ -131,6 +134,16 @@ try {
   if (evidence.receipt.totalCostCny !== evidence.cost.costCny || evidence.receipt.approval?.status !== 'approved') throw new Error('Receipt omitted its approval or real cost');
   if (!evidence.integrity?.valid || !evidence.receipt.chainIntegrity?.valid) throw new Error('Outcome receipt hash chain is invalid');
   if (/sk-[A-Za-z0-9]/.test(evidence.receipt.receiptJson)) throw new Error('Outcome receipt leaked a secret-shaped value');
+  writeFileSync(exportedReceiptPath, `${evidence.exportedReceipt}\n`, 'utf8');
+  const verified = verifyReceipt(exportedReceiptPath);
+  if (verified.status !== 0 || !verified.result.valid) throw new Error(`Standalone receipt verification failed: ${verified.stdout}`);
+  const tampered = JSON.parse(readFileSync(exportedReceiptPath, 'utf8'));
+  tampered.receipt.outcome.verdict = 'rejected';
+  writeFileSync(tamperedReceiptPath, `${JSON.stringify(tampered, null, 2)}\n`, 'utf8');
+  const rejectedTamper = verifyReceipt(tamperedReceiptPath);
+  if (rejectedTamper.status !== 1 || rejectedTamper.result.field !== '/receipt/outcome/verdict') throw new Error(`Tamper was not pinpointed: ${rejectedTamper.stdout}`);
+  delete evidence.exportedReceipt;
+  evidence.independentVerification = { original: verified.result, tampered: rejectedTamper.result, exportedReceiptPath, tamperedReceiptPath };
   writeFileSync(evidencePath, `${JSON.stringify({ ...evidence, evidencePath, dataDirectory }, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify({ ...evidence, evidencePath, dataDirectory }, null, 2));
 } finally {
@@ -140,6 +153,11 @@ try {
     if (!process.killed) process.kill();
   }
   vite.kill();
+}
+
+function verifyReceipt(path) {
+  const result = spawnSync(process.execPath, [resolve(root, 'scripts/verify-receipt.mjs'), path], { encoding: 'utf8' });
+  return { status: result.status, stdout: result.stdout.trim(), result: JSON.parse(result.stdout) };
 }
 
 async function ensureIdentity(page) {

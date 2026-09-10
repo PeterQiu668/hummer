@@ -5,10 +5,12 @@ import { delimiter, join } from 'node:path';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 import { ApprovalContinuationWatchdog } from './approval-watchdog.js';
-import { buildCodexProviderArgs, customerEngineProfiles, engineProfileById, redactRuntimeSecrets, requiredCodexCliVersion } from './engine-profiles.js';
+import { buildCodexProviderArgs, engineProfileById, redactRuntimeSecrets, requiredCodexCliVersion } from './engine-profiles.js';
 import { JsonLineDecoder } from './jsonl.js';
 import { TextLineDecoder, WireLog } from './wire-log.js';
 import { listRuntimeConnectors, recordMcpStartupStatus } from './mcp-connector-registry.js';
+import { buildRuntimeEnvironment } from './runtime-credential-environment.js';
+import { replaceSandboxArgument, resolveCodexSandbox } from './codex-sandbox.js';
 
 const START = 'hummer:codex:start';
 const REPLAY = 'hummer:codex:replay';
@@ -19,7 +21,6 @@ const EVENT = 'hummer:codex:event';
 const FORK = 'hummer:codex:fork';
 const CONNECTORS_LIST = 'hummer:runtime-connectors:list';
 const CONNECTORS_CHANGED = 'hummer:runtime-connectors:changed';
-const ENGINE_PROFILES_LIST = 'hummer:engine-profiles:list';
 
 interface Invocation {
   command: 'codex';
@@ -31,6 +32,7 @@ interface Invocation {
   engineProfileId: string;
   sandbox: 'read-only' | 'workspace-write';
   outputSchema?: Record<string, unknown>;
+  authToken?: string;
 }
 
 interface EventEnvelope {
@@ -69,9 +71,16 @@ const runs = new Map<string, RunState>();
 let registered = false;
 let verifiedCodexExecutable: string | undefined;
 
-export function registerCodexHost(): void {
+export interface CodexHostOptions {
+  resolveCredential?: (token: string, engineProfileId: string, envKey: string) => string | undefined;
+}
+
+let hostOptions: CodexHostOptions = {};
+
+export function registerCodexHost(options: CodexHostOptions = {}): void {
   if (registered) return;
   registered = true;
+  hostOptions = options;
   ipcMain.handle(START, startCodex);
   ipcMain.handle(REPLAY, (_event, processId: string) => [...requireRun(processId).events]);
   ipcMain.handle(STOP, async (_event, processId: string) => stopRun(requireRun(processId)));
@@ -81,18 +90,29 @@ export function registerCodexHost(): void {
   ipcMain.handle(STEER, async (_event, processId: string, text: string) => steerRun(requireRun(processId), text));
   ipcMain.handle(FORK, (event, processId: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => forkCodex(event, requireRun(processId), checkpoint, sop));
   ipcMain.handle(CONNECTORS_LIST, () => listRuntimeConnectors());
-  ipcMain.handle(ENGINE_PROFILES_LIST, () => customerEngineProfiles());
 }
 
 async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
   validateInvocation(request);
+  const sandbox = resolveCodexSandbox(request.sandbox, process.env.HUMMER_CODEX_SANDBOX);
+  const effectiveRequest = {
+    ...request,
+    sandbox,
+    args: request.protocol === 'exec-jsonl' ? replaceSandboxArgument(request.args, sandbox) : request.args,
+  };
   const processId = randomUUID();
-  const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || request.engineProfileId);
-  const providerArgs = buildCodexProviderArgs(profile, process.env);
+  const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || effectiveRequest.engineProfileId);
+  const runtimeEnvironment = buildRuntimeEnvironment(process.env, {
+    authToken: effectiveRequest.authToken,
+    engineProfileId: profile.id,
+    envKey: profile.envKey,
+    resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
+  });
+  const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, [...providerArgs, ...request.args], {
-    cwd: request.cwd,
-    env: process.env,
+  const child = spawn(executable, [...providerArgs, ...effectiveRequest.args], {
+    cwd: effectiveRequest.cwd,
+    env: runtimeEnvironment,
     windowsHide: true,
     shell: process.platform === 'win32' && executable.endsWith('.cmd'),
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -105,27 +125,27 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
   });
   state = {
     processId,
-    protocol: request.protocol,
+    protocol: effectiveRequest.protocol,
     child,
     owner: event.sender,
     decoder: new JsonLineDecoder(),
     stderrDecoder: new TextLineDecoder(),
-    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, process.env)),
+    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, runtimeEnvironment)),
     events: [],
     stderr: '',
     requestSequence: 0,
     pending: new Map(),
     approvalRequests: new Map(),
     approvalWatchdog,
-    invocation: request,
+    invocation: effectiveRequest,
     turnActive: false,
   };
   runs.set(processId, state);
   attachProcess(state);
 
-  if (request.protocol === 'exec-jsonl') {
-    child.stdin.end(request.stdin);
-    return { processId, engine: disclosure(profile, request) };
+  if (effectiveRequest.protocol === 'exec-jsonl') {
+    child.stdin.end(effectiveRequest.stdin);
+    return { processId, engine: disclosure(profile, effectiveRequest) };
   }
 
   try {
@@ -135,9 +155,9 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     });
     notify(state, 'initialized');
     const threadResult = await requestRpc(state, 'thread/start', {
-      cwd: request.cwd ?? null,
+      cwd: effectiveRequest.cwd ?? null,
       approvalPolicy: 'on-request',
-      sandbox: request.sandbox,
+      sandbox: effectiveRequest.sandbox,
       ephemeral: false,
     });
     state.threadId = nestedString(threadResult, 'thread', 'id');
@@ -146,14 +166,14 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
 
     const turnResult = await requestRpc(state, 'turn/start', {
       threadId: state.threadId,
-      input: textInput(request.initialPrompt),
-      cwd: request.cwd ?? null,
-      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
+      input: textInput(effectiveRequest.initialPrompt),
+      cwd: effectiveRequest.cwd ?? null,
+      ...(effectiveRequest.outputSchema ? { outputSchema: effectiveRequest.outputSchema } : {}),
     });
     state.turnId = nestedString(turnResult, 'turn', 'id');
     if (!state.turnId) throw new Error('Codex app-server turn/start did not return turn.id');
     state.turnActive = true;
-    return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, request) };
+    return { processId, nativeSessionId: state.threadId, engine: disclosure(profile, effectiveRequest) };
   } catch (error) {
     if (!child.killed) child.kill();
     runs.delete(processId);
@@ -178,11 +198,17 @@ async function forkCodex(
   validateInvocation(request);
   const processId = randomUUID();
   const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || request.engineProfileId);
-  const providerArgs = buildCodexProviderArgs(profile, process.env);
+  const runtimeEnvironment = buildRuntimeEnvironment(process.env, {
+    authToken: request.authToken,
+    engineProfileId: profile.id,
+    envKey: profile.envKey,
+    resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
+  });
+  const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
   const executable = resolveCodexExecutable();
   const child = spawn(executable, [...providerArgs, ...request.args], {
     cwd: request.cwd,
-    env: process.env,
+    env: runtimeEnvironment,
     windowsHide: true,
     shell: process.platform === 'win32' && executable.endsWith('.cmd'),
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -200,7 +226,7 @@ async function forkCodex(
     owner: event.sender,
     decoder: new JsonLineDecoder(),
     stderrDecoder: new TextLineDecoder(),
-    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, process.env)),
+    wireLog: new WireLog(process.env.HUMMER_CODEX_WIRE_LOG_PATH, (raw) => redactRuntimeSecrets(raw, runtimeEnvironment)),
     events: [],
     stderr: '',
     requestSequence: 0,
@@ -224,7 +250,7 @@ async function forkCodex(
       lastTurnId: checkpoint.nativeTurnId,
       cwd: request.cwd ?? null,
       approvalPolicy: 'on-request',
-      sandbox: process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write',
+      sandbox: resolveCodexSandbox(request.sandbox, process.env.HUMMER_CODEX_SANDBOX),
       ephemeral: false,
     });
     state.threadId = nestedString(forkResult, 'thread', 'id');

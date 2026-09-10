@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from './store/useAppStore';
 import BootScreen from './components/boot/BootScreen';
 import AppShell from './components/shell/AppShell';
+import RuntimeSetupGate from './components/boot/RuntimeSetupGate';
 
 export default function App() {
   const bootDone = useAppStore((s) => s.bootDone);
@@ -14,7 +15,7 @@ export default function App() {
   }, [bootDone, setScreen]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <RuntimeSetupGate><div className="relative h-full w-full overflow-hidden">
       <AnimatePresence mode="wait">
         {!bootDone ? (
           <motion.div
@@ -44,6 +45,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div></RuntimeSetupGate>
   );
 }

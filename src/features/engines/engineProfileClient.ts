@@ -1,4 +1,5 @@
 import config from './engine-profiles.json';
+import { currentSessionToken } from '../identity/identityClient';
 
 export type EngineTier = 'standard' | 'enhanced' | 'flagship';
 
@@ -9,10 +10,11 @@ export interface CustomerEngineProfile {
   available: boolean;
   dataDomain: string;
   compatibilityNote?: string;
+  credentialStatus?: 'configured' | 'not_configured' | 'managed';
 }
 
 export interface EngineProfileBridge {
-  list(): Promise<CustomerEngineProfile[]>;
+  list(token: string | null): Promise<CustomerEngineProfile[]>;
 }
 
 declare global {
@@ -29,10 +31,13 @@ export function browserEngineProfiles(): readonly CustomerEngineProfile[] {
   return browserPrototypeProfiles;
 }
 
-export async function listEngineProfiles(bridge?: EngineProfileBridge): Promise<readonly CustomerEngineProfile[]> {
+export async function listEngineProfiles(
+  bridge?: EngineProfileBridge,
+  token: string | null = currentSessionToken(),
+): Promise<readonly CustomerEngineProfile[]> {
   const runtimeBridge = bridge ?? (typeof window !== 'undefined' ? window.hummerEngineProfiles : undefined);
   if (!runtimeBridge) return browserPrototypeProfiles;
-  const profiles = await runtimeBridge.list();
+  const profiles = await runtimeBridge.list(token);
   return profiles.filter(isCustomerProfile);
 }
 
@@ -43,6 +48,7 @@ export function engineProfileForLabel(
   return profiles.find((profile) => profile.label === label && profile.available)
     ?? profiles.find((profile) => profile.id === label && profile.available)
     ?? profiles.find((profile) => profile.available)
+    ?? profiles[0]
     ?? browserPrototypeProfiles[0];
 }
 

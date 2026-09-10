@@ -67,7 +67,11 @@ contextBridge.exposeInMainWorld('hummerClaudeCliHost', {
 });
 
 contextBridge.exposeInMainWorld('hummerEngineProfiles', {
-  list: () => ipcRenderer.invoke('hummer:engine-profiles:list'),
+  list: (token: string | null) => ipcRenderer.invoke('hummer:engine-profiles:list', token),
+});
+contextBridge.exposeInMainWorld('hummerEngineCredentials', {
+  configure: (request: unknown) => ipcRenderer.invoke('hummer:engine-credentials:configure', request),
+  remove: (request: unknown) => ipcRenderer.invoke('hummer:engine-credentials:remove', request),
 });
 contextBridge.exposeInMainWorld('hummerDesktop', {
   platform: process.platform,
@@ -103,6 +107,10 @@ contextBridge.exposeInMainWorld('hummerProjects', {
   growthChain: (request: unknown) => ipcRenderer.invoke('hummer:projects:growth-chain', request),
   recordGrowthReview: (request: unknown) => ipcRenderer.invoke('hummer:projects:record-growth-review', request),
 });
+contextBridge.exposeInMainWorld('hummerEnvironmentDoctor', {
+  check: () => ipcRenderer.invoke('hummer:environment:check'),
+  openInstallGuide: () => ipcRenderer.invoke('hummer:environment:install-guide'),
+});
 contextBridge.exposeInMainWorld('hummerApprovalPolicy', {
   preview: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:preview', request),
   authorize: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:authorize', request),
@@ -120,6 +128,8 @@ contextBridge.exposeInMainWorld('hummerOutcomes', {
   recordCost: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:record-cost', request),
   receipt: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:receipt', request),
   sessionCost: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:session-cost', request),
+  list: (token: string) => ipcRenderer.invoke('hummer:outcomes:list', token),
+  exportReceipt: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:export-receipt', request),
 });
 
 contextBridge.exposeInMainWorld('hummerRuntimeConnectors', {

@@ -45,6 +45,14 @@ describe('desktop persistence migrations', () => {
     persistence.close();
   });
 
+  it('adds encrypted engine credentials through additive migration version 6', () => {
+    const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
+
+    expect(persistence.schemaVersion()).toBe(6);
+    expect(persistence.listTables()).toContain('engine_credentials');
+    persistence.close();
+  });
+
   it('reopens the same database without rerunning or duplicating migrations', () => {
     const directory = temporaryDirectory();
     const first = openPersistence({ dataDirectory: directory });

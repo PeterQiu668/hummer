@@ -20,6 +20,7 @@ const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host',
   cwd: root,
   stdio: 'pipe',
   windowsHide: true,
+  env: { ...process.env, VITE_HUMMER_RUNTIME_ADAPTER: 'mock' },
 });
 
 let app;
@@ -28,6 +29,7 @@ try {
   app = await launchDesktop();
   let page = await app.firstWindow();
   await ensureIdentity(page);
+  await configureLocalTestEngine(page);
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   const composer = page.getByRole('textbox', { name: '任务描述' });
   await composer.fill('整理本周线索并生成跟进清单，写回客户管理系统前先给我确认');
@@ -109,6 +111,19 @@ async function ensureIdentity(page) {
   await page.getByLabel('邮箱或手机').fill('persistence-acceptance@example.test');
   await page.getByRole('button', { name: '创建并进入' }).click();
   await gate.waitFor({ state: 'hidden', timeout: 15_000 });
+}
+
+async function configureLocalTestEngine(page) {
+  await page.evaluate(async () => {
+    const token = localStorage.getItem('hummer.auth.session');
+    if (!token || !window.hummerEngineCredentials) throw new Error('Encrypted credential bridge or session is missing');
+    await window.hummerEngineCredentials.configure({
+      token,
+      engineProfileId: 'deepseek-standard',
+      credential: 'local-persistence-test-placeholder',
+    });
+  });
+  await page.reload();
 }
 async function waitForServer(url) {
   const deadline = Date.now() + 30_000;

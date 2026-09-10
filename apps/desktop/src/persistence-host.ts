@@ -1,5 +1,7 @@
 import { join, resolve } from 'node:path';
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, safeStorage } from 'electron';
+import { CredentialVault } from './credential-vault.js';
+import { customerEngineProfiles, engineProfileById, listEngineProfiles } from './engine-profiles.js';
 import { enrichRuntimeEventEvidence } from './persistence-runtime.js';
 import {
   openPersistence,
@@ -29,6 +31,7 @@ interface AcceptInvitationRequest { token: string; displayName: string; email?: 
 
 export interface PersistenceHostRegistration {
   databasePath: string;
+  resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
   close(): void;
 }
 export interface PersistenceHostOptions {
@@ -64,15 +67,48 @@ const CHANNELS = [
   'hummer:outcomes:record-cost',
   'hummer:outcomes:receipt',
   'hummer:outcomes:session-cost',
+  'hummer:outcomes:list',
+  'hummer:outcomes:export-receipt',
+  'hummer:engine-profiles:list',
+  'hummer:engine-credentials:configure',
+  'hummer:engine-credentials:remove',
 ] as const;
 
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
   const dataDirectory = resolve(process.env.HUMMER_DATA_DIR ?? join(app.getPath('userData'), 'facts'));
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
   const persistence = openPersistence({ dataDirectory });
+  const credentialVault = new CredentialVault(persistence.engineCredentials, {
+    available: () => safeStorage.isEncryptionAvailable(),
+    protect: (value) => safeStorage.encryptString(value),
+    unprotect: (value) => safeStorage.decryptString(value),
+  });
   persistence.runtimeEvents.interruptStaleRealSessions(new Date().toISOString());
   const runtimeId = process.env.HUMMER_RUNTIME_SHELL === 'claude' ? 'claude-code' : 'codex-cli';
   const nodeIds = new Set<string>();
+
+  ipcMain.handle('hummer:engine-profiles:list', (_event, token: string | null) => {
+    const configured = new Set<string>();
+    for (const profile of listEngineProfiles()) {
+      if (process.env[profile.envKey]) configured.add(profile.envKey);
+    }
+    if (token) {
+      const tenantId = persistence.identity.currentTenantId(token);
+      credentialVault.statuses(tenantId).forEach((status) => configured.add(status.envKey));
+    }
+    return customerEngineProfiles(configured);
+  });
+  ipcMain.handle('hummer:engine-credentials:configure', (_event, request: { token: string; engineProfileId: string; credential: string }) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    const profile = requireCustomerEngineProfile(request.engineProfileId);
+    return credentialVault.configure(tenantId, profile.id, profile.envKey, request.credential);
+  });
+  ipcMain.handle('hummer:engine-credentials:remove', (_event, request: { token: string; engineProfileId: string }) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    const profile = requireCustomerEngineProfile(request.engineProfileId);
+    credentialVault.remove(tenantId, profile.id);
+    return { engineProfileId: profile.id, envKey: profile.envKey, configured: false };
+  });
 
   ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
   ipcMain.handle('hummer:identity:accept-invitation', (_event, input: AcceptInvitationRequest) => persistence.identity.acceptInvitation(input));
@@ -219,15 +255,38 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     const tenantId = persistence.identity.currentTenantId(request.token);
     return persistence.outcomes.sessionCostSummary(tenantId, request.input.sessionId);
   });
+  ipcMain.handle('hummer:outcomes:list', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    return persistence.outcomes.listEvents(tenantId).map((outcome) => {
+      const definition = persistence.outcomes.getDefinition(tenantId, outcome.outcomeDefinitionId);
+      if (!definition) throw new Error('Outcome definition is unavailable in the current tenant');
+      const costs = persistence.outcomes.listCosts(tenantId, outcome.id);
+      return { outcome, definition, totalCostCny: costs.reduce((total, cost) => total + cost.costCny, 0), costCount: costs.length };
+    });
+  });
+  ipcMain.handle('hummer:outcomes:export-receipt', (_event, request: Authenticated<{ outcomeEventId: string }>) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return JSON.stringify(persistence.buildVerifiableOutcomeReceipt(tenantId, request.input.outcomeEventId), null, 2);
+  });
 
   return {
     databasePath: persistence.databasePath,
+    resolveEngineCredential: (token, engineProfileId, envKey) => {
+      const tenantId = persistence.identity.currentTenantId(token);
+      return credentialVault.resolve(tenantId, engineProfileId, envKey) ?? process.env[envKey];
+    },
     close: () => {
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));
       nodeIds.forEach((nodeId) => persistence.executionNodes.markOffline(nodeId, new Date().toISOString()));
       persistence.close();
     },
   };
+}
+
+function requireCustomerEngineProfile(engineProfileId: string) {
+  const profile = engineProfileById(engineProfileId);
+  if (profile.customerVisible === false) throw new Error('Internal engine profiles cannot be configured from the customer UI');
+  return profile;
 }
 
 function listSessions(persistence: DesktopPersistence, token: string): Array<Record<string, JsonValue>> {

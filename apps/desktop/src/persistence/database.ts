@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ApprovalPolicyStore } from './approval-policy-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
+import { EngineCredentialStore } from './engine-credential-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
 import { EvidenceStore, type StoredEvidence } from './evidence-store.js';
 import { IdentityStore } from './identity-store.js';
@@ -11,6 +12,7 @@ import { OutcomeLedgerStore } from './outcome-ledger-store.js';
 import { assembleOutcomeReceipt, type OutcomeReceipt } from './outcome-receipt.js';
 import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
+import { createVerifiableReceipt, type VerifiableOutcomeReceipt } from './verifiable-receipt.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
 
 export interface OpenPersistenceOptions {
@@ -97,6 +99,7 @@ export class DesktopPersistence {
   readonly organization: OrganizationStore;
   readonly approvalPolicies: ApprovalPolicyStore;
   readonly executionNodes: ExecutionNodeStore;
+  readonly engineCredentials: EngineCredentialStore;
   readonly identity: IdentityStore;
   readonly projects: ProjectStore;
   readonly outcomes: OutcomeLedgerStore;
@@ -114,6 +117,7 @@ export class DesktopPersistence {
     this.organization = new OrganizationStore(database);
     this.approvalPolicies = new ApprovalPolicyStore(database);
     this.executionNodes = new ExecutionNodeStore(database);
+    this.engineCredentials = new EngineCredentialStore(database, now);
     this.identity = new IdentityStore(database, now);
     this.projects = new ProjectStore(database, now);
     this.outcomes = new OutcomeLedgerStore(database, now);
@@ -171,6 +175,11 @@ export class DesktopPersistence {
       generatedAt: new Date().toISOString(),
       environment,
     });
+  }
+
+  buildVerifiableOutcomeReceipt(tenantId: string, outcomeEventId: string, environment: NodeJS.ProcessEnv = process.env): VerifiableOutcomeReceipt {
+    const receipt = this.buildOutcomeReceipt(tenantId, outcomeEventId, environment);
+    return createVerifiableReceipt(receipt, this.domainEvents.list());
   }
 
   replaceDomainEvent(_eventId: string, _replacement: unknown): never {

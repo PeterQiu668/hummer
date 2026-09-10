@@ -12,6 +12,7 @@ export interface CodexCliInvocation {
   protocol: 'exec-jsonl' | 'app-server-jsonrpc';
   sandbox: 'read-only' | 'workspace-write';
   outputSchema?: Record<string, unknown>;
+  authToken?: string;
 }
 
 export interface CodexCliRun {
@@ -66,6 +67,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
     cwd?: string;
     protocol?: 'exec-jsonl' | 'app-server-jsonrpc';
     pricing?: RuntimePricing;
+    getAuthToken?: () => string | null;
   }) {}
 
   async startSession(plan: SessionPlan): Promise<RuntimeHandle> {
@@ -73,6 +75,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
     const invocation = buildCodexInvocation(plan, {
       cwd: this.options.cwd,
       protocol: this.options.protocol ?? 'exec-jsonl',
+      authToken: this.options.getAuthToken?.() ?? undefined,
     });
     const run = await this.options.host!.start(invocation);
     const handle: RuntimeHandle = {
@@ -231,6 +234,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
 export function buildCodexInvocation(plan: SessionPlan, options: {
   cwd?: string;
   protocol?: 'exec-jsonl' | 'app-server-jsonrpc';
+  authToken?: string;
 } = {}): CodexCliInvocation {
   const protocol = options.protocol ?? 'exec-jsonl';
   if (protocol === 'app-server-jsonrpc') {
@@ -244,6 +248,7 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
       protocol,
       sandbox: sandboxForPlan(plan),
       outputSchema: plan.responseSchema,
+      authToken: options.authToken,
     };
   }
   return {
@@ -256,6 +261,7 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
     protocol,
     sandbox: sandboxForPlan(plan),
     outputSchema: plan.responseSchema,
+    authToken: options.authToken,
   };
 }
 
@@ -439,7 +445,7 @@ export function extractCodexUsage(message: unknown): RuntimeTokenUsage | undefin
 }
 
 function sandboxForPlan(plan: SessionPlan): 'read-only' | 'workspace-write' {
-  return plan.approvalMode === 'L1' || /只读/.test(plan.workspaceScope) ? 'read-only' : 'workspace-write';
+  return plan.approvalMode === 'L1' ? 'read-only' : 'workspace-write';
 }
 
 function buildCodexPrompt(plan: SessionPlan): string {

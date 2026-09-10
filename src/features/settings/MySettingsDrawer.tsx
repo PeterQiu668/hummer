@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAppStore, type PersonalSettings } from '../../store/useAppStore';
 import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../engines/engineProfileClient';
+import { configureEngineCredential, hasEngineCredentialBridge, removeEngineCredential } from '../engines/engineCredentialClient';
 
 export default function MySettingsDrawer() {
   const settings = useAppStore((state) => state.personalSettings);
@@ -19,6 +20,8 @@ export default function MySettingsDrawer() {
   const pushToast = useAppStore((state) => state.pushToast);
   const [draft, setDraft] = useState(settings);
   const [engineProfiles, setEngineProfiles] = useState<readonly CustomerEngineProfile[]>(browserEngineProfiles);
+  const [credentialDrafts, setCredentialDrafts] = useState<Record<string, string>>({});
+  const [credentialBusy, setCredentialBusy] = useState<string | null>(null);
   const selectedProfile = engineProfileForLabel(engineProfiles, draft.preferredModel);
 
   useEffect(() => {
@@ -28,6 +31,39 @@ export default function MySettingsDrawer() {
     });
     return () => { active = false; };
   }, []);
+
+  const refreshEngineProfiles = async () => {
+    const profiles = await listEngineProfiles();
+    if (profiles.length) setEngineProfiles(profiles);
+  };
+
+  const configureCredential = async (profile: CustomerEngineProfile) => {
+    const credential = credentialDrafts[profile.id]?.trim();
+    if (!credential) return;
+    setCredentialBusy(profile.id);
+    try {
+      await configureEngineCredential(profile.id, credential);
+      setCredentialDrafts((current) => ({ ...current, [profile.id]: '' }));
+      await refreshEngineProfiles();
+      pushToast({ kind: 'success', title: '\u5bc6\u94a5\u5df2\u5b89\u5168\u4fdd\u5b58', detail: '\u5bc6\u94a5\u7531 Windows \u52a0\u5bc6\u4fdd\u62a4\uff0c\u754c\u9762\u4e0d\u4f1a\u56de\u663e\u660e\u6587\u3002' });
+    } catch (error) {
+      setCredentialDrafts((current) => ({ ...current, [profile.id]: '' }));
+      pushToast({ kind: 'error', title: '\u5bc6\u94a5\u672a\u4fdd\u5b58', detail: error instanceof Error ? error.message : '\u672a\u77e5\u9519\u8bef' });
+    } finally {
+      setCredentialBusy(null);
+    }
+  };
+
+  const removeCredential = async (profile: CustomerEngineProfile) => {
+    setCredentialBusy(profile.id);
+    try {
+      await removeEngineCredential(profile.id);
+      setCredentialDrafts((current) => ({ ...current, [profile.id]: '' }));
+      await refreshEngineProfiles();
+    } finally {
+      setCredentialBusy(null);
+    }
+  };
 
   const patch = <Key extends keyof PersonalSettings>(key: Key, value: PersonalSettings[Key]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -56,6 +92,35 @@ export default function MySettingsDrawer() {
         </header>
 
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
+          {hasEngineCredentialBridge() && <SettingsSection icon={<KeyRound size={15} />} title={'\u5f15\u64ce\u4e0e\u5bc6\u94a5'}>
+            <div className="space-y-3">
+              {engineProfiles.filter((profile) => profile.credentialStatus !== 'managed').map((profile) => {
+                const configured = profile.credentialStatus === 'configured';
+                return <div key={profile.id} className="rounded-md border border-neutral-200 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11.5px] font-medium text-neutral-800">{profile.label}</div>
+                      <div className="mt-0.5 text-[10.5px] text-neutral-500">{configured ? '\u5df2\u914d\u7f6e' : '\u672a\u914d\u7f6e'} · {profile.dataDomain}</div>
+                    </div>
+                    {configured && <button type="button" disabled={credentialBusy === profile.id} onClick={() => { void removeCredential(profile); }} className="hum-btn text-danger">{'\u79fb\u9664'}</button>}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      aria-label={`${profile.label}\u5bc6\u94a5`}
+                      value={credentialDrafts[profile.id] ?? ''}
+                      onChange={(event) => setCredentialDrafts((current) => ({ ...current, [profile.id]: event.target.value }))}
+                      placeholder={configured ? '\u8f93\u5165\u65b0\u5bc6\u94a5\u4ee5\u66ff\u6362' : '\u8f93\u5165 API \u5bc6\u94a5'}
+                      className="hum-input min-w-0 flex-1"
+                    />
+                    <button type="button" aria-label={`\u4fdd\u5b58${profile.label}\u5bc6\u94a5`} disabled={credentialBusy === profile.id || !(credentialDrafts[profile.id]?.trim())} onClick={() => { void configureCredential(profile); }} className="hum-btn is-primary">{'\u4fdd\u5b58'}</button>
+                  </div>
+                </div>;
+              })}
+            </div>
+            <p className="mt-2 text-[10.5px] leading-4 text-neutral-500">{'\u5bc6\u94a5\u4ec5\u5728\u542f\u52a8\u6267\u884c\u5185\u6838\u65f6\u89e3\u5bc6\uff0c\u4e0d\u8fdb\u5165\u547d\u4ee4\u53c2\u6570\u3001\u8fd0\u884c\u65e5\u5fd7\u6216\u8bc1\u636e\u94fe\u3002'}</p>
+          </SettingsSection>}
           <SettingsSection icon={<UserRound size={15} />} title="我的身份">
             <div className="grid gap-3 sm:grid-cols-2">
               <ReadOnlyField label="姓名" value="昆仑" />

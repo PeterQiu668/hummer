@@ -13,6 +13,15 @@ describe('customer engine profile catalog', () => {
     await expect(listEngineProfiles(bridge)).resolves.toEqual([
       { id: 'deepseek-standard', tier: 'standard', label: '\u6807\u51c6', available: true, dataDomain: 'api.deepseek.com' },
     ]);
+    expect(bridge.list).toHaveBeenCalledWith(null);
+  });
+
+  it('authenticates the desktop catalog lookup with the current session token', async () => {
+    const bridge = { list: vi.fn().mockResolvedValue([]) };
+
+    await listEngineProfiles(bridge, 'session-token');
+
+    expect(bridge.list).toHaveBeenCalledWith('session-token');
   });
 
   it('keeps a safe public catalog in browser prototype mode', async () => {

@@ -7,6 +7,7 @@ export type {
   SessionProjection,
 } from './database.js';
 export type { DomainEventInput, IntegrityResult, StoredDomainEvent } from './domain-event-store.js';
+export type { EncryptedEngineCredential, EngineCredentialStatus } from './engine-credential-store.js';
 export type { DigitalEmployeeRecord, HireDigitalEmployeeInput } from './organization-store.js';
 export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
 export type {
@@ -36,4 +37,6 @@ export type {
   SessionCostSummary,
 } from './outcome-ledger-store.js';
 export type { OutcomeReceipt } from './outcome-receipt.js';
+export { createVerifiableReceipt } from './verifiable-receipt.js';
+export type { VerifiableOutcomeReceipt } from './verifiable-receipt.js';
 export type { PricedCost, RuntimeUsage } from '../pricing/deepseek-pricing.js';

@@ -14,7 +14,7 @@ describe('desktop engine profiles', () => {
   });
 
   it('exposes only customer profiles with availability and data-domain disclosure', () => {
-    const profiles = customerEngineProfiles();
+    const profiles = customerEngineProfiles(new Set(['DEEPSEEK_API_KEY']));
 
     expect(profiles.map((profile) => profile.id)).toEqual([
       'deepseek-standard',
@@ -25,6 +25,7 @@ describe('desktop engine profiles', () => {
     expect(profiles.find((profile) => profile.id === 'deepseek-standard')).toMatchObject({
       label: '\u6807\u51c6',
       available: true,
+      credentialStatus: 'configured',
       dataDomain: 'api.deepseek.com',
     });
     expect(profiles.find((profile) => profile.id === 'zhipu-enhanced')).toMatchObject({
@@ -32,6 +33,20 @@ describe('desktop engine profiles', () => {
       available: false,
       dataDomain: 'open.bigmodel.cn',
       compatibilityNote: expect.stringMatching(/Responses/),
+    });
+  });
+
+  it('disables customer profiles before use when their credential is not configured', () => {
+    const profiles = customerEngineProfiles(new Set());
+
+    expect(profiles.find((profile) => profile.id === 'deepseek-standard')).toMatchObject({
+      available: false,
+      credentialStatus: 'not_configured',
+      compatibilityNote: '未配置密钥',
+    });
+    expect(profiles.find((profile) => profile.id === 'openai-flagship')).toMatchObject({
+      available: false,
+      credentialStatus: 'not_configured',
     });
   });
 
@@ -91,5 +106,14 @@ describe('desktop engine profiles', () => {
 
     expect(redacted).not.toContain(secret);
     expect(redacted).toContain('[REDACTED:DEEPSEEK_API_KEY]');
+  });
+
+  it('redacts a decrypted credential supplied only to the child environment', () => {
+    const secret = 'sk-vault-injected-secret-never-log';
+    const runtimeEnvironment = { DEEPSEEK_API_KEY: secret };
+
+    const redacted = redactRuntimeSecrets(`credential=${secret}`, runtimeEnvironment);
+
+    expect(redacted).toBe('credential=[REDACTED:DEEPSEEK_API_KEY]');
   });
 });

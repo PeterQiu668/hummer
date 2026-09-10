@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { _electron as electron } from 'playwright';
+import { configureInternalValidationDisplay } from './support/configure-e2e-engine.mjs';
 
 const root = process.cwd();
 const engineProfile = process.argv.find((argument) => argument.startsWith('--engine-profile='))?.split('=')[1] ?? 'openai-codex-validation';
@@ -65,7 +66,11 @@ try {
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[renderer] ${message.text()}`); });
   await ensureIdentity(page);
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
-  if (engineProfile === 'openai-codex-validation') await page.getByLabel('选择模型').selectOption({ label: '旗舰' });
+  if (engineProfile === 'openai-codex-validation') {
+    await configureInternalValidationDisplay(page);
+    await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.getByLabel('选择模型').selectOption({ label: '旗舰' });
+  }
 
   for (const [index, task] of tasks.entries()) {
     if (index > 0) await page.getByRole('button', { name: '改一下' }).click();

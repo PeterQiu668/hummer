@@ -14,6 +14,16 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     expect(invocation.args).not.toContain('danger-full-access');
   });
 
+  it('does not let model-authored workspace prose downgrade an approved execution sandbox', () => {
+    const plan = draftPlanFromPrompt('读取文件后写入摘要', { approvalMode: 'L2' });
+    plan.workspaceScope = '我的工作空间（规划阶段只读，执行阶段按审批策略）';
+
+    const invocation = buildCodexInvocation(plan);
+
+    expect(invocation.sandbox).toBe('workspace-write');
+    expect(invocation.args).toContain('workspace-write');
+  });
+
   it('maps user-facing quality tiers to internal engine profile ids', () => {
     const plan = draftPlanFromPrompt('complex analysis', { modelProfile: '\u65d7\u8230' });
     expect(buildCodexInvocation(plan).engineProfileId).toBe('openai-flagship');
@@ -28,6 +38,17 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     };
 
     expect(buildCodexInvocation(plan, { protocol: 'app-server-jsonrpc' }).outputSchema).toEqual(plan.responseSchema);
+  });
+
+  it('passes only the current session token as a credential lookup reference', () => {
+    const invocation = buildCodexInvocation(draftPlanFromPrompt('secure plan'), {
+      protocol: 'app-server-jsonrpc',
+      authToken: 'auth-reference-only',
+    });
+
+    expect(invocation.authToken).toBe('auth-reference-only');
+    expect(JSON.stringify(invocation.args)).not.toContain('auth-reference-only');
+    expect(invocation.initialPrompt).not.toContain('auth-reference-only');
   });
 
   it('maps completed command and approval messages without importing Codex types', () => {

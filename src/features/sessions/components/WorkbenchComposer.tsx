@@ -37,7 +37,7 @@ export default function WorkbenchComposer(props: WorkbenchComposerProps) {
   const textArea = useRef<HTMLTextAreaElement>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const selectedProfile = engineProfileForLabel(engineProfiles, modelProfile);
-  const submit = () => { if (value.trim() && !busy) onSubmit(); };
+  const submit = () => { if (value.trim() && !busy && selectedProfile.available) onSubmit(); };
 
   return <div className={compact ? 'w-full' : 'mx-auto w-full max-w-[920px]'}>
     {!compact && <div className="mb-5 text-center"><h2 className="text-[24px] font-semibold text-neutral-900">昆仑，今天想推进什么？</h2><p className="mt-1.5 text-[12px] text-neutral-500">你可以自己处理，也可以交给分身或数字同事一起完成。</p></div>}
@@ -51,7 +51,7 @@ export default function WorkbenchComposer(props: WorkbenchComposerProps) {
         <button type="button" onClick={() => fileInput.current?.click()} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-neutral-600 hover:bg-white"><Paperclip size={13} /> {attachmentNames.length ? `${attachmentNames.length} 份资料` : '添加资料'}</button>
         <input ref={fileInput} type="file" multiple className="hidden" aria-label="选择参考资料" onChange={(event) => onAttachmentNamesChange(Array.from(event.target.files ?? []).map((file) => file.name))} />
         {busy && <span role="status" className="ml-auto flex items-center gap-1.5 text-[10.5px] text-neutral-500"><LoaderCircle size={12} className="animate-spin" /> 正在生成计划</span>}
-        <button type="button" onClick={submit} disabled={!value.trim() || busy} aria-label={busy ? '正在生成计划' : '提交任务'} className={`${busy ? '' : 'ml-auto'} grid h-8 w-8 place-items-center rounded-md bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30`}>{busy ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />}</button>
+        <button type="button" onClick={submit} disabled={!value.trim() || busy || !selectedProfile.available} aria-label={busy ? '正在生成计划' : '提交任务'} className={`${busy ? '' : 'ml-auto'} grid h-8 w-8 place-items-center rounded-md bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30`}>{busy ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />}</button>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-neutral-100 bg-white px-3 py-1.5 text-[10.5px] text-neutral-500">
         <span>数据流向：<strong className="font-medium text-neutral-700">{selectedProfile.dataDomain}</strong></span>

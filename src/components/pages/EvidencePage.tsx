@@ -18,6 +18,7 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import { desktopProjectsPort, type ProjectRecord } from '../../features/projects/projectClient';
 import WorkspacePage from './WorkspacePage';
+import OutcomeLedgerPanel from '../../features/outcomes/OutcomeLedgerPanel';
 
 type ReviewTab = 'results' | 'quality' | 'growth' | 'knowledge';
 
@@ -28,7 +29,7 @@ export default function EvidencePage() {
   useEffect(() => { const port = desktopProjectsPort(); if (!port) return; void port.list().then(setProjects).catch(() => setProjects([])); }, []);
   return <WorkspacePage title="成长与复盘" sub="从每次交付中看清结果、改进工作方法，并把有效经验留给整个组织。" actions={<button type="button" onClick={() => setActivePage('office')} className="hum-btn is-sm is-primary">回到工作台 <ArrowRight size={12} /></button>} sticky={<div className="flex gap-1 overflow-x-auto">{([['results', '成果'], ['quality', '质量'], ['growth', '成长'], ['knowledge', '组织知识']] as const).map(([key, label]) => <button type="button" key={key} onClick={() => setTab(key)} className={`hum-btn is-sm ${tab === key ? 'is-primary' : ''}`}>{label}</button>)}</div>}>
     <div className="mx-auto max-w-[1280px] p-5">
-      {tab === 'results' && <Results />}
+      {tab === 'results' && <div className="space-y-5"><OutcomeLedgerPanel /><Results /></div>}
       {tab === 'quality' && <Quality />}
       {tab === 'growth' && <Growth projects={projects} onRetry={() => setActivePage('office')} />}
       {tab === 'knowledge' && <Knowledge />}

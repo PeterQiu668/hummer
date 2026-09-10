@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
+import { configureInternalValidationDisplay, ensureE2eIdentity } from './support/configure-e2e-engine.mjs';
 
 const mode = process.argv.includes('--interrupt') ? 'interrupt' : 'steer';
 const root = process.cwd();
@@ -39,15 +40,20 @@ try {
       HUMMER_CODEX_PATH: codexPath,
       HUMMER_CODEX_WIRE_LOG_PATH: wireLogPath,
       HUMMER_DATA_DIR: dataDirectory,
+      HUMMER_ENGINE_PROFILE: 'openai-codex-validation',
     },
   });
   const page = await app.firstWindow();
+  await ensureE2eIdentity(page, `control-${mode}`);
+  await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+  await configureInternalValidationDisplay(page);
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   const composer = page.getByRole('textbox', { name: '任务描述' });
   await composer.fill(mode === 'steer'
     ? 'First run PowerShell Start-Sleep -Seconds 20. Only after that, read input.txt and use apply_patch to create original-summary.md with one sentence. Do not create any file before the wait finishes.'
     : 'Run PowerShell Start-Sleep -Seconds 60 before doing anything else. Only after the wait, create interrupted-output.md.');
   await composer.press('Enter');
+  await page.getByText('模型生成计划', { exact: true }).waitFor({ state: 'visible', timeout: 150_000 });
   await page.getByRole('button', { name: '开始干' }).click();
   await page.getByLabel('当前执行会话').waitFor({ state: 'visible', timeout: 30_000 });
 

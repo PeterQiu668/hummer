@@ -22,6 +22,7 @@ const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host',
   cwd: root,
   stdio: 'pipe',
   windowsHide: true,
+  env: { ...process.env, VITE_HUMMER_RUNTIME_ADAPTER: 'mock' },
 });
 
 let app;
@@ -39,6 +40,7 @@ try {
   });
   const page = await app.firstWindow();
   await ensureIdentity(page);
+  await configureLocalTestEngine(page);
   await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
   await page.getByRole('textbox', { name: '任务描述' }).fill('整理本周线索，写回客户管理系统前先给我确认');
   await page.getByRole('textbox', { name: '任务描述' }).press('Enter');
@@ -80,6 +82,19 @@ async function ensureIdentity(page) {
     page.getByRole('alert').waitFor({ state: 'visible', timeout: 15_000 }).then(async () => `error:${await page.getByRole('alert').textContent()}`),
   ]);
   if (created !== 'created') throw new Error(`Identity creation failed: ${created}`);
+}
+
+async function configureLocalTestEngine(page) {
+  await page.evaluate(async () => {
+    const token = localStorage.getItem('hummer.auth.session');
+    if (!token || !window.hummerEngineCredentials) throw new Error('Encrypted credential bridge or session is missing');
+    await window.hummerEngineCredentials.configure({
+      token,
+      engineProfileId: 'deepseek-standard',
+      credential: 'local-approval-test-placeholder',
+    });
+  });
+  await page.reload();
 }
 
 async function waitForServer(url) {
