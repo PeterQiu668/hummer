@@ -413,5 +413,15 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 
 当前未闭合项：`DEEPSEEK_API_KEY` 在本轮进程环境中不存在，因此默认 DeepSeek 档未运行，真实人民币规划成本与带成本 receipt 尚未获得外部证据。内部验证模型没有已核实的 CNY 价格，保持 `null`/未提供，没有估算或伪造。DeepSeek 验收命令为 `npm run test:desktop:planner:deepseek`。
 
-规划接入后，原有 app-server 文件执行 E2E 于 2026-09-10 04:14:34（Asia/Shanghai）复跑通过。Codex 0.153.4 对 `apply_patch` 产生真实 file-change approval；测试在确认文件尚未写入后由 UI 回传批准，随后观察到 `workspace.patch` 和 `turn.completed`。主进程新增活动 turn 状态，已完成 turn 的 `stop()` 只清理进程，不再发送会被 server 拒绝的重复 interrupt。
+规划接入后的早期复跑曾把 `apply_patch` 与审批先后出现解释为“file-change approval”。后续完整 wire 复核不能支持这个结论：在 `workspace-write` 下，当前 Codex 0.153.4 的 `apply_patch` 可以直接产生 `fileChange`，不保证先发审批。已确认的审批边界是 `read-only` 沙箱中的受保护命令执行。主进程保留活动 turn 状态；已完成 turn 的 `stop()` 只清理进程，不再发送会被 server 拒绝的重复 interrupt。
 - 升级前首次复跑暴露了两个 E2E 脚本债务：M4 身份门禁未处理，以及新的持久化查询未传 session token。脚本已使用独立 Electron profile、真实登录 token 修复，不改变生产协议。
+
+## 16. M5-C 桌面默认运行时与沙箱复核（2026-09-11）
+
+- 浏览器没有桌面 host 时仍使用明确标识的 Mock；Electron renderer 未显式配置时根据 `window.hummerDesktop.runtime` 选择真实外壳，不再依赖构建期 `VITE_HUMMER_RUNTIME_ADAPTER` 才能通电。显式配置仍优先。
+- Codex 的桌面默认协议是 `app-server-jsonrpc`；`exec-jsonl` 只用于显式诊断。运行时不可用时仍经 `FailoverRuntimeAdapter` 显式回落并展示原因。
+- 沙箱只由结构化 `approvalMode` 推导。模型生成的工作区说明即使包含“只读”等自然语言，也不能降低或提高执行权限。`HUMMER_CODEX_SANDBOX` 覆盖在初始 thread 和 fork 两条路径一致应用，并拒绝 `danger-full-access`。
+- 2026-09-10 18:32:49 至 18:33:46 UTC 的真实内部验证运行位于 `spikes/codex-runtime/app-server-approval-wire.jsonl` 与 `app-server-approval-trajectory.json`。trajectory sequence 9 为 `approval_required(shell.command)`，10 为真人批准，11 为后续命令工具事件，16 为结果；完整 turn 正常完成。
+- 2026-09-10 18:37:25 至 18:38:54 UTC 的真会话重启证据位于 `spikes/m3-real-restart/`。已完成事件恢复后追加明确的 `interrupted`，不把失效子进程伪装为运行中。
+- 2026-09-11 的打包验收暴露并修复了两个发布缺陷：Vite 绝对 `/assets` 路径导致 `file://` 空白页，以及打包命令未先重建 renderer。`npm run test:desktop:packaged` 现要求可见 UI、真实 runtime 标识、原生 SQLite、身份写入和环境自检同时通过。
+- 默认 `deepseek-standard` 的结构化规划仍受本轮进程缺少 `DEEPSEEK_API_KEY` 阻塞；本节的真实 runtime 证据来自内部 `openai-codex-validation`，两者不得合并宣称。

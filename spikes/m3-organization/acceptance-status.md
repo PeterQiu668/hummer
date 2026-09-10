@@ -86,10 +86,58 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - `spikes/m5b-planner/openai-codex-validation-evidence.json`: five task classes, five distinct understanding arrays, no fallback sentence, five accepted planning outcomes, five valid hash-chain receipts.
 - `spikes/m5b-planner/openai-codex-validation-wire.jsonl`: five schema-constrained turn starts and zero command execution, file change, or approval request messages.
 - Local screenshots are in `dist/hummer-m5b-plan-{excel,contract,external-send,delete,hiring}.png`; the delete screenshot contains the critical `data.delete*` gate.
-- The post-planning Codex execution regression completed at 2026-09-10 04:14:34 (Asia/Shanghai): read command, file-change approval, UI approval response, `workspace.patch`, real `summary.md`, and `turn.completed` all appeared in one run.
+- A later complete-wire regression supersedes the earlier file-change-approval interpretation. In `workspace-write`, `apply_patch` is not proven to request approval. The verified boundary is a protected command in `read-only`: the 2026-09-11 02:32:49-02:33:46 (Asia/Shanghai) run contains trajectory sequence 9 `approval_required(shell.command)`, sequence 10 human approval, sequence 11 continued tool execution, and sequence 16 result/turn completion.
 
 ### Blocked product-profile evidence
 
 - `DEEPSEEK_API_KEY` was absent from the process environment at verification time. The default `deepseek-standard` E2E was not run and is not claimed.
 - The internal validation model is not in the verified CNY price catalog. Planning outcomes and valid receipts exist, but their cost lists are empty and the UI reports that cost is unavailable. The priced planning-cost receipt gate remains blocked until `npm run test:desktop:planner:deepseek` passes with a safely injected key.
 - No Feishu, channel adapter, or inbound/outbound messaging work was started.
+
+## M5-C partial status update - 2026-09-11
+
+### P0.1 default DeepSeek planning
+
+- Blocked before provider access because the current process has no `DEEPSEEK_API_KEY`.
+- On 2026-09-11, `npm run test:desktop:planner:deepseek`, `npm run test:desktop:credentials`, and `npm run test:desktop:wedge` all stopped at explicit preflight. They did not start Electron, write fallback evidence, or claim DeepSeek compatibility.
+- DeepSeek `turn/start.outputSchema` behavior therefore remains unverified. Decision and closure evidence are defined in `docs/decisions/ADR-006-deepseek-structured-planning.md`.
+
+### P0.2 encrypted credential product chain
+
+- Additive migration v6 creates tenant-scoped `engine_credentials`; migrations v1-v5 are unchanged.
+- Desktop `safeStorage` encrypts before persistence. The renderer can configure or remove a credential and read only configured/unconfigured status; plaintext is never returned.
+- Runtime invocation carries an authenticated lookup reference, not a credential. The main process decrypts immediately before spawn and injects only the child-process environment.
+- Focused evidence: 36 unit tests across persistence, vault, profile, redaction, environment and adapter boundaries; three UI tests across settings and unavailable-profile submission. All passed on 2026-09-11.
+- The real configure-restart-plan E2E exists at `scripts/e2e-desktop-credentials.mjs` but remains blocked on the same provider key. No mock substitute was used.
+
+### P0.3 internal Windows package
+
+- NSIS artifact generated at `release/m5c/HUMMER-Setup-0.0.0.exe` (104,353,266 bytes; SHA-256 `5A47521EBBFD15999B6AACFA3C4C0E74093083420DE08DD3BD5E46A0BAC36A34`). Authenticode status is `NotSigned`.
+- `npm run test:desktop:packaged` passed against the unpacked production artifact: visible renderer loaded through relative assets, native SQLite loaded, tenant creation succeeded through the packaged UI, the workbench exposed the real desktop runtime state, embedded Node was `22.22.0`, and Codex CLI `0.153.4` was recognized.
+- This is current-machine package evidence, not a clean-Windows installation result. Clean-machine installation and certificate issuance remain external release gates.
+- Codex CLI is not bundled in this internal package. The Apache-2.0 redistribution option and current non-bundling decision are recorded in ADR-007 and `THIRD_PARTY_NOTICES.md`.
+- No Feishu or channel work was started.
+
+### P1.1 external-send wedge
+
+- `scripts/e2e-desktop-wedge-external-send.mjs` defines the real acceptance path: encrypted credential configuration, real DeepSeek planning, draft creation with content-addressed evidence, `external.send*` approval and rejection branches, priced outcome recording, receipt export, independent verification, and secret scanning.
+- The script is syntax-valid but its real run is blocked at credential preflight. No wedge trajectory or external-runtime evidence is claimed.
+- The approved branch means "approved for delivery" only. M5-C intentionally contains no channel implementation and does not claim that any message was delivered. The rejected branch asserts that no delivery marker exists.
+
+### P1.2 self-contained receipt
+
+- `scripts/e2e-desktop-outcome-receipt.mjs` completed through the real Electron persistence host on 2026-09-11 and produced `spikes/m5a-outcome-ledger/verifiable-outcome-receipt.json`.
+- Standalone `scripts/verify-receipt.mjs` accepted the original receipt. After the outcome verdict was changed, it rejected the document and identified `/receipt/outcome/verdict`.
+- The exported proof contains six domain events and root hash `35548a28057b2e9209e194842b76afcfd27429f59d9859dac0068103ae06f9f1`. It was generated at 2026-09-10 19:09:44 UTC (2026-09-11 03:09:44 Asia/Shanghai). Cost CNY 0.01883 comes from deterministic usage input and the verified DeepSeek catalog. This remains local product-chain evidence, not an external provider call.
+- ADR-008 records the exact trust boundary: hashes prove content consistency, while issuer authenticity and non-repudiation still require signing and trusted timestamping.
+
+### P2 deferred backlog
+
+- Tool registry/MCP configuration, DSH ACP, Feishu ChannelAdapter, and automatic updates are recorded in `docs/plans/m5c-deferred-backlog.md` and were not implemented.
+
+### M5-C final regression snapshot
+
+- Passed on 2026-09-11: `npm run typecheck`; `npm run test:unit` (160); `npm run test:ui` (32); `npm run build`; `npm run desktop:build`; `npm run test:e2e`; `npm run test:desktop:persistence`; `npm run test:desktop:identity`; `npm run test:desktop:approval-rejection`; `npm run test:desktop:projects`; `npm run test:desktop:outcome-receipt`; and `npm run test:desktop:packaged`.
+- The current external internal-profile evidence also passed the real Codex approval, restart, steer, interrupt, and five-plan runs. Their UTC run windows are recorded in `spikes/codex-runtime/`, `spikes/m3-real-restart/`, and `spikes/m5b-planner/`; they do not prove DeepSeek compatibility.
+- `scripts/ops-simulation.mjs` has no FAIL. `scripts/ops-simulation-2.mjs` exits successfully but retains its pre-existing FAIL for a Feishu/enterprise inbound trigger. This work order explicitly prohibits implementing that channel path.
+- The three credential-dependent commands remain blocked at explicit preflight: DeepSeek planner, encrypted credential restart, and external-send wedge. Therefore the global “all desktop tests green” gate is not claimed.

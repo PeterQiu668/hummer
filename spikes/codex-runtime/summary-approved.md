@@ -1,1 +1,1 @@
-﻿HUMMER is a human-AI workspace whose runtime must surface real execution events and never present a mock Codex connection as live.
+﻿HUMMER is a human-AI collaboration workspace whose runtime must expose real execution events and never present a mock runtime as a live Codex connection.

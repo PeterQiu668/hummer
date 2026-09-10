@@ -1,23 +1,21 @@
 {
-  "occurredAt": "2026-08-28T14:00:23.419Z",
-  "sessionId": "codex_hkzqk0_1",
-  "nativeSessionId": "01a048aa-c3bb-7473-8933-acbe938f1cd9",
+  "occurredAt": "2026-09-10T18:38:57.314Z",
+  "sessionId": "codex_plan_hkzqk0_2",
+  "nativeSessionId": "01a08c9c-7a05-7fa1-878d-f6768884d0f0",
   "before": {
     "status": "running",
-    "eventCount": 7,
+    "eventCount": 5,
     "sequences": [
       1,
       2,
       3,
       4,
-      5,
-      6,
-      7
+      5
     ]
   },
   "after": {
     "status": "interrupted",
-    "eventCount": 8,
+    "eventCount": 6,
     "events": [
       {
         "sequence": 1,
@@ -45,24 +43,12 @@
       },
       {
         "sequence": 5,
-        "type": "step",
-        "status": "completed",
-        "tool": null
-      },
-      {
-        "sequence": 6,
-        "type": "step",
-        "status": "completed",
-        "tool": null
-      },
-      {
-        "sequence": 7,
         "type": "tool",
         "status": "completed",
         "tool": "shell.command"
       },
       {
-        "sequence": 8,
+        "sequence": 6,
         "type": "status",
         "status": "interrupted",
         "tool": null
@@ -71,7 +57,7 @@
   },
   "integrity": {
     "valid": true,
-    "checked": 8
+    "checked": 9
   },
   "screenshotPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\dist\\hummer-m3-real-restart.png",
   "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m3-real-restart\\codex-restart-wire.jsonl"
