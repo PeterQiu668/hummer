@@ -177,3 +177,37 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - Passed: `typecheck`; `test:unit` (176); `test:ui` (33); `build`; `desktop:build`; `test:e2e`; desktop Codex read, approval, steer, interrupt and restart; persistence; identity; approval rejection; projects; outcome receipt; planner internal validation; write gate; tool registry; external draft; packaged smoke; and both operations simulations (the explicitly deferred channel-inbound check is `SKIP`, not a delivery claim).
 - Rebuilt unsigned installer: `release/m5d/HUMMER-Setup-0.5.0-internal.1.exe`, 104,368,997 bytes, SHA-256 `CFA877D47D56F425420B217EB71D902D86F595AA825F7E84DF4BE8915CD61A68`, Authenticode `NotSigned`.
 - Still blocked: all three DeepSeek credential-backed E2Es and clean-Windows installation. No mock or internal OpenAI result is substituted for either gate.
+
+## M5-E status update - 2026-09-12
+
+### P0 default DeepSeek gate
+
+- Process, User, and Machine environment scopes still have no `DEEPSEEK_API_KEY`, and the default Electron user-data location contains no reusable HUMMER credential database.
+- `test:desktop:planner:deepseek`, `test:desktop:credentials`, and `test:desktop:wedge` therefore remain blocked at their explicit credential preflight. This is not evidence for or against DeepSeek `outputSchema`; ADR-006 remains open.
+- No mock or `openai-codex-validation` run is substituted for the default product profile.
+
+### P1 local office-document capability
+
+- Additive catalog update exposes exactly three implemented capabilities: `fs.read`, `external.send.draft`, and `doc.extract`. The existing unknown-capability test remains fail-closed.
+- Real Codex run generated at `2026-09-11T18:41:59.555Z`: `spikes/m5e-doc-extract/doc-extract-evidence.json` and `doc-extract-wire.jsonl`. It called `hummer_local/doc_extract`, retained worksheet/cell coordinates, persisted SHA-256 evidence, recorded the tool invocation, and verified `valid=true, checked=25`.
+- Encrypted, corrupt, oversized, out-of-workspace, and symbolic-link failures are explicit. DOCX and PDF are verified locally by integration tests; only XLSX has external-runtime E2E evidence.
+
+### P2 durable internal order intake
+
+- Additive migration v8 creates tenant-scoped `work_order_intake` and `work_order_inbox`; v1-v7 are unchanged.
+- Run generated at `2026-09-11T18:43:35.617Z`: `spikes/m5e-intake/intake-evidence.json` and `intake-wire.jsonl`. A real XLSX file appeared as a pending intake, with zero sessions before confirmation and `valid=true, checked=2`.
+- Confirmation created work order `wo_intake_31ab22a26cad2f44a1e168d8`; real Codex planning and `doc.extract` then completed. The draft approval, outcome, receipt, and restart checks are local HUMMER product-chain evidence. Restart restored the intake/session and the final chain was `valid=true, checked=30`.
+- No ChannelAdapter or external delivery was implemented.
+
+### P3 release gates
+
+- Electron was upgraded from 38.8.6 to 39.8.10 and safe lockfile audit fixes were applied. Upstream `extract-zip` and ExcelJS `uuid` advisories remain documented; no force downgrade or unverified major upgrade was applied.
+- Code-signing remains not applied: owner, vendor, and expected completion date are not assigned. See `docs/release/m5e-windows-internal-release.md`.
+- No clean Windows machine is available, so install-to-first-order acceptance remains blocked and unclaimed.
+
+### M5-E final regression snapshot
+
+- Passed: `typecheck`; `test:unit` (187); `test:ui` (35); `build`; `desktop:build`; `test:e2e`; persistence; identity; approval rejection; projects; outcome receipt; internal planner; real Codex app-server, approval, steer, interrupt and restart; write gate; tool registry; external draft; `doc.extract`; intake; and packaged smoke against the M5-E output.
+- Both operations simulations completed with no `FAIL`. Their existing `SKIP`, `CHECK`, and `WARN` items remain explicit product-boundary observations, not passes.
+- Built unsigned `release/m5e/HUMMER-Setup-0.5.0-internal.1.exe`: 125,123,558 bytes, SHA-256 `8CC246BDA3267C3F439980FB3BCB904CC92FC3EAC7A752BF3ED3C64D325BFB70`, Authenticode `NotSigned`.
+- Explicitly blocked: the three DeepSeek credential-backed E2Es and clean-Windows installation. The global all-desktop-green gate is therefore not claimed.

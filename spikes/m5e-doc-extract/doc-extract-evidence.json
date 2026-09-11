@@ -1,0 +1,300 @@
+{
+  "generatedAt": "2026-09-11T18:41:59.555Z",
+  "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5e-doc-extract\\doc-extract-wire.jsonl",
+  "wireProof": {
+    "mcpReady": true,
+    "docExtractCall": true,
+    "elicitationAccepted": true
+  },
+  "failureModes": {
+    "encrypted": "doc_extract cannot read encrypted XLSX files",
+    "corrupt": "doc_extract could not parse corrupt or unsupported XLSX content: Can't find end of central directory : is this a zip file ? If it is, see https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+    "oversized": "doc_extract refuses files larger than 26214400 bytes",
+    "outside": "doc_extract path is outside the workspace",
+    "symbolicLink": "doc_extract refuses symbolic links"
+  },
+  "session": {
+    "plan": {
+      "approvalMode": "L2",
+      "assignees": [
+        "自动推荐"
+      ],
+      "attachmentNames": [],
+      "estimate": "约2分钟",
+      "humanGates": [],
+      "id": "plan_d3phep",
+      "modelProfile": "旗舰",
+      "planning": {
+        "costUnavailableReason": "该运行时模型未配置价格，成本未记录",
+        "label": "模型生成计划",
+        "planningSessionId": "codex_planning_plan_d3phep_1",
+        "receiptOutcomeEventId": "outcome_evt_b9f9e483df3541588c134cdb5fa4ebbb",
+        "runtimeId": "codex-cli",
+        "source": "runtime"
+      },
+      "prompt": "Use the HUMMER doc.extract capability, specifically hummer_local doc_extract, to read 真实订单.xlsx. Do not use shell commands. Report the sheet name, customer, amount, and delivery date.",
+      "tools": [
+        "doc.extract"
+      ],
+      "understanding": [
+        "在“我的工作空间”内定位文件“真实订单.xlsx”，不访问范围外内容",
+        "执行 HUMMER 的 doc.extract 能力，并明确使用 hummer_local doc_extract 读取工作簿",
+        "从提取结果中识别并报告工作表名称、客户、金额和交付日期",
+        "核对四个字段均有文档提取证据，缺失或无法识别时明确标注"
+      ],
+      "workContext": "我的工作空间",
+      "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读，仅限真实订单.xlsx）"
+    },
+    "handle": {
+      "engine": {
+        "dataDomain": "chatgpt.com",
+        "modelName": "gpt-5.6-sol",
+        "providerName": "OpenAI (Codex login)",
+        "sandbox": "read-only",
+        "tier": "flagship"
+      },
+      "nativeSessionId": "01a091c6-7b4e-73c2-9381-8f8fb44a0f22",
+      "runtimeId": "codex-cli",
+      "sessionId": "codex_plan_d3phep_2"
+    },
+    "events": [
+      {
+        "actorRef": "system:desktop-host",
+        "category": "system",
+        "evidenceRefs": [
+          "codex://host/stderr"
+        ],
+        "occurredAt": "2026-09-11T18:41:39.412Z",
+        "result": "{\"timestamp\":\"2026-09-11T18:41:39.309376Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}",
+        "sequence": 1,
+        "sessionId": "codex_plan_d3phep_2",
+        "status": "completed",
+        "title": "Runtime 诊断",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "system",
+        "evidenceRefs": [
+          "codex://turn/started"
+        ],
+        "occurredAt": "2026-09-11T18:41:39.699Z",
+        "result": "已建立非交互运行，等待结构化事件。",
+        "sequence": 2,
+        "sessionId": "codex_plan_d3phep_2",
+        "status": "running",
+        "title": "执行内核开始运行",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "message",
+        "evidenceRefs": [
+          "codex://items/msg_08e801d5c546ff8e016aa44b6cb84087d0abb9b97fe273a6e9"
+        ],
+        "occurredAt": "2026-09-11T18:41:49.463Z",
+        "result": "我会严格只读取“我的工作空间”中的 `真实订单.xlsx`，并使用指定的 `hummer_local doc_extract` 提取和核对四个字段。",
+        "sequence": 3,
+        "sessionId": "codex_plan_d3phep_2",
+        "status": "completed",
+        "title": "执行进展",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "args": {
+          "path": "真实订单.xlsx"
+        },
+        "costCny": null,
+        "durationMs": 32,
+        "evidenceRefs": [
+          "codex://items/exec-f26f1755-53ef-40fd-ab89-f1c1f77537ff",
+          "evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30"
+        ],
+        "occurredAt": "2026-09-11T18:41:54.451Z",
+        "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"真实订单.xlsx\\\",\\\"sha256\\\":\\\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\\\",\\\"sizeBytes\\\":6551},\\\"sheets\\\":[{\\\"name\\\":\\\"九月订单\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"交付日\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"华东系统集成\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":128000},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":\\\"2026-09-30\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"真实订单.xlsx\",\"sha256\":\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\",\"sizeBytes\":6551},\"sheets\":[{\"name\":\"九月订单\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"客户\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"金额\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"交付日\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"华东系统集成\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":128000},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":\"2026-09-30\"}]}],\"warnings\":[]},\"_meta\":null}",
+        "sequence": 4,
+        "sessionId": "codex_plan_d3phep_2",
+        "status": "completed",
+        "title": "调用 MCP 工具 doc_extract",
+        "tool": "doc.extract",
+        "type": "tool"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "message",
+        "evidenceRefs": [
+          "codex://items/msg_08e801d5c546ff8e016aa44b753bec87d0bc1f0eafe207d261"
+        ],
+        "occurredAt": "2026-09-11T18:41:58.639Z",
+        "result": "通过 `hummer_local doc_extract` 读取 `真实订单.xlsx`，结果如下：\n\n- 工作表：九月订单\n- 客户：华东系统集成（A2）\n- 金额：128,000（B2）\n- 交付日期：2026-09-30（C2）\n\n四个字段均有提取证据，无警告或缺失。",
+        "sequence": 5,
+        "sessionId": "codex_plan_d3phep_2",
+        "status": "completed",
+        "title": "执行进展",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "costCny": null,
+        "deliverables": [
+          {
+            "kind": "report",
+            "name": "最终回复"
+          }
+        ],
+        "durationMs": 19026,
+        "evidenceRefs": [
+          "codex://turn/completed",
+          "evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30"
+        ],
+        "occurredAt": "2026-09-11T18:41:58.725Z",
+        "rollback": {
+          "supported": false
+        },
+        "sequence": 6,
+        "sessionId": "codex_plan_d3phep_2",
+        "summary": "通过 `hummer_local doc_extract` 读取 `真实订单.xlsx`，结果如下：\n\n- 工作表：九月订单\n- 客户：华东系统集成（A2）\n- 金额：128,000（B2）\n- 交付日期：2026-09-30（C2）\n\n四个字段均有提取证据，无警告或缺失。",
+        "title": "任务运行完成",
+        "type": "result",
+        "usage": {
+          "cacheWriteInputTokens": 0,
+          "cachedInputTokens": 16256,
+          "inputTokens": 16949,
+          "outputTokens": 123,
+          "reasoningOutputTokens": 34,
+          "totalTokens": 17072
+        }
+      }
+    ]
+  },
+  "toolEvent": {
+    "actorRef": "employee:codex",
+    "args": {
+      "path": "真实订单.xlsx"
+    },
+    "costCny": null,
+    "durationMs": 32,
+    "evidenceRefs": [
+      "codex://items/exec-f26f1755-53ef-40fd-ab89-f1c1f77537ff",
+      "evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30"
+    ],
+    "occurredAt": "2026-09-11T18:41:54.451Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"真实订单.xlsx\\\",\\\"sha256\\\":\\\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\\\",\\\"sizeBytes\\\":6551},\\\"sheets\\\":[{\\\"name\\\":\\\"九月订单\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"交付日\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"华东系统集成\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":128000},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":\\\"2026-09-30\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"真实订单.xlsx\",\"sha256\":\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\",\"sizeBytes\":6551},\"sheets\":[{\"name\":\"九月订单\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"客户\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"金额\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"交付日\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"华东系统集成\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":128000},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":\"2026-09-30\"}]}],\"warnings\":[]},\"_meta\":null}",
+    "sequence": 4,
+    "sessionId": "codex_plan_d3phep_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 doc_extract",
+    "tool": "doc.extract",
+    "type": "tool"
+  },
+  "receipt": {
+    "generatedAt": "2026-09-11T18:41:58.920Z",
+    "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+    "outcome": {
+      "id": "outcome_evt_4de21720e9e74dd0af86b48e4888048b",
+      "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+      "outcomeDefinitionId": "outcome_def_f457cbf15328471fafc0c457c9b07863",
+      "workOrderId": null,
+      "sessionId": "codex_plan_d3phep_2",
+      "approvalId": null,
+      "verdict": "accepted",
+      "acceptedBy": "account:account_a3695731f2d4468e904417f3d458223b",
+      "evidenceRef": "evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30",
+      "occurredAt": "2026-09-11T18:41:58.914Z"
+    },
+    "definition": {
+      "id": "outcome_def_f457cbf15328471fafc0c457c9b07863",
+      "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+      "actionPattern": "doc.extract",
+      "title": "真实订单文档提取验收",
+      "acceptanceCriteria": "结果包含 sheet、单元格坐标和内容寻址证据",
+      "unitPriceCny": null,
+      "riskLevel": "low",
+      "enabled": true,
+      "createdAt": "2026-09-11T18:41:58.913Z",
+      "updatedAt": "2026-09-11T18:41:58.913Z"
+    },
+    "costs": [],
+    "tools": [
+      {
+        "id": "tool_inv_a6b6a7b0-c1f1-4f08-b260-2f38d4648859",
+        "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+        "sessionId": "codex_plan_d3phep_2",
+        "toolDefinitionId": "tenant_812049e6ff0f4d1193cbae2e17b8a936_tool_doc_extract",
+        "capabilityId": "doc.extract",
+        "actorRef": "employee:codex",
+        "status": "completed",
+        "args": {
+          "path": "真实订单.xlsx"
+        },
+        "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"真实订单.xlsx\\\",\\\"sha256\\\":\\\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\\\",\\\"sizeBytes\\\":6551},\\\"sheets\\\":[{\\\"name\\\":\\\"九月订单\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"交付日\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"华东系统集成\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":128000},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":\\\"2026-09-30\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"真实订单.xlsx\",\"sha256\":\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\",\"sizeBytes\":6551},\"sheets\":[{\"name\":\"九月订单\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"客户\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"金额\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"交付日\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"华东系统集成\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":128000},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":\"2026-09-30\"}]}],\"warnings\":[]},\"_meta\":null}",
+        "durationMs": 32,
+        "evidenceRefs": [
+          "codex://items/exec-f26f1755-53ef-40fd-ab89-f1c1f77537ff",
+          "evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30"
+        ],
+        "occurredAt": "2026-09-11T18:41:54.451Z",
+        "idempotencyKey": "codex_plan_d3phep_2:4:doc.extract"
+      }
+    ],
+    "totalCostCny": 0,
+    "approval": null,
+    "chainIntegrity": {
+      "valid": true,
+      "checked": 25
+    },
+    "receiptJson": "{\"approval\":null,\"chainIntegrity\":{\"checked\":25,\"valid\":true},\"costs\":[],\"definition\":{\"acceptanceCriteria\":\"结果包含 sheet、单元格坐标和内容寻址证据\",\"actionPattern\":\"doc.extract\",\"createdAt\":\"2026-09-11T18:41:58.913Z\",\"enabled\":true,\"id\":\"outcome_def_f457cbf15328471fafc0c457c9b07863\",\"riskLevel\":\"low\",\"tenantId\":\"tenant_812049e6ff0f4d1193cbae2e17b8a936\",\"title\":\"真实订单文档提取验收\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-11T18:41:58.913Z\"},\"generatedAt\":\"2026-09-11T18:41:58.920Z\",\"outcome\":{\"acceptedBy\":\"account:account_a3695731f2d4468e904417f3d458223b\",\"approvalId\":null,\"evidenceRef\":\"evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\",\"id\":\"outcome_evt_4de21720e9e74dd0af86b48e4888048b\",\"occurredAt\":\"2026-09-11T18:41:58.914Z\",\"outcomeDefinitionId\":\"outcome_def_f457cbf15328471fafc0c457c9b07863\",\"sessionId\":\"codex_plan_d3phep_2\",\"tenantId\":\"tenant_812049e6ff0f4d1193cbae2e17b8a936\",\"verdict\":\"accepted\",\"workOrderId\":null},\"tenantId\":\"tenant_812049e6ff0f4d1193cbae2e17b8a936\",\"tools\":[{\"actorRef\":\"employee:codex\",\"args\":{\"path\":\"真实订单.xlsx\"},\"capabilityId\":\"doc.extract\",\"durationMs\":32,\"evidenceRefs\":[\"codex://items/exec-f26f1755-53ef-40fd-ab89-f1c1f77537ff\",\"evidence://sha256/f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\"],\"id\":\"tool_inv_a6b6a7b0-c1f1-4f08-b260-2f38d4648859\",\"idempotencyKey\":\"codex_plan_d3phep_2:4:doc.extract\",\"occurredAt\":\"2026-09-11T18:41:54.451Z\",\"result\":\"{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"{\\\\\\\"format\\\\\\\":\\\\\\\"xlsx\\\\\\\",\\\\\\\"source\\\\\\\":{\\\\\\\"path\\\\\\\":\\\\\\\"真实订单.xlsx\\\\\\\",\\\\\\\"sha256\\\\\\\":\\\\\\\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\\\\\\\",\\\\\\\"sizeBytes\\\\\\\":6551},\\\\\\\"sheets\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"九月订单\\\\\\\",\\\\\\\"cells\\\\\\\":[{\\\\\\\"address\\\\\\\":\\\\\\\"A1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"客户\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":\\\\\\\"金额\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"C1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":\\\\\\\"交付日\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"A2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"华东系统集成\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":128000},{\\\\\\\"address\\\\\\\":\\\\\\\"C2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":\\\\\\\"2026-09-30\\\\\\\"}]}],\\\\\\\"warnings\\\\\\\":[]}\\\"}],\\\"structuredContent\\\":{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"真实订单.xlsx\\\",\\\"sha256\\\":\\\"f54bfd87ec35099fe819001fdefaca98d1fe1ed6818878bc169b2ed87ae2ec30\\\",\\\"sizeBytes\\\":6551},\\\"sheets\\\":[{\\\"name\\\":\\\"九月订单\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"交付日\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"华东系统集成\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":128000},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":\\\"2026-09-30\\\"}]}],\\\"warnings\\\":[]},\\\"_meta\\\":null}\",\"sessionId\":\"codex_plan_d3phep_2\",\"status\":\"completed\",\"tenantId\":\"tenant_812049e6ff0f4d1193cbae2e17b8a936\",\"toolDefinitionId\":\"tenant_812049e6ff0f4d1193cbae2e17b8a936_tool_doc_extract\"}],\"totalCostCny\":0}"
+  },
+  "definitions": [
+    {
+      "id": "tenant_812049e6ff0f4d1193cbae2e17b8a936_tool_doc_extract",
+      "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+      "capabilityId": "doc.extract",
+      "displayName": "办公文档提取",
+      "transport": "builtin",
+      "riskLevel": "low",
+      "policyActionPattern": "doc.extract",
+      "endpoint": {
+        "execution": "local-only",
+        "serverName": "hummer_local",
+        "toolName": "doc_extract"
+      },
+      "status": "verified",
+      "verifiedAt": "2026-09-11T18:41:40.455Z"
+    },
+    {
+      "id": "tenant_812049e6ff0f4d1193cbae2e17b8a936_tool_external_send_draft",
+      "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+      "capabilityId": "external.send.draft",
+      "displayName": "外发草稿",
+      "transport": "builtin",
+      "riskLevel": "high",
+      "policyActionPattern": "external.send*",
+      "endpoint": {
+        "handler": "controlled-write"
+      },
+      "status": "verified",
+      "verifiedAt": null
+    },
+    {
+      "id": "tenant_812049e6ff0f4d1193cbae2e17b8a936_tool_fs_read",
+      "tenantId": "tenant_812049e6ff0f4d1193cbae2e17b8a936",
+      "capabilityId": "fs.read",
+      "displayName": "工作区文件读取",
+      "transport": "mcp",
+      "riskLevel": "low",
+      "policyActionPattern": "fs.read",
+      "endpoint": {
+        "serverName": "hummer_local",
+        "toolName": "fs_read"
+      },
+      "status": "verified",
+      "verifiedAt": "2026-09-11T18:41:40.455Z"
+    }
+  ],
+  "integrity": {
+    "valid": true,
+    "checked": 25
+  }
+}

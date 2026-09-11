@@ -12,7 +12,7 @@ This file records direct runtime and delivery dependencies relevant to the HUMME
 
 ## Electron
 
-- Version: 38.8.6
+- Version: 39.8.10
 - Source: https://github.com/electron/electron
 - License: MIT
 
@@ -27,6 +27,34 @@ This file records direct runtime and delivery dependencies relevant to the HUMME
 - Version: 13.0.3
 - Source: https://github.com/WiseLibs/better-sqlite3
 - License: MIT
+
+## ExcelJS
+
+- Version: 4.4.0
+- Source: https://github.com/exceljs/exceljs
+- License: MIT
+- Use: local XLSX extraction with worksheet and cell-coordinate preservation.
+
+## Mammoth
+
+- Version: 1.12.2
+- Source: https://github.com/mwilliamson/mammoth.js
+- License: BSD-2-Clause
+- Use: local DOCX raw-text extraction.
+
+## PDF.js
+
+- Version: 6.3.289
+- Source: https://github.com/mozilla/pdf.js
+- License: Apache License 2.0
+- Use: local PDF text extraction.
+
+## JSZip
+
+- Version: 3.10.1
+- Source: https://github.com/Stuk/jszip
+- License: MIT or GPL-3.0-or-later; HUMMER uses the MIT option.
+- Use: document-extraction test fixtures only.
 
 ## Playwright
 

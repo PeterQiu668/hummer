@@ -427,3 +427,17 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 - 2026-09-10 18:37:25 至 18:38:54 UTC 的真会话重启证据位于 `spikes/m3-real-restart/`。已完成事件恢复后追加明确的 `interrupted`，不把失效子进程伪装为运行中。
 - 2026-09-11 的打包验收暴露并修复了两个发布缺陷：Vite 绝对 `/assets` 路径导致 `file://` 空白页，以及打包命令未先重建 renderer。`npm run test:desktop:packaged` 现要求可见 UI、真实 runtime 标识、原生 SQLite、身份写入和环境自检同时通过。
 - 默认 `deepseek-standard` 的结构化规划仍受本轮进程缺少 `DEEPSEEK_API_KEY` 阻塞；本节的真实 runtime 证据来自内部 `openai-codex-validation`，两者不得合并宣称。
+
+## 17. M5-E embedded-runtime isolation and order intake (2026-09-12)
+
+M5-E keeps `RuntimeAdapter` unchanged. The new `doc.extract` capability is exposed by the trusted `hummer_local` stdio MCP server and arrives through the existing MCP tool-event mapping. It is authorized only when the tenant registry contains the exact verified, low-risk endpoint. The product domain imports no Electron, SQLite, Codex, or MCP implementation types.
+
+The embedded Codex process now disables `memories` and `apps`, in addition to remote plugins. A failed order-planning run produced a complete wire/stderr record showing a planning-only turn attempting to patch the operator's global `MEMORY.md` before its stream disconnected. The local command `codex features list` verified the exact feature names `memories` and `apps`; after applying those protocol flags, the same order E2E completed without timeout or retry changes. This is runtime isolation, not prompt guidance.
+
+Migration v8 adds a runtime-neutral intake boundary. Folder and form sources call the same `intake(source, externalRef, payload)` operation. A pending intake is persisted and content-addressed but cannot start a session. Confirmation creates the existing work-order projection, after which the existing Planner and RuntimeAdapter paths remain unchanged. A future ChannelAdapter may call this intake operation, but M5-E contains no channel implementation.
+
+Evidence boundaries:
+
+- `spikes/m5e-doc-extract/` proves a real Codex MCP call and local XLSX extraction. DOCX/PDF support is local integration-test evidence.
+- `spikes/m5e-intake/` proves folder detection, zero execution before confirmation, real Codex planning and document extraction, plus local HUMMER approval/outcome/receipt/restart behavior.
+- Neither evidence set proves the default DeepSeek profile or external delivery.
