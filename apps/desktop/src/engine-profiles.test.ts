@@ -70,7 +70,7 @@ describe('desktop engine profiles', () => {
     expect(args).toContain('model_providers.deepseek.wire_api="responses"');
     expect(serialized).not.toContain(secret);
   });
-  it('uses a non-reserved OpenAI provider id and disables remote plugin catalog loading', () => {
+  it('uses a non-reserved OpenAI provider id and isolates the embedded runtime from personal capabilities', () => {
     const profile = engineProfileById('openai-flagship');
     const args = buildCodexProviderArgs(profile, {});
 
@@ -79,6 +79,8 @@ describe('desktop engine profiles', () => {
       '--disable', 'remote_plugin',
       '--disable', 'plugins',
       '--disable', 'recommended_plugins',
+      '--disable', 'memories',
+      '--disable', 'apps',
     ]));
     expect(args).not.toContain('model_providers.openai_hummer.env_key="OPENAI_API_KEY"');
   });

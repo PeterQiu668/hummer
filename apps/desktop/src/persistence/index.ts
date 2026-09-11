@@ -13,6 +13,7 @@ export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evid
 export type { ControlledWriteInput, ControlledWriteResult } from './controlled-write-store.js';
 export type { ExternalSendDraftInput } from './builtin-tool-executor.js';
 export type { ToolDefinitionRecord, ToolInvocationRecord, RecordToolInvocationInput } from './tool-registry-store.js';
+export type { WorkOrderIntakePayload, WorkOrderIntakeRecord, WorkOrderIntakeSource, WorkOrderIntakeStatus } from './work-order-intake-store.js';
 export type {
   AccountRecord,
   AuthSessionRecord,

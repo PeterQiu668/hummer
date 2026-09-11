@@ -132,6 +132,16 @@ contextBridge.exposeInMainWorld('hummerToolRegistry', {
   createExternalSendDraft: (request: unknown) => ipcRenderer.invoke('hummer:tools:create-external-draft', request),
 });
 
+contextBridge.exposeInMainWorld('hummerWorkOrderIntake', {
+  list: (token: string) => ipcRenderer.invoke('hummer:intake:list', token),
+  listAll: (token: string) => ipcRenderer.invoke('hummer:intake:list-all', token),
+  submitForm: (request: unknown) => ipcRenderer.invoke('hummer:intake:submit-form', request),
+  confirm: (request: unknown) => ipcRenderer.invoke('hummer:intake:confirm', request),
+  inbox: (token: string) => ipcRenderer.invoke('hummer:intake:inbox', token),
+  chooseInbox: (token: string) => ipcRenderer.invoke('hummer:intake:choose-inbox', token),
+  configureInbox: (token: string, directory: string) => ipcRenderer.invoke('hummer:intake:configure-inbox', { token, directory }),
+});
+
 contextBridge.exposeInMainWorld('hummerOutcomes', {
   define: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:define', request),
   record: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:record', request),

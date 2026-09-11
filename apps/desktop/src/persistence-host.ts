@@ -1,6 +1,8 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, ipcMain, safeStorage } from 'electron';
+import { app, dialog, ipcMain, safeStorage } from 'electron';
 import { CredentialVault } from './credential-vault.js';
 import { customerEngineProfiles, engineProfileById, listEngineProfiles } from './engine-profiles.js';
 import { enrichRuntimeEventEvidence } from './persistence-runtime.js';
@@ -12,12 +14,15 @@ import {
   type DefineOutcomeInput,
   type RecordCostInput,
   type RecordOutcomeInput,
+  type WorkOrderIntakePayload,
 } from './persistence/index.js';
 import type { AuthorizeApprovalInput } from './persistence/approval-policy-store.js';
-import type { JsonValue } from './persistence/canonical-json.js';
+import { canonicalJson, type JsonValue } from './persistence/canonical-json.js';
 import type { PersistableRuntimeEvent } from './persistence/runtime-event-store.js';
 import type { RuntimeConnectorRecord } from './mcp-connector-registry.js';
 import { probeLocalMcp } from './mcp-connection-probe.js';
+import { WorkOrderInboxWatcher } from './work-order-inbox-watcher.js';
+import { requireWorkspaceDirectory, requireWorkspaceFile } from './workspace-file-guard.js';
 
 interface SessionRecordRequest {
   token: string;
@@ -81,12 +86,20 @@ const CHANNELS = [
   'hummer:tools:list',
   'hummer:tools:verify-local-mcp',
   'hummer:tools:create-external-draft',
+  'hummer:intake:list',
+  'hummer:intake:list-all',
+  'hummer:intake:submit-form',
+  'hummer:intake:confirm',
+  'hummer:intake:inbox',
+  'hummer:intake:choose-inbox',
+  'hummer:intake:configure-inbox',
 ] as const;
 
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
   const dataDirectory = resolve(process.env.HUMMER_DATA_DIR ?? join(app.getPath('userData'), 'facts'));
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
   const persistence = openPersistence({ dataDirectory });
+  const inboxWatcher = new WorkOrderInboxWatcher();
   const credentialVault = new CredentialVault(persistence.engineCredentials, {
     available: () => safeStorage.isEncryptionAvailable(),
     protect: (value) => safeStorage.encryptString(value),
@@ -134,12 +147,13 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
         serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
         workspace: workspaceDirectory,
       });
-      return persistence.tools.recordConnectionStatus({
-        tenantId: context.tenant.id, capabilityId: 'fs.read', connected: true, actorRef, occurredAt, error: null,
-      });
+      const connected = ['fs.read', 'doc.extract'].map((capabilityId) => persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id, capabilityId, connected: true, actorRef, occurredAt, error: null,
+      }));
+      return connected.find((definition) => definition.capabilityId === 'fs.read')!;
     } catch (error) {
-      persistence.tools.recordConnectionStatus({
-        tenantId: context.tenant.id, capabilityId: 'fs.read', connected: false, actorRef, occurredAt,
+      for (const capabilityId of ['fs.read', 'doc.extract']) persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id, capabilityId, connected: false, actorRef, occurredAt,
         error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
       });
       throw error;
@@ -161,6 +175,57 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       tenantId: context.tenant.id,
       workspaceDirectory,
     });
+  });
+  const watchInbox = (tenantId: string, directory: string) => inboxWatcher.watch({
+    tenantId,
+    workspaceDirectory,
+    inboxDirectory: directory,
+    onFile: ({ relativePath }) => ingestInboxFile(persistence, tenantId, workspaceDirectory, relativePath),
+  });
+  for (const inbox of persistence.workOrderIntakes.listInboxes()) {
+    try { watchInbox(inbox.tenantId, inbox.directory); } catch { /* The UI will surface an invalid saved path when the tenant opens the inbox settings. */ }
+  }
+  ipcMain.handle('hummer:intake:list', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    return persistence.workOrderIntakes.list(tenantId, 'pending');
+  });
+  ipcMain.handle('hummer:intake:list-all', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    return persistence.workOrderIntakes.list(tenantId);
+  });
+  ipcMain.handle('hummer:intake:submit-form', (_event, request: Authenticated<WorkOrderIntakePayload>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const receivedAt = new Date().toISOString();
+    const payload = normalizeIntakePayload(request.input);
+    return persistence.workOrderIntakes.intake({
+      tenantId: context.tenant.id, source: 'form', externalRef: `form:${randomUUID()}`, payload,
+      payloadBytes: Buffer.from(canonicalIntakePayload(payload)), payloadMediaType: 'application/json', payloadName: 'work-order.json',
+      actorRef: `account:${context.account.id}`, receivedAt,
+    });
+  });
+  ipcMain.handle('hummer:intake:confirm', (_event, request: Authenticated<{ id: string }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.workOrderIntakes.confirm(context.tenant.id, request.input.id, `account:${context.account.id}`, new Date().toISOString());
+  });
+  ipcMain.handle('hummer:intake:inbox', (_event, token: string) => {
+    const tenantId = persistence.identity.currentTenantId(token);
+    return persistence.workOrderIntakes.inbox(tenantId);
+  });
+  ipcMain.handle('hummer:intake:choose-inbox', async (_event, token: string) => {
+    const context = persistence.identity.resumeSession(token);
+    const selected = await dialog.showOpenDialog({ title: '选择订单收件目录', defaultPath: workspaceDirectory, properties: ['openDirectory', 'createDirectory'] });
+    if (selected.canceled || !selected.filePaths[0]) return persistence.workOrderIntakes.inbox(context.tenant.id);
+    const directory = requireWorkspaceDirectory(workspaceDirectory, selected.filePaths[0]);
+    const inbox = persistence.workOrderIntakes.configureInbox(context.tenant.id, directory, new Date().toISOString());
+    watchInbox(context.tenant.id, directory);
+    return inbox;
+  });
+  ipcMain.handle('hummer:intake:configure-inbox', (_event, request: { token: string; directory: string }) => {
+    const context = persistence.identity.resumeSession(request.token);
+    const directory = requireWorkspaceDirectory(workspaceDirectory, request.directory);
+    const inbox = persistence.workOrderIntakes.configureInbox(context.tenant.id, directory, new Date().toISOString());
+    watchInbox(context.tenant.id, directory);
+    return inbox;
   });
 
   ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
@@ -356,29 +421,73 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       const context = persistence.identity.resumeSession(token);
       persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
       if (record.technicalName !== 'hummer_local') return;
-      persistence.tools.recordConnectionStatus({
-        tenantId: context.tenant.id,
-        capabilityId: 'fs.read',
-        connected: record.status === 'connected',
-        actorRef: 'system:codex-host',
-        occurredAt: record.checkedAt,
-        error: record.error,
+      for (const capabilityId of ['fs.read', 'doc.extract']) persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id, capabilityId, connected: record.status === 'connected',
+        actorRef: 'system:codex-host', occurredAt: record.checkedAt, error: record.error,
       });
     },
     authorizeMcpTool: (token, request) => {
       const context = persistence.identity.resumeSession(token);
       persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
-      if (request.serverName !== 'hummer_local' || request.toolName !== 'fs_read') return false;
-      const definition = persistence.tools.listDefinitions(context.tenant.id)
-        .find((candidate) => candidate.capabilityId === 'fs.read');
+      const definition = persistence.tools.listDefinitions(context.tenant.id).find((candidate) => (
+        candidate.endpoint.serverName === request.serverName && candidate.endpoint.toolName === request.toolName
+      ));
       return definition?.status === 'verified' && definition.riskLevel === 'low';
     },
     close: () => {
+      inboxWatcher.close();
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));
       nodeIds.forEach((nodeId) => persistence.executionNodes.markOffline(nodeId, new Date().toISOString()));
       persistence.close();
     },
   };
+}
+
+function ingestInboxFile(persistence: DesktopPersistence, tenantId: string, workspaceDirectory: string, requestedPath: string): void {
+  const file = requireWorkspaceFile({ workspaceDirectory, requestedPath, capability: 'work_order_intake', maxBytes: 25 * 1024 * 1024 });
+  const bytes = readFileSync(file.absolutePath);
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  const office = ['.xlsx', '.docx', '.pdf'].includes(file.extension);
+  const text = ['.txt', '.md', '.json', '.csv'].includes(file.extension);
+  const executable = office || text;
+  const tool = office ? 'doc.extract' : text ? 'fs.read' : null;
+  const prompt = tool
+    ? `使用 ${tool} 读取 ${requestedPath}，提取订单目标与交付要求，生成一份可验收的订单处理结果。`
+    : `收到文件 ${requestedPath}；当前没有实现该文件类型的读取能力，请先转换为 XLSX、DOCX、PDF、TXT、MD、JSON 或 CSV。`;
+  persistence.workOrderIntakes.intake({
+    tenantId, source: 'folder', externalRef: `folder:${requestedPath}:${digest}`, actorRef: 'system:inbox-watcher',
+    receivedAt: new Date().toISOString(), payloadBytes: bytes, payloadMediaType: intakeMediaType(file.extension), payloadName: requestedPath,
+    payload: {
+      title: `处理新订单：${requestedPath}`, target: '读取订单资料并完成明确交付', expectedDeliverable: '订单处理结果与可验证回执',
+      assignee: '自动推荐', dueAt: null, attachmentNames: [requestedPath], prompt, executable, suggestedCapabilities: tool ? [tool] : [],
+    },
+  });
+}
+
+function normalizeIntakePayload(payload: WorkOrderIntakePayload): WorkOrderIntakePayload {
+  const attachmentNames = Array.isArray(payload.attachmentNames) ? payload.attachmentNames.map((name) => String(name).trim()).filter(Boolean) : [];
+  const title = String(payload.title ?? '').trim();
+  const target = String(payload.target ?? '').trim();
+  const expectedDeliverable = String(payload.expectedDeliverable ?? '').trim();
+  const assignee = String(payload.assignee ?? '自动推荐').trim() || '自动推荐';
+  const dueAt = payload.dueAt ? String(payload.dueAt) : null;
+  return {
+    title, target, expectedDeliverable, assignee, dueAt, attachmentNames,
+    prompt: String(payload.prompt ?? `${title}。目标：${target}。期望交付：${expectedDeliverable}。附件：${attachmentNames.join('、') || '无'}。`).trim(),
+    executable: true,
+  };
+}
+
+function canonicalIntakePayload(payload: WorkOrderIntakePayload): string {
+  return canonicalJson(payload);
+}
+
+function intakeMediaType(extension: string): string {
+  return ({
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.pdf': 'application/pdf',
+    '.txt': 'text/plain', '.md': 'text/markdown', '.json': 'application/json', '.csv': 'text/csv',
+  } as Record<string, string>)[extension] ?? 'application/octet-stream';
 }
 
 function requireCustomerEngineProfile(engineProfileId: string) {
@@ -414,7 +523,9 @@ function descriptorFromRequest(persistence: DesktopPersistence, request: Session
     sessionId,
     runtimeId,
     tenantId: persistence.identity.currentTenantId(request.token),
-    workOrderId: `wo_${planId.replace(/^plan_/, '')}`,
+    workOrderId: typeof request.plan.workOrderId === 'string' && request.plan.workOrderId
+      ? request.plan.workOrderId
+      : `wo_${planId.replace(/^plan_/, '')}`,
   };
 }
 

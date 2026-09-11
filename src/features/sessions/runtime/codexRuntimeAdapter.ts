@@ -343,7 +343,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
         status: stringValue(item.status) === 'failed' ? 'blocked' : 'completed',
         actorRef: 'employee:codex',
         title: `调用 MCP 工具 ${tool}`,
-        tool: server === 'hummer_local' && tool === 'fs_read' ? 'fs.read' : `mcp.${server}.${tool}`,
+        tool: stableMcpCapabilityId(server, tool),
         args: isRecord(item.arguments) ? item.arguments : {},
         result: stringifyResult(item.result ?? item.error ?? item.status),
         durationMs: numberOrNull(item.duration_ms),
@@ -504,4 +504,11 @@ function stringifyResult(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value === undefined) return '工具调用已结束，runtime 未提供结果文本。';
   try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function stableMcpCapabilityId(server: string, tool: string): string {
+  if (server !== 'hummer_local') return `mcp.${server}.${tool}`;
+  if (tool === 'fs_read') return 'fs.read';
+  if (tool === 'doc_extract') return 'doc.extract';
+  return `mcp.${server}.${tool}`;
 }

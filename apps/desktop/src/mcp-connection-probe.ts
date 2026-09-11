@@ -45,7 +45,9 @@ export function probeLocalMcp(input: {
           }
           if (response.id === 2) {
             const toolNames = (response.result?.tools ?? []).flatMap((tool) => typeof tool.name === 'string' ? [tool.name] : []);
-            if (!toolNames.includes('fs_read')) throw new Error('MCP server did not advertise fs_read');
+            for (const required of ['fs_read', 'doc_extract']) {
+              if (!toolNames.includes(required)) throw new Error(`MCP server did not advertise ${required}`);
+            }
             finish(() => resolve({ serverName: 'hummer_local', toolNames }));
           }
         }

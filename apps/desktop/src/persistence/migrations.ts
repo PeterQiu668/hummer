@@ -480,6 +480,39 @@ export const migrations: readonly Migration[] = [
         ON tool_invocations (tenant_id, session_id, occurred_at);
     `,
   },
+  {
+    version: 8,
+    name: 'm5e_work_order_intake',
+    sql: `
+      CREATE TABLE work_order_intake (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('folder', 'form')),
+        external_ref TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+        payload_evidence_ref TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        work_order_id TEXT,
+        confirmed_by TEXT,
+        confirmed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, source, external_ref)
+      );
+
+      CREATE INDEX work_order_intake_queue
+        ON work_order_intake (tenant_id, status, received_at);
+
+      CREATE TABLE work_order_inbox (
+        tenant_id TEXT PRIMARY KEY,
+        directory TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

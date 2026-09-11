@@ -15,14 +15,15 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "electron": "38.8.6",
-    "electron-builder": "26.15.3"
+    "electron": "39.8.10",
+    "electron-builder": "26.15.3",
+    "jszip": "3.10.1"
   },
   "build": {
     "appId": "com.hummer.desktop",
     "productName": "HUMMER",
     "directories": {
-      "output": "../../release/m5d"
+      "output": "../../release/m5e"
     },
     "electronDist": "../../node_modules/electron/dist",
     "asar": true,
@@ -38,7 +39,9 @@
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "artifactName": "HUMMER-Setup-${version}.${ext}"
     },
     "nsis": {
@@ -49,6 +52,9 @@
     }
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "exceljs": "^4.4.0",
+    "mammoth": "^1.12.2",
+    "pdfjs-dist": "^6.3.289"
   }
 }

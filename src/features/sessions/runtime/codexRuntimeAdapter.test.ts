@@ -118,6 +118,18 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     expect(event[0]).toMatchObject({ type: 'tool', tool: 'fs.read', args: { path: 'input.txt' }, durationMs: 12 });
   });
 
+  it('maps the HUMMER document extractor to the stable doc.extract capability id', () => {
+    const event = mapCodexMessage({
+      type: 'item.completed',
+      item: {
+        id: 'mcp_doc_1', type: 'mcp_tool_call', server: 'hummer_local', tool: 'doc_extract', status: 'completed',
+        arguments: { path: 'orders.xlsx' }, result: { structuredContent: { format: 'xlsx', sha256: 'abc' } }, duration_ms: 21,
+      },
+    });
+
+    expect(event[0]).toMatchObject({ type: 'tool', tool: 'doc.extract', args: { path: 'orders.xlsx' }, durationMs: 21 });
+  });
+
   it('extracts the native thread id without leaking the Codex event type', () => {
     expect(extractCodexThreadId('{"type":"thread.started","thread_id":"thread_123"}')).toBe('thread_123');
     expect(extractCodexThreadId({ type: 'turn.started', thread_id: 'thread_ignored' })).toBeUndefined();

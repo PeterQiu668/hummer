@@ -74,7 +74,7 @@ export class RuntimeEventStore {
         this.database.prepare(`
           INSERT INTO work_orders (id, tenant_id, status, title, payload_json, created_at, updated_at)
           VALUES (?, ?, 'running', ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json, updated_at = excluded.updated_at
+          ON CONFLICT(id) DO UPDATE SET status = 'running', payload_json = excluded.payload_json, updated_at = excluded.updated_at
         `).run(workOrderId, descriptor.tenantId, title, canonicalJson(descriptor.plan), descriptor.startedAt, descriptor.startedAt);
       }
       this.database.prepare(`
@@ -236,6 +236,9 @@ export class RuntimeEventStore {
       VALUES (?, ?, ?, ?, 'delivered', ?, ?)
       ON CONFLICT(id) DO NOTHING
     `).run(id, options.tenantId, event.sessionId, options.workOrderId ?? null, eventJson, event.occurredAt);
+    if (options.workOrderId) this.database.prepare(`
+      UPDATE work_orders SET status = 'delivered', updated_at = ? WHERE id = ? AND tenant_id = ?
+    `).run(event.occurredAt, options.workOrderId, options.tenantId);
   }
 }
 

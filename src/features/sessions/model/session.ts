@@ -27,6 +27,8 @@ export interface PlanGeneration {
 
 export interface SessionPlan {
   id: string;
+  workOrderId?: string;
+  intakeId?: string;
   prompt: string;
   understanding: string[];
   assignees: string[];

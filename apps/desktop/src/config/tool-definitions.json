@@ -2,6 +2,20 @@
   "version": 1,
   "definitions": [
     {
+      "id": "tool_doc_extract",
+      "capabilityId": "doc.extract",
+      "displayName": "办公文档提取",
+      "transport": "builtin",
+      "riskLevel": "low",
+      "policyActionPattern": "doc.extract",
+      "enabled": true,
+      "endpoint": {
+        "serverName": "hummer_local",
+        "toolName": "doc_extract",
+        "execution": "local-only"
+      }
+    },
+    {
       "id": "tool_external_send_draft",
       "capabilityId": "external.send.draft",
       "displayName": "外发草稿",

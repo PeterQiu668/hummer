@@ -12,11 +12,51 @@ afterEach(() => {
   delete window.hummerOrganization;
   delete window.hummerApprovalPolicy;
   delete window.hummerOutcomes;
+  delete window.hummerWorkOrderIntake;
   localStorage.removeItem('hummer.auth.session');
 });
 
 
 describe('WorkbenchPage V5', () => {
+  it('shows real pending intake only when present and confirms it into the existing plan flow', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-intake-test');
+    const pending = {
+      id: 'intake_1', tenantId: 'tenant_1', source: 'folder' as const, externalRef: 'folder:orders.xlsx:sha',
+      receivedAt: '2026-09-12T01:00:00.000Z', status: 'pending' as const, payloadEvidenceRef: 'evidence://sha256/abc',
+      payload: {
+        title: '处理新订单：orders.xlsx', target: '提取订单', expectedDeliverable: '订单摘要', assignee: '自动推荐',
+        dueAt: null, attachmentNames: ['orders.xlsx'], prompt: '使用 doc.extract 读取 orders.xlsx 并生成摘要', executable: true,
+      },
+      workOrderId: null, confirmedBy: null, confirmedAt: null,
+      createdAt: '2026-09-12T01:00:00.000Z', updatedAt: '2026-09-12T01:00:00.000Z',
+    };
+    const confirm = vi.fn().mockResolvedValue({ ...pending, status: 'confirmed', workOrderId: 'wo_intake_1' });
+    window.hummerWorkOrderIntake = {
+      list: vi.fn().mockResolvedValue([pending]), listAll: vi.fn().mockResolvedValue([pending]), submitForm: vi.fn(), confirm,
+      inbox: vi.fn().mockResolvedValue(null), chooseInbox: vi.fn().mockResolvedValue(null), configureInbox: vi.fn(),
+    };
+    const draft = vi.fn().mockResolvedValue(draftPlanFromPrompt(pending.payload.prompt));
+
+    render(<WorkbenchPage runtime={new MockRuntimeAdapter({ stepDelayMs: 1 })} sessionStore={new MemorySessionStore()} planner={{ draft }} />);
+
+    expect(await screen.findByText('待处理工单')).toBeInTheDocument();
+    expect(screen.getByText('处理新订单：orders.xlsx')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '确认工单：处理新订单：orders.xlsx' }));
+    expect(await screen.findByText('我理解你要做的是：')).toBeInTheDocument();
+    expect(confirm).toHaveBeenCalledWith({ token: 'auth-intake-test', input: { id: 'intake_1' } });
+    expect(draft).toHaveBeenCalledWith(expect.objectContaining({ input: pending.payload.prompt, attachmentNames: ['orders.xlsx'] }));
+  });
+
+  it('does not render an empty pending-order section', async () => {
+    localStorage.setItem('hummer.auth.session', 'auth-empty-intake-test');
+    window.hummerWorkOrderIntake = {
+      list: vi.fn().mockResolvedValue([]), listAll: vi.fn().mockResolvedValue([]), submitForm: vi.fn(), confirm: vi.fn(),
+      inbox: vi.fn().mockResolvedValue(null), chooseInbox: vi.fn().mockResolvedValue(null), configureInbox: vi.fn(),
+    };
+    renderWorkbench();
+    await waitFor(() => expect(window.hummerWorkOrderIntake?.list).toHaveBeenCalled());
+    expect(screen.queryByText('待处理工单')).not.toBeInTheDocument();
+  });
   it('opens with company context, delegated work and twin guidance without execution-only details', () => {
     renderWorkbench();
 

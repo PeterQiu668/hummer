@@ -44,6 +44,8 @@
     "test:desktop:wedge": "node scripts/e2e-desktop-wedge-external-send.mjs",
     "test:desktop:write-gate": "node scripts/e2e-desktop-write-gate.mjs",
     "test:desktop:tool-registry": "node scripts/e2e-desktop-tool-registry.mjs",
+    "test:desktop:doc-extract": "node scripts/e2e-desktop-doc-extract.mjs",
+    "test:desktop:intake": "node scripts/e2e-desktop-intake.mjs",
     "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs"
   },
   "dependencies": {

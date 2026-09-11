@@ -10,6 +10,7 @@ import {
   FileText,
   FolderOpen,
   GitFork,
+  Inbox,
   Keyboard,
   Laptop,
   MessageSquare,
@@ -49,6 +50,12 @@ import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type 
 import { desktopOutcomePort } from '../../features/outcomes/outcomeClient';
 import type { Planner } from '../../features/planning/planner';
 import { createDefaultPlanner } from '../../features/planning/plannerFactory';
+import {
+  desktopWorkOrderIntakePort,
+  type WorkOrderInboxRecord,
+  type WorkOrderIntakePayload,
+  type WorkOrderIntakeRecord,
+} from '../../features/intake/workOrderIntakeClient';
 
 const DEFAULT_RUNTIME = createDefaultRuntimeAdapter();
 
@@ -92,9 +99,14 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const [approvalEvidenceOpen, setApprovalEvidenceOpen] = useState(false);
   const [approvalLedgerCostCny, setApprovalLedgerCostCny] = useState<number | null>(null);
   const [planningBusy, setPlanningBusy] = useState(false);
+  const [pendingIntakes, setPendingIntakes] = useState<WorkOrderIntakeRecord[]>([]);
+  const [intakeInbox, setIntakeInbox] = useState<WorkOrderInboxRecord | null>(null);
+  const [intakeFormOpen, setIntakeFormOpen] = useState(false);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
   const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
+  const intakePort = useMemo(() => desktopWorkOrderIntakePort(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +117,26 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     });
     return () => { cancelled = true; };
   }, [store]);
+
+  useEffect(() => {
+    if (!intakePort) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const [pending, inbox] = await Promise.all([intakePort.list(), intakePort.inbox()]);
+        if (active) {
+          setPendingIntakes(pending);
+          setIntakeInbox(inbox);
+          setIntakeError(null);
+        }
+      } catch (error) {
+        if (active) setIntakeError(error instanceof Error ? error.message : '未能读取订单入口');
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 1_500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [intakePort]);
 
   useEffect(() => {
     let active = true;
@@ -325,6 +357,56 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     }
   };
 
+  const confirmIntake = async (intake: WorkOrderIntakeRecord) => {
+    if (!intakePort || planningBusy || intake.payload.executable === false) return;
+    setPlanningBusy(true);
+    setIntakeError(null);
+    try {
+      const confirmed = await intakePort.confirm(intake.id);
+      const profile = engineProfileForLabel(engineProfiles, modelProfile);
+      const nextPlan = await activePlanner.draft({
+        input: intake.payload.prompt,
+        assignee: intake.payload.assignee || assignee,
+        approvalMode,
+        attachmentNames: intake.payload.attachmentNames,
+        modelProfile,
+        engineProfileId: profile.id,
+        workContext,
+      });
+      setComposerText(intake.payload.prompt);
+      setAssignee(intake.payload.assignee || assignee);
+      setAttachmentNames(intake.payload.attachmentNames);
+      setPlan({ ...nextPlan, workOrderId: confirmed.workOrderId ?? undefined, intakeId: confirmed.id });
+      setPendingIntakes((current) => current.filter((candidate) => candidate.id !== intake.id));
+    } catch (error) {
+      setIntakeError(error instanceof Error ? error.message : '工单确认失败');
+    } finally {
+      setPlanningBusy(false);
+    }
+  };
+
+  const submitIntakeForm = async (payload: WorkOrderIntakePayload) => {
+    if (!intakePort) return;
+    setIntakeError(null);
+    try {
+      const created = await intakePort.submitForm(payload);
+      setPendingIntakes((current) => [created, ...current.filter((candidate) => candidate.id !== created.id)]);
+      setIntakeFormOpen(false);
+    } catch (error) {
+      setIntakeError(error instanceof Error ? error.message : '工单提交失败');
+    }
+  };
+
+  const chooseInbox = async () => {
+    if (!intakePort) return;
+    setIntakeError(null);
+    try {
+      setIntakeInbox(await intakePort.chooseInbox());
+    } catch (error) {
+      setIntakeError(error instanceof Error ? error.message : '收件目录配置失败');
+    }
+  };
+
   const sendFollowUp = async () => {
     if (!activeRecord || !followUp.trim()) return;
     const text = followUp.trim();
@@ -390,6 +472,13 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
           ) : (
             <div className="mx-auto w-full max-w-[1180px] space-y-6">
               {nodeBar}
+              {pendingIntakes.length > 0 && (
+                <PendingWorkOrders records={pendingIntakes} busy={planningBusy} onConfirm={(record) => { void confirmIntake(record); }} />
+              )}
+              {intakePort && (
+                <OrderIntakeActions inbox={intakeInbox} onOpenForm={() => setIntakeFormOpen(true)} onChooseInbox={() => { void chooseInbox(); }} />
+              )}
+              {intakeError && <div role="alert" className="rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-[11px] text-danger">{intakeError}</div>}
               <WorkdayContext onDelegate={delegateToTwin} mentorEnabled={personalSettings.mentorEnabled} />
               <WorkbenchComposer
                 value={composerText}
@@ -410,6 +499,13 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
                 onRecentSelect={(prompt) => { void draftPlan(prompt); }}
                 busy={planningBusy}
               />
+              {intakeFormOpen && (
+                <WorkOrderIntakeDialog
+                  assigneeOptions={['自动推荐', `我的分身 · ${personalSettings.twinName}`, ...organizationAssignees]}
+                  onClose={() => setIntakeFormOpen(false)}
+                  onSubmit={(payload) => { void submitIntakeForm(payload); }}
+                />
+              )}
             </div>
           )}
         </div>
@@ -594,6 +690,103 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
         </div>
       </div>
     </WorkspacePage>
+  );
+}
+
+function PendingWorkOrders({ records, busy, onConfirm }: { records: WorkOrderIntakeRecord[]; busy: boolean; onConfirm: (record: WorkOrderIntakeRecord) => void }) {
+  return (
+    <section aria-label="待处理工单" className="overflow-hidden rounded-md border border-primary-200 bg-white">
+      <div className="flex items-center gap-2 border-b border-primary-100 bg-primary-50 px-4 py-3">
+        <Inbox size={15} className="text-primary-700" />
+        <div className="text-[12px] font-semibold text-neutral-900">待处理工单</div>
+        <span className="hum-chip is-brand ml-auto">{records.length}</span>
+      </div>
+      <div className="divide-y divide-neutral-100">
+        {records.map((record) => (
+          <div key={record.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] font-medium text-neutral-900">{record.payload.title}</span>
+                <span className="hum-chip is-muted">{record.source === 'folder' ? '文件夹收件' : '内部表单'}</span>
+                {record.payload.executable === false && <span className="hum-chip is-warning">文件类型暂不支持</span>}
+              </div>
+              <div className="mt-1 truncate text-[10.5px] text-neutral-500">{record.payload.target} · {record.payload.expectedDeliverable}</div>
+              <div className="mt-1 font-mono text-[9.5px] text-neutral-400">{record.payloadEvidenceRef}</div>
+            </div>
+            <button
+              type="button"
+              aria-label={`确认工单：${record.payload.title}`}
+              onClick={() => onConfirm(record)}
+              disabled={busy || record.payload.executable === false}
+              className="hum-btn is-sm is-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ArrowRight size={12} /> 确认并生成计划
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OrderIntakeActions({ inbox, onOpenForm, onChooseInbox }: { inbox: WorkOrderInboxRecord | null; onOpenForm: () => void; onChooseInbox: () => void }) {
+  return (
+    <section aria-label="订单入口" className="flex flex-col gap-3 border-y border-neutral-200 py-3 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <div className="text-[11.5px] font-medium text-neutral-800">订单入口</div>
+        <div className="mt-0.5 truncate text-[10.5px] text-neutral-500">{inbox ? `正在监听：${inbox.directory}` : '可监听工作区内的收件目录，也可直接提交结构化工单。'}</div>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={onChooseInbox} className="hum-btn is-sm"><FolderOpen size={12} /> {inbox ? '更换目录' : '设置收件目录'}</button>
+        <button type="button" onClick={onOpenForm} className="hum-btn is-sm is-primary"><Plus size={12} /> 提交工单</button>
+      </div>
+    </section>
+  );
+}
+
+function WorkOrderIntakeDialog({ assigneeOptions, onClose, onSubmit }: {
+  assigneeOptions: string[];
+  onClose: () => void;
+  onSubmit: (payload: WorkOrderIntakePayload) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [target, setTarget] = useState('');
+  const [expectedDeliverable, setExpectedDeliverable] = useState('');
+  const [assignee, setAssignee] = useState(assigneeOptions[0] ?? '自动推荐');
+  const [dueAt, setDueAt] = useState('');
+  const [attachments, setAttachments] = useState('');
+  const valid = title.trim() && target.trim() && expectedDeliverable.trim();
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-neutral-950/30 p-4" role="dialog" aria-modal="true" aria-label="提交结构化工单">
+      <form
+        className="w-full max-w-[620px] rounded-md border border-neutral-200 bg-white shadow-xl"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!valid) return;
+          const attachmentNames = attachments.split(/[，,\n]/).map((name) => name.trim()).filter(Boolean);
+          onSubmit({
+            title: title.trim(), target: target.trim(), expectedDeliverable: expectedDeliverable.trim(), assignee,
+            dueAt: dueAt ? new Date(dueAt).toISOString() : null, attachmentNames,
+            prompt: `${title.trim()}。目标：${target.trim()}。期望交付：${expectedDeliverable.trim()}。附件：${attachmentNames.join('、') || '无'}。`,
+            executable: true,
+          });
+        }}
+      >
+        <div className="flex items-center border-b border-neutral-100 px-5 py-4">
+          <div><div className="text-[14px] font-semibold text-neutral-900">提交结构化工单</div><div className="mt-0.5 text-[10.5px] text-neutral-500">提交后先进入待确认队列，不会自动执行。</div></div>
+          <button type="button" onClick={onClose} aria-label="关闭工单表单" className="ml-auto grid h-8 w-8 place-items-center rounded-md text-neutral-500 hover:bg-neutral-100"><X size={15} /></button>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
+          <label className="sm:col-span-2 text-[11px] text-neutral-600">标题<input aria-label="工单标题" value={title} onChange={(event) => setTitle(event.target.value)} className="hum-input mt-1.5 w-full" /></label>
+          <label className="sm:col-span-2 text-[11px] text-neutral-600">目标<textarea aria-label="工单目标" value={target} onChange={(event) => setTarget(event.target.value)} rows={2} className="hum-input mt-1.5 w-full resize-none" /></label>
+          <label className="sm:col-span-2 text-[11px] text-neutral-600">期望交付物<input aria-label="期望交付物" value={expectedDeliverable} onChange={(event) => setExpectedDeliverable(event.target.value)} className="hum-input mt-1.5 w-full" /></label>
+          <label className="text-[11px] text-neutral-600">责任人<select aria-label="工单责任人" value={assignee} onChange={(event) => setAssignee(event.target.value)} className="hum-input mt-1.5 w-full">{[...new Set(assigneeOptions)].map((option) => <option key={option}>{option}</option>)}</select></label>
+          <label className="text-[11px] text-neutral-600">截止时间<input type="datetime-local" aria-label="工单截止时间" value={dueAt} onChange={(event) => setDueAt(event.target.value)} className="hum-input mt-1.5 w-full" /></label>
+          <label className="sm:col-span-2 text-[11px] text-neutral-600">附件（工作区相对路径，多个用逗号分隔）<input aria-label="工单附件" value={attachments} onChange={(event) => setAttachments(event.target.value)} placeholder="比如：inbox/客户订单.xlsx" className="hum-input mt-1.5 w-full" /></label>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-neutral-100 px-5 py-4"><button type="button" onClick={onClose} className="hum-btn">取消</button><button type="submit" disabled={!valid} className="hum-btn is-primary disabled:opacity-40">加入待确认队列</button></div>
+      </form>
+    </div>
   );
 }
 

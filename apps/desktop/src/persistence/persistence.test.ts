@@ -45,12 +45,13 @@ describe('desktop persistence migrations', () => {
     persistence.close();
   });
 
-  it('keeps v6 credentials and adds the v7 tool registry through an additive migration', () => {
+  it('keeps v6 credentials and v7 tools while adding the v8 order intake through an additive migration', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
 
-    expect(persistence.schemaVersion()).toBe(7);
+    expect(persistence.schemaVersion()).toBe(8);
     expect(persistence.listTables()).toContain('engine_credentials');
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['tool_definitions', 'tool_invocations']));
+    expect(persistence.listTables()).toEqual(expect.arrayContaining(['work_order_intake', 'work_order_inbox']));
     persistence.close();
   });
 

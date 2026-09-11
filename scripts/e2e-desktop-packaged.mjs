@@ -4,12 +4,16 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
 
 const root = process.cwd();
-const executablePath = resolve(process.env.HUMMER_PACKAGED_EXE ?? 'release/m5d/win-unpacked/HUMMER.exe');
-const spikeDirectory = resolve(root, 'spikes/m5d-installer');
+const releaseDirectory = resolve(root, 'release/m5e');
+const executablePath = resolve(process.env.HUMMER_PACKAGED_EXE ?? resolve(releaseDirectory, 'win-unpacked/HUMMER.exe'));
+const spikeDirectory = resolve(root, 'spikes/m5e-installer');
 const dataDirectory = resolve(spikeDirectory, 'facts');
 const profileDirectory = resolve(spikeDirectory, 'profile');
 const codexPath = resolve(process.env.LOCALAPPDATA, 'hermes/node/codex.cmd');
 if (!existsSync(executablePath)) throw new Error(`Packaged HUMMER executable not found: ${executablePath}`);
+if (!process.env.HUMMER_PACKAGED_EXE && !executablePath.startsWith(releaseDirectory)) {
+  throw new Error(`Packaged smoke must use the M5-E release directory: ${executablePath}`);
+}
 mkdirSync(spikeDirectory, { recursive: true });
 for (const path of [dataDirectory, profileDirectory]) if (existsSync(path)) rmSync(path, { recursive: true, force: true });
 
