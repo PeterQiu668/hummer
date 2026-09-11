@@ -48,7 +48,7 @@ function receipt(): OutcomeReceipt {
     generatedAt: '2026-09-11T00:00:00.000Z', tenantId: 'tenant_a',
     outcome: { id: 'outcome_1', tenantId: 'tenant_a', outcomeDefinitionId: 'definition_1', workOrderId: 'wo_1', sessionId: 'session_1', approvalId: 'approval_1', verdict: 'accepted' as const, acceptedBy: 'account:owner', evidenceRef: 'evidence://sha256/test', occurredAt: '2026-09-11T00:00:00.000Z' },
     definition: { id: 'definition_1', tenantId: 'tenant_a', actionPattern: 'external.send*', title: 'External send', acceptanceCriteria: 'Approved first', unitPriceCny: null, riskLevel: 'high' as const, enabled: true, createdAt: '2026-09-11T00:00:00.000Z', updatedAt: '2026-09-11T00:00:00.000Z' },
-    costs: [], totalCostCny: 0, approval: null, chainIntegrity: { valid: true as const, checked: 1 },
+    costs: [], tools: [], totalCostCny: 0, approval: null, chainIntegrity: { valid: true as const, checked: 1 },
   };
   return { ...body, receiptJson: JSON.stringify(body) };
 }

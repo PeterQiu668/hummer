@@ -14,14 +14,26 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     expect(invocation.args).not.toContain('danger-full-access');
   });
 
-  it('does not let model-authored workspace prose downgrade an approved execution sandbox', () => {
+  it('keeps the model read-only even when the plan requests execution approval', () => {
     const plan = draftPlanFromPrompt('读取文件后写入摘要', { approvalMode: 'L2' });
     plan.workspaceScope = '我的工作空间（规划阶段只读，执行阶段按审批策略）';
 
     const invocation = buildCodexInvocation(plan);
 
-    expect(invocation.sandbox).toBe('workspace-write');
-    expect(invocation.args).toContain('workspace-write');
+    expect(invocation.sandbox).toBe('read-only');
+    expect(invocation.args).toContain('read-only');
+    expect(invocation.stdin).toContain('Human gates are informational only');
+    expect(invocation.stdin).toContain('invoke the file-change tool normally');
+    expect(invocation.stdin).toContain('read-only sandbox and app-server approval protocol');
+    expect(invocation.stdin).toContain('HUMMER controlled action channel');
+    expect(invocation.stdin).not.toContain('Do not write files directly');
+  });
+
+  it('never grants workspace write access at the highest autonomy level', () => {
+    const invocation = buildCodexInvocation(draftPlanFromPrompt('生成并保存报告', { approvalMode: 'L3' }));
+
+    expect(invocation.sandbox).toBe('read-only');
+    expect(invocation.args).not.toContain('workspace-write');
   });
 
   it('maps user-facing quality tiers to internal engine profile ids', () => {
@@ -74,6 +86,36 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
       approvalId: '42',
       actorRef: 'employee:codex',
     });
+
+    const fileApproval = mapCodexMessage({
+      id: 43,
+      method: 'item/commandExecution/requestApproval',
+      params: { itemId: 'patch_1', reason: 'patch requires approval', kind: 'fileChange', approvalId: 'thread:43' },
+    });
+    expect(fileApproval[0]).toMatchObject({
+      type: 'approval_required',
+      approvalId: 'thread:43',
+      tool: 'file.write.patch',
+      title: '请求修改工作区文件',
+    });
+  });
+
+  it('maps the HUMMER MCP wire name to the stable fs.read capability id', () => {
+    const event = mapCodexMessage({
+      type: 'item.completed',
+      item: {
+        id: 'mcp_1',
+        type: 'mcp_tool_call',
+        server: 'hummer_local',
+        tool: 'fs_read',
+        status: 'completed',
+        arguments: { path: 'input.txt' },
+        result: { structuredContent: { sha256: 'abc' } },
+        duration_ms: 12,
+      },
+    });
+
+    expect(event[0]).toMatchObject({ type: 'tool', tool: 'fs.read', args: { path: 'input.txt' }, durationMs: 12 });
   });
 
   it('extracts the native thread id without leaking the Codex event type', () => {

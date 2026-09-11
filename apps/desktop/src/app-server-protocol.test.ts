@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
+import { approvalResult, mcpElicitationResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 
 describe('Codex app-server protocol boundary', () => {
   it('translates v2 item notifications to the exec JSONL shape consumed by the existing adapter', () => {
@@ -21,6 +21,8 @@ describe('Codex app-server protocol boundary', () => {
     }]);
     expect(approvalResult(true)).toEqual({ decision: 'accept' });
     expect(approvalResult(false)).toEqual({ decision: 'decline' });
+    expect(mcpElicitationResult(true)).toEqual({ action: 'accept', content: {} });
+    expect(mcpElicitationResult(false)).toEqual({ action: 'decline', content: null });
     expect(textInput('continue')).toEqual([{ type: 'text', text: 'continue', text_elements: [] }]);
   });
 

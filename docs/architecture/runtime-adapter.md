@@ -167,7 +167,7 @@ M1.5 对审批 wire 做了逐行复验。成功 E2E 的实际审批响应是：
 codex exec --json --sandbox read-only -
 ```
 
-计划正文通过 stdin 发送。L2/L3 且工作区允许写时映射为 `workspace-write`；代码绝不自动选择 `danger-full-access`。
+计划正文通过 stdin 发送。自 M5-D 起，L1/L2/L3 全部映射为 `read-only`；代码绝不自动选择 `workspace-write` 或 `danger-full-access`。文件变更必须经 Codex app-server 的原生 file-change approval，或经 HUMMER 主进程受控工具执行。
 
 这条路径适合 V5 的最小证明：“在一个明确工作区内读取文件，输出摘要”。它能流式返回执行事件，但 `codex exec` 面向预设策略、无人工交互的运行，不能被假定为支持 HUMMER 页面里的实时审批回传、插话、暂停或任意检查点 fork。
 
@@ -357,7 +357,9 @@ DeepSeek Harness 本轮只做源码 spike，不写 adapter；四问、源码行�
 
 2026-08-28 21:53:46 至 21:54:48 的真实审批运行同时提供了 MCP client 证据。app-server-approval-wire.jsonl 中 node_repl 在 21:53:46.315 为 starting，21:53:46.393 为 ready；codex_apps 在 21:53:46.314 为 starting，21:53:48.766 为 ready。
 
-桌面主进程现在只接收 mcpServer/startupStatus/updated 并映射为 starting / connected / failed，通过 preload 暴露 runtime-neutral 的只读端口。能力页只有在宿主观察到 ready 时才显示“已验证连接”；飞书、钉钉等应用目录没有真实 OAuth/握手，统一显示“待接入”。浏览器原型明确显示无法核验本机连接。该证据证明 MCP 握手成功，不等于某个业务应用已完成授权或工具调用。
+M5-D 之前，桌面主进程只接收 `mcpServer/startupStatus/updated`。M5-D 主动向 Codex 注入本地 `hummer_local` stdio server，并处理 `mcpServer/elicitation/request`。只有租户注册表中已验证、低风险且精确匹配 `hummer_local/fs_read` 的请求会被接受；其余请求默认拒绝。能力页可以执行真实握手，只有成功后才显示“已验证连接”。飞书、钉钉等应用目录没有真实 OAuth/握手，统一显示“待接入”。
+
+真实调用证据位于 `spikes/m5d-tool-registry/`：2026-09-11T04:31:27.294Z 的运行包含 MCP ready、`fs_read` 调用、elicitation accept、内容寻址证据、工具账本和有效哈希链。官方协议依据：https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md
 
 ### 12.6 真会话重启语义
 
@@ -413,7 +415,7 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 
 当前未闭合项：`DEEPSEEK_API_KEY` 在本轮进程环境中不存在，因此默认 DeepSeek 档未运行，真实人民币规划成本与带成本 receipt 尚未获得外部证据。内部验证模型没有已核实的 CNY 价格，保持 `null`/未提供，没有估算或伪造。DeepSeek 验收命令为 `npm run test:desktop:planner:deepseek`。
 
-规划接入后的早期复跑曾把 `apply_patch` 与审批先后出现解释为“file-change approval”。后续完整 wire 复核不能支持这个结论：在 `workspace-write` 下，当前 Codex 0.153.4 的 `apply_patch` 可以直接产生 `fileChange`，不保证先发审批。已确认的审批边界是 `read-only` 沙箱中的受保护命令执行。主进程保留活动 turn 状态；已完成 turn 的 `stop()` 只清理进程，不再发送会被 server 拒绝的重复 interrupt。
+规划接入后的早期复跑曾把 `apply_patch` 与审批先后出现解释为“file-change approval”。M5-D 的完整对照探针给出了确定边界：`workspace-write` 下直接完成 `fileChange` 且零审批；`read-only` 下同类变更先发 `item/fileChange/requestApproval`，拒绝后状态为 declined 且磁盘无目标文件。因此 HUMMER 强制所有 Codex 计划使用 `read-only`，并把原生请求映射为 `file.write.patch` 后交给租户审批策略。完整证据与结论见 ADR-009 和 `spikes/m5d-write-gate/`。
 - 升级前首次复跑暴露了两个 E2E 脚本债务：M4 身份门禁未处理，以及新的持久化查询未传 session token。脚本已使用独立 Electron profile、真实登录 token 修复，不改变生产协议。
 
 ## 16. M5-C 桌面默认运行时与沙箱复核（2026-09-11）

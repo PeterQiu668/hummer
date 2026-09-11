@@ -20,6 +20,8 @@ M5-B proved schema-constrained planning with the internal `openai-codex-validati
 
 On 2026-09-11 (Asia/Shanghai), `npm run test:desktop:planner:deepseek`, `npm run test:desktop:credentials`, and `npm run test:desktop:wedge` all stopped at preflight because `DEEPSEEK_API_KEY` was absent from the process environment. No provider request was made and no mock evidence was substituted. Therefore DeepSeek's `outputSchema` behavior is **not yet verified in this milestone**.
 
+M5-D repeated the three commands on 2026-09-11 at approximately 12:52 Asia/Shanghai. Each command exited with status 1 at its explicit credential preflight. A separate non-secret check found the key absent from Process, User, and Machine environment scopes. This is a credential-availability blocker, not evidence for or against DeepSeek structured-output compatibility.
+
 Earlier evidence in `spikes/deepseek-standard/` proves real DeepSeek execution, approval, file writes, and fork behavior. It does not contain the M5-B schema-constrained planning scenario and cannot satisfy this ADR's gate.
 
 ## Required closure evidence

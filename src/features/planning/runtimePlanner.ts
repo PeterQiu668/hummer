@@ -5,6 +5,7 @@ import type { RuntimeAdapter, RuntimeEvent, RuntimeHandle, RuntimeResultEvent } 
 import { planIdForInput, RUNTIME_PLAN_LABEL, type PlanRequest, type Planner } from './planner';
 import { policyDerivedHumanGates } from './policyGates';
 import { TemplatePlanner } from './templatePlanner';
+import { implementedCapabilityIds, validatePlanCapabilities } from '../tools/capabilityCatalog';
 
 interface RuntimePlanPayload {
   understanding: string[];
@@ -51,7 +52,7 @@ export class RuntimePlanner implements Planner {
       if (handle.runtimeId.startsWith('mock')) throw new Error('真实规划运行时不可用，已回落演示运行时');
       const result = await waitForPlanningResult(this.options.runtime, handle, this.options.timeoutMs ?? 120_000);
       const payload = parseRuntimePlan(result.summary);
-      const tools = [...payload.tools];
+      const tools = validatePlanCapabilities(payload.tools);
       const planId = planIdForInput(request.input);
       const humanGates = await policyDerivedHumanGates(request.input, tools, this.options.policy);
       const assignees = request.assignee && request.assignee !== '自动推荐' ? [request.assignee] : payload.assignees;
@@ -146,7 +147,7 @@ function makePlanningTurn(request: PlanRequest): SessionPlan {
       'You are HUMMER planning only. Do not call tools, read files, run commands, or change external state.',
       'Return exactly one JSON object with no Markdown or commentary.',
       `Required schema: ${schema}`,
-      'Use 2-6 concrete, task-specific understanding steps. Use canonical dot-separated action ids in tools.',
+      `Use 2-6 concrete, task-specific understanding steps. tools may contain only: ${implementedCapabilityIds().join(', ')}.`,
       'humanGates is required for schema compatibility but HUMMER will ignore it and derive gates from enterprise policy.',
       `User task: ${input}`,
       `Requested assignee: ${request.assignee ?? '自动推荐'}`,

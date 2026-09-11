@@ -18,6 +18,7 @@ describe('OutcomeLedgerStore', () => {
     const persistence = openPersistence({ dataDirectory: tmpDir(), now: () => new Date('2026-09-02T10:00:00.000Z') });
     const owner = persistence.identity.createCompany({ companyName: '鲲鹏智造', displayName: '昆仑', email: 'kunlun@example.test' });
     persistence.approvalPolicies.ensureDefaults(owner.tenant.id, `account:${owner.account.id}`);
+    persistence.tools.ensureDefaults(owner.tenant.id, `account:${owner.account.id}`);
 
     const sessionId = 'ses_outreach_review_001';
     const approvalId = 'apr_outreach_review_001';
@@ -61,6 +62,26 @@ describe('OutcomeLedgerStore', () => {
       totalCostCny: cost.costCny,
       entryCount: 1,
     });
+    const toolEvidence = persistence.evidence.put(Buffer.from('customer facts'), {
+      tenantId: owner.tenant.id,
+      sessionId,
+      mediaType: 'text/plain',
+      name: 'customer.txt',
+      createdAt: '2026-09-02T09:57:00.000Z',
+    });
+    const toolInvocation = persistence.tools.recordInvocation({
+      tenantId: owner.tenant.id,
+      sessionId,
+      capabilityId: 'fs.read',
+      actorRef: 'employee:sales-writer',
+      status: 'completed',
+      args: { path: 'customer.txt' },
+      result: { sizeBytes: 14 },
+      durationMs: 18,
+      evidenceRefs: [toolEvidence.ref],
+      occurredAt: '2026-09-02T09:57:01.000Z',
+      idempotencyKey: 'outcome-tool-001',
+    });
 
     const receipt = persistence.buildOutcomeReceipt(owner.tenant.id, outcome.id, { DEEPSEEK_API_KEY: 'sk-super-secret-value' });
     expect(receipt.outcome.id).toBe(outcome.id);
@@ -69,6 +90,12 @@ describe('OutcomeLedgerStore', () => {
     expect(receipt.approval).not.toBeNull();
     expect(receipt.approval?.status).toBe('approved');
     expect(receipt.approval?.approverActorRef).toBe(`account:${owner.account.id}`);
+    expect(receipt.tools).toEqual([expect.objectContaining({
+      id: toolInvocation.id,
+      capabilityId: 'fs.read',
+      durationMs: 18,
+      evidenceRefs: [toolEvidence.ref],
+    })]);
     expect(receipt.chainIntegrity).toEqual(expect.objectContaining({ valid: true }));
     // The receipt must never leak a raw secret even if it happened to be present in a stored field.
     expect(receipt.receiptJson).not.toContain('sk-super-secret-value');

@@ -6,6 +6,12 @@ export function approvalResult(approved: boolean): { decision: 'accept' | 'decli
   return { decision: approved ? 'accept' : 'decline' };
 }
 
+export function mcpElicitationResult(approved: boolean):
+  | { action: 'accept'; content: Record<string, never> }
+  | { action: 'decline'; content: null } {
+  return approved ? { action: 'accept', content: {} } : { action: 'decline', content: null };
+}
+
 export interface ScopedApprovalRequest {
   approvalId: string;
   requestId: string | number;

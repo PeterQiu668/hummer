@@ -19,7 +19,7 @@ const DELETE_TASK: PlanRequest = {
 const runtimePayload = {
   understanding: ['确认客户资料的边界和保留要求', '列出待删除记录并生成可复核清单', '等待指定责任人批准后才允许删除'],
   assignees: ['数据治理助理'],
-  tools: ['data.delete.records', 'file.write.audit-report'],
+  tools: ['fs.read'],
   workspaceScope: '客户资料目录，先只读生成删除清单',
   humanGates: ['模型自己声称的关口不应被采信'],
   estimate: '约 6 分钟',
@@ -97,6 +97,23 @@ describe('RuntimePlanner', () => {
     expect(plan.planning?.label).toBe('演示计划 · 未经模型生成');
     expect(plan.planning?.fallbackReason).toMatch(/schema/i);
     expect(recordCost).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the model names an unimplemented capability', async () => {
+    const planner = new RuntimePlanner({
+      runtime: new ScriptedRuntime({ ...runtimePayload, tools: ['desktop.excel.open'] }),
+      policy: policyPort(),
+      timeoutMs: 100,
+    });
+
+    const plan = await planner.draft(DELETE_TASK);
+
+    expect(plan.planning).toEqual(expect.objectContaining({
+      source: 'template',
+      fallbackReason: expect.stringMatching(/unimplemented capability desktop\.excel\.open/i),
+    }));
+    expect(plan.tools).toEqual(['fs.read', 'external.send.draft']);
+    expect(plan.tools).not.toContain('desktop.excel.open');
   });
 
   it('keeps a valid real plan but replaces an unpriced-model exception with a product-safe cost message', async () => {

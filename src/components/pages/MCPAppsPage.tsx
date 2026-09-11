@@ -17,6 +17,7 @@ import {
 import WorkspacePage from './WorkspacePage';
 import { useAppStore } from '../../store/useAppStore';
 import { desktopRuntimeConnectorPort, type RuntimeConnectorRecord } from '../../features/connectors/runtimeConnectorClient';
+import { desktopToolRegistryPort, type ToolDefinitionRecord } from '../../features/tools/toolRegistryClient';
 
 type CapabilityTab = 'apps' | 'experts' | 'skills' | 'knowledge' | 'models';
 
@@ -58,6 +59,8 @@ export default function MCPAppsPage() {
   const [tab, setTab] = useState<CapabilityTab>('apps');
   const [query, setQuery] = useState('');
   const [runtimeConnectors, setRuntimeConnectors] = useState<RuntimeConnectorRecord[]>([]);
+  const [toolDefinitions, setToolDefinitions] = useState<ToolDefinitionRecord[]>([]);
+  const [verifyingTool, setVerifyingTool] = useState(false);
   const mcpApps = useAppStore((state) => state.mcpApps);
   const installedSkills = useAppStore((state) => state.installedSkills);
   const installSkill = useAppStore((state) => state.installSkill);
@@ -65,6 +68,7 @@ export default function MCPAppsPage() {
   const settings = useAppStore((state) => state.personalSettings);
   const updateSettings = useAppStore((state) => state.updatePersonalSettings);
   const connectorPort = desktopRuntimeConnectorPort();
+  const toolRegistry = useMemo(() => desktopToolRegistryPort(), []);
   const connectedCount = runtimeConnectors.filter((connector) => connector.status === 'connected').length;
 
   useEffect(() => {
@@ -78,9 +82,26 @@ export default function MCPAppsPage() {
     };
   }, [connectorPort]);
 
+  useEffect(() => {
+    let active = true;
+    if (toolRegistry) void toolRegistry.list().then((records) => { if (active) setToolDefinitions(records); });
+    return () => { active = false; };
+  }, [toolRegistry]);
+
+  const verifyLocalMcp = async () => {
+    if (!toolRegistry || verifyingTool) return;
+    setVerifyingTool(true);
+    try {
+      const verified = await toolRegistry.verifyLocalMcp();
+      setToolDefinitions((current) => [...current.filter((tool) => tool.id !== verified.id), verified].sort((left, right) => left.capabilityId.localeCompare(right.capabilityId)));
+    } finally {
+      setVerifyingTool(false);
+    }
+  };
+
   return <WorkspacePage title="能力与连接" sub="把专家经验、可复用技能、企业知识、模型和日常工作应用装进团队。" actions={<span className={`hum-chip ${connectedCount ? 'is-success' : 'is-muted'}`}><Check size={11} /> {connectedCount ? `${connectedCount} 个运行连接已验证` : '尚无已验证连接'}</span>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{tabs.map((item) => { const Icon = item.icon; return <button type="button" key={item.key} onClick={() => setTab(item.key)} className={`hum-btn is-sm ${tab === item.key ? 'is-primary' : ''}`}><Icon size={12} /> {item.label}</button>; })}</div><div className="relative w-full sm:w-64"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索能力与连接" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索专家、技能或应用" className="hum-input pl-7" /></div></div>}>
     <div className="mx-auto max-w-[1280px] p-5">
-      {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} connectors={runtimeConnectors} hostAvailable={Boolean(connectorPort)} />}
+      {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} connectors={runtimeConnectors} tools={toolDefinitions} hostAvailable={Boolean(connectorPort && toolRegistry)} verifyingTool={verifyingTool} onVerifyLocalMcp={verifyLocalMcp} />}
       {tab === 'experts' && <ExpertsPanel query={query} />}
       {tab === 'skills' && <SkillsPanel query={query} installed={installedSkills} onInstall={installSkill} onToggle={toggleSkill} />}
       {tab === 'knowledge' && <KnowledgePanel query={query} />}
@@ -89,7 +110,7 @@ export default function MCPAppsPage() {
   </WorkspacePage>;
 }
 
-function AppsPanel({ query, apps, connectors, hostAvailable }: { query: string; apps: Record<string, { id: string; name: string; kind: string }>; connectors: RuntimeConnectorRecord[]; hostAvailable: boolean }) {
+function AppsPanel({ query, apps, connectors, tools, hostAvailable, verifyingTool, onVerifyLocalMcp }: { query: string; apps: Record<string, { id: string; name: string; kind: string }>; connectors: RuntimeConnectorRecord[]; tools: ToolDefinitionRecord[]; hostAvailable: boolean; verifyingTool: boolean; onVerifyLocalMcp: () => Promise<void> }) {
   const items = featuredAppIds.map((id) => apps[id]).filter(Boolean).filter((app) => matches(query, `${app.name} ${app.kind}`));
   const visibleConnectors = connectors.filter((connector) => matches(query, `${connectorDisplayName(connector)} ${connector.technicalName} ${connector.runtimeId}`));
   const verified = connectors.filter((connector) => connector.status === 'connected').length;
@@ -98,6 +119,13 @@ function AppsPanel({ query, apps, connectors, hostAvailable }: { query: string; 
       <Summary icon={<Link2 size={15} />} label="已验证连接" value={`${verified} 个`} detail={hostAvailable ? '来自桌面运行时的实际握手' : '浏览器原型未连接桌面宿主'} />
       <Summary icon={<ShieldCheck size={15} />} label="需要我确认" value="3 类操作" detail="外发、写回和权限变化" />
       <Summary icon={<BriefcaseBusiness size={15} />} label="可接入范围" value="销售 · 交付 · 研发" detail="未验证的应用不会显示为已连接" />
+    </section>
+    <section>
+      <SectionTitle icon={<Wrench size={15} />} title="可执行能力" detail="能力来自租户工具注册表；握手成功前不会显示为已验证。" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{tools.map((tool) => <div key={tool.id} className="hum-card flex min-h-[126px] flex-col p-4">
+        <div className="flex items-start gap-3"><AppMark name={tool.displayName} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{tool.displayName}</div><div className="mt-0.5 font-mono text-[10.5px] text-neutral-500">{tool.capabilityId} · {tool.transport.toUpperCase()}</div></div><span className={`hum-chip ${tool.status === 'verified' ? 'is-success' : 'is-muted'}`}>{tool.status === 'verified' ? '已验证连接' : '待接入'}</span></div>
+        <div className="mt-auto flex items-end gap-3 pt-3"><div className="min-w-0 flex-1 text-[10.5px] text-neutral-500">风险：{tool.riskLevel} · 策略：{tool.policyActionPattern}</div>{tool.transport === 'mcp' && tool.status !== 'verified' && <button type="button" disabled={!hostAvailable || verifyingTool} onClick={() => { void onVerifyLocalMcp(); }} className="hum-btn is-sm is-primary">{verifyingTool ? '正在验证' : '验证连接'}</button>}</div>
+      </div>)}</div>
     </section>
     <section>
       <SectionTitle icon={<Link2 size={15} />} title="运行连接" detail="这里只显示桌面执行内核实际观察到的 MCP 握手状态，技术名称保留用于安全审计。" />

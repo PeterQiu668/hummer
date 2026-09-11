@@ -10,6 +10,9 @@ export type { DomainEventInput, IntegrityResult, StoredDomainEvent } from './dom
 export type { EncryptedEngineCredential, EngineCredentialStatus } from './engine-credential-store.js';
 export type { DigitalEmployeeRecord, HireDigitalEmployeeInput } from './organization-store.js';
 export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
+export type { ControlledWriteInput, ControlledWriteResult } from './controlled-write-store.js';
+export type { ExternalSendDraftInput } from './builtin-tool-executor.js';
+export type { ToolDefinitionRecord, ToolInvocationRecord, RecordToolInvocationInput } from './tool-registry-store.js';
 export type {
   AccountRecord,
   AuthSessionRecord,

@@ -1,4 +1,5 @@
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { app, ipcMain, safeStorage } from 'electron';
 import { CredentialVault } from './credential-vault.js';
 import { customerEngineProfiles, engineProfileById, listEngineProfiles } from './engine-profiles.js';
@@ -15,6 +16,8 @@ import {
 import type { AuthorizeApprovalInput } from './persistence/approval-policy-store.js';
 import type { JsonValue } from './persistence/canonical-json.js';
 import type { PersistableRuntimeEvent } from './persistence/runtime-event-store.js';
+import type { RuntimeConnectorRecord } from './mcp-connector-registry.js';
+import { probeLocalMcp } from './mcp-connection-probe.js';
 
 interface SessionRecordRequest {
   token: string;
@@ -32,6 +35,8 @@ interface AcceptInvitationRequest { token: string; displayName: string; email?: 
 export interface PersistenceHostRegistration {
   databasePath: string;
   resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
+  recordMcpConnectorStatus(token: string, record: RuntimeConnectorRecord): void;
+  authorizeMcpTool(token: string, request: { serverName: string; toolName: string }): boolean;
   close(): void;
 }
 export interface PersistenceHostOptions {
@@ -60,6 +65,7 @@ const CHANNELS = [
   'hummer:approval-policy:preview',
   'hummer:approval-policy:authorize',
   'hummer:approval-policy:evidence',
+  'hummer:controlled-write:write',
   'hummer:execution-nodes:list',
   'hummer:execution-nodes:kill-all',
   'hummer:outcomes:define',
@@ -72,6 +78,9 @@ const CHANNELS = [
   'hummer:engine-profiles:list',
   'hummer:engine-credentials:configure',
   'hummer:engine-credentials:remove',
+  'hummer:tools:list',
+  'hummer:tools:verify-local-mcp',
+  'hummer:tools:create-external-draft',
 ] as const;
 
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
@@ -109,6 +118,50 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     credentialVault.remove(tenantId, profile.id);
     return { engineProfileId: profile.id, envKey: profile.envKey, configured: false };
   });
+  ipcMain.handle('hummer:tools:list', (_event, token: string) => {
+    const context = persistence.identity.resumeSession(token);
+    persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
+    return persistence.tools.listDefinitions(context.tenant.id);
+  });
+  ipcMain.handle('hummer:tools:verify-local-mcp', async (_event, token: string) => {
+    const context = persistence.identity.resumeSession(token);
+    const actorRef = `account:${context.account.id}`;
+    persistence.tools.ensureDefaults(context.tenant.id, actorRef);
+    const occurredAt = new Date().toISOString();
+    try {
+      await probeLocalMcp({
+        executable: process.execPath,
+        serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
+        workspace: workspaceDirectory,
+      });
+      return persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id, capabilityId: 'fs.read', connected: true, actorRef, occurredAt, error: null,
+      });
+    } catch (error) {
+      persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id, capabilityId: 'fs.read', connected: false, actorRef, occurredAt,
+        error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      });
+      throw error;
+    }
+  });
+  ipcMain.handle('hummer:tools:create-external-draft', (_event, request: Authenticated<{
+    sessionId: string;
+    approvalId: string;
+    requestedBy: string;
+    relativePath: string;
+    content: string;
+    occurredAt: string;
+    idempotencyKey: string;
+  }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
+    return persistence.builtinTools.createExternalSendDraft({
+      ...request.input,
+      tenantId: context.tenant.id,
+      workspaceDirectory,
+    });
+  });
 
   ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
   ipcMain.handle('hummer:identity:accept-invitation', (_event, input: AcceptInvitationRequest) => persistence.identity.acceptInvitation(input));
@@ -130,6 +183,23 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       correlationId: `corr_${descriptor.sessionId}`,
       workOrderId: descriptor.workOrderId,
     });
+    persistence.tools.ensureDefaults(descriptor.tenantId, 'system:desktop-host');
+    if (persisted.type === 'tool' && typeof persisted.tool === 'string') {
+      const registered = persistence.tools.listDefinitions(descriptor.tenantId).some((tool) => tool.capabilityId === persisted.tool);
+      if (registered) persistence.tools.recordInvocation({
+        tenantId: descriptor.tenantId,
+        sessionId: persisted.sessionId,
+        capabilityId: persisted.tool,
+        actorRef: persisted.actorRef,
+        status: persisted.status === 'completed' ? 'completed' : persisted.status === 'blocked' ? 'failed' : 'declined',
+        args: (persisted.args ?? {}) as JsonValue,
+        result: (persisted.result ?? '') as JsonValue,
+        durationMs: typeof persisted.durationMs === 'number' ? persisted.durationMs : null,
+        evidenceRefs: persisted.evidenceRefs,
+        occurredAt: persisted.occurredAt,
+        idempotencyKey: `${persisted.sessionId}:${persisted.sequence}:${persisted.tool}`,
+      });
+    }
     return persisted;
   });
   ipcMain.handle('hummer:persistence:verify-integrity', (_event, token: string) => {
@@ -207,13 +277,20 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     const approver = evidence.approverActorRef ? persistence.identity.resolveActor(request.token, evidence.approverActorRef) : undefined;
     const decisionActor = evidence.decisionActorRef ? persistence.identity.resolveActor(request.token, evidence.decisionActorRef) : undefined;
     return { ...evidence, approverDisplayName: approver?.displayName ?? null, decisionActorDisplayName: decisionActor?.displayName ?? null };
-  });  ipcMain.handle('hummer:execution-nodes:list', (_event, token: string) => {
+  });
+  ipcMain.handle('hummer:controlled-write:write', (_event, request: Authenticated<{
+    sessionId: string; approvalId: string; action: string; requestedBy: string; relativePath: string; content: string; occurredAt: string;
+  }>) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return persistence.controlledWrites.write({ ...request.input, tenantId, workspaceDirectory });
+  });
+  ipcMain.handle('hummer:execution-nodes:list', (_event, token: string) => {
     const tenantId = persistence.identity.currentTenantId(token);
     const nodeId = `node_local_${tenantId.replace(/^tenant_/, '').slice(0, 12)}`;
     persistence.executionNodes.registerLocal({
       id: nodeId, tenantId, displayName: process.env.COMPUTERNAME ?? '本地执行节点', runtimeId,
       cwd: workspaceDirectory,
-      permissionScope: `${process.env.HUMMER_CODEX_SANDBOX ?? 'workspace-write'}; approval-required`,
+      permissionScope: 'read-only runtime; controlled-write approval-required',
       lastSeenAt: new Date().toISOString(),
     });
     nodeIds.add(nodeId);
@@ -274,6 +351,27 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     resolveEngineCredential: (token, engineProfileId, envKey) => {
       const tenantId = persistence.identity.currentTenantId(token);
       return credentialVault.resolve(tenantId, engineProfileId, envKey) ?? process.env[envKey];
+    },
+    recordMcpConnectorStatus: (token, record) => {
+      const context = persistence.identity.resumeSession(token);
+      persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
+      if (record.technicalName !== 'hummer_local') return;
+      persistence.tools.recordConnectionStatus({
+        tenantId: context.tenant.id,
+        capabilityId: 'fs.read',
+        connected: record.status === 'connected',
+        actorRef: 'system:codex-host',
+        occurredAt: record.checkedAt,
+        error: record.error,
+      });
+    },
+    authorizeMcpTool: (token, request) => {
+      const context = persistence.identity.resumeSession(token);
+      persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
+      if (request.serverName !== 'hummer_local' || request.toolName !== 'fs_read') return false;
+      const definition = persistence.tools.listDefinitions(context.tenant.id)
+        .find((candidate) => candidate.capabilityId === 'fs.read');
+      return definition?.status === 'verified' && definition.riskLevel === 'low';
     },
     close: () => {
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));

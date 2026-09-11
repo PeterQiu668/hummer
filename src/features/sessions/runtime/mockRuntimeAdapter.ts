@@ -238,7 +238,7 @@ function buildInitialScript(plan: SessionPlan): RuntimeEventDraft[] {
       status: 'completed',
       actorRef,
       title: plan.understanding[1] ?? '按计划处理合成资料',
-      tool: plan.tools.some((tool) => tool.includes('浏览器')) ? 'browser.research' : 'document.analyze',
+      tool: /核验|浏览器|桌面/i.test(plan.prompt) ? 'browser.research' : 'document.analyze',
       args: { synthetic: true, scope: plan.workspaceScope },
       result: '完成第一轮处理，已形成可复核的中间结果。',
       output: 'fixture://workspace/working-draft.md',

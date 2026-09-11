@@ -435,6 +435,51 @@ export const migrations: readonly Migration[] = [
         ON engine_credentials (tenant_id, engine_profile_id);
     `,
   },
+  {
+    version: 7,
+    name: 'm5d_tool_registry',
+    sql: `
+      CREATE TABLE tool_definitions (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        capability_id TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        transport TEXT NOT NULL CHECK (transport IN ('mcp', 'builtin')),
+        risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+        policy_action_pattern TEXT NOT NULL,
+        endpoint_config_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'verified', 'disabled')),
+        verified_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, capability_id)
+      );
+
+      CREATE INDEX tool_definitions_tenant
+        ON tool_definitions (tenant_id, status, capability_id);
+
+      CREATE TABLE tool_invocations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        tool_definition_id TEXT NOT NULL,
+        capability_id TEXT NOT NULL,
+        actor_ref TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('completed', 'failed', 'declined')),
+        args_json TEXT NOT NULL,
+        result_json TEXT NOT NULL,
+        duration_ms REAL,
+        evidence_refs_json TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (tool_definition_id) REFERENCES tool_definitions(id)
+      );
+
+      CREATE INDEX tool_invocations_session
+        ON tool_invocations (tenant_id, session_id, occurred_at);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

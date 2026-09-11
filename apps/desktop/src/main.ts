@@ -38,7 +38,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('hummer:environment:check', () => inspectRuntimeEnvironment());
   ipcMain.handle('hummer:environment:install-guide', () => shell.openExternal('https://www.npmjs.com/package/@openai/codex'));
   persistenceHost = registerPersistenceHost({ stopAll: async () => (await stopAllCodexRuns()) + stopAllClaudeRuns() });
-  registerCodexHost({ resolveCredential: persistenceHost.resolveEngineCredential });
+  registerCodexHost({
+    resolveCredential: persistenceHost.resolveEngineCredential,
+    recordMcpConnectorStatus: persistenceHost.recordMcpConnectorStatus,
+    authorizeMcpTool: persistenceHost.authorizeMcpTool,
+  });
   registerClaudeHost();
   await createWindow();
   app.on('activate', async () => {

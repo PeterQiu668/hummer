@@ -1,6 +1,8 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ApprovalPolicyStore } from './approval-policy-store.js';
+import { BuiltinToolExecutor } from './builtin-tool-executor.js';
+import { ControlledWriteStore } from './controlled-write-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
 import { EngineCredentialStore } from './engine-credential-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
@@ -12,6 +14,7 @@ import { OutcomeLedgerStore } from './outcome-ledger-store.js';
 import { assembleOutcomeReceipt, type OutcomeReceipt } from './outcome-receipt.js';
 import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
+import { ToolRegistryStore } from './tool-registry-store.js';
 import { createVerifiableReceipt, type VerifiableOutcomeReceipt } from './verifiable-receipt.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
 
@@ -98,11 +101,14 @@ export class DesktopPersistence {
   private readonly domainEvents: DomainEventStore;
   readonly organization: OrganizationStore;
   readonly approvalPolicies: ApprovalPolicyStore;
+  readonly controlledWrites: ControlledWriteStore;
+  readonly builtinTools: BuiltinToolExecutor;
   readonly executionNodes: ExecutionNodeStore;
   readonly engineCredentials: EngineCredentialStore;
   readonly identity: IdentityStore;
   readonly projects: ProjectStore;
   readonly outcomes: OutcomeLedgerStore;
+  readonly tools: ToolRegistryStore;
 
   constructor(
     private readonly database: SqliteDatabase,
@@ -116,11 +122,14 @@ export class DesktopPersistence {
     this.evidence = new EvidenceStore(database, dataDirectory);
     this.organization = new OrganizationStore(database);
     this.approvalPolicies = new ApprovalPolicyStore(database);
+    this.controlledWrites = new ControlledWriteStore(database, this.approvalPolicies, this.evidence);
     this.executionNodes = new ExecutionNodeStore(database);
     this.engineCredentials = new EngineCredentialStore(database, now);
     this.identity = new IdentityStore(database, now);
     this.projects = new ProjectStore(database, now);
     this.outcomes = new OutcomeLedgerStore(database, now);
+    this.tools = new ToolRegistryStore(database);
+    this.builtinTools = new BuiltinToolExecutor(this.controlledWrites, this.tools);
   }
 
   close(): void {
@@ -169,8 +178,9 @@ export class DesktopPersistence {
     const approval = outcome.approvalId
       ? this.approvalPolicies.getEvidence(tenantId, outcome.sessionId, outcome.approvalId) ?? null
       : null;
+    const tools = this.tools.listInvocations(tenantId, outcome.sessionId);
     return assembleOutcomeReceipt({
-      tenantId, outcome, definition, costs, approval,
+      tenantId, outcome, definition, costs, tools, approval,
       chainIntegrity: this.verifyDomainEventIntegrity(),
       generatedAt: new Date().toISOString(),
       environment,

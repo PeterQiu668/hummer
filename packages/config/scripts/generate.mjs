@@ -8,6 +8,7 @@ const checkOnly = process.argv.includes('--check');
 
 const engineCatalog = await readJson(resolve(packageRoot, 'src/engine-profiles.json'));
 const runtimePricing = await readJson(resolve(packageRoot, 'src/runtime-pricing.json'));
+const toolDefinitions = await readJson(resolve(packageRoot, 'src/tool-definitions.json'));
 const publicEngineCatalog = {
   defaultProfileId: engineCatalog.defaultProfileId,
   profiles: engineCatalog.profiles
@@ -27,6 +28,8 @@ const outputs = [
   ['src/features/engines/engine-profiles.json', publicEngineCatalog],
   ['apps/desktop/src/config/deepseek-pricing.json', runtimePricing],
   ['src/features/sessions/runtime/runtime-pricing.json', runtimePricing],
+  ['apps/desktop/src/config/tool-definitions.json', toolDefinitions],
+  ['src/features/tools/tool-definitions.json', toolDefinitions],
 ];
 
 for (const [relativePath, value] of outputs) {

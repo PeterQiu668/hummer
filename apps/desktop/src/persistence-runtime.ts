@@ -25,6 +25,23 @@ export function enrichRuntimeEventEvidence(
       evidenceRefs.push(stored.ref);
     }
   }
+  if (event.type === 'tool' && event.tool === 'fs.read') {
+    const requestedPath = isRecord(event.args) && typeof event.args.path === 'string' ? event.args.path : undefined;
+    if (requestedPath) {
+      const path = resolve(workspaceDirectory, requestedPath);
+      if (isInside(workspaceDirectory, path) && existsSync(path)) {
+        const stored = persistence.evidence.put(readFileSync(path), {
+          tenantId,
+          sessionId: event.sessionId,
+          mediaType: mediaType(path),
+          name: requestedPath,
+          createdAt: event.occurredAt,
+          metadata: { source: 'tool-invocation', capabilityId: 'fs.read', relativePath: requestedPath },
+        });
+        evidenceRefs.push(stored.ref);
+      }
+    }
+  }
   if (event.type === 'result') {
     evidenceRefs.push(...persistence.listEvidence(event.sessionId).map((item) => item.ref));
   }

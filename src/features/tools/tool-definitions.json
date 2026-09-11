@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "definitions": [
+    {
+      "id": "tool_external_send_draft",
+      "capabilityId": "external.send.draft",
+      "displayName": "外发草稿",
+      "transport": "builtin",
+      "riskLevel": "high",
+      "policyActionPattern": "external.send*",
+      "enabled": true,
+      "endpoint": {
+        "handler": "controlled-write"
+      }
+    },
+    {
+      "id": "tool_fs_read",
+      "capabilityId": "fs.read",
+      "displayName": "工作区文件读取",
+      "transport": "mcp",
+      "riskLevel": "low",
+      "policyActionPattern": "fs.read",
+      "enabled": true,
+      "endpoint": {
+        "serverName": "hummer_local",
+        "toolName": "fs_read"
+      }
+    }
+  ]
+}

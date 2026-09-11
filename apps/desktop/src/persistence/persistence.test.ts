@@ -45,11 +45,12 @@ describe('desktop persistence migrations', () => {
     persistence.close();
   });
 
-  it('adds encrypted engine credentials through additive migration version 6', () => {
+  it('keeps v6 credentials and adds the v7 tool registry through an additive migration', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
 
-    expect(persistence.schemaVersion()).toBe(6);
+    expect(persistence.schemaVersion()).toBe(7);
     expect(persistence.listTables()).toContain('engine_credentials');
+    expect(persistence.listTables()).toEqual(expect.arrayContaining(['tool_definitions', 'tool_invocations']));
     persistence.close();
   });
 

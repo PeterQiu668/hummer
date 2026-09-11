@@ -3,6 +3,7 @@ import { canonicalJson } from './canonical-json.js';
 import type { ApprovalEvidence } from './approval-policy-store.js';
 import type { CostLedgerRecord, OutcomeDefinitionRecord, OutcomeEventRecord } from './outcome-ledger-store.js';
 import type { IntegrityResult } from './domain-event-store.js';
+import type { ToolInvocationRecord } from './tool-registry-store.js';
 
 export interface OutcomeReceipt {
   generatedAt: string;
@@ -10,6 +11,7 @@ export interface OutcomeReceipt {
   outcome: OutcomeEventRecord;
   definition: OutcomeDefinitionRecord;
   costs: CostLedgerRecord[];
+  tools: ToolInvocationRecord[];
   totalCostCny: number;
   approval: ApprovalEvidence | null;
   chainIntegrity: IntegrityResult;
@@ -22,6 +24,7 @@ export interface AssembleOutcomeReceiptInput {
   outcome: OutcomeEventRecord;
   definition: OutcomeDefinitionRecord;
   costs: CostLedgerRecord[];
+  tools: ToolInvocationRecord[];
   approval: ApprovalEvidence | null;
   chainIntegrity: IntegrityResult;
   generatedAt: string;
@@ -45,6 +48,7 @@ export function assembleOutcomeReceipt(input: AssembleOutcomeReceiptInput): Outc
     outcome: input.outcome,
     definition: input.definition,
     costs: input.costs,
+    tools: input.tools,
     totalCostCny,
     approval: input.approval,
     chainIntegrity: input.chainIntegrity,

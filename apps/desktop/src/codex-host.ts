@@ -2,15 +2,17 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
-import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
-import { approvalResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
+import { fileURLToPath } from 'node:url';
+import { app, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
+import { approvalResult, mcpElicitationResult, scopeAppServerApproval, textInput, translateAppServerMessage } from './app-server-protocol.js';
 import { ApprovalContinuationWatchdog } from './approval-watchdog.js';
 import { buildCodexProviderArgs, engineProfileById, redactRuntimeSecrets, requiredCodexCliVersion } from './engine-profiles.js';
 import { JsonLineDecoder } from './jsonl.js';
 import { TextLineDecoder, WireLog } from './wire-log.js';
-import { listRuntimeConnectors, recordMcpStartupStatus } from './mcp-connector-registry.js';
+import { listRuntimeConnectors, recordMcpStartupStatus, type RuntimeConnectorRecord } from './mcp-connector-registry.js';
 import { buildRuntimeEnvironment } from './runtime-credential-environment.js';
 import { replaceSandboxArgument, resolveCodexSandbox } from './codex-sandbox.js';
+import { buildHummerMcpProviderArgs } from './hummer-mcp-config.js';
 
 const START = 'hummer:codex:start';
 const REPLAY = 'hummer:codex:replay';
@@ -60,6 +62,7 @@ interface RunState {
   requestSequence: number;
   pending: Map<string, PendingRequest>;
   approvalRequests: Map<string, string | number>;
+  activeMcpTools: Map<string, { serverName: string; toolName: string }>;
   approvalWatchdog: ApprovalContinuationWatchdog;
   threadId?: string;
   invocation: Invocation;
@@ -73,6 +76,8 @@ let verifiedCodexExecutable: string | undefined;
 
 export interface CodexHostOptions {
   resolveCredential?: (token: string, engineProfileId: string, envKey: string) => string | undefined;
+  recordMcpConnectorStatus?: (token: string, record: RuntimeConnectorRecord) => void;
+  authorizeMcpTool?: (token: string, request: { serverName: string; toolName: string }) => boolean;
 }
 
 let hostOptions: CodexHostOptions = {};
@@ -109,8 +114,13 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
   });
   const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
+  const mcpArgs = buildHummerMcpProviderArgs({
+    executable: process.execPath,
+    serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
+    workspace: effectiveRequest.cwd ?? process.cwd(),
+  });
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, [...providerArgs, ...effectiveRequest.args], {
+  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...effectiveRequest.args], {
     cwd: effectiveRequest.cwd,
     env: runtimeEnvironment,
     windowsHide: true,
@@ -136,6 +146,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     requestSequence: 0,
     pending: new Map(),
     approvalRequests: new Map(),
+    activeMcpTools: new Map(),
     approvalWatchdog,
     invocation: effectiveRequest,
     turnActive: false,
@@ -150,7 +161,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
 
   try {
     await requestRpc(state, 'initialize', {
-      clientInfo: { name: 'hummer-desktop', title: 'HUMMER Desktop', version: '0.0.0' },
+      clientInfo: { name: 'hummer-desktop', title: 'HUMMER Desktop', version: app.getVersion() },
       capabilities: null,
     });
     notify(state, 'initialized');
@@ -205,8 +216,13 @@ async function forkCodex(
     resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
   });
   const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
+  const mcpArgs = buildHummerMcpProviderArgs({
+    executable: process.execPath,
+    serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
+    workspace: request.cwd ?? process.cwd(),
+  });
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, [...providerArgs, ...request.args], {
+  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...request.args], {
     cwd: request.cwd,
     env: runtimeEnvironment,
     windowsHide: true,
@@ -232,6 +248,7 @@ async function forkCodex(
     requestSequence: 0,
     pending: new Map(),
     approvalRequests: new Map(),
+    activeMcpTools: new Map(),
     approvalWatchdog,
     invocation: request,
     turnActive: false,
@@ -241,7 +258,7 @@ async function forkCodex(
 
   try {
     await requestRpc(state, 'initialize', {
-      clientInfo: { name: 'hummer-desktop', title: 'HUMMER Desktop', version: '0.0.0' },
+      clientInfo: { name: 'hummer-desktop', title: 'HUMMER Desktop', version: app.getVersion() },
       capabilities: null,
     });
     notify(state, 'initialized');
@@ -319,6 +336,9 @@ function handleNativeMessage(state: RunState, message: unknown): void {
   if (connector && !state.owner.isDestroyed()) {
     state.owner.send(CONNECTORS_CHANGED, listRuntimeConnectors());
   }
+  if (connector && state.invocation.authToken) {
+    hostOptions.recordMcpConnectorStatus?.(state.invocation.authToken, connector);
+  }
   if (state.protocol === 'exec-jsonl') {
     publish(state, message);
     return;
@@ -337,6 +357,11 @@ function handleNativeMessage(state: RunState, message: unknown): void {
   }
 
   const method = typeof message.method === 'string' ? message.method : '';
+  rememberMcpToolCall(state, message);
+  if (method === 'mcpServer/elicitation/request') {
+    respondToMcpElicitation(state, message);
+    return;
+  }
   const approval = scopeAppServerApproval(message, state.threadId ?? state.processId);
   if (approval) {
     state.approvalRequests.set(approval.approvalId, approval.requestId);
@@ -348,6 +373,37 @@ function handleNativeMessage(state: RunState, message: unknown): void {
   }
   if (method === 'turn/completed') state.turnActive = false;
   translateAppServerMessage(message).forEach((translated) => publish(state, translated));
+}
+
+function rememberMcpToolCall(state: RunState, message: Record<string, unknown>): void {
+  if (message.method !== 'item/started') return;
+  const params = isRecord(message.params) ? message.params : {};
+  const item = isRecord(params.item) ? params.item : {};
+  if (item.type !== 'mcpToolCall') return;
+  const turnId = typeof params.turnId === 'string' ? params.turnId : state.turnId;
+  if (!turnId || typeof item.server !== 'string' || typeof item.tool !== 'string') return;
+  state.activeMcpTools.set(turnId, { serverName: item.server, toolName: item.tool });
+}
+
+function respondToMcpElicitation(state: RunState, message: Record<string, unknown>): void {
+  if (message.id === undefined || (typeof message.id !== 'string' && typeof message.id !== 'number')) return;
+  const params = isRecord(message.params) ? message.params : {};
+  const meta = isRecord(params._meta) ? params._meta : {};
+  const turnId = typeof params.turnId === 'string' ? params.turnId : state.turnId;
+  const activeTool = turnId ? state.activeMcpTools.get(turnId) : undefined;
+  const isToolApproval = meta.codex_approval_kind === 'mcp_tool_call';
+  const token = state.invocation.authToken;
+  const approved = Boolean(
+    isToolApproval
+    && token
+    && activeTool
+    && activeTool.serverName === params.serverName
+    && hostOptions.authorizeMcpTool?.(token, activeTool),
+  );
+  writeJson(state, { id: message.id, result: mcpElicitationResult(approved) });
+  if (!approved) {
+    publishStderr(state, `MCP tool request declined by HUMMER policy: ${activeTool?.serverName ?? 'unknown'}/${activeTool?.toolName ?? 'unknown'}`);
+  }
 }
 
 function requestRpc(state: RunState, method: string, params: Record<string, unknown>): Promise<unknown> {

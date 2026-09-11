@@ -96,7 +96,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
     plan: {
       understanding: ['读取并整理本周线索', '核验客户信息与关键联系人', '按客户分层规则排优先级', '生成 CRM 写回差异，提交前请你确认'],
       assignees: ['雪·销售官', '璇·数据官'],
-      tools: ['受控浏览器', '表格', 'CRM（合成只读）'],
+      tools: ['fs.read', 'external.send.draft'],
       workspaceScope: '合成工作区 / GTM-2026Q3（可读写）',
       humanGates: ['写回 CRM 之前'],
       estimate: '约 8 分钟 · ¥3 以内',
@@ -107,7 +107,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
     plan: {
       understanding: ['明确竞对与比较维度', '读取合成资料并核验公开信息', '形成逐项对比与差异判断', '交付带证据的对比报告'],
       assignees: ['岚·分析官'],
-      tools: ['受控浏览器', '文档', '证据采集'],
+      tools: ['fs.read'],
       workspaceScope: '合成工作区 / Market-Research（只读）',
       humanGates: ['采用外部结论之前'],
       estimate: '约 12 分钟 · ¥4 以内',
@@ -118,7 +118,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
     plan: {
       understanding: ['读取待审合同副本', '提取付款、交付与责任条款', '标记偏离标准模板的风险', '交付关键条款清单与复核建议'],
       assignees: ['苓·法务官'],
-      tools: ['文档解析', '条款比对', '风险规则'],
+      tools: ['fs.read'],
       workspaceScope: '合成工作区 / Contracts（只读）',
       humanGates: ['形成对外法律意见之前'],
       estimate: '约 10 分钟 · ¥3 以内',
@@ -129,7 +129,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
     plan: {
       understanding: ['汇总上周经营与任务数据', '定位目标与结果偏差', '提炼有效动作和坏例', '交付一页复盘与下周建议'],
       assignees: ['璇·数据官'],
-      tools: ['表格', '文档', '指标分析'],
+      tools: ['fs.read'],
       workspaceScope: '合成工作区 / Weekly-Review（只读）',
       humanGates: ['发布复盘结论之前'],
       estimate: '约 7 分钟 · ¥2 以内',
@@ -140,7 +140,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
     plan: {
       understanding: ['读取岗位要求与候选资料', '按统一标准提取能力证据', '形成候选人比较清单', '交付面试建议但不代替真人决定'],
       assignees: ['澄·招聘官'],
-      tools: ['文档解析', '候选人矩阵', '面试题库'],
+      tools: ['fs.read'],
       workspaceScope: '合成工作区 / Hiring（只读）',
       humanGates: ['联系候选人或改变状态之前'],
       estimate: '约 9 分钟 · ¥3 以内',
@@ -151,7 +151,7 @@ const PLAN_TEMPLATES: Array<{ match: RegExp; plan: PlanTemplate }> = [
 const FALLBACK_PLAN: PlanTemplate = {
   understanding: ['确认目标与可验收结果', '读取本次授权范围内的合成资料', '执行任务并记录完整证据', '交付结果，涉及外部变化时先请你确认'],
   assignees: ['自动推荐数字员工'],
-  tools: ['受控工作区', '文档'],
+  tools: ['fs.read'],
   workspaceScope: '本次会话合成工作区（可读写）',
   humanGates: ['任何外部写入之前'],
   estimate: '约 10 分钟 · ¥3 以内',

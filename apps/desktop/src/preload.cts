@@ -122,6 +122,16 @@ contextBridge.exposeInMainWorld('hummerExecutionNodes', {
   killAll: (token: string) => ipcRenderer.invoke('hummer:execution-nodes:kill-all', token),
 });
 
+contextBridge.exposeInMainWorld('hummerControlledWrite', {
+  write: (request: unknown) => ipcRenderer.invoke('hummer:controlled-write:write', request),
+});
+
+contextBridge.exposeInMainWorld('hummerToolRegistry', {
+  list: (token: string) => ipcRenderer.invoke('hummer:tools:list', token),
+  verifyLocalMcp: (token: string) => ipcRenderer.invoke('hummer:tools:verify-local-mcp', token),
+  createExternalSendDraft: (request: unknown) => ipcRenderer.invoke('hummer:tools:create-external-draft', request),
+});
+
 contextBridge.exposeInMainWorld('hummerOutcomes', {
   define: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:define', request),
   record: (request: unknown) => ipcRenderer.invoke('hummer:outcomes:record', request),

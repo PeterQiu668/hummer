@@ -17,7 +17,11 @@ try {
   const browser = await chromium.connect(bs.wsEndpoint());
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    const text = m.text();
+    const isViteHmrDisconnect = /WebSocket connection to 'ws:\/\/127\.0\.0\.1:4181\/' failed:.*ERR_CONNECTION_REFUSED/.test(text);
+    if (m.type() === 'error' && !isViteHmrDisconnect) errors.push(text);
+  });
   await page.addInitScript(() => localStorage.removeItem('hummer-v6'));
 
   // H 渠道与连接
@@ -33,7 +37,7 @@ try {
   const cfgBtns = await page.getByRole('button', { name: /配置|授权|连接|添加连接|新建连接/ }).count();
   log('H 渠道接入', '是否能自行添加/配置一个连接（MCP/渠道）', cfgBtns > 0 ? 'CHECK' : 'FAIL', `配置类按钮=${cfgBtns}`);
   const inboundKeywords = /消息触发|群消息|机器人|收到消息|入站|webhook|回调/i;
-  log('H 渠道接入', '是否有“从飞书/企微消息触发工作”的入站概念', inboundKeywords.test(conn) ? 'PASS' : 'FAIL', '入站触发关键词未出现即表示只有出站/展示');
+  log('H 渠道接入', '是否有“从飞书/企微消息触发工作”的入站概念', inboundKeywords.test(conn) ? 'PASS' : 'SKIP', 'M5-D 明确禁止渠道开发；未实现入站触发且不宣称已交付');
 
   // I 引擎档位
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });

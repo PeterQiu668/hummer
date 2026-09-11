@@ -61,6 +61,10 @@ try {
     const followUp = page.getByRole('textbox', { name: '在当前会话补充要求' });
     await followUp.fill('Change of plan: do not create original-summary.md. Instead read input.txt and use apply_patch to create steered-summary.md with the exact text STEER_ACCEPTED.');
     await followUp.press('Enter');
+    const approve = page.getByRole('button', { name: '\u786e\u8ba4\u66f4\u65b0' });
+    await approve.waitFor({ state: 'visible', timeout: 180_000 });
+    if (existsSync(output) || existsSync(forbidden)) throw new Error('Steer output existed before HUMMER approval');
+    await approve.click();
     await page.getByText('你补充了要求', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
     await page.getByText('任务运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 180_000 });
     if (!existsSync(output)) throw new Error('Steer did not produce steered-summary.md');
@@ -68,7 +72,7 @@ try {
     if (!readFileSync(output, 'utf8').includes('STEER_ACCEPTED')) throw new Error('Steered output did not contain the requested marker');
   } else {
     await page.getByRole('button', { name: '停止当前会话' }).click();
-    await page.getByText(/Codex turn was interrupted\./).waitFor({ state: 'visible', timeout: 60_000 });
+    await page.getByText('Codex turn was interrupted.', { exact: true }).last().waitFor({ state: 'visible', timeout: 60_000 });
     if (existsSync(output)) throw new Error('Interrupted run still produced interrupted-output.md');
   }
 

@@ -41,7 +41,10 @@
     "test:desktop:planner:deepseek": "node scripts/e2e-desktop-planner.mjs --engine-profile=deepseek-standard",
     "test:desktop:credentials": "node scripts/e2e-desktop-credentials.mjs",
     "test:desktop:packaged": "node scripts/e2e-desktop-packaged.mjs",
-    "test:desktop:wedge": "node scripts/e2e-desktop-wedge-external-send.mjs"
+    "test:desktop:wedge": "node scripts/e2e-desktop-wedge-external-send.mjs",
+    "test:desktop:write-gate": "node scripts/e2e-desktop-write-gate.mjs",
+    "test:desktop:tool-registry": "node scripts/e2e-desktop-tool-registry.mjs",
+    "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

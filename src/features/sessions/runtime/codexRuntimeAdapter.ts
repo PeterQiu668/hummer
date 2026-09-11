@@ -336,12 +336,14 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
       }];
     }
     if (itemType === 'mcp_tool_call') {
+      const server = stringValue(item.server) || 'unknown';
+      const tool = stringValue(item.tool) || 'unknown';
       return [{
         type: 'tool',
         status: stringValue(item.status) === 'failed' ? 'blocked' : 'completed',
         actorRef: 'employee:codex',
-        title: `调用 MCP 工具 ${stringValue(item.tool) || ''}`.trim(),
-        tool: `mcp.${stringValue(item.server) || 'unknown'}.${stringValue(item.tool) || 'unknown'}`,
+        title: `调用 MCP 工具 ${tool}`,
+        tool: server === 'hummer_local' && tool === 'fs_read' ? 'fs.read' : `mcp.${server}.${tool}`,
         args: isRecord(item.arguments) ? item.arguments : {},
         result: stringifyResult(item.result ?? item.error ?? item.status),
         durationMs: numberOrNull(item.duration_ms),
@@ -394,13 +396,14 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
   if (stringValue(raw.method) === 'item/commandExecution/requestApproval' && isRecord(raw.params)) {
     const params = raw.params;
     const approvalId = stringValue(params.approvalId) || String(raw.id ?? 'unknown');
+    const isFileChange = stringValue(params.kind) === 'fileChange';
     return [{
       type: 'approval_required',
       actorRef: 'employee:codex',
       approvalId,
-      title: '请求执行命令',
-      message: stringValue(params.reason) || '命令需要真人批准后才能继续。',
-      tool: 'shell.command',
+      title: isFileChange ? '请求修改工作区文件' : '请求执行命令',
+      message: stringValue(params.reason) || (isFileChange ? '文件变更需要真人批准后才能继续。' : '命令需要真人批准后才能继续。'),
+      tool: isFileChange ? 'file.write.patch' : 'shell.command',
       args: { itemId: params.itemId ?? null, kind: params.kind ?? null },
       result: '等待 HUMMER 责任人决定。',
       durationMs: null,
@@ -444,8 +447,11 @@ export function extractCodexUsage(message: unknown): RuntimeTokenUsage | undefin
   };
 }
 
-function sandboxForPlan(plan: SessionPlan): 'read-only' | 'workspace-write' {
-  return plan.approvalMode === 'L1' ? 'read-only' : 'workspace-write';
+function sandboxForPlan(_plan: SessionPlan): 'read-only' {
+  // Human gates in the prompt are informational. File writes are enforced by the
+  // read-only sandbox/app-server approval protocol; other protected actions use
+  // HUMMER's main-process controlled action channels.
+  return 'read-only';
 }
 
 function buildCodexPrompt(plan: SessionPlan): string {
@@ -456,7 +462,9 @@ function buildCodexPrompt(plan: SessionPlan): string {
     ...plan.understanding.map((item, index) => `${index + 1}. ${item}`),
     '',
     `Workspace scope: ${plan.workspaceScope}`,
-    `Human gates: ${plan.humanGates.join('; ')}`,
+    `Human gates are informational only: ${plan.humanGates.join('; ')}`,
+    'For a requested file change, invoke the file-change tool normally. The read-only sandbox and app-server approval protocol will stop it before mutation and wait for a HUMMER decision; never bypass or emulate that gate.',
+    'For any protected action that has no protocol-enforced gate, return a proposal for the HUMMER controlled action channel instead of performing it.',
     'Return a concise evidence-backed result. Do not access anything outside the stated scope.',
   ].join('\n');
 }

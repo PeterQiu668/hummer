@@ -7,7 +7,7 @@ import { configureInternalValidationDisplay } from './support/configure-e2e-engi
 
 const root = process.cwd();
 const protocol = process.argv.find((argument) => argument.startsWith('--protocol='))?.split('=')[1] ?? 'app-server-jsonrpc';
-const approvalFlow = process.argv.includes('--approval') || !process.argv.includes('--without-approval');
+const approvalFlow = process.argv.includes('--approval');
 const forkFlow = process.argv.includes('--fork');
 if (!['exec-jsonl', 'app-server-jsonrpc'].includes(protocol)) throw new Error(`Unsupported test protocol ${protocol}`);
 const engineProfile = process.argv.find((argument) => argument.startsWith('--engine-profile='))?.split('=')[1] ?? 'openai-codex-validation';
@@ -100,8 +100,8 @@ try {
   }
   const composer = page.getByRole('textbox', { name: '任务描述' });
   const runtimeTask = approvalFlow
-    ? 'Read input.txt. Do not use apply_patch. Run a PowerShell Set-Content command to create summary-approved.md with one concise sentence summarizing the file. Do not modify any other file.'
-    : 'Read input.txt with a local command. Then use apply_patch to create summary.md containing one concise sentence that summarizes the file. Do not modify any other file.';
+    ? 'Read input.txt, then use apply_patch to create summary-approved.md with one concise sentence summarizing the file. This is an explicit write-gate test: request approval for the file change and do not modify any other file.'
+    : 'Read input.txt with a local command and return one concise sentence that summarizes it. Do not create or modify any file.';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     await composer.fill(runtimeTask);
     await composer.press('Enter');
@@ -125,18 +125,11 @@ try {
       console.log('stage=approval-visible');
       await approve.click();
       console.log('stage=approval-accepted');
-    }
-    await page.locator('[data-runtime-event-kind="tool"][data-runtime-tool="shell.command"]').last().waitFor({ state: 'visible', timeout: 120_000 });
-    console.log('stage=command-event-visible');
-    if (!approvalFlow) {
-      const approve = page.getByRole('button', { name: '确认更新' });
-      await approve.waitFor({ state: 'visible', timeout: 120_000 });
-      if (existsSync(output)) throw new Error('Protected file output existed before HUMMER approval');
-      console.log('stage=file-change-approval-visible');
-      await approve.click();
-      console.log('stage=file-change-approval-accepted');
       await page.locator('[data-runtime-tool="workspace.patch"]').waitFor({ state: 'visible', timeout: 120_000 });
       console.log('stage=file-change-visible');
+    } else {
+      await page.locator('[data-runtime-event-kind="tool"][data-runtime-tool="shell.command"]').last().waitFor({ state: 'visible', timeout: 120_000 });
+      console.log('stage=command-event-visible');
     }
     await page.getByText('任务运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 120_000 });
   } catch (error) {
@@ -145,7 +138,8 @@ try {
     if (existsSync(wireLogPath)) console.error(`wire-log=${readFileSync(wireLogPath, 'utf8').slice(-20_000)}`);
     throw error;
   }
-  if (!existsSync(output)) throw new Error('Codex trajectory reported a file change but summary.md does not exist');
+  if (approvalFlow && !existsSync(output)) throw new Error('Codex trajectory reported an approved file change but summary-approved.md does not exist');
+  if (!approvalFlow && existsSync(output)) throw new Error('Read-only Codex smoke unexpectedly created an output file');
   let forkEvidence;
   if (forkFlow) {
     if (!approvalFlow) throw new Error('Fork E2E requires the approval flow');
@@ -159,7 +153,7 @@ try {
     if (existsSync(branchOutput)) rmSync(branchOutput);
     await page.getByRole('button', { name: '展开协作与能力' }).click();
     await page.getByRole('button', { name: '工作方法', exact: true }).click();
-    await page.getByLabel('本次工作方法').fill('Read input.txt again. Run a PowerShell Set-Content command to create branch-summary.md with exactly six words. Do not modify summary-approved.md or any other file.');
+    await page.getByLabel('本次工作方法').fill('Read input.txt again. Use apply_patch to create branch-summary.md with exactly six words. This is an explicit write-gate test: request approval and do not modify summary-approved.md or any other file.');
     await page.getByRole('button', { name: '保存并重新尝试' }).click();
     console.log('stage=fork-requested');
     const branchApprove = page.getByRole('button', { name: '确认更新' });
@@ -193,7 +187,7 @@ try {
   const persistedSessions = await page.evaluate(() => window.hummerPersistence?.listSessions(localStorage.getItem('hummer.auth.session') ?? '') ?? []);
   const persistedEvents = persistedSessions.flatMap((session) => session.events);
   const persistedFileChange = persistedEvents.find((event) => event.type === 'tool' && event.tool === 'workspace.patch');
-  if (!approvalFlow && !persistedFileChange?.evidenceRefs.some((ref) => ref.startsWith('evidence://sha256/'))) {
+  if (approvalFlow && !persistedFileChange?.evidenceRefs.some((ref) => ref.startsWith('evidence://sha256/'))) {
     throw new Error('Persisted file change did not contain content-addressed evidence');
   }
 
