@@ -1,7 +1,7 @@
 {
   "name": "@hummer/desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.5.0-internal.1",
   "description": "HUMMER trusted enterprise agent desktop",
   "author": "HUMMER",
   "type": "module",
@@ -22,7 +22,7 @@
     "appId": "com.hummer.desktop",
     "productName": "HUMMER",
     "directories": {
-      "output": "../../release/m5c"
+      "output": "../../release/m5d"
     },
     "electronDist": "../../node_modules/electron/dist",
     "asar": true,

@@ -4,8 +4,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { _electron as electron } from 'playwright';
 
 const root = process.cwd();
-const executablePath = resolve(process.env.HUMMER_PACKAGED_EXE ?? 'release/m5c/win-unpacked/HUMMER.exe');
-const spikeDirectory = resolve(root, 'spikes/m5c-installer');
+const executablePath = resolve(process.env.HUMMER_PACKAGED_EXE ?? 'release/m5d/win-unpacked/HUMMER.exe');
+const spikeDirectory = resolve(root, 'spikes/m5d-installer');
 const dataDirectory = resolve(spikeDirectory, 'facts');
 const profileDirectory = resolve(spikeDirectory, 'profile');
 const codexPath = resolve(process.env.LOCALAPPDATA, 'hermes/node/codex.cmd');
