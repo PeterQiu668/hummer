@@ -1,0 +1,122 @@
+{
+  "generatedAt": "2026-09-11T05:46:08.244Z",
+  "evidenceClass": "local-product-controlled-builtin",
+  "rejected": {
+    "branch": "rejected",
+    "sessionId": "session_m5d_draft_rejected",
+    "approvalId": "approval_m5d_draft_rejected",
+    "authorization": {
+      "effect": "require_approval",
+      "policyId": "tenant_b1ad85d0e7b34c44878b276f35b5e416_policy_external_send",
+      "approverActorRef": "account:account_bcbabbe731c34d0f83e721b84abf4bf3",
+      "reason": "matched_rule",
+      "approved": false
+    },
+    "execution": null,
+    "error": "Error invoking remote method 'hummer:tools:create-external-draft': Error: Controlled write requires an approved approval for the current tenant and session"
+  },
+  "approved": {
+    "branch": "approved",
+    "sessionId": "session_m5d_draft_approved",
+    "approvalId": "approval_m5d_draft_approved",
+    "authorization": {
+      "effect": "require_approval",
+      "policyId": "tenant_b1ad85d0e7b34c44878b276f35b5e416_policy_external_send",
+      "approverActorRef": "account:account_bcbabbe731c34d0f83e721b84abf4bf3",
+      "reason": "matched_rule",
+      "approved": true
+    },
+    "execution": {
+      "id": "write_e7b24870-08e9-4cda-9e73-cbd0b1d8935e",
+      "action": "external.send.draft",
+      "relativePath": "drafts/approved-customer-update.md",
+      "evidenceRef": "evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539",
+      "sha256": "3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539",
+      "sizeBytes": 67
+    },
+    "error": null
+  },
+  "receipt": {
+    "generatedAt": "2026-09-11T05:46:08.241Z",
+    "tenantId": "tenant_b1ad85d0e7b34c44878b276f35b5e416",
+    "outcome": {
+      "id": "outcome_evt_1f37f8afc5424b5887175147ca9309bf",
+      "tenantId": "tenant_b1ad85d0e7b34c44878b276f35b5e416",
+      "outcomeDefinitionId": "outcome_def_58aed162879246d38a4614bb4a224142",
+      "workOrderId": null,
+      "sessionId": "session_m5d_draft_approved",
+      "approvalId": "approval_m5d_draft_approved",
+      "verdict": "accepted",
+      "acceptedBy": "account:account_bcbabbe731c34d0f83e721b84abf4bf3",
+      "evidenceRef": "evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539",
+      "occurredAt": "2026-09-11T05:10:05.000Z"
+    },
+    "definition": {
+      "id": "outcome_def_58aed162879246d38a4614bb4a224142",
+      "tenantId": "tenant_b1ad85d0e7b34c44878b276f35b5e416",
+      "actionPattern": "external.send.draft",
+      "title": "External draft accepted",
+      "acceptanceCriteria": "Approved draft is content-addressed and not delivered",
+      "unitPriceCny": null,
+      "riskLevel": "high",
+      "enabled": true,
+      "createdAt": "2026-09-11T05:46:08.233Z",
+      "updatedAt": "2026-09-11T05:46:08.233Z"
+    },
+    "costs": [],
+    "tools": [
+      {
+        "id": "tool_inv_ead286e5-7acc-41ce-b3e3-71557854f5e7",
+        "tenantId": "tenant_b1ad85d0e7b34c44878b276f35b5e416",
+        "sessionId": "session_m5d_draft_approved",
+        "toolDefinitionId": "tenant_b1ad85d0e7b34c44878b276f35b5e416_tool_external_send_draft",
+        "capabilityId": "external.send.draft",
+        "actorRef": "employee:external-draft-writer",
+        "status": "completed",
+        "args": {
+          "relativePath": "drafts/approved-customer-update.md"
+        },
+        "result": {
+          "evidenceRef": "evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539",
+          "relativePath": "drafts/approved-customer-update.md",
+          "sha256": "3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539",
+          "sizeBytes": 67
+        },
+        "durationMs": 9,
+        "evidenceRefs": [
+          "evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539"
+        ],
+        "occurredAt": "2026-09-11T05:10:04.000Z",
+        "idempotencyKey": "m5d-draft-approved"
+      }
+    ],
+    "totalCostCny": 0,
+    "approval": {
+      "id": "approval_m5d_draft_approved",
+      "sessionId": "session_m5d_draft_approved",
+      "status": "approved",
+      "requestedAt": "2026-09-11T05:10:02.000Z",
+      "decidedAt": "2026-09-11T05:10:03.000Z",
+      "action": "external.send.draft",
+      "requestedBy": "employee:external-draft-writer",
+      "estimatedCostCny": null,
+      "policyId": "tenant_b1ad85d0e7b34c44878b276f35b5e416_policy_external_send",
+      "approverActorRef": "account:account_bcbabbe731c34d0f83e721b84abf4bf3",
+      "decisionActorRef": "account:account_bcbabbe731c34d0f83e721b84abf4bf3",
+      "decisionEventType": "approval.authorized",
+      "eventHash": "163c0d8cd519a3cdfe63a7712404fe5366b4645afddfb979342bf08a792f7408"
+    },
+    "chainIntegrity": {
+      "valid": true,
+      "checked": 12
+    },
+    "receiptJson": "{\"approval\":{\"action\":\"external.send.draft\",\"approverActorRef\":\"account:account_bcbabbe731c34d0f83e721b84abf4bf3\",\"decidedAt\":\"2026-09-11T05:10:03.000Z\",\"decisionActorRef\":\"account:account_bcbabbe731c34d0f83e721b84abf4bf3\",\"decisionEventType\":\"approval.authorized\",\"estimatedCostCny\":null,\"eventHash\":\"163c0d8cd519a3cdfe63a7712404fe5366b4645afddfb979342bf08a792f7408\",\"id\":\"approval_m5d_draft_approved\",\"policyId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416_policy_external_send\",\"requestedAt\":\"2026-09-11T05:10:02.000Z\",\"requestedBy\":\"employee:external-draft-writer\",\"sessionId\":\"session_m5d_draft_approved\",\"status\":\"approved\"},\"chainIntegrity\":{\"checked\":12,\"valid\":true},\"costs\":[],\"definition\":{\"acceptanceCriteria\":\"Approved draft is content-addressed and not delivered\",\"actionPattern\":\"external.send.draft\",\"createdAt\":\"2026-09-11T05:46:08.233Z\",\"enabled\":true,\"id\":\"outcome_def_58aed162879246d38a4614bb4a224142\",\"riskLevel\":\"high\",\"tenantId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416\",\"title\":\"External draft accepted\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-11T05:46:08.233Z\"},\"generatedAt\":\"2026-09-11T05:46:08.241Z\",\"outcome\":{\"acceptedBy\":\"account:account_bcbabbe731c34d0f83e721b84abf4bf3\",\"approvalId\":\"approval_m5d_draft_approved\",\"evidenceRef\":\"evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539\",\"id\":\"outcome_evt_1f37f8afc5424b5887175147ca9309bf\",\"occurredAt\":\"2026-09-11T05:10:05.000Z\",\"outcomeDefinitionId\":\"outcome_def_58aed162879246d38a4614bb4a224142\",\"sessionId\":\"session_m5d_draft_approved\",\"tenantId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416\",\"verdict\":\"accepted\",\"workOrderId\":null},\"tenantId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416\",\"tools\":[{\"actorRef\":\"employee:external-draft-writer\",\"args\":{\"relativePath\":\"drafts/approved-customer-update.md\"},\"capabilityId\":\"external.send.draft\",\"durationMs\":9,\"evidenceRefs\":[\"evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539\"],\"id\":\"tool_inv_ead286e5-7acc-41ce-b3e3-71557854f5e7\",\"idempotencyKey\":\"m5d-draft-approved\",\"occurredAt\":\"2026-09-11T05:10:04.000Z\",\"result\":{\"evidenceRef\":\"evidence://sha256/3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539\",\"relativePath\":\"drafts/approved-customer-update.md\",\"sha256\":\"3cc451ce449758676709e6214a6feacef923eb6aba9ec5dea31e49df92f50539\",\"sizeBytes\":67},\"sessionId\":\"session_m5d_draft_approved\",\"status\":\"completed\",\"tenantId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416\",\"toolDefinitionId\":\"tenant_b1ad85d0e7b34c44878b276f35b5e416_tool_external_send_draft\"}],\"totalCostCny\":0}"
+  },
+  "integrity": {
+    "valid": true,
+    "checked": 12
+  },
+  "approvedDraft": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5d-external-draft\\workspace\\drafts\\approved-customer-update.md",
+  "rejectedDraft": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5d-external-draft\\workspace\\drafts\\rejected-customer-update.md",
+  "noDeliveryPerformed": true
+}

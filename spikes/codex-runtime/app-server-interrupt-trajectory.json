@@ -2,7 +2,7 @@
   {
     "sequence": 1,
     "kind": "system",
-    "text": "1Runtime 诊断本地执行节点 · {\"timestamp\":\"2026-09-10T18:43:13.148338Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}可追溯"
+    "text": "1Runtime 诊断本地执行节点 · {\"timestamp\":\"2026-09-11T05:24:08.679233Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}可追溯"
   },
   {
     "sequence": 2,

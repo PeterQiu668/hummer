@@ -1,0 +1,133 @@
+{
+  "generatedAt": "2026-09-11T05:16:17.667Z",
+  "runtime": {
+    "providerName": "OpenAI (Codex login)",
+    "modelName": "gpt-5.6-sol",
+    "dataDomain": "chatgpt.com",
+    "sandbox": "read-only",
+    "tier": "flagship"
+  },
+  "approval": {
+    "id": "01a08ee4-efe5-7cf3-9115-4ec3cbe480e7:0",
+    "sessionId": "session_m5d_write_gate",
+    "status": "declined",
+    "requestedAt": "2026-09-11T05:16:13.675Z",
+    "decidedAt": "2026-09-11T05:16:13.679Z",
+    "action": "file.write.patch",
+    "requestedBy": "employee:write-gate-probe",
+    "estimatedCostCny": null,
+    "policyId": "tenant_a8be1b0e26b842b1a4746f2b60eb937b_policy_file_write",
+    "approverActorRef": "account:account_e70afc83afb44bd5bbb299fb4671b593",
+    "decisionActorRef": "account:account_e70afc83afb44bd5bbb299fb4671b593",
+    "decisionEventType": "approval.rejected",
+    "eventHash": "9e131acf5bf0711906d52f32c05aeaf2373d2148f243b3662d7db2a77bbcdb9f",
+    "approverDisplayName": "写入门禁验收人",
+    "decisionActorDisplayName": "写入门禁验收人"
+  },
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 6
+  },
+  "outputExists": false,
+  "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5d-write-gate\\read-only-write-gate-wire.jsonl",
+  "fileChangeMessages": [],
+  "runtimeMessages": [
+    {
+      "type": "host.stderr",
+      "line": "{\"timestamp\":\"2026-09-11T05:16:03.589021Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}"
+    },
+    {
+      "type": "thread.started",
+      "thread_id": "01a08ee4-efe5-7cf3-9115-4ec3cbe480e7"
+    },
+    {
+      "type": "thread.started",
+      "thread_id": "01a08ee4-efe5-7cf3-9115-4ec3cbe480e7"
+    },
+    {
+      "type": "turn.started",
+      "turn_id": "01a08ee4-f0ed-76b2-bcb3-a95f7db3cd2c"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "agent_message",
+        "id": "msg_08b9a19e427a9975016aa38e9cb54c87d08f1350053787f614",
+        "text": "I’ll run the requested single-file patch and make no other changes."
+      }
+    },
+    {
+      "method": "item/commandExecution/requestApproval",
+      "id": 0,
+      "params": {
+        "threadId": "01a08ee4-efe5-7cf3-9115-4ec3cbe480e7",
+        "turnId": "01a08ee4-f0ed-76b2-bcb3-a95f7db3cd2c",
+        "itemId": "exec-93d589da-5f9c-4ab4-9cfa-ed815af2c2d1",
+        "startedAtMs": 1789103773674,
+        "reason": null,
+        "grantRoot": null,
+        "approvalId": "01a08ee4-efe5-7cf3-9115-4ec3cbe480e7:0",
+        "kind": "fileChange"
+      }
+    },
+    {
+      "type": "host.stderr",
+      "line": "{\"timestamp\":\"2026-09-11T05:16:13.685750Z\",\"level\":\"ERROR\",\"fields\":{\"error\":\"patch rejected by user\"},\"target\":\"codex_core::tools::router\"}"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "file_change",
+        "id": "exec-93d589da-5f9c-4ab4-9cfa-ed815af2c2d1",
+        "status": "declined",
+        "changes": [
+          {
+            "path": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5d-write-gate\\runtime-workspace\\blocked-unapproved.md",
+            "kind": {
+              "type": "add"
+            },
+            "diff": "forbidden\n"
+          }
+        ]
+      }
+    },
+    {
+      "type": "usage.updated",
+      "usage": {
+        "totalTokens": 19550,
+        "inputTokens": 19433,
+        "cachedInputTokens": 11136,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 117,
+        "reasoningOutputTokens": 47
+      }
+    },
+    {
+      "type": "host.stderr",
+      "line": "{\"timestamp\":\"2026-09-11T05:16:14.320585Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"failed to fetch rate limits\",\"err\":\"error sending request for url (https://chatgpt.com/backend-api/wham/usage)\"},\"target\":\"codex_memories_write::guard\"}"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "agent_message",
+        "id": "msg_08b9a19e427a9975016aa38ea113b487d08cae252d07d3aa83",
+        "text": "`apply_patch` was invoked, but the patch was rejected by the sandbox. No file was created or modified."
+      }
+    },
+    {
+      "type": "usage.updated",
+      "usage": {
+        "totalTokens": 19656,
+        "inputTokens": 19580,
+        "cachedInputTokens": 19200,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 76,
+        "reasoningOutputTokens": 47
+      }
+    },
+    {
+      "type": "turn.completed",
+      "turn_id": "01a08ee4-f0ed-76b2-bcb3-a95f7db3cd2c"
+    }
+  ]
+}

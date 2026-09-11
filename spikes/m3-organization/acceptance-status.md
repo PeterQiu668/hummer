@@ -141,3 +141,39 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - The current external internal-profile evidence also passed the real Codex approval, restart, steer, interrupt, and five-plan runs. Their UTC run windows are recorded in `spikes/codex-runtime/`, `spikes/m3-real-restart/`, and `spikes/m5b-planner/`; they do not prove DeepSeek compatibility.
 - `scripts/ops-simulation.mjs` has no FAIL. `scripts/ops-simulation-2.mjs` exits successfully but retains its pre-existing FAIL for a Feishu/enterprise inbound trigger. This work order explicitly prohibits implementing that channel path.
 - The three credential-dependent commands remain blocked at explicit preflight: DeepSeek planner, encrypted credential restart, and external-send wedge. Therefore the global “all desktop tests green” gate is not claimed.
+
+## M5-D status update - 2026-09-11
+
+### P0.0 runtime-enforced write gate
+
+- Baseline real Codex probe: `workspace-write` completed an `apply_patch` file change with zero approval requests. Wire and copied output are under `spikes/m5d-write-gate/`; exact timestamps and wire SHA-256 are in ADR-009.
+- Post-change real Codex run generated at 2026-09-11T04:15:38.366Z used `read-only`, persisted the native `file.write.patch` approval request, rejected it as the logged-in account, received runtime status `declined`, wrote no file, and verified the hash chain.
+- All autonomy levels now use `read-only`. Prompt human-gate text is informational only; enforcement is app-server file-change approval or the main-process controlled action channel.
+
+### P0.1 DeepSeek gate
+
+- At approximately 2026-09-11 12:52 Asia/Shanghai, Process/User/Machine environment scopes all lacked `DEEPSEEK_API_KEY`.
+- `test:desktop:planner:deepseek`, `test:desktop:credentials`, and `test:desktop:wedge` each exited 1 at explicit preflight. No provider request, fallback evidence, or mock substitution occurred. ADR-006 remains blocked.
+
+### P1 tool execution
+
+- Additive migration v7 creates tenant-scoped `tool_definitions` and `tool_invocations`; v1-v6 are unchanged.
+- `packages/config/src/tool-definitions.json` is the sole authored catalog. Only `fs.read` and `external.send.draft` are plan-valid.
+- Real Codex plus product-chain run generated at 2026-09-11T04:31:27.294Z: `spikes/m5d-tool-registry/tool-registry-evidence.json`. `hummer_local/fs_read` was ready, elicitation was accepted by the tenant control plane, the read completed in 4 ms, the receipt included its content-addressed evidence, and chain integrity was `valid=true, checked=19`.
+- Local product-chain run generated at 2026-09-11T04:43:48.371Z: `spikes/m5d-external-draft/external-draft-evidence.json`. Rejection wrote no file; approval produced a draft only, recorded the tool and evidence in the receipt, and left `valid=true, checked=12`. No external delivery is claimed.
+
+### P2 internal release
+
+- Built unsigned `release/m5d/HUMMER-Setup-0.5.0-internal.1.exe`: 104,368,997 bytes, SHA-256 `CFA877D47D56F425420B217EB71D902D86F595AA825F7E84DF4BE8915CD61A68`, Authenticode `NotSigned`.
+- Current-machine packaged smoke passed. Windows Sandbox is disabled and no separate clean machine was available, so clean-Windows installation remains an external gate.
+- Certificate owner, vendor, and target date are not supplied; `docs/release/m5d-windows-internal-release.md` records the unstarted status without inventing values.
+
+### M5-D final regression snapshot
+
+- Latest rejected real-write gate: 2026-09-11T05:16:17.667Z, approval declined, runtime `fileChange` status `declined`, output absent, chain `valid=true, checked=6`.
+- Latest accepted real-write gate: 2026-09-11T05:14:38Z to 05:15:12Z, trajectory sequence 6 approval request, sequence 7 named human approval, sequence 8 completed `workspace.patch` with content-addressed evidence.
+- Real steer completed with a second file-write approval and changed output; real interrupt returned `status=interrupted`; restart recovery at 2026-09-11T05:26:12.800Z restored five prior events, appended the interrupted state, and verified `valid=true, checked=14`.
+- Real MCP `fs.read` regression generated at 2026-09-11T05:27:40.990Z, completed in 3 ms with SHA-256 evidence and `valid=true, checked=19`. The local controlled `external.send.draft` regression retained rejection-without-file and approved-draft receipt behavior with `valid=true, checked=12`.
+- Passed: `typecheck`; `test:unit` (176); `test:ui` (33); `build`; `desktop:build`; `test:e2e`; desktop Codex read, approval, steer, interrupt and restart; persistence; identity; approval rejection; projects; outcome receipt; planner internal validation; write gate; tool registry; external draft; packaged smoke; and both operations simulations (the explicitly deferred channel-inbound check is `SKIP`, not a delivery claim).
+- Rebuilt unsigned installer: `release/m5d/HUMMER-Setup-0.5.0-internal.1.exe`, 104,368,997 bytes, SHA-256 `CFA877D47D56F425420B217EB71D902D86F595AA825F7E84DF4BE8915CD61A68`, Authenticode `NotSigned`.
+- Still blocked: all three DeepSeek credential-backed E2Es and clean-Windows installation. No mock or internal OpenAI result is substituted for either gate.

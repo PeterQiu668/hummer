@@ -1,0 +1,6 @@
+[mcp_servers.hummer_probe]
+command = "node"
+args = ["probe-server.mjs"]
+
+[mcp_servers.hummer_probe.env]
+HUMMER_PROBE = "1"

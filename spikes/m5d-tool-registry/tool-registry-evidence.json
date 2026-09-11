@@ -1,0 +1,315 @@
+{
+  "generatedAt": "2026-09-11T05:27:43.973Z",
+  "verifiedTool": {
+    "id": "tenant_eecf26fa71054e88b40b255fc9d9abe4_tool_fs_read",
+    "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+    "capabilityId": "fs.read",
+    "displayName": "工作区文件读取",
+    "transport": "mcp",
+    "riskLevel": "low",
+    "policyActionPattern": "fs.read",
+    "endpoint": {
+      "serverName": "hummer_local",
+      "toolName": "fs_read"
+    },
+    "status": "verified",
+    "verifiedAt": "2026-09-11T05:27:06.520Z"
+  },
+  "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5d-tool-registry\\tool-registry-wire.jsonl",
+  "wireProof": {
+    "mcpReady": true,
+    "fsReadCall": true,
+    "elicitationAccepted": true
+  },
+  "session": {
+    "plan": {
+      "approvalMode": "L2",
+      "assignees": [
+        "自动推荐：具备 hummer_local fs_read 能力的执行代理"
+      ],
+      "attachmentNames": [],
+      "estimate": "约1分钟；需1次文件读取并输出1句摘要",
+      "humanGates": [],
+      "id": "plan_11ccx2h",
+      "modelProfile": "旗舰",
+      "planning": {
+        "costUnavailableReason": "该运行时模型未配置价格，成本未记录",
+        "label": "模型生成计划",
+        "planningSessionId": "codex_planning_plan_11ccx2h_1",
+        "receiptOutcomeEventId": "outcome_evt_b92870148b574c389c2637b21ee0f36b",
+        "runtimeId": "codex-cli",
+        "source": "runtime"
+      },
+      "prompt": "Use the HUMMER fs.read capability, specifically the hummer_local fs_read MCP tool, to read input.txt. Do not use shell commands. Return one sentence summarizing the file.",
+      "tools": [
+        "fs.read"
+      ],
+      "understanding": [
+        "确认目标文件为“我的工作空间”内的 input.txt，且不得访问范围外内容",
+        "执行阶段仅使用 hummer_local 的 fs_read MCP 工具读取文件，不使用 Shell 命令",
+        "基于读取到的文件内容生成一句话摘要，作为可验收结果"
+      ],
+      "workContext": "我的工作空间",
+      "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读；执行时仅允许读取 input.txt）"
+    },
+    "handle": {
+      "engine": {
+        "dataDomain": "chatgpt.com",
+        "modelName": "gpt-5.6-sol",
+        "providerName": "OpenAI (Codex login)",
+        "sandbox": "read-only",
+        "tier": "flagship"
+      },
+      "nativeSessionId": "01a08eef-5f5d-79b1-a887-a29ab0ccb445",
+      "runtimeId": "codex-cli",
+      "sessionId": "codex_plan_11ccx2h_2"
+    },
+    "events": [
+      {
+        "actorRef": "system:desktop-host",
+        "category": "system",
+        "evidenceRefs": [
+          "codex://host/stderr"
+        ],
+        "occurredAt": "2026-09-11T05:27:27.595Z",
+        "result": "{\"timestamp\":\"2026-09-11T05:27:27.478964Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}",
+        "sequence": 1,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "status": "completed",
+        "title": "Runtime 诊断",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "system",
+        "evidenceRefs": [
+          "codex://turn/started"
+        ],
+        "occurredAt": "2026-09-11T05:27:27.834Z",
+        "result": "已建立非交互运行，等待结构化事件。",
+        "sequence": 2,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "status": "running",
+        "title": "执行内核开始运行",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "message",
+        "evidenceRefs": [
+          "codex://items/msg_093c84368d46bcc9016aa39147b07887d0835ef1b09164b4ad"
+        ],
+        "occurredAt": "2026-09-11T05:27:36.399Z",
+        "result": "我将严格限定为“我的工作空间”内的 `input.txt`，只调用 `hummer_local` 的 `fs_read` 能力读取，不使用 Shell。",
+        "sequence": 3,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "status": "completed",
+        "title": "执行进展",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "args": {
+          "path": "input.txt"
+        },
+        "costCny": null,
+        "durationMs": 3,
+        "evidenceRefs": [
+          "codex://items/exec-39a417aa-3c9a-4665-95b6-4e195f0108ea",
+          "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6"
+        ],
+        "occurredAt": "2026-09-11T05:27:40.990Z",
+        "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"path\\\":\\\"input.txt\\\",\\\"content\\\":\\\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\\\n\\\",\\\"sha256\\\":\\\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\\\",\\\"sizeBytes\\\":73}\"}],\"structuredContent\":{\"path\":\"input.txt\",\"content\":\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\n\",\"sha256\":\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\",\"sizeBytes\":73},\"_meta\":null}",
+        "sequence": 4,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "status": "completed",
+        "title": "调用 MCP 工具 fs_read",
+        "tool": "fs.read",
+        "type": "tool"
+      },
+      {
+        "actorRef": "employee:codex",
+        "category": "message",
+        "evidenceRefs": [
+          "codex://items/msg_093c84368d46bcc9016aa3914eddf487d0ba968bd52e2f97fa"
+        ],
+        "occurredAt": "2026-09-11T05:27:43.652Z",
+        "result": "`input.txt` 强调：HUMMER 工具必须真实可用、限定租户范围、具备审批感知能力且全程可审计。",
+        "sequence": 5,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "status": "completed",
+        "title": "执行进展",
+        "type": "step"
+      },
+      {
+        "actorRef": "employee:codex",
+        "costCny": null,
+        "deliverables": [
+          {
+            "kind": "report",
+            "name": "最终回复"
+          }
+        ],
+        "durationMs": 16057,
+        "evidenceRefs": [
+          "codex://turn/completed",
+          "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6"
+        ],
+        "occurredAt": "2026-09-11T05:27:43.891Z",
+        "rollback": {
+          "supported": false
+        },
+        "sequence": 6,
+        "sessionId": "codex_plan_11ccx2h_2",
+        "summary": "`input.txt` 强调：HUMMER 工具必须真实可用、限定租户范围、具备审批感知能力且全程可审计。",
+        "title": "任务运行完成",
+        "type": "result",
+        "usage": {
+          "cacheWriteInputTokens": 0,
+          "cachedInputTokens": 19840,
+          "inputTokens": 20136,
+          "outputTokens": 83,
+          "reasoningOutputTokens": 42,
+          "totalTokens": 20219
+        }
+      }
+    ]
+  },
+  "toolEvent": {
+    "actorRef": "employee:codex",
+    "args": {
+      "path": "input.txt"
+    },
+    "costCny": null,
+    "durationMs": 3,
+    "evidenceRefs": [
+      "codex://items/exec-39a417aa-3c9a-4665-95b6-4e195f0108ea",
+      "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6"
+    ],
+    "occurredAt": "2026-09-11T05:27:40.990Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"path\\\":\\\"input.txt\\\",\\\"content\\\":\\\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\\\n\\\",\\\"sha256\\\":\\\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\\\",\\\"sizeBytes\\\":73}\"}],\"structuredContent\":{\"path\":\"input.txt\",\"content\":\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\n\",\"sha256\":\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\",\"sizeBytes\":73},\"_meta\":null}",
+    "sequence": 4,
+    "sessionId": "codex_plan_11ccx2h_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 fs_read",
+    "tool": "fs.read",
+    "type": "tool"
+  },
+  "definition": {
+    "id": "outcome_def_5dcee6f931a646dfa3a53795348a1ff3",
+    "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+    "actionPattern": "fs.read",
+    "title": "工作区事实读取验收",
+    "acceptanceCriteria": "读取结果包含内容寻址证据",
+    "unitPriceCny": null,
+    "riskLevel": "low",
+    "enabled": true,
+    "createdAt": "2026-09-11T05:27:43.957Z",
+    "updatedAt": "2026-09-11T05:27:43.957Z"
+  },
+  "outcome": {
+    "id": "outcome_evt_886ff822dfae40aba4ac822c3a321b16",
+    "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+    "outcomeDefinitionId": "outcome_def_5dcee6f931a646dfa3a53795348a1ff3",
+    "workOrderId": null,
+    "sessionId": "codex_plan_11ccx2h_2",
+    "approvalId": null,
+    "verdict": "accepted",
+    "acceptedBy": "account:account_f58d263dd5fa4e35924d1a6843466039",
+    "evidenceRef": "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6",
+    "occurredAt": "2026-09-11T05:27:43.958Z"
+  },
+  "receipt": {
+    "generatedAt": "2026-09-11T05:27:43.961Z",
+    "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+    "outcome": {
+      "id": "outcome_evt_886ff822dfae40aba4ac822c3a321b16",
+      "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+      "outcomeDefinitionId": "outcome_def_5dcee6f931a646dfa3a53795348a1ff3",
+      "workOrderId": null,
+      "sessionId": "codex_plan_11ccx2h_2",
+      "approvalId": null,
+      "verdict": "accepted",
+      "acceptedBy": "account:account_f58d263dd5fa4e35924d1a6843466039",
+      "evidenceRef": "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6",
+      "occurredAt": "2026-09-11T05:27:43.958Z"
+    },
+    "definition": {
+      "id": "outcome_def_5dcee6f931a646dfa3a53795348a1ff3",
+      "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+      "actionPattern": "fs.read",
+      "title": "工作区事实读取验收",
+      "acceptanceCriteria": "读取结果包含内容寻址证据",
+      "unitPriceCny": null,
+      "riskLevel": "low",
+      "enabled": true,
+      "createdAt": "2026-09-11T05:27:43.957Z",
+      "updatedAt": "2026-09-11T05:27:43.957Z"
+    },
+    "costs": [],
+    "tools": [
+      {
+        "id": "tool_inv_ade875ca-a2ca-41fb-b4cf-d5207c825c46",
+        "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+        "sessionId": "codex_plan_11ccx2h_2",
+        "toolDefinitionId": "tenant_eecf26fa71054e88b40b255fc9d9abe4_tool_fs_read",
+        "capabilityId": "fs.read",
+        "actorRef": "employee:codex",
+        "status": "completed",
+        "args": {
+          "path": "input.txt"
+        },
+        "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"path\\\":\\\"input.txt\\\",\\\"content\\\":\\\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\\\n\\\",\\\"sha256\\\":\\\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\\\",\\\"sizeBytes\\\":73}\"}],\"structuredContent\":{\"path\":\"input.txt\",\"content\":\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\n\",\"sha256\":\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\",\"sizeBytes\":73},\"_meta\":null}",
+        "durationMs": 3,
+        "evidenceRefs": [
+          "codex://items/exec-39a417aa-3c9a-4665-95b6-4e195f0108ea",
+          "evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6"
+        ],
+        "occurredAt": "2026-09-11T05:27:40.990Z",
+        "idempotencyKey": "codex_plan_11ccx2h_2:4:fs.read"
+      }
+    ],
+    "totalCostCny": 0,
+    "approval": null,
+    "chainIntegrity": {
+      "valid": true,
+      "checked": 19
+    },
+    "receiptJson": "{\"approval\":null,\"chainIntegrity\":{\"checked\":19,\"valid\":true},\"costs\":[],\"definition\":{\"acceptanceCriteria\":\"读取结果包含内容寻址证据\",\"actionPattern\":\"fs.read\",\"createdAt\":\"2026-09-11T05:27:43.957Z\",\"enabled\":true,\"id\":\"outcome_def_5dcee6f931a646dfa3a53795348a1ff3\",\"riskLevel\":\"low\",\"tenantId\":\"tenant_eecf26fa71054e88b40b255fc9d9abe4\",\"title\":\"工作区事实读取验收\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-11T05:27:43.957Z\"},\"generatedAt\":\"2026-09-11T05:27:43.961Z\",\"outcome\":{\"acceptedBy\":\"account:account_f58d263dd5fa4e35924d1a6843466039\",\"approvalId\":null,\"evidenceRef\":\"evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\",\"id\":\"outcome_evt_886ff822dfae40aba4ac822c3a321b16\",\"occurredAt\":\"2026-09-11T05:27:43.958Z\",\"outcomeDefinitionId\":\"outcome_def_5dcee6f931a646dfa3a53795348a1ff3\",\"sessionId\":\"codex_plan_11ccx2h_2\",\"tenantId\":\"tenant_eecf26fa71054e88b40b255fc9d9abe4\",\"verdict\":\"accepted\",\"workOrderId\":null},\"tenantId\":\"tenant_eecf26fa71054e88b40b255fc9d9abe4\",\"tools\":[{\"actorRef\":\"employee:codex\",\"args\":{\"path\":\"input.txt\"},\"capabilityId\":\"fs.read\",\"durationMs\":3,\"evidenceRefs\":[\"codex://items/exec-39a417aa-3c9a-4665-95b6-4e195f0108ea\",\"evidence://sha256/3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\"],\"id\":\"tool_inv_ade875ca-a2ca-41fb-b4cf-d5207c825c46\",\"idempotencyKey\":\"codex_plan_11ccx2h_2:4:fs.read\",\"occurredAt\":\"2026-09-11T05:27:40.990Z\",\"result\":\"{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"{\\\\\\\"path\\\\\\\":\\\\\\\"input.txt\\\\\\\",\\\\\\\"content\\\\\\\":\\\\\\\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\\\\\\\n\\\\\\\",\\\\\\\"sha256\\\\\\\":\\\\\\\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\\\\\\\",\\\\\\\"sizeBytes\\\\\\\":73}\\\"}],\\\"structuredContent\\\":{\\\"path\\\":\\\"input.txt\\\",\\\"content\\\":\\\"HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.\\\\n\\\",\\\"sha256\\\":\\\"3f07e277db4d75abf4ce00d87312e9aa38e8b728b7699cdfdf49debfc647fcb6\\\",\\\"sizeBytes\\\":73},\\\"_meta\\\":null}\",\"sessionId\":\"codex_plan_11ccx2h_2\",\"status\":\"completed\",\"tenantId\":\"tenant_eecf26fa71054e88b40b255fc9d9abe4\",\"toolDefinitionId\":\"tenant_eecf26fa71054e88b40b255fc9d9abe4_tool_fs_read\"}],\"totalCostCny\":0}"
+  },
+  "definitions": [
+    {
+      "id": "tenant_eecf26fa71054e88b40b255fc9d9abe4_tool_external_send_draft",
+      "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+      "capabilityId": "external.send.draft",
+      "displayName": "外发草稿",
+      "transport": "builtin",
+      "riskLevel": "high",
+      "policyActionPattern": "external.send*",
+      "endpoint": {
+        "handler": "controlled-write"
+      },
+      "status": "verified",
+      "verifiedAt": null
+    },
+    {
+      "id": "tenant_eecf26fa71054e88b40b255fc9d9abe4_tool_fs_read",
+      "tenantId": "tenant_eecf26fa71054e88b40b255fc9d9abe4",
+      "capabilityId": "fs.read",
+      "displayName": "工作区文件读取",
+      "transport": "mcp",
+      "riskLevel": "low",
+      "policyActionPattern": "fs.read",
+      "endpoint": {
+        "serverName": "hummer_local",
+        "toolName": "fs_read"
+      },
+      "status": "verified",
+      "verifiedAt": "2026-09-11T05:27:27.772Z"
+    }
+  ],
+  "integrity": {
+    "valid": true,
+    "checked": 19
+  }
+}

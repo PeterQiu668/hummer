@@ -1,0 +1,1 @@
+HUMMER tools must be real, tenant-scoped, approval-aware, and auditable.
