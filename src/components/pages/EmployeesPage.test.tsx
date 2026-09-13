@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopOrganizationHost, DigitalEmployeeRecord } from '../../features/organization/organizationClient';
+import { useAppStore } from '../../store/useAppStore';
 import EmployeesPage from './EmployeesPage';
 
 const hiredEmployee: DigitalEmployeeRecord = {
@@ -20,9 +21,23 @@ const hiredEmployee: DigitalEmployeeRecord = {
 afterEach(() => {
   localStorage.removeItem('hummer.auth.session');
   delete window.hummerOrganization;
+  useAppStore.setState({ activePage: 'office', leftNav: 'office', workbenchPrefill: null });
 });
 
 describe('EmployeesPage organization facts', () => {
+  it('opens the workbench with the selected digital colleague prefilled', async () => {
+    useAppStore.setState({ activePage: 'employees', leftNav: 'employees', workbenchPrefill: null });
+    render(<EmployeesPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /销售官/ }));
+    fireEvent.click(screen.getByRole('button', { name: '交给他一项工作' }));
+
+    expect(useAppStore.getState()).toEqual(expect.objectContaining({
+      activePage: 'office',
+      leftNav: 'office',
+      workbenchPrefill: expect.objectContaining({ assignee: expect.stringMatching(/销售官/) }),
+    }));
+  });
   it('renders the durable employee id returned by the desktop organization port', async () => {
     localStorage.setItem('hummer.auth.session', 'auth-test-token');
     const organization: DesktopOrganizationHost = {

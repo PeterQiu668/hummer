@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   AtSign,
-  Paperclip,
   Send,
   AlertTriangle,
   Workflow,
@@ -193,7 +192,7 @@ export default function BottomFlow() {
               ))}
             </div>
             <div className="flex-1" />
-            <button className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-primary-200 text-primary-700 bg-white hover:bg-primary-50 text-[11px] transition">
+            <button type="button" onClick={() => { setMentionOpen(true); setMentionQuery(''); setDraft((value) => `${value}${value && !value.endsWith(' ') ? ' ' : ''}@`); }} className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-primary-200 text-primary-700 bg-white hover:bg-primary-50 text-[11px] transition">
               <UserPlus size={11} /> 拉人入群
             </button>
             <button
@@ -218,9 +217,6 @@ export default function BottomFlow() {
               className="text-neutral-500 hover:text-primary-600 transition"
             >
               <AtSign size={14} />
-            </button>
-            <button className="text-neutral-500 hover:text-primary-600 transition">
-              <Paperclip size={14} />
             </button>
             <input
               value={draft}

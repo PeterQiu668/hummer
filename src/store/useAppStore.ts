@@ -92,6 +92,9 @@ interface AppState {
   setActivePage: (k: PageKey) => void;
   leftNav: string;
   setLeftNav: (k: string) => void;
+  workbenchPrefill: { assignee: string; prompt: string } | null;
+  openWorkbenchForEmployee: (assignee: string) => void;
+  clearWorkbenchPrefill: () => void;
 
   // ───────── office viewport ─────────
   activeZone: ZoneId | null;
@@ -251,6 +254,13 @@ export const useAppStore = create<AppState>()(
       setActivePage: (activePage) => set({ activePage }),
       leftNav: 'office',
       setLeftNav: (leftNav) => set({ leftNav }),
+      workbenchPrefill: null,
+      openWorkbenchForEmployee: (assignee) => set({
+        activePage: 'office',
+        leftNav: 'office',
+        workbenchPrefill: { assignee, prompt: `请给 ${assignee} 安排一项工作：` },
+      }),
+      clearWorkbenchPrefill: () => set({ workbenchPrefill: null }),
 
       activeZone: null,
       setActiveZone: (activeZone) => set({ activeZone }),

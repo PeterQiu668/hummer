@@ -75,6 +75,8 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const [defaultSessionStore] = useState(createDefaultSessionStore);
   const store = sessionStore ?? defaultSessionStore;
   const personalSettings = useAppStore((state) => state.personalSettings);
+  const workbenchPrefill = useAppStore((state) => state.workbenchPrefill);
+  const clearWorkbenchPrefill = useAppStore((state) => state.clearWorkbenchPrefill);
   const [composerText, setComposerText] = useState('');
   const [assignee, setAssignee] = useState('自动推荐');
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(personalSettings.defaultPermission);
@@ -91,6 +93,13 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const [rightTab, setRightTab] = useState<'collab' | 'capability' | 'sop'>('collab');
   const [sopDraft, setSopDraft] = useState('');
   const [followUp, setFollowUp] = useState('');
+
+  useEffect(() => {
+    if (!workbenchPrefill) return;
+    setComposerText(workbenchPrefill.prompt);
+    setAssignee(workbenchPrefill.assignee);
+    clearWorkbenchPrefill();
+  }, [clearWorkbenchPrefill, workbenchPrefill]);
   const [takeover, setTakeover] = useState(false);
   const [takeoverNote, setTakeoverNote] = useState('');
   const [policyError, setPolicyError] = useState<string | null>(null);

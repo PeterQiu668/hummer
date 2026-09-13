@@ -4,6 +4,7 @@ import { MockRuntimeAdapter } from '../../features/sessions/runtime/mockRuntimeA
 import { MemorySessionStore } from '../../features/sessions/persistence/sessionStore';
 import { draftPlanFromPrompt } from '../../features/sessions/model/session';
 import WorkbenchPage from './WorkbenchPage';
+import { useAppStore } from '../../store/useAppStore';
 
 function renderWorkbench(store = new MemorySessionStore()) {
   return render(<WorkbenchPage runtime={new MockRuntimeAdapter({ stepDelayMs: 1 })} sessionStore={store} />);
@@ -14,6 +15,19 @@ afterEach(() => {
   delete window.hummerOutcomes;
   delete window.hummerWorkOrderIntake;
   localStorage.removeItem('hummer.auth.session');
+  useAppStore.setState({ workbenchPrefill: null });
+});
+
+it('consumes a team assignment prefill into the task composer and assignee', async () => {
+  useAppStore.setState({
+    workbenchPrefill: { assignee: '雪·销售官', prompt: '请给 雪·销售官 安排一项工作：' },
+  });
+
+  renderWorkbench();
+
+  expect(await screen.findByRole('textbox', { name: '任务描述' })).toHaveValue('请给 雪·销售官 安排一项工作：');
+  expect(screen.getByLabelText('派给谁')).toHaveValue('雪·销售官');
+  expect(useAppStore.getState().workbenchPrefill).toBeNull();
 });
 
 

@@ -174,7 +174,7 @@ export default function Marketplace() {
           <Zap size={12} className="text-warning" />
           <span>每位 Agent 都有真人专家兜底 · 7 天试岗不满意可下架 · 数据完全私有</span>
           <span className="flex-1" />
-          <button className="hum-btn is-sm">联系顾问定制 54 岗位</button>
+          <span className="hum-chip is-muted">顾问定制暂未开放</span>
         </div>
       </motion.div>
 
@@ -269,9 +269,9 @@ function BrowseTab({
                     <Sparkles size={11} /> 体验工坊
                   </button>
                   {isInstalled ? (
-                    <button className="hum-btn is-sm is-primary justify-center" disabled>
+                    <span className="hum-chip is-success justify-center" aria-label={`${m.name}已招聘`}>
                       <CheckCircle2 size={11} /> 已招聘
-                    </button>
+                    </span>
                   ) : (
                     <button onClick={() => onHire(m)} className="hum-btn is-sm is-primary justify-center">
                       <ShoppingCart size={11} /> 招聘
