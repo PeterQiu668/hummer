@@ -211,3 +211,36 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - Both operations simulations completed with no `FAIL`. Their existing `SKIP`, `CHECK`, and `WARN` items remain explicit product-boundary observations, not passes.
 - Built unsigned `release/m5e/HUMMER-Setup-0.5.0-internal.1.exe`: 125,123,558 bytes, SHA-256 `8CC246BDA3267C3F439980FB3BCB904CC92FC3EAC7A752BF3ED3C64D325BFB70`, Authenticode `NotSigned`.
 - Explicitly blocked: the three DeepSeek credential-backed E2Es and clean-Windows installation. The global all-desktop-green gate is therefore not claimed.
+
+## M5-F status update - 2026-09-13
+
+### P0 `workspace.exec` gate: blocked and retracted
+
+- Real Codex CLI 0.153.4 probe started at `2026-09-13T10:13:53.357Z`. Evidence: `spikes/m5f-workspace-exec/blocked-evidence.json`; complete wire: `spikes/m5f-workspace-exec/runs/2026-09-13T10-13-53-357Z/workspace-exec-wire.jsonl`.
+- The order sandbox wrote and hashed an in-sandbox artifact. The `../../escaped.md` probe failed with `PermissionError`, but an outbound HTTPS probe completed with exit code 0 under the `codexsandboxoffline` identity.
+- The mandatory no-network gate failed. The fourth capability, migration v9, environment-doctor additions, and runtime changes were retracted. The production catalog remains at three capabilities.
+- P1's six workflow E2Es were not created or run because the user-specified P0 gate did not pass. No mock evidence substitutes for them.
+
+### P2 dead-control closure
+
+- All seven reported dead controls were either connected to a real existing flow or converted to non-interactive status text. Assigning work from an employee profile now routes to the workbench with that employee preselected.
+- `scripts/audit-dead-controls.mjs` uses the TypeScript AST and fails on native buttons without `onClick`, except legitimate `type="submit"` buttons. It is part of the root `npm test` command.
+
+### P3 DeepSeek local environment loading
+
+- `.env.local` is ignored by Git. The three credential-backed DeepSeek commands use Node's native `--env-file=.env.local`; no `dotenv` dependency was added.
+- This checkout has no `.env.local`, so the three real DeepSeek tests remain blocked and were not replaced by mock or internal-profile runs.
+
+### P4 release gate
+
+- Code-signing and clean-Windows status remain unchanged from `docs/release/m5e-windows-internal-release.md`: certificate not applied, ownership/vendor/date unassigned, and no clean Windows host available.
+- M5-F is not release-qualified because P0 failed. No M5-F installer is claimed.
+
+### M5-F regression snapshot
+
+- Current-code checks run on 2026-09-13 passed: `typecheck`; dead-control audit; `test:unit` (188); `test:ui` (37); `build`; `desktop:build`; and browser `test:e2e`.
+- Local product-chain desktop checks passed: persistence, identity, approval rejection, projects, outcome receipt with independent tamper detection, internal planner, external draft, and packaged smoke.
+- Real Codex checks passed separately: app-server execution, approval continuation, steer, interrupt, real-session restart recovery, denied unapproved write, MCP `fs.read`, real XLSX `doc.extract`, and confirmed order intake.
+- Both operations simulations exited 0 with no `FAIL`; their existing `SKIP`, `CHECK`, and `WARN` entries remain open observations.
+- The three credential-backed DeepSeek checks, the rejected `workspace.exec` E2E, six dependent workflow E2Es, and clean-Windows installation are not green. The global all-desktop/all-workflow gate is not claimed.
+- Existing non-blocking runtime diagnostics remain visible: internal OpenAI validation has no verified CNY price, and the basic Codex smoke logged missing intake IPC handlers in that reduced host mode.

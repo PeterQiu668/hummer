@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-09-13T10:16:00.515Z",
+  "status": "blocked",
+  "evidenceClass": "real-runtime-and-local-product-chain",
+  "runtime": {
+    "codexCli": "0.153.4",
+    "platform": "Windows",
+    "executionIdentity": "h4-480\\codexsandboxoffline",
+    "networkProfile": "limited with no allowed domains"
+  },
+  "workOrderId": "wo_plan_7giqri",
+  "sessionId": "codex_plan_7giqri_2",
+  "wireLog": "runs/2026-09-13T10-13-53-357Z/workspace-exec-wire.jsonl",
+  "domainEventCount": 38,
+  "probes": [
+    {
+      "name": "inside-write",
+      "exitCode": 0,
+      "artifact": "inside.txt",
+      "sha256": "3cb3ee1c66378b9cf8806c31311bf1b3b7c3778026f03fc4671e1933b7e951e0"
+    },
+    {
+      "name": "path-escape",
+      "exitCode": 1,
+      "result": "PermissionError"
+    },
+    {
+      "name": "network-egress",
+      "exitCode": 0,
+      "result": "Outbound HTTPS succeeded; the no-network gate failed"
+    }
+  ],
+  "decision": "NO-GO: workspace.exec was retracted, migration v9 was retracted, and the six workflow E2Es were not started"
+}

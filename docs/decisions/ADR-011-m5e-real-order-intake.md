@@ -49,3 +49,19 @@ M5-D proved a controlled read capability and an approved draft-writing capabilit
 - HUMMER can now accept a local file order, hold it for human confirmation, extract a real office document, and preserve the resulting work order and receipt across restart.
 - The proof does not establish the default DeepSeek profile, external message delivery, or clean-machine readiness.
 - Additional office capabilities must not enter the catalog until they have the same guarded implementation, invocation ledger, evidence addressing, and real E2E proof.
+
+## M5-F amendment: rejected `workspace.exec` proposal - 2026-09-13
+
+This amendment records a rejected extension; it does not change the accepted M5-E boundary above.
+
+M5-F proposed a fourth capability, `workspace.exec`, with `workspace-write` inside an order-specific directory and no network access. The implementation was tested against Codex CLI 0.153.4 on Windows before registration. The final run started at `2026-09-13T10:13:53.357Z`; its summary is `spikes/m5f-workspace-exec/blocked-evidence.json` and its complete app-server wire log is `spikes/m5f-workspace-exec/runs/2026-09-13T10-13-53-357Z/workspace-exec-wire.jsonl`.
+
+The real probe established all three of these facts:
+
+1. A child process ran as `h4-480\codexsandboxoffline` and successfully created `inside.txt` in the order workspace.
+2. A requested write to `../../escaped.md` failed with `PermissionError`; no escaped file was created.
+3. A Python `urllib.request.urlopen('https://example.com')` command completed with exit code 0 despite the managed profile using limited network mode with no allowed domains.
+
+The same network escape had already reproduced with `unified_exec` enabled and disabled, with `network_proxy` disabled and enabled, and with ordinary and elevated Windows sandbox selection. The final run therefore fails the M5-F no-network acceptance gate. Public upstream reports describe related [Windows sandbox bypass](https://github.com/openai/codex/issues/14367) and [single-command network-control](https://github.com/openai/codex/issues/33688) failures, but those reports are supporting context rather than proof; the local wire log is the decision evidence. The policy was configured against the documented [app-server protocol](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md) and its [sandbox permission schema](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/src/protocol/v2/permissions.rs).
+
+Decision: do not register or ship `workspace.exec`, do not add migration v9, and do not begin the six office-workflow E2Es. The catalog remains exactly the three M5-E capabilities. A future proposal must first prove denied outbound traffic in a fresh real-runtime probe, using a control outside the model prompt and outside the affected app-server path.
