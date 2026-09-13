@@ -39,6 +39,20 @@
         "serverName": "hummer_local",
         "toolName": "fs_read"
       }
+    },
+    {
+      "id": "tool_workspace_exec",
+      "capabilityId": "workspace.exec",
+      "displayName": "隔离工作区执行",
+      "transport": "mcp",
+      "riskLevel": "low",
+      "policyActionPattern": "workspace.exec",
+      "enabled": true,
+      "endpoint": {
+        "serverName": "hummer_local",
+        "toolName": "workspace_exec",
+        "execution": "container-offline"
+      }
     }
   ]
 }

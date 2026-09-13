@@ -23,8 +23,9 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     expect(invocation.sandbox).toBe('read-only');
     expect(invocation.args).toContain('read-only');
     expect(invocation.stdin).toContain('Human gates are informational only');
-    expect(invocation.stdin).toContain('invoke the file-change tool normally');
-    expect(invocation.stdin).toContain('read-only sandbox and app-server approval protocol');
+    expect(invocation.stdin).toContain('built-in shell is disabled');
+    expect(invocation.stdin).toContain('hummer_local/workspace_exec');
+    expect(invocation.stdin).toContain('current order sandbox and has no network');
     expect(invocation.stdin).toContain('HUMMER controlled action channel');
     expect(invocation.stdin).not.toContain('Do not write files directly');
   });
@@ -128,6 +129,23 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     });
 
     expect(event[0]).toMatchObject({ type: 'tool', tool: 'doc.extract', args: { path: 'orders.xlsx' }, durationMs: 21 });
+  });
+
+  it('maps workspace execution and preserves broker-issued content evidence', () => {
+    const digest = 'a'.repeat(64);
+    const event = mapCodexMessage({
+      type: 'item.completed',
+      item: {
+        id: 'mcp_exec_1', type: 'mcp_tool_call', server: 'hummer_local', tool: 'workspace_exec', status: 'completed',
+        arguments: { argv: ['python', 'build.py'], files: [] },
+        result: { structuredContent: { evidenceRefs: [`evidence://sha256/${digest}`] } }, duration_ms: 42,
+      },
+    });
+
+    expect(event[0]).toMatchObject({
+      type: 'tool', tool: 'workspace.exec', durationMs: 42,
+      evidenceRefs: [`evidence://sha256/${digest}`, 'codex://items/mcp_exec_1'],
+    });
   });
 
   it('extracts the native thread id without leaking the Codex event type', () => {

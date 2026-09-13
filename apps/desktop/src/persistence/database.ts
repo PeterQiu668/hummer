@@ -16,6 +16,7 @@ import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
 import { ToolRegistryStore } from './tool-registry-store.js';
 import { WorkOrderIntakeStore } from './work-order-intake-store.js';
+import { WorkspaceExecStore } from './workspace-exec-store.js';
 import { createVerifiableReceipt, type VerifiableOutcomeReceipt } from './verifiable-receipt.js';
 import { openSqlite, type SqliteDatabase } from './sqlite.js';
 
@@ -111,6 +112,7 @@ export class DesktopPersistence {
   readonly outcomes: OutcomeLedgerStore;
   readonly tools: ToolRegistryStore;
   readonly workOrderIntakes: WorkOrderIntakeStore;
+  readonly workspaceExec: WorkspaceExecStore;
 
   constructor(
     private readonly database: SqliteDatabase,
@@ -132,6 +134,7 @@ export class DesktopPersistence {
     this.outcomes = new OutcomeLedgerStore(database, now);
     this.tools = new ToolRegistryStore(database);
     this.workOrderIntakes = new WorkOrderIntakeStore(database, this.evidence);
+    this.workspaceExec = new WorkspaceExecStore(database);
     this.builtinTools = new BuiltinToolExecutor(this.controlledWrites, this.tools);
   }
 

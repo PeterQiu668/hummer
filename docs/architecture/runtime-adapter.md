@@ -422,7 +422,7 @@ apps/desktop/src/persistence/m3-responsibility-chain.test.ts 验证同一 employ
 
 - 浏览器没有桌面 host 时仍使用明确标识的 Mock；Electron renderer 未显式配置时根据 `window.hummerDesktop.runtime` 选择真实外壳，不再依赖构建期 `VITE_HUMMER_RUNTIME_ADAPTER` 才能通电。显式配置仍优先。
 - Codex 的桌面默认协议是 `app-server-jsonrpc`；`exec-jsonl` 只用于显式诊断。运行时不可用时仍经 `FailoverRuntimeAdapter` 显式回落并展示原因。
-- 沙箱只由结构化 `approvalMode` 推导。模型生成的工作区说明即使包含“只读”等自然语言，也不能降低或提高执行权限。`HUMMER_CODEX_SANDBOX` 覆盖在初始 thread 和 fork 两条路径一致应用，并拒绝 `danger-full-access`。
+- 沙箱只由结构化控制平面决定。模型生成的工作区说明即使包含“只读”等自然语言，也不能降低或提高执行权限。M5-G 已废除 `HUMMER_CODEX_SANDBOX` 写权限覆盖；初始 thread、fork 和 exec-jsonl 兼容路径均强制 `read-only`。
 - 2026-09-10 18:32:49 至 18:33:46 UTC 的真实内部验证运行位于 `spikes/codex-runtime/app-server-approval-wire.jsonl` 与 `app-server-approval-trajectory.json`。trajectory sequence 9 为 `approval_required(shell.command)`，10 为真人批准，11 为后续命令工具事件，16 为结果；完整 turn 正常完成。
 - 2026-09-10 18:37:25 至 18:38:54 UTC 的真会话重启证据位于 `spikes/m3-real-restart/`。已完成事件恢复后追加明确的 `interrupted`，不把失效子进程伪装为运行中。
 - 2026-09-11 的打包验收暴露并修复了两个发布缺陷：Vite 绝对 `/assets` 路径导致 `file://` 空白页，以及打包命令未先重建 renderer。`npm run test:desktop:packaged` 现要求可见 UI、真实 runtime 标识、原生 SQLite、身份写入和环境自检同时通过。
@@ -441,3 +441,11 @@ Evidence boundaries:
 - `spikes/m5e-doc-extract/` proves a real Codex MCP call and local XLSX extraction. DOCX/PDF support is local integration-test evidence.
 - `spikes/m5e-intake/` proves folder detection, zero execution before confirmation, real Codex planning and document extraction, plus local HUMMER approval/outcome/receipt/restart behavior.
 - Neither evidence set proves the default DeepSeek profile or external delivery.
+
+## 18. M5-G HUMMER-owned execution boundary (2026-09-13)
+
+M5-G does not change the `RuntimeAdapter` method set. Codex remains a read-only reasoning and orchestration runtime with its built-in shell disabled. The adapter maps the verified `hummer_local/workspace_exec` MCP call to the runtime-neutral capability ID `workspace.exec`; it does not import container, Electron, or SQLite types.
+
+The other side of the boundary is owned by the desktop host. A session-bound, random lease authorizes one `workOrderId`; the main process then stages validated files into a unique container volume, runs a non-root image with a read-only root filesystem and no network, validates and hashes the returned snapshot, records `tool_invocations`, and removes the volume. User-configured MCP servers are explicitly disabled for embedded execution, so a runtime cannot bypass the HUMMER registry through inherited tools.
+
+The five-probe startup self-check is a control-plane prerequisite, not an advisory health badge. Missing container support, duplicate or incomplete probe output, or any successful network/DNS/raw-socket probe disables `workspace.exec` before the broker can execute it. Evidence and the packaging limits are recorded in `docs/decisions/ADR-012-m5g-hummer-owned-execution-sandbox.md`.

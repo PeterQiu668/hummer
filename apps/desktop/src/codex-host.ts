@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
@@ -13,6 +14,7 @@ import { listRuntimeConnectors, recordMcpStartupStatus, type RuntimeConnectorRec
 import { buildRuntimeEnvironment } from './runtime-credential-environment.js';
 import { replaceSandboxArgument, resolveCodexSandbox } from './codex-sandbox.js';
 import { buildHummerMcpProviderArgs } from './hummer-mcp-config.js';
+import type { WorkspaceExecLease, WorkspaceExecLeaseContext } from './workspace-exec-broker.js';
 
 const START = 'hummer:codex:start';
 const REPLAY = 'hummer:codex:replay';
@@ -35,6 +37,8 @@ interface Invocation {
   sandbox: 'read-only' | 'workspace-write';
   outputSchema?: Record<string, unknown>;
   authToken?: string;
+  sessionId?: string;
+  workOrderId?: string;
 }
 
 interface EventEnvelope {
@@ -68,16 +72,36 @@ interface RunState {
   invocation: Invocation;
   turnId?: string;
   turnActive: boolean;
+  workspaceExecLeaseToken?: string;
 }
 
 const runs = new Map<string, RunState>();
 let registered = false;
 let verifiedCodexExecutable: string | undefined;
 
+function inheritedMcpServerNames(environment: NodeJS.ProcessEnv): string[] {
+  const configPath = join(environment.CODEX_HOME || join(homedir(), '.codex'), 'config.toml');
+  if (!existsSync(configPath)) return [];
+  const names = new Set<string>();
+  for (const match of readFileSync(configPath, 'utf8').matchAll(/^\s*\[mcp_servers\.([A-Za-z0-9_-]+)(?:\.[^\]]+)?\]\s*$/gm)) {
+    if (match[1]) names.add(match[1]);
+  }
+  return [...names];
+}
+
+function reasoningEffortArgs(environment: NodeJS.ProcessEnv): string[] {
+  const effort = environment.HUMMER_CODEX_REASONING_EFFORT;
+  return effort && ['minimal', 'low', 'medium', 'high', 'xhigh'].includes(effort)
+    ? ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]
+    : [];
+}
+
 export interface CodexHostOptions {
   resolveCredential?: (token: string, engineProfileId: string, envKey: string) => string | undefined;
   recordMcpConnectorStatus?: (token: string, record: RuntimeConnectorRecord) => void;
   authorizeMcpTool?: (token: string, request: { serverName: string; toolName: string }) => boolean;
+  createWorkspaceExecLease?: (context: WorkspaceExecLeaseContext) => WorkspaceExecLease;
+  revokeWorkspaceExecLease?: (token: string) => void;
 }
 
 let hostOptions: CodexHostOptions = {};
@@ -99,7 +123,7 @@ export function registerCodexHost(options: CodexHostOptions = {}): void {
 
 async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
   validateInvocation(request);
-  const sandbox = resolveCodexSandbox(request.sandbox, process.env.HUMMER_CODEX_SANDBOX);
+  const sandbox = resolveCodexSandbox(request.sandbox);
   const effectiveRequest = {
     ...request,
     sandbox,
@@ -113,14 +137,21 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     envKey: profile.envKey,
     resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
   });
+  const workspaceExecLease = createWorkspaceExecLease(effectiveRequest);
+  if (workspaceExecLease) {
+    runtimeEnvironment.HUMMER_EXEC_BROKER_PIPE = workspaceExecLease.pipe;
+    runtimeEnvironment.HUMMER_EXEC_BROKER_TOKEN = workspaceExecLease.token;
+  }
   const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
   const mcpArgs = buildHummerMcpProviderArgs({
     executable: process.execPath,
     serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
     workspace: effectiveRequest.cwd ?? process.cwd(),
+    disabledServerNames: inheritedMcpServerNames(runtimeEnvironment),
   });
+  const reasoningArgs = reasoningEffortArgs(runtimeEnvironment);
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...effectiveRequest.args], {
+  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...reasoningArgs, ...effectiveRequest.args], {
     cwd: effectiveRequest.cwd,
     env: runtimeEnvironment,
     windowsHide: true,
@@ -150,6 +181,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
     approvalWatchdog,
     invocation: effectiveRequest,
     turnActive: false,
+    workspaceExecLeaseToken: workspaceExecLease?.token,
   };
   runs.set(processId, state);
   attachProcess(state);
@@ -215,14 +247,21 @@ async function forkCodex(
     envKey: profile.envKey,
     resolveCredential: hostOptions.resolveCredential ?? (() => undefined),
   });
+  const workspaceExecLease = createWorkspaceExecLease(request);
+  if (workspaceExecLease) {
+    runtimeEnvironment.HUMMER_EXEC_BROKER_PIPE = workspaceExecLease.pipe;
+    runtimeEnvironment.HUMMER_EXEC_BROKER_TOKEN = workspaceExecLease.token;
+  }
   const providerArgs = buildCodexProviderArgs(profile, runtimeEnvironment);
   const mcpArgs = buildHummerMcpProviderArgs({
     executable: process.execPath,
     serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
     workspace: request.cwd ?? process.cwd(),
+    disabledServerNames: inheritedMcpServerNames(runtimeEnvironment),
   });
+  const reasoningArgs = reasoningEffortArgs(runtimeEnvironment);
   const executable = resolveCodexExecutable();
-  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...request.args], {
+  const child = spawn(executable, [...providerArgs, ...mcpArgs, ...reasoningArgs, ...request.args], {
     cwd: request.cwd,
     env: runtimeEnvironment,
     windowsHide: true,
@@ -252,6 +291,7 @@ async function forkCodex(
     approvalWatchdog,
     invocation: request,
     turnActive: false,
+    workspaceExecLeaseToken: workspaceExecLease?.token,
   };
   runs.set(processId, state);
   attachProcess(state);
@@ -267,7 +307,7 @@ async function forkCodex(
       lastTurnId: checkpoint.nativeTurnId,
       cwd: request.cwd ?? null,
       approvalPolicy: 'on-request',
-      sandbox: resolveCodexSandbox(request.sandbox, process.env.HUMMER_CODEX_SANDBOX),
+      sandbox: resolveCodexSandbox(request.sandbox),
       ephemeral: false,
     });
     state.threadId = nestedString(forkResult, 'thread', 'id');
@@ -326,6 +366,7 @@ function attachProcess(state: RunState): void {
     });
     state.pending.clear();
     state.approvalWatchdog.clearAll();
+    if (state.workspaceExecLeaseToken) hostOptions.revokeWorkspaceExecLease?.(state.workspaceExecLeaseToken);
     if (code && code !== 0) publish(state, hostError(closeError));
   });
 }
@@ -502,6 +543,15 @@ function validateInvocation(request: Invocation): void {
     throw new Error('Codex arguments contain unsupported shell metacharacters');
   }
   if (request.protocol !== 'exec-jsonl' && request.protocol !== 'app-server-jsonrpc') throw new Error('Unsupported Codex protocol');
+}
+
+function createWorkspaceExecLease(request: Invocation): WorkspaceExecLease | undefined {
+  if (!request.authToken || !request.sessionId || !request.workOrderId || !hostOptions.createWorkspaceExecLease) return undefined;
+  return hostOptions.createWorkspaceExecLease({
+    authToken: request.authToken,
+    sessionId: request.sessionId,
+    workOrderId: request.workOrderId,
+  });
 }
 
 function resolveCodexExecutable(): string {

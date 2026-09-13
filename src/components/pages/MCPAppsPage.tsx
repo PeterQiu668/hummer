@@ -118,7 +118,7 @@ function AppsPanel({ query, apps, connectors, tools, hostAvailable, verifyingToo
     <section className="grid grid-cols-1 divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0">
       <Summary icon={<Link2 size={15} />} label="已验证连接" value={`${verified} 个`} detail={hostAvailable ? '来自桌面运行时的实际握手' : '浏览器原型未连接桌面宿主'} />
       <Summary icon={<ShieldCheck size={15} />} label="需要我确认" value="3 类操作" detail="外发、写回和权限变化" />
-      <Summary icon={<BriefcaseBusiness size={15} />} label="可接入范围" value="销售 · 交付 · 研发" detail="未验证的应用不会显示为已连接" />
+      <Summary icon={<BriefcaseBusiness size={15} />} label="当前可执行范围" value="本地文件 · 隔离产物" detail="外部应用尚未在当前版本开放" />
     </section>
     <section>
       <SectionTitle icon={<Wrench size={15} />} title="可执行能力" detail="能力来自租户工具注册表；握手成功前不会显示为已验证。" />
@@ -135,8 +135,8 @@ function AppsPanel({ query, apps, connectors, tools, hostAvailable, verifyingToo
       </div>)}</div> : <div className="rounded-md border border-dashed border-neutral-300 bg-white px-4 py-5 text-[11px] text-neutral-500">{hostAvailable ? '当前桌面运行时尚未完成连接握手。启动一次真实任务后，这里会刷新实际状态。' : '当前是浏览器原型，无法核验本机连接状态。'}</div>}
     </section>
     <section>
-      <SectionTitle icon={<Blocks size={15} />} title="工作应用目录" detail="这些是计划接入的工作环境；完成真实授权和握手前，统一标为待接入。" />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map((app) => <div key={app.id} className="hum-card flex min-h-[132px] flex-col p-4"><div className="flex items-start gap-3"><AppMark name={app.name} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{app.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{app.kind}</div></div><span className="hum-chip is-muted">待接入</span></div><div className="mt-3 text-[10.5px] leading-4 text-neutral-500">尚未建立真实授权与数据连接</div></div>)}</div>
+      <SectionTitle icon={<Blocks size={15} />} title="未来规划" detail="以下外部工作环境仅用于说明产品路线，当前版本不提供连接、授权或投递能力。" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map((app) => <div key={app.id} aria-disabled="true" className="hum-card flex min-h-[132px] flex-col bg-neutral-50 p-4 opacity-65"><div className="flex items-start gap-3"><AppMark name={app.name} /><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-700">{app.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{app.kind}</div></div><span className="hum-chip is-muted">路线图</span></div><div className="mt-3 text-[10.5px] leading-4 text-neutral-500">当前版本不提供；无法点击、授权或连接。</div></div>)}</div>
     </section>
   </div>;
 }

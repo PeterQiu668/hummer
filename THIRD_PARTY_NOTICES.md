@@ -62,4 +62,13 @@ This file records direct runtime and delivery dependencies relevant to the HUMME
 - Source: https://github.com/microsoft/playwright
 - License: Apache License 2.0
 
+## WenQuanYi Zen Hei
+
+- Version: Debian Bookworm `fonts-wqy-zenhei` package selected by the locked OCI image build
+- Source: http://wenq.org/
+- Debian package metadata: https://packages.debian.org/bookworm/fonts-wqy-zenhei
+- License: GPL-2.0 with font embedding exception, plus M+ Fonts License for applicable source material
+- Use: Chinese text rendering inside the M5-G office execution image.
+- Distribution boundary: not included in the current NSIS installer. Any future OCI archive distribution must include the package copyright file and complete applicable license texts.
+
 Before any public or commercial distribution, generate a complete dependency license report from the lockfile, include all required license texts and upstream NOTICE files, and obtain legal review.

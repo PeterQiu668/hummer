@@ -22,6 +22,7 @@ spikes/**/facts/
 spikes/**/profile*/
 spikes/**/.profile*/
 spikes/**/workspace/
+spikes/**/order-workspaces/
 spikes/**/outside/
 
 # Local Claude Code config

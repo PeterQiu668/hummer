@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { requiredCodexCliVersion } from './engine-profiles.js';
+import type { WorkspaceExecHealth } from './workspace-exec-service.js';
 
 export interface RuntimeEnvironmentStatus {
   ready: boolean;
@@ -14,6 +15,7 @@ export interface RuntimeEnvironmentStatus {
     executable?: string;
     issue?: string;
   };
+  workspaceExec: WorkspaceExecHealth | null;
 }
 
 interface DoctorDependencies {
@@ -40,6 +42,7 @@ const defaultDependencies: DoctorDependencies = {
 export function inspectRuntimeEnvironment(
   environment: NodeJS.ProcessEnv = process.env,
   dependencies: DoctorDependencies = defaultDependencies,
+  workspaceExec: WorkspaceExecHealth | null = null,
 ): RuntimeEnvironmentStatus {
   const expectedVersion = requiredCodexCliVersion();
   const executable = findCodexExecutable(environment, dependencies);
@@ -48,6 +51,7 @@ export function inspectRuntimeEnvironment(
     return {
       ready: false,
       node,
+      workspaceExec,
       codex: {
         available: false, compatible: false, expectedVersion,
         issue: `Codex CLI \u672a\u5b89\u88c5\u3002HUMMER \u9700\u8981 ${expectedVersion} \u7248\u672c\u624d\u80fd\u6267\u884c\u771f\u5b9e\u4efb\u52a1\u3002`,
@@ -60,6 +64,7 @@ export function inspectRuntimeEnvironment(
     return {
       ready: false,
       node,
+      workspaceExec,
       codex: {
         available: true, compatible: false, expectedVersion, executable,
         issue: '\u5df2\u627e\u5230 Codex CLI\uff0c\u4f46\u65e0\u6cd5\u8bfb\u53d6\u7248\u672c\u3002\u8bf7\u6309\u5b89\u88c5\u6307\u5f15\u91cd\u65b0\u5b89\u88c5\u3002',
@@ -70,6 +75,7 @@ export function inspectRuntimeEnvironment(
   return {
     ready: compatible,
     node,
+    workspaceExec,
     codex: {
       available: true, compatible, expectedVersion, version, executable,
       ...(!compatible ? { issue: `Codex CLI \u7248\u672c\u4e3a ${version}\uff0cHUMMER \u9700\u8981 ${expectedVersion}\u3002` } : {}),

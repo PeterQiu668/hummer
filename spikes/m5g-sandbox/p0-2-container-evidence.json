@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M5-G",
+  "probe": "P0.2 rootless container isolation",
+  "occurredAt": "2026-09-13T21:17:47.7862499+08:00",
+  "result": "pass",
+  "passed": 5,
+  "total": 5,
+  "runtime": {
+    "evaluatedPreference": "Podman",
+    "executedRuntime": "Docker Desktop 28.3.2",
+    "reason": "Podman is not installed on this workstation. The existing Docker engine was used only to prove the container boundary without installing another material dependency.",
+    "image": "hummer-office-sandbox:m5g-spike",
+    "imageDigest": "sha256:0674445a994093d31207cbd905082dc146041569faa409d36f7844d4013b48ca",
+    "imageSizeBytes": 106094077,
+    "baseImageDigest": "sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+    "containerIdentity": "uid 65532 (hummer)"
+  },
+  "isolation": {
+    "arguments": [
+      "--rm",
+      "--network=none",
+      "--read-only",
+      "--cap-drop=ALL",
+      "--security-opt=no-new-privileges",
+      "--pids-limit=128",
+      "--memory=512m",
+      "--cpus=1"
+    ],
+    "writableMount": "C:\\HUMMER-sandbox-spike\\p0-2-final\\workspace\\order-probe:/workspace",
+    "mountConstraint": "Only the order workspace is mounted writable. The image root filesystem is read-only."
+  },
+  "probes": [
+    {
+      "name": "inside-write",
+      "expected": "succeed",
+      "observed": "succeeded",
+      "passed": true,
+      "sha256": "abdada9f0e970e52c1d89e18ccc9d4e9c9f9feedafc9f80beb9dd0f5c57d9d28"
+    },
+    {
+      "name": "path-escape",
+      "expected": "fail",
+      "observed": "Errno 30 read-only file system",
+      "passed": true,
+      "hostEscapeTargetsExist": false
+    },
+    {
+      "name": "network-egress",
+      "expected": "fail",
+      "observed": "temporary failure in name resolution",
+      "passed": true
+    },
+    {
+      "name": "dns-resolution",
+      "expected": "fail",
+      "observed": "gaierror: temporary failure in name resolution",
+      "passed": true
+    },
+    {
+      "name": "raw-socket",
+      "expected": "fail",
+      "observed": "Errno 101 network is unreachable",
+      "passed": true
+    }
+  ],
+  "deploymentFindings": [
+    "Cold Docker Desktop bind mounts exceeded the first 30 second probe timeout twice; a warmed C drive ASCII mount then completed in under 5 seconds.",
+    "The product self-check must distinguish runtime startup latency from a failed isolation boundary.",
+    "Podman on Windows still requires a WSL2-backed machine; clean-machine setup is a release gate, not proven by this spike.",
+    "Docker Desktop licensing must be assessed for enterprises above its paid-use thresholds before selecting it for distribution."
+  ],
+  "decision": "The container boundary is technically viable. Production implementation may proceed only with a boot-time fail-closed isolation self-check."
+}

@@ -16,6 +16,7 @@ describe('RuntimeSetupGate', () => {
         ready: true,
         node: { available: true, version: '22.22.3', source: 'embedded' },
         codex: { available: true, compatible: true, version: '0.153.4', expectedVersion: '0.153.4' },
+        workspaceExec: { available: false, runtime: 'docker', passed: 4, total: 5, checkedAt: '2026-09-13T13:00:00.000Z', issue: '执行能力不可用：本机网络隔离未生效' },
       });
     window.hummerEnvironmentDoctor = { check, openInstallGuide: vi.fn() };
 
@@ -26,6 +27,7 @@ describe('RuntimeSetupGate', () => {
     expect(window.hummerEnvironmentDoctor.openInstallGuide).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: '\u91cd\u65b0\u68c0\u6d4b' }));
     await waitFor(() => expect(screen.getByText('workspace ready')).toBeInTheDocument());
+    expect(screen.getByText('执行能力不可用：本机网络隔离未生效')).toBeInTheDocument();
   });
 
   it('does not block the browser prototype', async () => {

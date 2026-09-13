@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M5-G",
+  "generatedAt": "2026-09-13T16:12:44.548Z",
+  "evidenceClass": "local-product-container-boundary",
+  "orderId": "order-real-1789315944737",
+  "health": {
+    "available": true,
+    "checkedAt": "2026-09-13T16:12:24.736Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "result": {
+    "exitCode": 0,
+    "stdout": "built\n",
+    "stderr": "",
+    "durationMs": 7480,
+    "artifacts": [
+      {
+        "path": "build.py",
+        "sha256": "5447ff18bc075e330418c2c6b8ea112adc471dfdc3f0872dec2c9ef17538029c",
+        "sizeBytes": 110
+      },
+      {
+        "path": "result.txt",
+        "sha256": "e330804c6e061b5849e548cea4d6ff9279d7a8b8fc6008a398e0f793b12ef637",
+        "sizeBytes": 18
+      }
+    ],
+    "evidenceRefs": [
+      "evidence://sha256/5447ff18bc075e330418c2c6b8ea112adc471dfdc3f0872dec2c9ef17538029c",
+      "evidence://sha256/e330804c6e061b5849e548cea4d6ff9279d7a8b8fc6008a398e0f793b12ef637"
+    ]
+  }
+}

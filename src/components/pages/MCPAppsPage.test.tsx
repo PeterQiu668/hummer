@@ -20,6 +20,11 @@ describe('Capabilities and connections page', () => {
     expect(screen.getByRole('button', { name: '工作应用' })).toBeInTheDocument();
     expect(screen.getByText('飞书')).toBeInTheDocument();
     expect(screen.getByText('钉钉')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '未来规划' })).toBeInTheDocument();
+    const feishuCard = screen.getByText('飞书').closest<HTMLElement>('[aria-disabled="true"]');
+    expect(feishuCard).not.toBeNull();
+    expect(within(feishuCard as HTMLElement).getByText('路线图')).toBeInTheDocument();
+    expect(within(feishuCard as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '技能' }));
     expect(screen.getByText('线索整理与跟进')).toBeInTheDocument();
@@ -46,7 +51,7 @@ describe('Capabilities and connections page', () => {
     expect(screen.getAllByText('已验证连接').length).toBeGreaterThan(0);
     expect(screen.getByText(/技术名称：node_repl/)).toBeInTheDocument();
     expect(screen.getByText('飞书')).toBeInTheDocument();
-    expect(screen.getAllByText('待接入').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('路线图').length).toBeGreaterThan(0);
   });
 
   it('marks fs.read verified only after the desktop handshake succeeds', async () => {

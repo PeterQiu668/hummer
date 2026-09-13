@@ -13,6 +13,8 @@ export interface CodexCliInvocation {
   sandbox: 'read-only' | 'workspace-write';
   outputSchema?: Record<string, unknown>;
   authToken?: string;
+  sessionId?: string;
+  workOrderId?: string;
 }
 
 export interface CodexCliRun {
@@ -72,15 +74,17 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
 
   async startSession(plan: SessionPlan): Promise<RuntimeHandle> {
     this.assertAvailable();
+    const sessionId = `codex_${plan.id}_${++this.sessionCounter}`;
     const invocation = buildCodexInvocation(plan, {
       cwd: this.options.cwd,
       protocol: this.options.protocol ?? 'exec-jsonl',
       authToken: this.options.getAuthToken?.() ?? undefined,
+      sessionId,
     });
     const run = await this.options.host!.start(invocation);
     const handle: RuntimeHandle = {
       runtimeId: this.id,
-      sessionId: `codex_${plan.id}_${++this.sessionCounter}`,
+      sessionId,
       engine: run.engine,
       nativeSessionId: run.nativeSessionId,
     };
@@ -235,6 +239,7 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
   cwd?: string;
   protocol?: 'exec-jsonl' | 'app-server-jsonrpc';
   authToken?: string;
+  sessionId?: string;
 } = {}): CodexCliInvocation {
   const protocol = options.protocol ?? 'exec-jsonl';
   if (protocol === 'app-server-jsonrpc') {
@@ -249,6 +254,8 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
       sandbox: sandboxForPlan(plan),
       outputSchema: plan.responseSchema,
       authToken: options.authToken,
+      sessionId: options.sessionId,
+      workOrderId: plan.workOrderId,
     };
   }
   return {
@@ -262,6 +269,8 @@ export function buildCodexInvocation(plan: SessionPlan, options: {
     sandbox: sandboxForPlan(plan),
     outputSchema: plan.responseSchema,
     authToken: options.authToken,
+    sessionId: options.sessionId,
+    workOrderId: plan.workOrderId,
   };
 }
 
@@ -348,7 +357,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
         result: stringifyResult(item.result ?? item.error ?? item.status),
         durationMs: numberOrNull(item.duration_ms),
         costCny: null,
-        evidenceRefs: [`codex://items/${itemId}`],
+        evidenceRefs: [...mcpEvidenceRefs(item.result), `codex://items/${itemId}`],
       }];
     }
     if (itemType === 'file_change') {
@@ -448,22 +457,28 @@ export function extractCodexUsage(message: unknown): RuntimeTokenUsage | undefin
 }
 
 function sandboxForPlan(_plan: SessionPlan): 'read-only' {
-  // Human gates in the prompt are informational. File writes are enforced by the
-  // read-only sandbox/app-server approval protocol; other protected actions use
-  // HUMMER's main-process controlled action channels.
+  // Human gates in the prompt are informational. Codex receives neither host shell
+  // nor direct write authority; HUMMER-owned MCP and controlled action channels
+  // enforce execution and egress boundaries in the desktop main process.
   return 'read-only';
 }
 
 function buildCodexPrompt(plan: SessionPlan): string {
   return [
     plan.prompt,
+    ...(plan.tools.includes('workspace.exec') ? [
+      '',
+      'This is the execution turn, not a planning turn. Invoke hummer_local/workspace_exec immediately; do not send a preamble, restate, or merely confirm the plan.',
+      'The tool input is {"argv":[...],"files":[{"path":"build.py","content":"..."}],"timeoutMs":120000}. Put every source file needed by the job in files and run it with an absolute /workspace path.',
+    ] : []),
     '',
     'Confirmed plan:',
     ...plan.understanding.map((item, index) => `${index + 1}. ${item}`),
     '',
     `Workspace scope: ${plan.workspaceScope}`,
     `Human gates are informational only: ${plan.humanGates.join('; ')}`,
-    'For a requested file change, invoke the file-change tool normally. The read-only sandbox and app-server approval protocol will stop it before mutation and wait for a HUMMER decision; never bypass or emulate that gate.',
+    'The built-in shell is disabled and this runtime is read-only. Use fs.read/doc.extract for reads. Use hummer_local/workspace_exec only when it is explicitly included in the confirmed plan; other proposed file changes remain subject to the app-server protocol gate.',
+    'workspace_exec is confined to the current order sandbox and has no network. Every artifact is re-hashed by HUMMER before it enters the evidence ledger.',
     'For any protected action that has no protocol-enforced gate, return a proposal for the HUMMER controlled action channel instead of performing it.',
     'Return a concise evidence-backed result. Do not access anything outside the stated scope.',
   ].join('\n');
@@ -510,5 +525,22 @@ function stableMcpCapabilityId(server: string, tool: string): string {
   if (server !== 'hummer_local') return `mcp.${server}.${tool}`;
   if (tool === 'fs_read') return 'fs.read';
   if (tool === 'doc_extract') return 'doc.extract';
+  if (tool === 'workspace_exec') return 'workspace.exec';
   return `mcp.${server}.${tool}`;
+}
+
+function mcpEvidenceRefs(value: unknown): string[] {
+  const candidates: unknown[] = [value];
+  const refs = new Set<string>();
+  while (candidates.length) {
+    const candidate = candidates.pop();
+    if (typeof candidate === 'string') {
+      if (candidate.startsWith('evidence://sha256/')) refs.add(candidate);
+      else if (/^[\[{]/.test(candidate.trim())) {
+        try { candidates.push(JSON.parse(candidate)); } catch { /* Tool text may be ordinary prose. */ }
+      }
+    } else if (Array.isArray(candidate)) candidates.push(...candidate);
+    else if (isRecord(candidate)) candidates.push(...Object.values(candidate));
+  }
+  return [...refs];
 }

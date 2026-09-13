@@ -17,6 +17,7 @@ export class TemplatePlanner implements Planner {
     });
     return {
       ...plan,
+      workOrderId: plan.workOrderId ?? `work_order_${plan.id.replace(/^plan_/, '')}`,
       humanGates: await policyDerivedHumanGates(request.input, plan.tools, this.options.policy),
       planning: {
         source: 'template' as const,

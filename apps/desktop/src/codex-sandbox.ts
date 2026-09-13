@@ -1,7 +1,8 @@
-export type CodexSandbox = 'read-only' | 'workspace-write';
+export type CodexSandbox = 'read-only';
+type LegacyCodexSandboxRequest = CodexSandbox | 'workspace-write';
 
-export function resolveCodexSandbox(requested: CodexSandbox, configured?: string): CodexSandbox {
-  return configured === 'read-only' || configured === 'workspace-write' ? configured : requested;
+export function resolveCodexSandbox(_requested: LegacyCodexSandboxRequest): CodexSandbox {
+  return 'read-only';
 }
 
 export function replaceSandboxArgument(args: string[], sandbox: CodexSandbox): string[] {

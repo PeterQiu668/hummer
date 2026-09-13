@@ -513,6 +513,41 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 9,
+    name: 'm5g_hummer_execution_sandbox',
+    sql: `
+      CREATE TABLE execution_sandbox_checks (
+        id TEXT PRIMARY KEY,
+        runtime TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('passed', 'failed')),
+        passed_probes INTEGER NOT NULL,
+        total_probes INTEGER NOT NULL,
+        issue TEXT,
+        result_json TEXT NOT NULL,
+        checked_at TEXT NOT NULL
+      );
+
+      CREATE INDEX execution_sandbox_checks_latest
+        ON execution_sandbox_checks (checked_at DESC);
+
+      CREATE TABLE workspace_exec_jobs (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        work_order_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+        argv_json TEXT NOT NULL,
+        exit_code INTEGER NOT NULL,
+        duration_ms REAL NOT NULL,
+        artifacts_json TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      );
+
+      CREATE INDEX workspace_exec_jobs_session
+        ON workspace_exec_jobs (tenant_id, session_id, occurred_at);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

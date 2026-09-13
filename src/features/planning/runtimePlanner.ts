@@ -65,6 +65,7 @@ export class RuntimePlanner implements Planner {
       };
       return {
         id: planId,
+        workOrderId: `work_order_${planId.replace(/^plan_/, '')}`,
         prompt: request.input.trim(),
         understanding: payload.understanding,
         assignees,

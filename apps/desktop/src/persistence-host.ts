@@ -23,6 +23,8 @@ import type { RuntimeConnectorRecord } from './mcp-connector-registry.js';
 import { probeLocalMcp } from './mcp-connection-probe.js';
 import { WorkOrderInboxWatcher } from './work-order-inbox-watcher.js';
 import { requireWorkspaceDirectory, requireWorkspaceFile } from './workspace-file-guard.js';
+import type { WorkspaceExecLeaseContext } from './workspace-exec-broker.js';
+import type { WorkspaceExecHealth, WorkspaceExecRequest, WorkspaceExecResult } from './workspace-exec-service.js';
 
 interface SessionRecordRequest {
   token: string;
@@ -42,6 +44,13 @@ export interface PersistenceHostRegistration {
   resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
   recordMcpConnectorStatus(token: string, record: RuntimeConnectorRecord): void;
   authorizeMcpTool(token: string, request: { serverName: string; toolName: string }): boolean;
+  recordWorkspaceExecHealth(health: WorkspaceExecHealth): void;
+  recordWorkspaceExecResult(
+    context: WorkspaceExecLeaseContext,
+    result: WorkspaceExecResult,
+    request: Omit<WorkspaceExecRequest, 'orderId'>,
+    workspaceDirectory: string,
+  ): WorkspaceExecResult;
   close(): void;
 }
 export interface PersistenceHostOptions {
@@ -147,12 +156,12 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
         serverScript: fileURLToPath(new URL('./hummer-mcp-server.js', import.meta.url)),
         workspace: workspaceDirectory,
       });
-      const connected = ['fs.read', 'doc.extract'].map((capabilityId) => persistence.tools.recordConnectionStatus({
+      const connected = ['fs.read', 'doc.extract', 'workspace.exec'].map((capabilityId) => persistence.tools.recordConnectionStatus({
         tenantId: context.tenant.id, capabilityId, connected: true, actorRef, occurredAt, error: null,
       }));
       return connected.find((definition) => definition.capabilityId === 'fs.read')!;
     } catch (error) {
-      for (const capabilityId of ['fs.read', 'doc.extract']) persistence.tools.recordConnectionStatus({
+      for (const capabilityId of ['fs.read', 'doc.extract', 'workspace.exec']) persistence.tools.recordConnectionStatus({
         tenantId: context.tenant.id, capabilityId, connected: false, actorRef, occurredAt,
         error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
       });
@@ -433,6 +442,41 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
         candidate.endpoint.serverName === request.serverName && candidate.endpoint.toolName === request.toolName
       ));
       return definition?.status === 'verified' && definition.riskLevel === 'low';
+    },
+    recordWorkspaceExecHealth: (health) => persistence.workspaceExec.recordHealth(health),
+    recordWorkspaceExecResult: (context, result, request, executionWorkspace) => {
+      const identity = persistence.identity.resumeSession(context.authToken);
+      const occurredAt = new Date().toISOString();
+      const evidenceRefs = result.artifacts.map((artifact) => {
+        const file = requireWorkspaceFile({
+          workspaceDirectory: executionWorkspace,
+          requestedPath: artifact.path,
+          capability: 'workspace_exec_artifact',
+          maxBytes: 100 * 1024 * 1024,
+        });
+        const evidence = persistence.evidence.put(readFileSync(file.absolutePath), {
+          tenantId: identity.tenant.id,
+          sessionId: context.sessionId,
+          mediaType: intakeMediaType(file.extension),
+          name: artifact.path,
+          createdAt: occurredAt,
+          metadata: { source: 'workspace-exec', workOrderId: context.workOrderId, relativePath: artifact.path },
+        });
+        if (evidence.sha256 !== artifact.sha256) throw new Error(`workspace.exec artifact changed before evidence capture: ${artifact.path}`);
+        return evidence.ref;
+      });
+      persistence.workspaceExec.recordJob({
+        tenantId: identity.tenant.id,
+        sessionId: context.sessionId,
+        workOrderId: context.workOrderId,
+        actorRef: 'employee:codex',
+        argv: request.argv,
+        exitCode: result.exitCode,
+        durationMs: result.durationMs,
+        artifacts: result.artifacts,
+        occurredAt,
+      });
+      return { ...result, evidenceRefs };
     },
     close: () => {
       inboxWatcher.close();

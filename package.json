@@ -47,7 +47,15 @@
     "test:desktop:tool-registry": "node scripts/e2e-desktop-tool-registry.mjs",
     "test:desktop:doc-extract": "node scripts/e2e-desktop-doc-extract.mjs",
     "test:desktop:intake": "node scripts/e2e-desktop-intake.mjs",
-    "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs"
+    "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs",
+    "test:desktop:workspace-exec": "node scripts/e2e-desktop-workspace-exec.mjs",
+    "test:workflow:website": "node scripts/e2e-workflow-website.mjs",
+    "test:workflow:deck": "node scripts/e2e-workflow-deck.mjs",
+    "test:workflow:report": "node scripts/e2e-workflow-report.mjs",
+    "test:workflow:image": "node scripts/e2e-workflow-image.mjs",
+    "test:workflow:sales": "node scripts/e2e-workflow-sales.mjs",
+    "test:workflow:content": "node scripts/e2e-workflow-content.mjs",
+    "verify:m5g:evidence": "node scripts/verify-m5g-evidence.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

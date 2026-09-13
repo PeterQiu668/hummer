@@ -108,7 +108,7 @@ contextBridge.exposeInMainWorld('hummerProjects', {
   recordGrowthReview: (request: unknown) => ipcRenderer.invoke('hummer:projects:record-growth-review', request),
 });
 contextBridge.exposeInMainWorld('hummerEnvironmentDoctor', {
-  check: () => ipcRenderer.invoke('hummer:environment:check'),
+  check: (force = false) => ipcRenderer.invoke('hummer:environment:check', force),
   openInstallGuide: () => ipcRenderer.invoke('hummer:environment:install-guide'),
 });
 contextBridge.exposeInMainWorld('hummerApprovalPolicy', {

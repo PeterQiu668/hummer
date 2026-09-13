@@ -100,8 +100,8 @@ try {
   if (!evidence.receipt.tools.some((tool) => tool.capabilityId === 'doc.extract' && tool.evidenceRefs.some((ref) => ref.startsWith('evidence://sha256/')))) {
     throw new Error('Outcome receipt lacks doc.extract invocation details');
   }
-  if (evidence.definitions.map((tool) => tool.capabilityId).join(',') !== 'doc.extract,external.send.draft,fs.read') {
-    throw new Error(`Capability catalog is not fail-closed to three tools: ${JSON.stringify(evidence.definitions)}`);
+  if (evidence.definitions.map((tool) => tool.capabilityId).join(',') !== 'doc.extract,external.send.draft,fs.read,workspace.exec') {
+    throw new Error(`Capability catalog is not fail-closed to four tools: ${JSON.stringify(evidence.definitions)}`);
   }
   if (!evidence.integrity.valid) throw new Error(`Domain event chain is invalid: ${JSON.stringify(evidence.integrity)}`);
 

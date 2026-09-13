@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M5-G",
+  "probe": "P0.1 Windows account firewall isolation",
+  "occurredAt": "2026-09-13T21:01:24+08:00",
+  "result": "fail",
+  "passed": 3,
+  "total": 5,
+  "execution": {
+    "command": "codex sandbox -P :workspace --sandbox-state-disable-network -c windows.sandbox=\"elevated\" -C <order-dir> <python> p0_1_probe.py",
+    "tokenIdentity": "h4-480\\codexsandboxoffline",
+    "accountSid": "S-1-5-21-2028225646-3979590684-3452136659-1003",
+    "firewallRules": [
+      "codex_sandbox_offline_block_outbound",
+      "codex_sandbox_offline_block_loopback_udp",
+      "codex_sandbox_offline_block_loopback_tcp_except_proxy"
+    ]
+  },
+  "probes": [
+    {
+      "name": "inside-write",
+      "expected": "succeed",
+      "observed": "succeeded",
+      "passed": true,
+      "sha256": "abdada9f0e970e52c1d89e18ccc9d4e9c9f9feedafc9f80beb9dd0f5c57d9d28"
+    },
+    {
+      "name": "path-escape",
+      "expected": "fail",
+      "observed": "PermissionError",
+      "passed": true
+    },
+    {
+      "name": "network-egress",
+      "expected": "fail",
+      "observed": "HTTPS 200 from example.com",
+      "passed": false
+    },
+    {
+      "name": "dns-resolution",
+      "expected": "fail",
+      "observed": "resolved 104.20.23.154 and 172.66.147.243",
+      "passed": false
+    },
+    {
+      "name": "raw-socket",
+      "expected": "fail",
+      "observed": "WinError 10013",
+      "passed": true
+    }
+  ],
+  "decision": "P0.1 is NO-GO. Continue to P0.2; do not enable workspace.exec through this isolation path."
+}

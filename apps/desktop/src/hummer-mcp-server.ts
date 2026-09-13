@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { extractDocument } from './document-extractor.js';
 import { requireWorkspaceFile } from './workspace-file-guard.js';
 import { TextLineDecoder } from './wire-log.js';
+import { requestWorkspaceExecFromBroker } from './workspace-exec-broker.js';
+import type { WorkspaceExecResult } from './workspace-exec-service.js';
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -13,7 +15,13 @@ interface JsonRpcRequest {
   params?: unknown;
 }
 
-export async function handleMcpRequest(request: JsonRpcRequest, workspaceDirectory: string): Promise<Record<string, unknown> | undefined> {
+type WorkspaceExecForwarder = (input: Parameters<typeof requestWorkspaceExecFromBroker>[0]) => Promise<WorkspaceExecResult>;
+
+export async function handleMcpRequest(
+  request: JsonRpcRequest,
+  workspaceDirectory: string,
+  executeWorkspace: WorkspaceExecForwarder = requestWorkspaceExecFromBroker,
+): Promise<Record<string, unknown> | undefined> {
   if (request.id === undefined && request.method?.startsWith('notifications/')) return undefined;
   const id = request.id ?? null;
   try {
@@ -27,9 +35,16 @@ export async function handleMcpRequest(request: JsonRpcRequest, workspaceDirecto
       },
     };
     if (request.method === 'ping') return { jsonrpc: '2.0', id, result: {} };
-    if (request.method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: [FS_READ_TOOL, DOC_EXTRACT_TOOL] } };
+    if (request.method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: [FS_READ_TOOL, DOC_EXTRACT_TOOL, WORKSPACE_EXEC_TOOL] } };
     if (request.method === 'tools/call') {
       const params = record(request.params);
+      if (params.name === 'workspace_exec') {
+        const result = await executeWorkspace(workspaceExecInput(params.arguments));
+        return {
+          jsonrpc: '2.0', id,
+          result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result, isError: false },
+        };
+      }
       if (params.name !== 'fs_read' && params.name !== 'doc_extract') return failure(id, -32601, `Unknown tool ${String(params.name ?? '')}`);
       const args = record(params.arguments);
       const requestedPath = typeof args.path === 'string' ? args.path : '';
@@ -87,6 +102,38 @@ const DOC_EXTRACT_TOOL = {
     properties: { path: { type: 'string', minLength: 1 } },
   },
 };
+
+const WORKSPACE_EXEC_TOOL = {
+  name: 'workspace_exec',
+  title: 'Execute inside an isolated order workspace',
+  description: 'Stage source files and execute code inside the HUMMER-owned, offline order sandbox. Returns artifact hashes; the runtime never receives host shell access.',
+  inputSchema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['argv', 'files'],
+    properties: {
+      argv: { type: 'array', minItems: 1, maxItems: 128, items: { type: 'string', minLength: 1 } },
+      files: {
+        type: 'array', maxItems: 64,
+        items: {
+          type: 'object', additionalProperties: false, required: ['path', 'content'],
+          properties: { path: { type: 'string', minLength: 1 }, content: { type: 'string' } },
+        },
+      },
+      timeoutMs: { type: 'integer', minimum: 1000, maximum: 300000 },
+    },
+  },
+};
+
+function workspaceExecInput(value: unknown): Parameters<typeof requestWorkspaceExecFromBroker>[0] {
+  const input = record(value);
+  const argv = Array.isArray(input.argv) ? input.argv.filter((item): item is string => typeof item === 'string') : [];
+  const files = Array.isArray(input.files) ? input.files.map((item) => {
+    const file = record(item);
+    return { path: typeof file.path === 'string' ? file.path : '', content: typeof file.content === 'string' ? file.content : '' };
+  }) : [];
+  return { argv, files, ...(typeof input.timeoutMs === 'number' ? { timeoutMs: input.timeoutMs } : {}) };
+}
 
 function protocolVersion(params: unknown): string {
   const value = record(params).protocolVersion;

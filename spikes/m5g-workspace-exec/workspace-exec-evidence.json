@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-09-13T16:30:50.887Z",
+  "evidenceClass": "real-codex-runtime-and-local-product-chain",
+  "task": "Use only the HUMMER workspace.exec capability (hummer_local workspace_exec). Stage a Python file named build.py and execute it with python /workspace/build.py. The script must create deliverable.txt containing exactly: HUMMER_M5G_REAL_OUTPUT Do not use shell commands, apply_patch, direct file writes, web search, or any network access.",
+  "planText": "我理解你要做的是： 模型生成计划 1 确认目标产物为 build.py，并由其生成 deliverable.txt。 2 确认 deliverable.txt 的内容必须精确等于 HUMMER_M5G_REAL_OUTPUT。 3 规划后续仅通过 HUMMER workspace.exec 暂存并执行 build.py，执行入口为 python /workspace/build.py。 派给 自动推荐 换人 模型 旗舰 · 数据流向 api.openai.com 更换 需要能力 workspace.exec 修改 工作空间 我的工作空间 · 我的工作空间（规划阶段只读；后续执行仅限当前订单沙箱内的 /workspace/build.py 与 deliverable.txt） 改范围 停下来问你 改关口 预计 规划已就绪；获准进入执行阶段后预计少于1分钟。 改预计 规划成本：该运行时模型未配置价格，成本未记录 改一下 开始干",
+  "sessionId": "codex_plan_1fsz2hc_2",
+  "workOrderId": "work_order_1fsz2hc",
+  "deliverablePath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5g-workspace-exec\\order-workspaces\\work_order_1fsz2hc\\deliverable.txt",
+  "tool": {
+    "actorRef": "employee:codex",
+    "args": {
+      "argv": [
+        "python",
+        "/workspace/build.py"
+      ],
+      "files": [
+        {
+          "content": "from pathlib import Path\n\nPath(\"/workspace/deliverable.txt\").write_text(\"HUMMER_M5G_REAL_OUTPUT\", encoding=\"ascii\")\n",
+          "path": "build.py"
+        }
+      ],
+      "timeoutMs": 120000
+    },
+    "costCny": null,
+    "durationMs": 2219,
+    "evidenceRefs": [
+      "evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87",
+      "evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c",
+      "codex://items/exec-5a27e5fa-cb86-4260-8cad-39484c1a8b26"
+    ],
+    "occurredAt": "2026-09-13T16:30:46.848Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":669,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\\\",\\\"sizeBytes\\\":116},{\\\"path\\\":\\\"deliverable.txt\\\",\\\"sha256\\\":\\\"fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\\\",\\\"sizeBytes\\\":22}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\\\",\\\"evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"\",\"stderr\":\"\",\"durationMs\":669,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\",\"sizeBytes\":116},{\"path\":\"deliverable.txt\",\"sha256\":\"fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\",\"sizeBytes\":22}],\"evidenceRefs\":[\"evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\",\"evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\"]},\"_meta\":null}",
+    "sequence": 3,
+    "sessionId": "codex_plan_1fsz2hc_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 workspace_exec",
+    "tool": "workspace.exec",
+    "type": "tool"
+  },
+  "startupIsolation": {
+    "available": true,
+    "checkedAt": "2026-09-13T16:30:09.695Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "wireProof": {
+    "workspaceExecCall": true,
+    "shellCall": false
+  },
+  "receiptTools": [
+    {
+      "id": "tool_inv_7f55ca0f-79c9-4413-9568-e8e4c3173a06",
+      "tenantId": "tenant_c40c59b9a10941b090c33e5bd91b87d0",
+      "sessionId": "codex_plan_1fsz2hc_2",
+      "toolDefinitionId": "tenant_c40c59b9a10941b090c33e5bd91b87d0_tool_workspace_exec",
+      "capabilityId": "workspace.exec",
+      "actorRef": "employee:codex",
+      "status": "completed",
+      "args": {
+        "argv": [
+          "python",
+          "/workspace/build.py"
+        ],
+        "files": [
+          {
+            "content": "from pathlib import Path\n\nPath(\"/workspace/deliverable.txt\").write_text(\"HUMMER_M5G_REAL_OUTPUT\", encoding=\"ascii\")\n",
+            "path": "build.py"
+          }
+        ],
+        "timeoutMs": 120000
+      },
+      "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":669,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\\\",\\\"sizeBytes\\\":116},{\\\"path\\\":\\\"deliverable.txt\\\",\\\"sha256\\\":\\\"fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\\\",\\\"sizeBytes\\\":22}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\\\",\\\"evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"\",\"stderr\":\"\",\"durationMs\":669,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\",\"sizeBytes\":116},{\"path\":\"deliverable.txt\",\"sha256\":\"fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\",\"sizeBytes\":22}],\"evidenceRefs\":[\"evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c\",\"evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87\"]},\"_meta\":null}",
+      "durationMs": 2219,
+      "evidenceRefs": [
+        "evidence://sha256/fe1bb1a60bc5b8d895a0a1bad1924bd03ac2b07624ab1b56ee1eb956e7e93c87",
+        "evidence://sha256/27ed50ca8dd4aa124a4da434c3911d89ac9be78c63775253ea28d9127c11e17c",
+        "codex://items/exec-5a27e5fa-cb86-4260-8cad-39484c1a8b26"
+      ],
+      "occurredAt": "2026-09-13T16:30:46.848Z",
+      "idempotencyKey": "codex_plan_1fsz2hc_2:3:workspace.exec"
+    }
+  ],
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 28
+  }
+}

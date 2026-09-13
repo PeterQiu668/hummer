@@ -100,8 +100,8 @@ try {
   }
   const composer = page.getByRole('textbox', { name: '任务描述' });
   const runtimeTask = approvalFlow
-    ? 'Read input.txt, then use apply_patch to create summary-approved.md with one concise sentence summarizing the file. This is an explicit write-gate test: request approval for the file change and do not modify any other file.'
-    : 'Read input.txt with a local command and return one concise sentence that summarizes it. Do not create or modify any file.';
+    ? 'Use only HUMMER fs.read to read input.txt; the plan tools list must contain only fs.read. Then use apply_patch to create summary-approved.md with one concise sentence summarizing the file. Do not use workspace.exec. This is an explicit protocol write-gate test: request approval for the file change and do not modify any other file.'
+    : 'Use only the HUMMER fs.read capability (hummer_local/fs_read) to read input.txt, then return one concise sentence that summarizes it. Do not use workspace.exec, shell commands, or create or modify any file.';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     await composer.fill(runtimeTask);
     await composer.press('Enter');
@@ -128,8 +128,8 @@ try {
       await page.locator('[data-runtime-tool="workspace.patch"]').waitFor({ state: 'visible', timeout: 120_000 });
       console.log('stage=file-change-visible');
     } else {
-      await page.locator('[data-runtime-event-kind="tool"][data-runtime-tool="shell.command"]').last().waitFor({ state: 'visible', timeout: 120_000 });
-      console.log('stage=command-event-visible');
+      await page.locator('[data-runtime-event-kind="tool"][data-runtime-tool="fs.read"]').last().waitFor({ state: 'visible', timeout: 120_000 });
+      console.log('stage=controlled-read-event-visible');
     }
     await page.getByText('任务运行完成', { exact: true }).waitFor({ state: 'visible', timeout: 120_000 });
   } catch (error) {
@@ -198,6 +198,16 @@ try {
     text: node.textContent?.replace(/\s+/g, ' ').trim(),
   })));
   const artifactStem = forkFlow ? 'app-server-fork-trajectory' : approvalFlow ? 'app-server-approval-trajectory' : protocol === 'app-server-jsonrpc' ? 'app-server-trajectory' : 'desktop-trajectory';
+  if (!approvalFlow) {
+    if (trajectory.some((event) => event.tool === 'shell.command')) throw new Error('Read-only Codex smoke exposed a shell.command trajectory event');
+    const wireRows = readFileSync(wireLogPath, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => {
+      const envelope = JSON.parse(line);
+      return typeof envelope.raw === 'string' ? JSON.parse(envelope.raw) : envelope.raw;
+    });
+    if (wireRows.some((raw) => raw?.method === 'item/started' && raw.params?.item?.type === 'commandExecution')) {
+      throw new Error('Read-only Codex smoke executed a host command');
+    }
+  }
   if (approvalFlow) assertApprovalSequence(trajectory);
   writeFileSync(resolve(workspace, `${artifactStem}.json`), `${JSON.stringify(trajectory, null, 2)}\n`, 'utf8');
   await page.screenshot({ path: resolve(root, `dist/hummer-m1-codex-${protocol}.png`), fullPage: true });
