@@ -194,13 +194,21 @@ export function parseRuntimePlan(text: string): RuntimePlanPayload {
   let parsed: unknown;
   try { parsed = JSON.parse(candidate); } catch { throw new Error('Planning schema validation failed: response is not valid JSON'); }
   if (!isRecord(parsed)) throw new Error('Planning schema validation failed: root must be an object');
-  const understanding = stringArray(parsed.understanding, 'understanding', 2, 6);
+  const understanding = stringArray(parsed.understanding, 'understanding', 2, 6)
+    .filter((item) => !isPlanningMetaStep(item));
+  if (understanding.length < 2) {
+    throw new Error('Planning schema validation failed: understanding must contain at least 2 executable task steps');
+  }
   const assignees = stringArray(parsed.assignees, 'assignees', 1, 8);
   const tools = stringArray(parsed.tools, 'tools', 1, 16);
   const humanGates = stringArray(parsed.humanGates, 'humanGates', 0, 16);
   const workspaceScope = stringField(parsed.workspaceScope, 'workspaceScope');
   const estimate = stringField(parsed.estimate, 'estimate');
   return { understanding, assignees, tools, workspaceScope, humanGates, estimate };
+}
+
+function isPlanningMetaStep(item: string): boolean {
+  return /(?:planning\s+only|only\s+(?:return|output)\s+(?:a\s+)?plan|仅(?:生成|输出|理解).{0,12}计划|不执行(?:任何)?(?:工具|命令|操作)|本次仅输出计划)/i.test(item);
 }
 
 function extractJson(text: string): string {

@@ -82,6 +82,25 @@ describe('RuntimePlanner', () => {
     }));
   });
 
+  it('removes planning-only meta instructions before the execution plan is returned', async () => {
+    const planner = new RuntimePlanner({
+      runtime: new ScriptedRuntime({
+        ...runtimePayload,
+        understanding: [
+          ...runtimePayload.understanding,
+          '本次仅输出计划，不执行任何工具',
+        ],
+      }),
+      policy: policyPort(),
+      timeoutMs: 100,
+    });
+
+    const plan = await planner.draft(DELETE_TASK);
+
+    expect(plan.planning?.source).toBe('runtime');
+    expect(plan.understanding).toEqual(runtimePayload.understanding);
+  });
+
   it('fails closed to a visibly marked template when runtime output violates the schema', async () => {
     const recordCost = vi.fn(async (command: RecordCostCommand): Promise<CostLedgerRecord> => costRecord(command));
     const planner = new RuntimePlanner({
