@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-09-13T14:57:31.310Z",
+  "evidenceClass": "real-codex-runtime-plus-local-product-approval-chain",
+  "kind": "deck",
+  "task": "Use HUMMER workspace.exec now with python-pptx. Generate build.py, run python /workspace/build.py, and create delivery-review.pptx with exactly 5 slides: title, progress, risks, financials, next actions. Include real Chinese slide text. Do not merely describe the work.",
+  "planText": "我理解你要做的是： 模型生成计划 1 确认交付物为 delivery-review.pptx，且必须恰好包含 5 页：标题、进展、风险、财务、下一步行动。 2 规划使用 python-pptx 编写 build.py，并在 HUMMER 受控工作区通过 workspace.exec 执行 python /workspace/build.py。 3 为每页准备真实、可读的中文业务文本，并将“页数恰好为 5 页、主题顺序正确、文件可打开”作为验收标准。 派给 数字交付同事 换人 模型 旗舰 · 数据流向 api.openai.com 更换 需要能力 workspace.exec 修改 工作空间 我的工作空间 · 我的工作空间（规划阶段只读；后续执行仅限当前订单沙箱内的 /workspace/build.py 与 /workspace/delivery-review.pptx） 改范围 停下来问你 改关口 预计 执行阶段预计 10-15 分钟，包括生成脚本、构建演示文稿及验证 5 页结构。 改预计 规划成本：该运行时模型未配置价格，成本未记录 改一下 开始干",
+  "intakeId": "intake_9dd2fdb3f3d4241829ffd484ade3343c",
+  "sessionId": "codex_plan_1aj78ps_2",
+  "workOrderId": "wo_intake_b85e6809a1930f4b58b0ac83",
+  "orderDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5g-workflows\\deck\\order-workspaces\\wo_intake_b85e6809a1930f4b58b0ac83",
+  "artifactEvidence": {
+    "files": [
+      "delivery-review.pptx"
+    ],
+    "slideCount": 5
+  },
+  "tool": {
+    "actorRef": "employee:codex",
+    "args": {
+      "argv": [
+        "python",
+        "/workspace/build.py"
+      ],
+      "files": [
+        {
+          "content": "from pptx import Presentation\nfrom pptx.util import Inches, Pt\nfrom pptx.dml.color import RGBColor\nfrom pptx.enum.text import PP_ALIGN, MSO_ANCHOR\nfrom pptx.enum.shapes import MSO_SHAPE\nfrom pptx.enum.dml import MSO_THEME_COLOR\nfrom pathlib import Path\n\nOUT = Path(\"/workspace/delivery-review.pptx\")\nprs = Presentation()\nprs.slide_width = Inches(13.333)\nprs.slide_height = Inches(7.5)\n\nNAVY = RGBColor(20, 33, 61)\nBLUE = RGBColor(43, 92, 170)\nCYAN = RGBColor(48, 173, 220)\nGREEN = RGBColor(40, 153, 108)\nAMBER = RGBColor(224, 151, 38)\nRED = RGBColor(201, 74, 67)\nINK = RGBColor(31, 41, 55)\nMUTED = RGBColor(100, 116, 139)\nLIGHT = RGBColor(241, 245, 249)\nWHITE = RGBColor(255, 255, 255)\nLINE = RGBColor(215, 223, 233)\n\ndef rect(slide, x, y, w, h, fill, radius=False, line=None):\n    shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE if radius else MSO_SHAPE.RECTANGLE,\n                                   Inches(x), Inches(y), Inches(w), Inches(h))\n    shape.fill.solid(); shape.fill.fore_color.rgb = fill\n    shape.line.color.rgb = line if line else fill\n    return shape\n\ndef text(slide, s, x, y, w, h, size=18, color=INK, bold=False,\n         align=PP_ALIGN.LEFT, font=\"Microsoft YaHei\", valign=MSO_ANCHOR.MIDDLE):\n    box = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))\n    tf = box.text_frame; tf.clear(); tf.word_wrap = True; tf.vertical_anchor = valign\n    p = tf.paragraphs[0]; p.alignment = align\n    r = p.add_run(); r.text = s; r.font.name = font; r.font.size = Pt(size)\n    r.font.bold = bold; r.font.color.rgb = color\n    return box\n\ndef base(title, kicker, page):\n    slide = prs.slides.add_slide(prs.slide_layouts[6])\n    slide.background.fill.solid(); slide.background.fill.fore_color.rgb = WHITE\n    rect(slide, 0, 0, 0.12, 7.5, BLUE)\n    text(slide, kicker.upper(), 0.65, 0.38, 4.5, 0.3, 10, BLUE, True)\n    text(slide, title, 0.65, 0.73, 10.8, 0.55, 27, NAVY, True)\n    rect(slide, 0.65, 1.42, 12.0, 0.015, LINE)\n    text(slide, f\"{page:02d}  /  05\", 11.55, 0.48, 1.0, 0.3, 9, MUTED, True, PP_ALIGN.RIGHT)\n    return slide\n\n# 1 — title\ns = prs.slides.add_slide(prs.slide_layouts[6])\ns.background.fill.solid(); s.background.fill.fore_color.rgb = NAVY\nrect(s, 0, 0, 0.16, 7.5, CYAN)\ntext(s, \"HUMMER · 交付评审\", 0.85, 0.72, 4.5, 0.35, 12, CYAN, True)\ntext(s, \"MVP 交付进度与决策简报\", 0.85, 1.55, 10.8, 0.85, 34, WHITE, True)\ntext(s, \"从 React 原型迈向可信 AI 原生组织\", 0.85, 2.55, 8.8, 0.48, 19, RGBColor(190,205,228))\nrect(s, 0.85, 3.55, 3.0, 0.06, CYAN)\ntext(s, \"评审日期\", 0.85, 4.25, 1.3, 0.3, 11, RGBColor(153,170,196), True)\ntext(s, \"2026 年 9 月 13 日\", 0.85, 4.62, 3.2, 0.4, 17, WHITE, True)\ntext(s, \"评审范围\", 4.35, 4.25, 1.3, 0.3, 11, RGBColor(153,170,196), True)\ntext(s, \"MVP 交付就绪度\", 4.35, 4.62, 3.2, 0.4, 17, WHITE, True)\ntext(s, \"内部评审 · 决策材料\", 0.85, 6.75, 4.0, 0.3, 10, RGBColor(153,170,196))\n\n# 2 — progress\ns = base(\"当前进展\", \"DELIVERY PROGRESS\", 2)\nmetrics = [(\"核心事实模型\", \"80%\", \"WorkOrder、DomainEvent、Evidence 已形成主链路\"),\n           (\"审批闭环\", \"65%\", \"高风险动作默认拒绝，审批记录接入中\"),\n           (\"结果交付\", \"55%\", \"ResultPackage 结构已明确，导出体验待补齐\")]\nfor i,(name,pct,desc) in enumerate(metrics):\n    x = 0.7 + i*4.05\n    rect(s, x, 1.78, 3.7, 2.0, LIGHT, True, LINE)\n    text(s, pct, x+0.25, 2.0, 1.15, 0.62, 29, BLUE, True)\n    text(s, name, x+1.38, 2.04, 2.0, 0.38, 15, NAVY, True)\n    text(s, desc, x+0.25, 2.75, 3.15, 0.65, 11, MUTED)\ntext(s, \"本期完成\", 0.7, 4.22, 2, 0.35, 15, NAVY, True)\nitems = [(\"01\", \"前端保留既有 Vite + React + TypeScript 架构\"),\n         (\"02\", \"运行时能力统一收敛至 RuntimeAdapter 边界\"),\n         (\"03\", \"租户隔离与事件留痕纳入交付验收\")]\nfor i,(n,desc) in enumerate(items):\n    y=4.72+i*0.66\n    rect(s, 0.72, y, 0.42, 0.42, BLUE, True)\n    text(s, n, 0.72, y, 0.42, 0.42, 9, WHITE, True, PP_ALIGN.CENTER)\n    text(s, desc, 1.35, y-0.02, 10.7, 0.46, 13, INK)\n\n# 3 — risks\ns = base(\"主要风险与处置\", \"RISKS & CONTROLS\", 3)\nrisks = [\n(\"高\", RED, \"审批绕过\", \"个别动作仍可能从 UI 直达执行层\", \"统一经命令入口校验；无 Approval 即拒绝\"),\n(\"中\", AMBER, \"事件完整性\", \"边缘流程的状态变化尚未全部发出事件\", \"补充回归测试并核对事件覆盖矩阵\"),\n(\"中\", AMBER, \"租户隔离\", \"测试数据的跨租户负例覆盖不足\", \"增加 API 与存储层双重隔离验证\"),\n(\"低\", GREEN, \"供应商耦合\", \"局部适配代码仍暴露具体运行时概念\", \"收口至 RuntimeAdapter 并清理领域依赖\")]\ntext(s, \"级别\", 0.75, 1.72, 0.7, 0.35, 11, MUTED, True)\ntext(s, \"风险\", 1.6, 1.72, 2.0, 0.35, 11, MUTED, True)\ntext(s, \"当前暴露\", 3.8, 1.72, 3.65, 0.35, 11, MUTED, True)\ntext(s, \"处置动作\", 7.75, 1.72, 4.2, 0.35, 11, MUTED, True)\nfor i,(level,c,name,issue,action) in enumerate(risks):\n    y=2.18+i*1.12\n    rect(s, 0.72, y, 0.56, 0.56, c, True)\n    text(s, level, 0.72, y, 0.56, 0.56, 11, WHITE, True, PP_ALIGN.CENTER)\n    text(s, name, 1.6, y, 1.8, 0.56, 14, NAVY, True)\n    text(s, issue, 3.8, y-0.04, 3.45, 0.68, 11, INK)\n    text(s, action, 7.75, y-0.04, 4.3, 0.68, 11, INK)\n    rect(s, 0.72, y+0.86, 11.35, 0.012, LINE)\n\n# 4 — financials\ns = base(\"财务概览\", \"FINANCIALS\", 4)\ncards=[(\"本期预算\", \"¥ 480,000\", MUTED),(\"已发生\", \"¥ 312,000\", BLUE),(\"预算余额\", \"¥ 168,000\", GREEN)]\nfor i,(label,val,c) in enumerate(cards):\n    x=0.72+i*4.05\n    rect(s,x,1.78,3.7,1.42,LIGHT,True,LINE)\n    text(s,label,x+0.25,1.98,1.8,0.3,11,MUTED,True)\n    text(s,val,x+0.25,2.38,3.0,0.47,24,c,True)\ntext(s, \"成本结构\", 0.72, 3.64, 2.0, 0.35, 15, NAVY, True)\ncosts=[(\"研发与测试\",196000,BLUE),(\"基础设施\",58000,CYAN),(\"安全与合规\",36000,GREEN),(\"预备金使用\",22000,AMBER)]\nmaxv=220000\nfor i,(label,val,c) in enumerate(costs):\n    y=4.18+i*0.62\n    text(s,label,0.72,y,1.6,0.34,11,INK)\n    rect(s,2.35,y+0.07,6.65,0.18,LINE,True)\n    rect(s,2.35,y+0.07,6.65*val/maxv,0.18,c,True)\n    text(s,f\"¥ {val:,.0f}\",9.3,y-0.04,1.35,0.36,11,NAVY,True,PP_ALIGN.RIGHT)\n    text(s,f\"{val/312000:.0%}\",10.85,y-0.04,0.75,0.36,11,MUTED,True,PP_ALIGN.RIGHT)\ntext(s, \"判断：当前消耗率 65%，与整体交付进度基本匹配；余额优先保障审批闭环与回归测试。\", 0.72, 6.73, 11.6, 0.35, 11, BLUE, True)\n\n# 5 — next actions\ns = base(\"下一步行动\", \"NEXT ACTIONS\", 5)\nactions=[\n(\"01\", \"完成审批闭环\", \"负责人：平台组\", \"9 月 18 日\", \"所有高风险命令具备可验证的拒绝与放行路径\"),\n(\"02\", \"补齐事件回归\", \"负责人：领域组\", \"9 月 20 日\", \"状态变化事件覆盖率达到 100%\"),\n(\"03\", \"执行租户隔离测试\", \"负责人：质量组\", \"9 月 22 日\", \"跨租户访问负例全部通过\"),\n(\"04\", \"形成交付包\", \"负责人：交付组\", \"9 月 25 日\", \"ResultPackage 可审计、可下载、可复核\")]\nfor i,(n,title,owner,date,done) in enumerate(actions):\n    y=1.72+i*1.17\n    rect(s,0.72,y,0.68,0.68,BLUE,True)\n    text(s,n,0.72,y,0.68,0.68,12,WHITE,True,PP_ALIGN.CENTER)\n    text(s,title,1.65,y-0.02,2.25,0.36,15,NAVY,True)\n    text(s,owner,1.65,y+0.39,2.25,0.28,10,MUTED)\n    rect(s,4.15,y-0.02,1.32,0.38,LIGHT,True,LINE)\n    text(s,date,4.15,y-0.02,1.32,0.38,10,BLUE,True,PP_ALIGN.CENTER)\n    text(s,done,5.82,y-0.03,6.0,0.7,11,INK)\ntext(s, \"决策请求\", 0.72, 6.54, 1.15, 0.34, 12, CYAN, True)\ntext(s, \"同意将剩余预算优先投入审批闭环、隔离验证与交付验收。\", 1.88, 6.49, 10.35, 0.45, 13, NAVY, True)\n\nassert len(prs.slides) == 5\nprs.save(OUT)\n\n# Re-open to validate slide count and required Chinese section markers.\ncheck = Presentation(OUT)\nassert len(check.slides) == 5\nexpected = [\"MVP 交付进度与决策简报\", \"当前进展\", \"主要风险与处置\", \"财务概览\", \"下一步行动\"]\nfor slide, marker in zip(check.slides, expected):\n    content = \"\\n\".join(shape.text for shape in slide.shapes if hasattr(shape, \"text_frame\"))\n    assert marker in content, (marker, content)\nprint(f\"created={OUT}\")\nprint(f\"slides={len(check.slides)}\")\nprint(\"sections=\" + \"|\".join(expected))\n",
+          "path": "build.py"
+        }
+      ],
+      "timeoutMs": 120000
+    },
+    "costCny": null,
+    "durationMs": 2470,
+    "evidenceRefs": [
+      "evidence://sha256/7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839",
+      "evidence://sha256/40180fc1bb630639be2f2fce5f0b47b9a9a69a0aed9fdf6506c2fde1853a542f",
+      "codex://items/exec-8866bc28-42a8-48c1-afb2-bcec89d24a63"
+    ],
+    "occurredAt": "2026-09-13T14:57:26.188Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"created=/workspace/delivery-review.pptx\\\\nslides=5\\\\nsections=MVP 交付进度与决策简报|当前进展|主要风险与处置|财务概览|下一步行动\\\\n\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":1193,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"40180fc1bb630639be2f2fce5f0b47b9a9a69a0aed9fdf6506c2fde1853a542f\\\",\\\"sizeBytes\\\":8195},{\\\"path\\\":\\\"delivery-review.pptx\\\",\\\"sha256\\\":\\\"7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839\\\",\\\"sizeBytes\\\":38763}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/40180fc1bb630639be2f2fce5f0b47b9a9a69a0aed9fdf6506c2fde1853a542f\\\",\\\"evidence://sha256/7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"created=/workspace/delivery-review.pptx\\nslides=5\\nsections=MVP 交付进度与决策简报|当前进展|主要风险与处置|财务概览|下一步行动\\n\",\"stderr\":\"\",\"durationMs\":1193,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"40180fc1bb630639be2f2fce5f0b47b9a9a69a0aed9fdf6506c2fde1853a542f\",\"sizeBytes\":8195},{\"path\":\"delivery-review.pptx\",\"sha256\":\"7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839\",\"sizeBytes\":38763}],\"evidenceRefs\":[\"evidence://sha256/40180fc1bb630639be2f2fce5f0b47b9a9a69a0aed9fdf6506c2fde1853a542f\",\"evidence://sha256/7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839\"]},\"_meta\":null}",
+    "sequence": 3,
+    "sessionId": "codex_plan_1aj78ps_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 workspace_exec",
+    "tool": "workspace.exec",
+    "type": "tool"
+  },
+  "startupIsolation": {
+    "available": true,
+    "checkedAt": "2026-09-13T14:55:32.894Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "branches": [
+    {
+      "action": "file.write.export",
+      "branch": "rejected",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_8b9d6a43c8794630b6fa93a8cfea344b_policy_file_write",
+        "approverActorRef": "account:account_42a3d02233c741b39b6e04ee50109477",
+        "reason": "matched_rule",
+        "approved": false
+      },
+      "outcome": {
+        "id": "outcome_evt_6400bc55ed6249929dd506c389626c19",
+        "tenantId": "tenant_8b9d6a43c8794630b6fa93a8cfea344b",
+        "outcomeDefinitionId": "outcome_def_c2aa00c5d1a441bebe86a62b13d7483e",
+        "workOrderId": "wo_intake_b85e6809a1930f4b58b0ac83",
+        "sessionId": "codex_plan_1aj78ps_2",
+        "approvalId": "approval_m5g_deck_file_write_export_rejected",
+        "verdict": "rejected",
+        "acceptedBy": "account:account_42a3d02233c741b39b6e04ee50109477",
+        "evidenceRef": "evidence://sha256/7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839",
+        "occurredAt": "2026-09-13T14:57:30.926Z"
+      }
+    },
+    {
+      "action": "file.write.export",
+      "branch": "approved",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_8b9d6a43c8794630b6fa93a8cfea344b_policy_file_write",
+        "approverActorRef": "account:account_42a3d02233c741b39b6e04ee50109477",
+        "reason": "matched_rule",
+        "approved": true
+      },
+      "outcome": {
+        "id": "outcome_evt_92c3466747684abd87e4fe81a040bf39",
+        "tenantId": "tenant_8b9d6a43c8794630b6fa93a8cfea344b",
+        "outcomeDefinitionId": "outcome_def_c2aa00c5d1a441bebe86a62b13d7483e",
+        "workOrderId": "wo_intake_b85e6809a1930f4b58b0ac83",
+        "sessionId": "codex_plan_1aj78ps_2",
+        "approvalId": "approval_m5g_deck_file_write_export_approved",
+        "verdict": "accepted",
+        "acceptedBy": "account:account_42a3d02233c741b39b6e04ee50109477",
+        "evidenceRef": "evidence://sha256/7fc7fccd9f0c43f754f718e5fbb3e24f2085e81ba4eb087b01e6cb817e814839",
+        "occurredAt": "2026-09-13T14:57:30.939Z"
+      }
+    }
+  ],
+  "wireProof": {
+    "workspaceExecCall": true,
+    "shellCall": false,
+    "inheritedMcpServers": []
+  },
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 35
+  },
+  "disclosure": "出境批准分支只记录策略决策；本里程碑明确不接入渠道，因此未宣称真实外发。",
+  "artifactArchive": {
+    "directory": "artifacts",
+    "files": [
+      "delivery-review.pptx"
+    ]
+  },
+  "uiScreenshot": null
+}

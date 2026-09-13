@@ -1,0 +1,198 @@
+{
+  "generatedAt": "2026-09-13T15:05:43.369Z",
+  "evidenceClass": "real-codex-runtime-plus-local-product-approval-chain",
+  "kind": "sales",
+  "task": "First use HUMMER doc.extract to read leads.xlsx. Then use HUMMER workspace.exec now with openpyxl: stage build.py, run python /workspace/build.py, and create follow-up-plan.xlsx plus customer-message-draft.md. This is draft preparation only. The requested CRM write and external send must remain controlled actions and must not happen inside the sandbox. Do not merely describe the work.",
+  "planText": "我理解你要做的是： 模型生成计划 1 使用 doc.extract 读取并解析“leads.xlsx”，确认线索字段与可用记录。 2 使用 workspace.exec 在订单沙箱内暂存 build.py，并以 openpyxl 运行 python /workspace/build.py。 3 生成并校验 follow-up-plan.xlsx 与 customer-message-draft.md，作为后续跟进和客户消息的草稿材料。 4 不在沙箱内执行 CRM 写入或外部发送；相关动作仅保留为 HUMMER 受控动作提案。 派给 数字交付同事 换人 模型 旗舰 · 数据流向 api.openai.com 更换 需要能力 doc.extract · workspace.exec 修改 工作空间 我的工作空间 · 我的工作空间（规划阶段只读；仅限 leads.xlsx 及计划生成的 build.py、follow-up-plan.xlsx、customer-message-draft.md） 改范围 停下来问你 改关口 预计 约 10–20 分钟执行与校验；当前仅输出计划，不调用工具。 改预计 规划成本：该运行时模型未配置价格，成本未记录 改一下 开始干",
+  "intakeId": "intake_c223c0bb13ba5ca9d2a86892927b9b19",
+  "sessionId": "codex_plan_fuux41_2",
+  "workOrderId": "wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+  "orderDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5g-workflows\\sales\\order-workspaces\\wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+  "artifactEvidence": {
+    "files": [
+      "follow-up-plan.xlsx",
+      "customer-message-draft.md"
+    ],
+    "rows": 4
+  },
+  "tool": {
+    "actorRef": "employee:codex",
+    "args": {
+      "argv": [
+        "python",
+        "/workspace/prepare_input.py"
+      ],
+      "files": [
+        {
+          "content": "from openpyxl import Workbook\nfrom pathlib import Path\nimport runpy\n\np = Path(\"/workspace/leads.xlsx\")\nwb = Workbook()\nws = wb.active\nws.title = \"线索\"\nws.append([\"客户\",\"阶段\",\"金额\",\"下一步\"])\nws.append([\"甲公司\",\"方案\",320000,\"安排演示\"])\nws.append([\"乙公司\",\"商务\",560000,\"确认合同\"])\nws.append([\"丙公司\",\"线索\",180000,\"首次访谈\"])\nwb.save(p)\nrunpy.run_path(\"/workspace/build.py\", run_name=\"__main__\")\n",
+          "path": "prepare_input.py"
+        }
+      ],
+      "timeoutMs": 120000
+    },
+    "costCny": null,
+    "durationMs": 2431,
+    "evidenceRefs": [
+      "evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f",
+      "evidence://sha256/25aa6317668f4d1d9acf00d96574b73ada856f0d0b289537b3ffc62bc89fb8f6",
+      "evidence://sha256/ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e",
+      "evidence://sha256/e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c",
+      "evidence://sha256/d32797c60e3c7f330caa37908fdd08dd1ebf9a533d1a0719ca0c4b01ae7ee4ae",
+      "codex://items/exec-c3d8c2da-ed6a-4ee7-b2bd-01fc20f76271"
+    ],
+    "occurredAt": "2026-09-13T15:05:36.189Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"{\\\\\\\"source_records\\\\\\\": 3, \\\\\\\"source_total_amount\\\\\\\": 1060000, \\\\\\\"artifacts\\\\\\\": [{\\\\\\\"path\\\\\\\": \\\\\\\"/workspace/follow-up-plan.xlsx\\\\\\\", \\\\\\\"sha256\\\\\\\": \\\\\\\"ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\\\\\\\", \\\\\\\"sizeBytes\\\\\\\": 6629}, {\\\\\\\"path\\\\\\\": \\\\\\\"/workspace/customer-message-draft.md\\\\\\\", \\\\\\\"sha256\\\\\\\": \\\\\\\"e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\\\\\\\", \\\\\\\"sizeBytes\\\\\\\": 1424}], \\\\\\\"validation\\\\\\\": \\\\\\\"passed\\\\\\\", \\\\\\\"controlled_actions\\\\\\\": {\\\\\\\"crm_write\\\\\\\": \\\\\\\"not_performed\\\\\\\", \\\\\\\"external_send\\\\\\\": \\\\\\\"not_performed\\\\\\\"}}\\\\n\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":1130,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"d32797c60e3c7f330caa37908fdd08dd1ebf9a533d1a0719ca0c4b01ae7ee4ae\\\",\\\"sizeBytes\\\":6585},{\\\"path\\\":\\\"customer-message-draft.md\\\",\\\"sha256\\\":\\\"e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\\\",\\\"sizeBytes\\\":1424},{\\\"path\\\":\\\"follow-up-plan.xlsx\\\",\\\"sha256\\\":\\\"ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\\\",\\\"sizeBytes\\\":6629},{\\\"path\\\":\\\"leads.xlsx\\\",\\\"sha256\\\":\\\"25aa6317668f4d1d9acf00d96574b73ada856f0d0b289537b3ffc62bc89fb8f6\\\",\\\"sizeBytes\\\":5068},{\\\"path\\\":\\\"prepare_input.py\\\",\\\"sha256\\\":\\\"44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f\\\",\\\"sizeBytes\\\":444}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/d32797c60e3c7f330caa37908fdd08dd1ebf9a533d1a0719ca0c4b01ae7ee4ae\\\",\\\"evidence://sha256/e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\\\",\\\"evidence://sha256/ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\\\",\\\"evidence://sha256/25aa6317668f4d1d9acf00d96574b73ada856f0d0b289537b3ffc62bc89fb8f6\\\",\\\"evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"{\\\"source_records\\\": 3, \\\"source_total_amount\\\": 1060000, \\\"artifacts\\\": [{\\\"path\\\": \\\"/workspace/follow-up-plan.xlsx\\\", \\\"sha256\\\": \\\"ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\\\", \\\"sizeBytes\\\": 6629}, {\\\"path\\\": \\\"/workspace/customer-message-draft.md\\\", \\\"sha256\\\": \\\"e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\\\", \\\"sizeBytes\\\": 1424}], \\\"validation\\\": \\\"passed\\\", \\\"controlled_actions\\\": {\\\"crm_write\\\": \\\"not_performed\\\", \\\"external_send\\\": \\\"not_performed\\\"}}\\n\",\"stderr\":\"\",\"durationMs\":1130,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"d32797c60e3c7f330caa37908fdd08dd1ebf9a533d1a0719ca0c4b01ae7ee4ae\",\"sizeBytes\":6585},{\"path\":\"customer-message-draft.md\",\"sha256\":\"e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\",\"sizeBytes\":1424},{\"path\":\"follow-up-plan.xlsx\",\"sha256\":\"ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\",\"sizeBytes\":6629},{\"path\":\"leads.xlsx\",\"sha256\":\"25aa6317668f4d1d9acf00d96574b73ada856f0d0b289537b3ffc62bc89fb8f6\",\"sizeBytes\":5068},{\"path\":\"prepare_input.py\",\"sha256\":\"44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f\",\"sizeBytes\":444}],\"evidenceRefs\":[\"evidence://sha256/d32797c60e3c7f330caa37908fdd08dd1ebf9a533d1a0719ca0c4b01ae7ee4ae\",\"evidence://sha256/e724b630b4cea6b29354b185a6de639a185cb81161725947ad30ea4287570a1c\",\"evidence://sha256/ca09d35aba0b13409a6422fd39cf4dda5a22360352feca52f90e1d944af5ce6e\",\"evidence://sha256/25aa6317668f4d1d9acf00d96574b73ada856f0d0b289537b3ffc62bc89fb8f6\",\"evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f\"]},\"_meta\":null}",
+    "sequence": 9,
+    "sessionId": "codex_plan_fuux41_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 workspace_exec",
+    "tool": "workspace.exec",
+    "type": "tool"
+  },
+  "startupIsolation": {
+    "available": true,
+    "checkedAt": "2026-09-13T15:03:15.146Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "branches": [
+    {
+      "action": "crm.write.records",
+      "branch": "rejected",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_d929003d16684bf8b0f9138fad7f6ab7_policy_crm_write",
+        "approverActorRef": "account:account_d77a5163df64445b866577a4e602321a",
+        "reason": "matched_rule",
+        "approved": false
+      },
+      "outcome": {
+        "id": "outcome_evt_5b2543b222ef4d80932a011a43ca06d2",
+        "tenantId": "tenant_d929003d16684bf8b0f9138fad7f6ab7",
+        "outcomeDefinitionId": "outcome_def_76822b010b0e4dd6b545431249df93b5",
+        "workOrderId": "wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+        "sessionId": "codex_plan_fuux41_2",
+        "approvalId": "approval_m5g_sales_crm_write_records_rejected",
+        "verdict": "rejected",
+        "acceptedBy": "account:account_d77a5163df64445b866577a4e602321a",
+        "evidenceRef": "evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f",
+        "occurredAt": "2026-09-13T15:05:42.539Z"
+      }
+    },
+    {
+      "action": "crm.write.records",
+      "branch": "approved",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_d929003d16684bf8b0f9138fad7f6ab7_policy_crm_write",
+        "approverActorRef": "account:account_d77a5163df64445b866577a4e602321a",
+        "reason": "matched_rule",
+        "approved": true
+      },
+      "outcome": {
+        "id": "outcome_evt_380c0d2f713c478b83ca337a6fe78984",
+        "tenantId": "tenant_d929003d16684bf8b0f9138fad7f6ab7",
+        "outcomeDefinitionId": "outcome_def_76822b010b0e4dd6b545431249df93b5",
+        "workOrderId": "wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+        "sessionId": "codex_plan_fuux41_2",
+        "approvalId": "approval_m5g_sales_crm_write_records_approved",
+        "verdict": "accepted",
+        "acceptedBy": "account:account_d77a5163df64445b866577a4e602321a",
+        "evidenceRef": "evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f",
+        "occurredAt": "2026-09-13T15:05:42.561Z"
+      }
+    },
+    {
+      "action": "external.send.message",
+      "branch": "rejected",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_d929003d16684bf8b0f9138fad7f6ab7_policy_external_send",
+        "approverActorRef": "account:account_d77a5163df64445b866577a4e602321a",
+        "reason": "matched_rule",
+        "approved": false
+      },
+      "outcome": {
+        "id": "outcome_evt_a712fd79ea7a411ebedd9e593f6e3e8a",
+        "tenantId": "tenant_d929003d16684bf8b0f9138fad7f6ab7",
+        "outcomeDefinitionId": "outcome_def_69c33bc9b7944e769fd9c32bd2b1f005",
+        "workOrderId": "wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+        "sessionId": "codex_plan_fuux41_2",
+        "approvalId": "approval_m5g_sales_external_send_message_rejected",
+        "verdict": "rejected",
+        "acceptedBy": "account:account_d77a5163df64445b866577a4e602321a",
+        "evidenceRef": "evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f",
+        "occurredAt": "2026-09-13T15:05:42.582Z"
+      }
+    },
+    {
+      "action": "external.send.message",
+      "branch": "approved",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_d929003d16684bf8b0f9138fad7f6ab7_policy_external_send",
+        "approverActorRef": "account:account_d77a5163df64445b866577a4e602321a",
+        "reason": "matched_rule",
+        "approved": true
+      },
+      "outcome": {
+        "id": "outcome_evt_fc6de5a1c2dc431fa0c8705dbc17af29",
+        "tenantId": "tenant_d929003d16684bf8b0f9138fad7f6ab7",
+        "outcomeDefinitionId": "outcome_def_69c33bc9b7944e769fd9c32bd2b1f005",
+        "workOrderId": "wo_intake_fa2c4f8e1ffc2b633fd5cc2e",
+        "sessionId": "codex_plan_fuux41_2",
+        "approvalId": "approval_m5g_sales_external_send_message_approved",
+        "verdict": "accepted",
+        "acceptedBy": "account:account_d77a5163df64445b866577a4e602321a",
+        "evidenceRef": "evidence://sha256/44edf68bdbb74ac344f6d00faa12b1b170ff95ae4a990eacf443aaa6f2a58e6f",
+        "occurredAt": "2026-09-13T15:05:42.599Z"
+      }
+    }
+  ],
+  "wireProof": {
+    "workspaceExecCall": true,
+    "shellCall": false,
+    "inheritedMcpServers": []
+  },
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 52
+  },
+  "disclosure": "出境批准分支只记录策略决策；本里程碑明确不接入渠道，因此未宣称真实外发。",
+  "artifactArchive": {
+    "directory": "artifacts",
+    "files": [
+      "follow-up-plan.xlsx",
+      "customer-message-draft.md"
+    ]
+  },
+  "uiScreenshot": null
+}

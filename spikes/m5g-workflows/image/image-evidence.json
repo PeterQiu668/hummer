@@ -1,0 +1,151 @@
+{
+  "generatedAt": "2026-09-13T16:14:32.755Z",
+  "evidenceClass": "real-codex-runtime-plus-local-product-approval-chain",
+  "kind": "image",
+  "task": "Use HUMMER workspace.exec now with Pillow. Generate build.py, run python /workspace/build.py, and create campaign-visual.png at 1200x630 with a non-uniform background, Chinese title, metric blocks, and footer. Load /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc for every Chinese text element. Do not merely describe the work.",
+  "planText": "我理解你要做的是： 模型生成计划 1 确认交付物为通过 Pillow 脚本生成的 1200×630 PNG，包含非均匀背景、中文标题、指标区块和页脚 2 规划生成 build.py，并要求所有中文文本统一加载 /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc 3 规划通过 workspace.exec 运行 python /workspace/build.py，产出 /workspace/campaign-visual.png 派给 数字交付同事 换人 模型 旗舰 · 数据流向 api.openai.com 更换 需要能力 workspace.exec 修改 工作空间 我的工作空间 · 我的工作空间（规划阶段只读；未来执行仅限当前订单沙箱内的 /workspace/build.py 与 /workspace/campaign-visual.png） 改范围 停下来问你 改关口 预计 执行获批后约 10 分钟 改预计 规划成本：该运行时模型未配置价格，成本未记录 改一下 开始干",
+  "intakeId": "intake_44d1ff8e08880640c8fae4801a9b2ec6",
+  "sessionId": "codex_plan_u2gowv_2",
+  "workOrderId": "wo_intake_13e86df921bdb84b70e9252a",
+  "orderDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5g-workflows\\image\\order-workspaces\\wo_intake_13e86df921bdb84b70e9252a",
+  "artifactEvidence": {
+    "files": [
+      "campaign-visual.png"
+    ],
+    "width": 1200,
+    "height": 630,
+    "sizeBytes": 106762,
+    "visiblePixels": 756000,
+    "distinctColors": 256
+  },
+  "tool": {
+    "actorRef": "employee:codex",
+    "args": {
+      "argv": [
+        "python",
+        "/workspace/build.py"
+      ],
+      "files": [
+        {
+          "content": "from PIL import Image, ImageDraw, ImageFont, ImageFilter\n\nW, H = 1200, 630\nFONT_PATH = \"/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc\"\n\ndef font(size):\n    return ImageFont.truetype(FONT_PATH, size)\n\n# Layered, non-uniform midnight-to-indigo background\nimg = Image.new(\"RGB\", (W, H), \"#071426\")\npx = img.load()\nfor y in range(H):\n    for x in range(W):\n        t = (0.62 * x / W + 0.38 * y / H)\n        glow = max(0.0, 1.0 - (((x - 930) / 620) ** 2 + ((y - 80) / 380) ** 2))\n        r = int(7 + 16 * t + 18 * glow)\n        g = int(20 + 18 * t + 12 * glow)\n        b = int(38 + 42 * t + 43 * glow)\n        px[x, y] = (r, g, b)\n\n# Soft atmospheric shapes\nfx = Image.new(\"RGBA\", (W, H), (0, 0, 0, 0))\nfd = ImageDraw.Draw(fx)\nfd.ellipse((780, -210, 1350, 360), fill=(48, 115, 255, 75))\nfd.ellipse((-180, 380, 500, 880), fill=(16, 185, 129, 38))\nfx = fx.filter(ImageFilter.GaussianBlur(70))\nimg = Image.alpha_composite(img.convert(\"RGBA\"), fx)\nd = ImageDraw.Draw(img)\n\nwhite = \"#F7FAFF\"\nmuted = \"#A9B8CF\"\ncyan = \"#68E1FD\"\ngreen = \"#72F2B1\"\ncard = (255, 255, 255, 18)\nstroke = (255, 255, 255, 38)\n\n# Brand pill\nd.rounded_rectangle((72, 54, 252, 94), radius=20, fill=(104, 225, 253, 28), outline=(104, 225, 253, 90), width=1)\nd.text((92, 64), \"HUMMER · 增长战报\", font=font(18), fill=cyan)\n\n# Chinese title and subtitle\nd.text((72, 126), \"让每一次触达，都成为增长\", font=font(50), fill=white)\nd.text((74, 198), \"AI 驱动的全链路营销协同｜本周活动核心数据\", font=font(23), fill=muted)\n\n# Accent\nd.rounded_rectangle((72, 246, 1128, 250), radius=2, fill=(104, 225, 253, 150))\n\nmetrics = [\n    (\"精准触达\", \"128,640\", \"较上周 +24.8%\", cyan),\n    (\"有效线索\", \"3,286\", \"转化率 8.7%\", green),\n    (\"预计回报\", \"¥ 860K\", \"ROI 4.6×\", \"#FFC86B\"),\n]\nx0, y0, cw, ch, gap = 72, 286, 330, 190, 33\nfor i, (label, value, note, accent) in enumerate(metrics):\n    x = x0 + i * (cw + gap)\n    d.rounded_rectangle((x, y0, x + cw, y0 + ch), radius=22, fill=card, outline=stroke, width=2)\n    d.rounded_rectangle((x + 24, y0 + 24, x + 66, y0 + 30), radius=3, fill=accent)\n    d.text((x + 24, y0 + 48), label, font=font(21), fill=muted)\n    d.text((x + 24, y0 + 85), value, font=font(40), fill=white)\n    d.text((x + 24, y0 + 148), note, font=font(18), fill=accent)\n\n# Footer\nd.line((72, 538, 1128, 538), fill=(255, 255, 255, 35), width=1)\nd.text((72, 564), \"HUMMER 智能营销中枢\", font=font(18), fill=muted)\nfooter = \"数据更新：2026.09.14\"\nbbox = d.textbbox((0, 0), footer, font=font(18))\nd.text((1128 - (bbox[2] - bbox[0]), 564), footer, font=font(18), fill=muted)\n\nout = img.convert(\"RGB\")\nassert out.size == (1200, 630)\nout.save(\"/workspace/campaign-visual.png\", \"PNG\", optimize=True)\n",
+          "path": "build.py"
+        }
+      ],
+      "timeoutMs": 120000
+    },
+    "costCny": null,
+    "durationMs": 11352,
+    "evidenceRefs": [
+      "evidence://sha256/1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441",
+      "evidence://sha256/b3cf19f4442037fcf63f376b3eac4b212124ff567fbbd62df7ab21923dd5c358",
+      "codex://items/exec-5c73c07f-9cb2-43d6-8c0c-c7c56ea26244"
+    ],
+    "occurredAt": "2026-09-13T16:14:28.101Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":4748,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"b3cf19f4442037fcf63f376b3eac4b212124ff567fbbd62df7ab21923dd5c358\\\",\\\"sizeBytes\\\":2724},{\\\"path\\\":\\\"campaign-visual.png\\\",\\\"sha256\\\":\\\"1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441\\\",\\\"sizeBytes\\\":106762}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/b3cf19f4442037fcf63f376b3eac4b212124ff567fbbd62df7ab21923dd5c358\\\",\\\"evidence://sha256/1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"\",\"stderr\":\"\",\"durationMs\":4748,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"b3cf19f4442037fcf63f376b3eac4b212124ff567fbbd62df7ab21923dd5c358\",\"sizeBytes\":2724},{\"path\":\"campaign-visual.png\",\"sha256\":\"1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441\",\"sizeBytes\":106762}],\"evidenceRefs\":[\"evidence://sha256/b3cf19f4442037fcf63f376b3eac4b212124ff567fbbd62df7ab21923dd5c358\",\"evidence://sha256/1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441\"]},\"_meta\":null}",
+    "sequence": 3,
+    "sessionId": "codex_plan_u2gowv_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 workspace_exec",
+    "tool": "workspace.exec",
+    "type": "tool"
+  },
+  "startupIsolation": {
+    "available": true,
+    "checkedAt": "2026-09-13T16:13:19.822Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "branches": [
+    {
+      "action": "file.write.export",
+      "branch": "rejected",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_666296d5001e4857a7b27453019d6d34_policy_file_write",
+        "approverActorRef": "account:account_c8ea51deeb944cd2aa822c1ebc7d571e",
+        "reason": "matched_rule",
+        "approved": false
+      },
+      "outcome": {
+        "id": "outcome_evt_18be5593adf242e2baeb6bf86337773c",
+        "tenantId": "tenant_666296d5001e4857a7b27453019d6d34",
+        "outcomeDefinitionId": "outcome_def_edcfb1222d4b4e3ea7cabceacf7d48fe",
+        "workOrderId": "wo_intake_13e86df921bdb84b70e9252a",
+        "sessionId": "codex_plan_u2gowv_2",
+        "approvalId": "approval_m5g_image_file_write_export_rejected",
+        "verdict": "rejected",
+        "acceptedBy": "account:account_c8ea51deeb944cd2aa822c1ebc7d571e",
+        "evidenceRef": "evidence://sha256/1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441",
+        "occurredAt": "2026-09-13T16:14:32.327Z"
+      }
+    },
+    {
+      "action": "file.write.export",
+      "branch": "approved",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_666296d5001e4857a7b27453019d6d34_policy_file_write",
+        "approverActorRef": "account:account_c8ea51deeb944cd2aa822c1ebc7d571e",
+        "reason": "matched_rule",
+        "approved": true
+      },
+      "outcome": {
+        "id": "outcome_evt_655703d57bcf4948a1216e301313313b",
+        "tenantId": "tenant_666296d5001e4857a7b27453019d6d34",
+        "outcomeDefinitionId": "outcome_def_edcfb1222d4b4e3ea7cabceacf7d48fe",
+        "workOrderId": "wo_intake_13e86df921bdb84b70e9252a",
+        "sessionId": "codex_plan_u2gowv_2",
+        "approvalId": "approval_m5g_image_file_write_export_approved",
+        "verdict": "accepted",
+        "acceptedBy": "account:account_c8ea51deeb944cd2aa822c1ebc7d571e",
+        "evidenceRef": "evidence://sha256/1e29c941beeab01d3e60a586fa7c23b79acff25a689c161a1eb28e3cea905441",
+        "occurredAt": "2026-09-13T16:14:32.340Z"
+      }
+    }
+  ],
+  "wireProof": {
+    "workspaceExecCall": true,
+    "shellCall": false,
+    "inheritedMcpServers": []
+  },
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 35
+  },
+  "disclosure": "出境批准分支只记录策略决策；本里程碑明确不接入渠道，因此未宣称真实外发。",
+  "artifactArchive": {
+    "directory": "artifacts",
+    "files": [
+      "campaign-visual.png"
+    ]
+  },
+  "uiScreenshot": "image-ui.png"
+}

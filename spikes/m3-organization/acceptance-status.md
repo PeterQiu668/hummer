@@ -244,3 +244,33 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 - Both operations simulations exited 0 with no `FAIL`; their existing `SKIP`, `CHECK`, and `WARN` entries remain open observations.
 - The three credential-backed DeepSeek checks, the rejected `workspace.exec` E2E, six dependent workflow E2Es, and clean-Windows installation are not green. The global all-desktop/all-workflow gate is not claimed.
 - Existing non-blocking runtime diagnostics remain visible: internal OpenAI validation has no verified CNY price, and the basic Codex smoke logged missing intake IPC handlers in that reduced host mode.
+
+## M5-G status update - 2026-09-13
+
+### P0 HUMMER-owned execution boundary
+
+- P0.1 ran at `2026-09-13T21:01:24+08:00` with the dedicated Windows account and SID firewall rules. It passed inside-write, path-escape, and raw-socket, but HTTPS and DNS escaped. `spikes/m5g-sandbox/p0-1-firewall-evidence.json` records the 3/5 NO-GO.
+- P0.2 used the already-installed Docker engine after confirming Podman was absent. A read-only, non-root, capability-dropped, no-network container passed 5/5. Direct bind mounts were unstable, so the product uses a unique named volume with validated stdin staging and stdout export. See `spikes/m5g-sandbox/p0-2-container-evidence.json` and ADR-012.
+- The product service runs the same five probes at startup and fails closed. A failed check disables every `workspace.exec` call with the explicit Chinese diagnostic; a passing check is appended to the tenant-independent system audit chain.
+- Real Codex/MCP execution generated at `2026-09-13T16:30:50.887Z`: `spikes/m5g-workspace-exec/workspace-exec-evidence.json`. Codex had no built-in shell, invoked `hummer_local/workspace_exec`, produced SHA-256 artifacts, and left `valid=true, checked=28`.
+- After a wire review found inherited `node_repl`, the host was tightened to disable every MCP server discovered in the user's Codex config before enabling only `hummer_local`. All final six-workflow wire logs report `shellCall=false` and `inheritedMcpServers=[]`.
+
+### P1 six real office workflows
+
+- Website, generated `2026-09-13T14:55:09.320Z`: work order `wo_intake_8fe42b3c46419fe4260bddbf`; renderable HTML/CSS; rejected and approved export decisions; chain `valid=true, checked=37`.
+- Deck, generated `2026-09-13T14:57:31.310Z`: work order `wo_intake_b85e6809a1930f4b58b0ac83`; parseable PPTX with exactly five slides; chain `valid=true, checked=35`.
+- Report, generated `2026-09-13T15:00:57.221Z`: work order `wo_intake_c8e0b46aa32723bd2fa8edcf`; real `doc.extract` source plus parseable DOCX with one embedded chart; chain `valid=true, checked=51`.
+- Image, generated `2026-09-13T16:14:32.755Z`: work order `wo_intake_13e86df921bdb84b70e9252a`; decoded 1200x630 PNG with 756000 visible pixels and 256 sampled colors; WenQuanYi Chinese font rendering visually checked; chain `valid=true, checked=35`.
+- Sales, generated `2026-09-13T15:05:43.369Z`: work order `wo_intake_fa2c4f8e1ffc2b633fd5cc2e`; real lead-sheet extraction, parseable four-row workbook and local draft; independent CRM/external-send reject/approve decisions; chain `valid=true, checked=52`.
+- Content, generated `2026-09-13T16:16:09.425Z`: work order `wo_intake_606ed7b99f15f746886d8147`; local copy and decoded 1080x1080 visual; WenQuanYi Chinese font rendering visually checked; publish reject/approve decisions; chain `valid=true, checked=35`.
+- Evidence, full wire logs, independently verifiable receipts, and curated deliverables are under `spikes/m5g-workflows/<kind>/`. Every scenario begins as a persisted pending intake, reuses the confirmed `workOrderId`, creates real artifacts through Codex -> HUMMER MCP -> main-process container execution, independently verifies each receipt, and asserts zero host shell and zero inherited MCP use.
+- Approved CRM/external-send/publish branches are local policy decisions only. No connector exists in this milestone, so no external delivery or CRM mutation is claimed.
+
+### P2 capability catalog presentation
+
+- The 17 external workplace applications moved under a disabled `Future roadmap` section with explicit `current version unavailable` language. They are not buttons and cannot imply a connection or authorization flow. Verified local capabilities remain separate.
+
+### P3 and P4 open gates
+
+- `.env.local` is absent in this checkout on 2026-09-13. The DeepSeek planner, credential restart, and wedge commands were not run; no mock or internal profile result substitutes for them.
+- Code signing remains unstarted and a clean Windows host was unavailable. `docs/release/m5g-windows-internal-release.md` records the exact open gates. No M5-G installer is claimed.

@@ -1,0 +1,154 @@
+{
+  "generatedAt": "2026-09-13T16:16:09.425Z",
+  "evidenceClass": "real-codex-runtime-plus-local-product-approval-chain",
+  "kind": "content",
+  "task": "Use HUMMER workspace.exec now with Pillow. Generate build.py, run python /workspace/build.py, and create Chinese social-copy.md plus social-visual.png at 1080x1080. Load /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc for every Chinese text element. This is a draft only; publishing is a controlled external action. Do not merely describe the work.",
+  "planText": "我理解你要做的是： 模型生成计划 1 确认交付物为 build.py、中文社交文案 social-copy.md，以及 1080×1080 的 social-visual.png 2 确认图片应由 Pillow 生成，且每个中文文本元素都必须加载 /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc 3 确认预期执行方式为 python /workspace/build.py，并在 HUMMER 重新哈希后将产物纳入证据账本 派给 数字交付同事 换人 模型 旗舰 · 数据流向 api.openai.com 更换 需要能力 workspace.exec 修改 工作空间 我的工作空间 · 我的工作空间（规划阶段只读） 改范围 停下来问你 改关口 预计 实际制作与校验预计 15–25 分钟；本次仅完成规划 改预计 规划成本：该运行时模型未配置价格，成本未记录 改一下 开始干",
+  "intakeId": "intake_77f793d70ff9ad0df40c97faee55b152",
+  "sessionId": "codex_plan_1cwlh15_2",
+  "workOrderId": "wo_intake_606ed7b99f15f746886d8147",
+  "orderDirectory": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5g-workflows\\content\\order-workspaces\\wo_intake_606ed7b99f15f746886d8147",
+  "artifactEvidence": {
+    "files": [
+      "social-copy.md",
+      "social-visual.png"
+    ],
+    "width": 1080,
+    "height": 1080,
+    "sizeBytes": 77927,
+    "visiblePixels": 1166400,
+    "distinctColors": 256
+  },
+  "tool": {
+    "actorRef": "employee:codex",
+    "args": {
+      "argv": [
+        "python",
+        "/workspace/build.py"
+      ],
+      "files": [
+        {
+          "content": "from pathlib import Path\nfrom PIL import Image, ImageDraw, ImageFont\n\nOUT = Path(\"/workspace\")\nFONT_PATH = \"/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc\"\n\ndef cn_font(size: int):\n    # Every Chinese text element uses the mandated WenQuanYi Zen Hei font.\n    return ImageFont.truetype(FONT_PATH, size)\n\ncopy = \"\"\"# HUMMER 社交媒体文案（草案）\n\n## 主文案\n\n当 AI 开始参与真实业务，重要的不只是“能不能做”，更是“做了什么、依据什么、由谁批准”。\n\nHUMMER 正在把组织协作从一次次对话，升级为一套可信、可追溯、可治理的工作流：\n\n- 任务有明确责任边界\n- 关键动作形成事件记录\n- 结论绑定证据，而不是停留在聊天里\n- 高风险操作默认等待人工审批\n- 交付结果可复核、可追踪、可沉淀\n\n让 AI 不只会回答问题，更能在组织规则内可靠地完成工作。\n\n**HUMMER｜让每一次 AI 行动都有据可查**\n\n## 配图标题\n\nAI 不只要聪明  \n更要可信\n\n## 建议标签\n\n#HUMMER #AI原生组织 #企业AI #智能工作流 #可信AI #人机协作\n\n> 状态：内部草案，仅供审核；未授权发布。\n\"\"\"\n(OUT / \"social-copy.md\").write_text(copy, encoding=\"utf-8\")\n\nW = H = 1080\nimg = Image.new(\"RGB\", (W, H), \"#07111F\")\nd = ImageDraw.Draw(img)\n\n# Atmospheric background\nfor y in range(H):\n    t = y / (H - 1)\n    r = int(7 + 7 * t)\n    g = int(17 + 15 * t)\n    b = int(31 + 20 * t)\n    d.line((0, y, W, y), fill=(r, g, b))\n\n# Soft geometric accents\nd.ellipse((720, -170, 1190, 300), fill=\"#102E4E\")\nd.ellipse((820, -90, 1120, 210), fill=\"#154D65\")\nd.rounded_rectangle((72, 70, 1008, 1010), radius=38, outline=\"#22445E\", width=2)\nd.line((74, 790, 1006, 790), fill=\"#244A63\", width=2)\n\n# Fonts: all Chinese-bearing text uses cn_font(), which loads the required TTC.\nf_brand = cn_font(38)\nf_kicker = cn_font(26)\nf_title = cn_font(92)\nf_body = cn_font(34)\nf_pill = cn_font(28)\nf_footer = cn_font(24)\nf_draft = cn_font(21)\n\nd.text((108, 110), \"HUMMER\", font=f_brand, fill=\"#F5FAFF\")\nd.rounded_rectangle((108, 183, 340, 229), radius=23, fill=\"#123D50\")\nd.text((132, 192), \"可信 AI 工作流\", font=f_kicker, fill=\"#61E5CF\")\n\nd.text((108, 300), \"AI 不只要聪明\", font=f_title, fill=\"#F7FBFF\")\nd.text((108, 420), \"更要\", font=f_title, fill=\"#F7FBFF\")\nd.text((318, 420), \"可信\", font=f_title, fill=\"#61E5CF\")\n\nd.text((112, 575), \"有边界 · 有证据 · 有审批 · 可追溯\", font=f_body, fill=\"#B9CAD8\")\n\npill_y = 665\nlabels = [(\"业务事实\", 108, 278), (\"事件留痕\", 300, 470), (\"人工把关\", 492, 662), (\"结果可核\", 684, 854)]\nfor label, x1, x2 in labels:\n    d.rounded_rectangle((x1, pill_y, x2, pill_y + 58), radius=29, fill=\"#12283A\", outline=\"#2B566C\", width=2)\n    box = d.textbbox((0, 0), label, font=f_pill)\n    tw = box[2] - box[0]\n    d.text((x1 + (x2-x1-tw)/2, pill_y + 10), label, font=f_pill, fill=\"#D9E7EF\")\n\nd.text((108, 838), \"让每一次 AI 行动都有据可查\", font=f_body, fill=\"#F0F6FA\")\nd.text((108, 920), \"HUMMER · AI 原生组织基础设施\", font=f_footer, fill=\"#7E9AAD\")\n\ndraft = \"内部草案｜未授权发布\"\nbox = d.textbbox((0, 0), draft, font=f_draft)\ntw = box[2] - box[0]\nd.text((972 - tw, 116), draft, font=f_draft, fill=\"#8AA1B1\")\n\nimg.save(OUT / \"social-visual.png\", \"PNG\", optimize=True)\nprint(\"created: /workspace/build.py\")\nprint(\"created: /workspace/social-copy.md\")\nprint(\"created: /workspace/social-visual.png\")\nprint(f\"image-size: {img.size[0]}x{img.size[1]}\")\n",
+          "path": "build.py"
+        }
+      ],
+      "timeoutMs": 120000
+    },
+    "costCny": null,
+    "durationMs": 2173,
+    "evidenceRefs": [
+      "evidence://sha256/ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4",
+      "evidence://sha256/6f81a200f266a5ac887f0b0c144aea782e03a86c624a78a5c003eecc55015184",
+      "evidence://sha256/dd62a489ce6b268bc6661d53e62f96b90bbcfc269e43a439a99765b110fecda9",
+      "codex://items/exec-799e7a43-ade6-4482-8ac1-63a391f54c0b"
+    ],
+    "occurredAt": "2026-09-13T16:16:04.122Z",
+    "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"exitCode\\\":0,\\\"stdout\\\":\\\"created: /workspace/build.py\\\\ncreated: /workspace/social-copy.md\\\\ncreated: /workspace/social-visual.png\\\\nimage-size: 1080x1080\\\\n\\\",\\\"stderr\\\":\\\"\\\",\\\"durationMs\\\":872,\\\"artifacts\\\":[{\\\"path\\\":\\\"build.py\\\",\\\"sha256\\\":\\\"dd62a489ce6b268bc6661d53e62f96b90bbcfc269e43a439a99765b110fecda9\\\",\\\"sizeBytes\\\":3483},{\\\"path\\\":\\\"social-copy.md\\\",\\\"sha256\\\":\\\"6f81a200f266a5ac887f0b0c144aea782e03a86c624a78a5c003eecc55015184\\\",\\\"sizeBytes\\\":841},{\\\"path\\\":\\\"social-visual.png\\\",\\\"sha256\\\":\\\"ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4\\\",\\\"sizeBytes\\\":77927}],\\\"evidenceRefs\\\":[\\\"evidence://sha256/dd62a489ce6b268bc6661d53e62f96b90bbcfc269e43a439a99765b110fecda9\\\",\\\"evidence://sha256/6f81a200f266a5ac887f0b0c144aea782e03a86c624a78a5c003eecc55015184\\\",\\\"evidence://sha256/ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4\\\"]}\"}],\"structuredContent\":{\"exitCode\":0,\"stdout\":\"created: /workspace/build.py\\ncreated: /workspace/social-copy.md\\ncreated: /workspace/social-visual.png\\nimage-size: 1080x1080\\n\",\"stderr\":\"\",\"durationMs\":872,\"artifacts\":[{\"path\":\"build.py\",\"sha256\":\"dd62a489ce6b268bc6661d53e62f96b90bbcfc269e43a439a99765b110fecda9\",\"sizeBytes\":3483},{\"path\":\"social-copy.md\",\"sha256\":\"6f81a200f266a5ac887f0b0c144aea782e03a86c624a78a5c003eecc55015184\",\"sizeBytes\":841},{\"path\":\"social-visual.png\",\"sha256\":\"ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4\",\"sizeBytes\":77927}],\"evidenceRefs\":[\"evidence://sha256/dd62a489ce6b268bc6661d53e62f96b90bbcfc269e43a439a99765b110fecda9\",\"evidence://sha256/6f81a200f266a5ac887f0b0c144aea782e03a86c624a78a5c003eecc55015184\",\"evidence://sha256/ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4\"]},\"_meta\":null}",
+    "sequence": 3,
+    "sessionId": "codex_plan_1cwlh15_2",
+    "status": "completed",
+    "title": "调用 MCP 工具 workspace_exec",
+    "tool": "workspace.exec",
+    "type": "tool"
+  },
+  "startupIsolation": {
+    "available": true,
+    "checkedAt": "2026-09-13T16:15:00.152Z",
+    "runtime": "docker",
+    "passed": 5,
+    "total": 5,
+    "issue": null,
+    "probes": [
+      {
+        "name": "inside-write",
+        "succeeded": true
+      },
+      {
+        "name": "path-escape",
+        "succeeded": false,
+        "error": "[Errno 30] Read-only file system: '../../escaped.md'"
+      },
+      {
+        "name": "network-egress",
+        "succeeded": false,
+        "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+      },
+      {
+        "name": "dns-resolution",
+        "succeeded": false,
+        "error": "[Errno -3] Temporary failure in name resolution"
+      },
+      {
+        "name": "raw-socket",
+        "succeeded": false,
+        "error": "[Errno 101] Network is unreachable"
+      }
+    ]
+  },
+  "branches": [
+    {
+      "action": "external.send.publish",
+      "branch": "rejected",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_fe53810502d646c38a9c2b9d440a9c81_policy_external_send",
+        "approverActorRef": "account:account_efe48fa150a04134ba5e21b361b91740",
+        "reason": "matched_rule",
+        "approved": false
+      },
+      "outcome": {
+        "id": "outcome_evt_c122496cce2e4475885e3375c7311e65",
+        "tenantId": "tenant_fe53810502d646c38a9c2b9d440a9c81",
+        "outcomeDefinitionId": "outcome_def_2a612a86e84a4e0d86abdfe38ac0fa48",
+        "workOrderId": "wo_intake_606ed7b99f15f746886d8147",
+        "sessionId": "codex_plan_1cwlh15_2",
+        "approvalId": "approval_m5g_content_external_send_publish_rejected",
+        "verdict": "rejected",
+        "acceptedBy": "account:account_efe48fa150a04134ba5e21b361b91740",
+        "evidenceRef": "evidence://sha256/ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4",
+        "occurredAt": "2026-09-13T16:16:08.930Z"
+      }
+    },
+    {
+      "action": "external.send.publish",
+      "branch": "approved",
+      "authorization": {
+        "effect": "require_approval",
+        "policyId": "tenant_fe53810502d646c38a9c2b9d440a9c81_policy_external_send",
+        "approverActorRef": "account:account_efe48fa150a04134ba5e21b361b91740",
+        "reason": "matched_rule",
+        "approved": true
+      },
+      "outcome": {
+        "id": "outcome_evt_fa2026fb648045cb83b16c0683eafae5",
+        "tenantId": "tenant_fe53810502d646c38a9c2b9d440a9c81",
+        "outcomeDefinitionId": "outcome_def_2a612a86e84a4e0d86abdfe38ac0fa48",
+        "workOrderId": "wo_intake_606ed7b99f15f746886d8147",
+        "sessionId": "codex_plan_1cwlh15_2",
+        "approvalId": "approval_m5g_content_external_send_publish_approved",
+        "verdict": "accepted",
+        "acceptedBy": "account:account_efe48fa150a04134ba5e21b361b91740",
+        "evidenceRef": "evidence://sha256/ef5638ed3ee60ba54981b9af455b3303d8569c57ce58b4b908a1947736c6e6e4",
+        "occurredAt": "2026-09-13T16:16:08.943Z"
+      }
+    }
+  ],
+  "wireProof": {
+    "workspaceExecCall": true,
+    "shellCall": false,
+    "inheritedMcpServers": []
+  },
+  "chainIntegrity": {
+    "valid": true,
+    "checked": 35
+  },
+  "disclosure": "出境批准分支只记录策略决策；本里程碑明确不接入渠道，因此未宣称真实外发。",
+  "artifactArchive": {
+    "directory": "artifacts",
+    "files": [
+      "social-copy.md",
+      "social-visual.png"
+    ]
+  },
+  "uiScreenshot": "content-ui.png"
+}
