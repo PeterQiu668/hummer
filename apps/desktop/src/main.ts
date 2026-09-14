@@ -56,7 +56,9 @@ app.whenReady().then(async () => {
       : workspaceExecService.currentHealth();
     return inspectRuntimeEnvironment(process.env, undefined, health);
   });
-  ipcMain.handle('hummer:environment:install-guide', () => shell.openExternal('https://www.npmjs.com/package/@openai/codex'));
+  ipcMain.handle('hummer:environment:install-guide', (_event, target: 'codex' | 'container' = 'codex') => shell.openExternal(
+    target === 'container' ? 'https://podman-desktop.io/docs/installation/windows-install' : 'https://www.npmjs.com/package/@openai/codex',
+  ));
   registerCodexHost({
     resolveCredential: persistenceHost.resolveEngineCredential,
     recordMcpConnectorStatus: persistenceHost.recordMcpConnectorStatus,

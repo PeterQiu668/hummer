@@ -15,6 +15,13 @@ export interface RuntimeEnvironmentStatus {
     executable?: string;
     issue?: string;
   };
+  container: {
+    available: boolean;
+    runtime: WorkspaceExecHealth['runtime'];
+    preferredRuntime: 'podman';
+    productionRecommended: boolean;
+    issue?: string;
+  };
   workspaceExec: WorkspaceExecHealth | null;
 }
 
@@ -47,10 +54,12 @@ export function inspectRuntimeEnvironment(
   const expectedVersion = requiredCodexCliVersion();
   const executable = findCodexExecutable(environment, dependencies);
   const node = { available: true as const, version: dependencies.nodeVersion, source: 'embedded' as const };
+  const container = containerStatus(workspaceExec);
   if (!executable) {
     return {
       ready: false,
       node,
+      container,
       workspaceExec,
       codex: {
         available: false, compatible: false, expectedVersion,
@@ -64,6 +73,7 @@ export function inspectRuntimeEnvironment(
     return {
       ready: false,
       node,
+      container,
       workspaceExec,
       codex: {
         available: true, compatible: false, expectedVersion, executable,
@@ -75,11 +85,30 @@ export function inspectRuntimeEnvironment(
   return {
     ready: compatible,
     node,
+    container,
     workspaceExec,
     codex: {
       available: true, compatible, expectedVersion, version, executable,
       ...(!compatible ? { issue: `Codex CLI \u7248\u672c\u4e3a ${version}\uff0cHUMMER \u9700\u8981 ${expectedVersion}\u3002` } : {}),
     },
+  };
+}
+
+function containerStatus(workspaceExec: WorkspaceExecHealth | null): RuntimeEnvironmentStatus['container'] {
+  const runtime = workspaceExec?.runtime ?? 'unavailable';
+  if (runtime === 'unavailable') return {
+    available: false,
+    runtime,
+    preferredRuntime: 'podman',
+    productionRecommended: false,
+    issue: '未检测到容器运行时。请先安装 Podman Desktop，并按引导启用 WSL2。',
+  };
+  return {
+    available: true,
+    runtime,
+    preferredRuntime: 'podman',
+    productionRecommended: runtime === 'podman',
+    ...(runtime === 'docker' ? { issue: '当前使用 Docker 兼容模式；企业部署推荐 Podman + WSL2。' } : {}),
   };
 }
 

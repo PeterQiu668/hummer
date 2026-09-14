@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-09-11T18:43:35.617Z",
+  "generatedAt": "2026-09-13T23:46:36.990Z",
   "evidenceClass": "real-codex-plus-local-product-chain",
   "wireLogPath": "C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5e-intake\\intake-wire.jsonl",
   "preConfirm": {
     "pending": [
       {
-        "id": "intake_18b54cab42cdc687b77af059b0370a3c",
-        "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
+        "id": "intake_f4076d48b46afa34301ad36f522bd72d",
+        "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
         "source": "folder",
-        "externalRef": "folder:inbox\\SO-2026-0912.xlsx:b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
-        "receivedAt": "2026-09-11T18:42:30.409Z",
+        "externalRef": "folder:inbox\\SO-2026-0912.xlsx:12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
+        "receivedAt": "2026-09-13T23:45:41.645Z",
         "status": "pending",
-        "payloadEvidenceRef": "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
+        "payloadEvidenceRef": "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
         "payload": {
           "assignee": "自动推荐",
           "attachmentNames": [
@@ -20,7 +20,9 @@
           "dueAt": null,
           "executable": true,
           "expectedDeliverable": "订单处理结果与可验证回执",
-          "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，提取订单目标与交付要求，生成一份可验收的订单处理结果。",
+          "preReadSummary": "工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+          "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+          "sourceSha256": "12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
           "suggestedCapabilities": [
             "doc.extract"
           ],
@@ -30,25 +32,25 @@
         "workOrderId": null,
         "confirmedBy": null,
         "confirmedAt": null,
-        "createdAt": "2026-09-11T18:42:30.409Z",
-        "updatedAt": "2026-09-11T18:42:30.409Z"
+        "createdAt": "2026-09-13T23:45:41.645Z",
+        "updatedAt": "2026-09-13T23:45:41.645Z"
       }
     ],
     "sessions": [],
     "integrity": {
       "valid": true,
-      "checked": 2
+      "checked": 9
     }
   },
   "productChain": {
     "intake": {
-      "id": "intake_18b54cab42cdc687b77af059b0370a3c",
-      "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
+      "id": "intake_f4076d48b46afa34301ad36f522bd72d",
+      "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
       "source": "folder",
-      "externalRef": "folder:inbox\\SO-2026-0912.xlsx:b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
-      "receivedAt": "2026-09-11T18:42:30.409Z",
+      "externalRef": "folder:inbox\\SO-2026-0912.xlsx:12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
+      "receivedAt": "2026-09-13T23:45:41.645Z",
       "status": "confirmed",
-      "payloadEvidenceRef": "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
+      "payloadEvidenceRef": "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
       "payload": {
         "assignee": "自动推荐",
         "attachmentNames": [
@@ -57,65 +59,67 @@
         "dueAt": null,
         "executable": true,
         "expectedDeliverable": "订单处理结果与可验证回执",
-        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，提取订单目标与交付要求，生成一份可验收的订单处理结果。",
+        "preReadSummary": "工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+        "sourceSha256": "12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
         "suggestedCapabilities": [
           "doc.extract"
         ],
         "target": "读取订单资料并完成明确交付",
         "title": "处理新订单：inbox\\SO-2026-0912.xlsx"
       },
-      "workOrderId": "wo_intake_31ab22a26cad2f44a1e168d8",
-      "confirmedBy": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
-      "confirmedAt": "2026-09-11T18:42:33.527Z",
-      "createdAt": "2026-09-11T18:42:30.409Z",
-      "updatedAt": "2026-09-11T18:42:33.527Z"
+      "workOrderId": "wo_intake_9c4e1993829acbfcfceba14e",
+      "confirmedBy": "account:account_4925a48f7ecf49519f653911b6a8474b",
+      "confirmedAt": "2026-09-13T23:45:44.803Z",
+      "createdAt": "2026-09-13T23:45:41.645Z",
+      "updatedAt": "2026-09-13T23:45:44.803Z"
     },
-    "sessionId": "codex_plan_1a890b7_2",
+    "sessionId": "codex_plan_17ew7za_2",
     "plan": {
       "approvalMode": "L2",
       "assignees": [
-        "订单处理专员（自动推荐）"
+        "订单处理智能体（自动推荐）"
       ],
       "attachmentNames": [
         "inbox\\SO-2026-0912.xlsx"
       ],
-      "estimate": "规划确认后约10分钟完成提取与可验收结果整理",
+      "estimate": "约 5 分钟",
       "humanGates": [],
-      "id": "plan_1a890b7",
-      "intakeId": "intake_18b54cab42cdc687b77af059b0370a3c",
+      "id": "plan_17ew7za",
+      "intakeId": "intake_f4076d48b46afa34301ad36f522bd72d",
       "modelProfile": "旗舰",
       "planning": {
         "costUnavailableReason": "该运行时模型未配置价格，成本未记录",
         "label": "模型生成计划",
-        "planningSessionId": "codex_planning_plan_1a890b7_1",
-        "receiptOutcomeEventId": "outcome_evt_829dc1f5982c462388a007689751f2e1",
+        "planningSessionId": "codex_planning_plan_17ew7za_1",
+        "receiptOutcomeEventId": "outcome_evt_ad69dc87cf794caaafd37c218387fa26",
         "runtimeId": "codex-cli",
         "source": "runtime"
       },
-      "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，提取订单目标与交付要求，生成一份可验收的订单处理结果。",
+      "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
       "tools": [
         "doc.extract"
       ],
       "understanding": [
-        "使用 doc.extract 读取“inbox\\SO-2026-0912.xlsx”，识别订单编号、客户需求、业务目标及关键约束。",
-        "提取交付物、数量或范围、质量标准、交付时间、交付方式及其他验收要求。",
-        "整理缺失、冲突或含糊信息，并标注其对订单处理和验收的影响。",
-        "形成包含订单目标、处理结果、交付清单、验收标准和待确认事项的结构化结果。",
-        "逐项建立交付要求与验收证据的对应关系，确保结果可核验、可判定。"
+        "使用 doc.extract 只读提取 inbox\\SO-2026-0912.xlsx 的“订单明细”工作表，并以本地预读摘要作为核验依据",
+        "确认订单目标：处理订单 SO-2026-0912，客户为华东制造集团，订单金额为 268000 元",
+        "确认交付要求：在 2026 年 9 月 30 日前交付月报",
+        "形成包含订单标识、客户、金额、交付物、截止日期和验收条件的结构化订单处理结果",
+        "将源文件提取值与预读摘要逐项比对，并记录一致性与可追溯证据；规划阶段不执行交付或外部发送"
       ],
       "workContext": "我的工作空间",
-      "workOrderId": "wo_intake_31ab22a26cad2f44a1e168d8",
-      "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读），仅限 inbox\\SO-2026-0912.xlsx"
+      "workOrderId": "wo_intake_9c4e1993829acbfcfceba14e",
+      "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读；仅限 inbox\\SO-2026-0912.xlsx）"
     },
     "authorization": {
       "effect": "require_approval",
-      "policyId": "tenant_731d62f796e34c5a85f24a2d8fdfc475_policy_external_send",
-      "approverActorRef": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
+      "policyId": "tenant_92b073f25765468bbd5efe8d269a7a47_policy_external_send",
+      "approverActorRef": "account:account_4925a48f7ecf49519f653911b6a8474b",
       "reason": "matched_rule",
       "approved": true
     },
     "draft": {
-      "id": "write_79194bc6-58fc-4128-93d2-f0b345c22108",
+      "id": "write_f7c60fe4-e3ff-416e-9a5f-4653404afedc",
       "action": "external.send.draft",
       "relativePath": "deliverables/order-summary-draft.md",
       "evidenceRef": "evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7",
@@ -123,59 +127,59 @@
       "sizeBytes": 138
     },
     "receipt": {
-      "generatedAt": "2026-09-11T18:43:31.792Z",
-      "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
+      "generatedAt": "2026-09-13T23:46:25.074Z",
+      "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
       "outcome": {
-        "id": "outcome_evt_e1e2b49a3be54692917b7cd8e2cade2c",
-        "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
-        "outcomeDefinitionId": "outcome_def_94e34924f82e4cf3a5eac999ab2f8ba1",
-        "workOrderId": "wo_intake_31ab22a26cad2f44a1e168d8",
-        "sessionId": "codex_plan_1a890b7_2",
-        "approvalId": "approval_intake_codex_plan_1a890b7_2",
+        "id": "outcome_evt_63d80202b41f4e6db6b5b05f16009f6d",
+        "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
+        "outcomeDefinitionId": "outcome_def_e74f0375f88049a782c0564dc099b201",
+        "workOrderId": "wo_intake_9c4e1993829acbfcfceba14e",
+        "sessionId": "codex_plan_17ew7za_2",
+        "approvalId": "approval_intake_codex_plan_17ew7za_2",
         "verdict": "accepted",
-        "acceptedBy": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
+        "acceptedBy": "account:account_4925a48f7ecf49519f653911b6a8474b",
         "evidenceRef": "evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7",
-        "occurredAt": "2026-09-11T18:43:31.764Z"
+        "occurredAt": "2026-09-13T23:46:25.060Z"
       },
       "definition": {
-        "id": "outcome_def_94e34924f82e4cf3a5eac999ab2f8ba1",
-        "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
+        "id": "outcome_def_e74f0375f88049a782c0564dc099b201",
+        "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
         "actionPattern": "order.intake.deliver",
         "title": "真实订单交付",
         "acceptanceCriteria": "订单被读取，草稿经具名审批，回执可验链",
         "unitPriceCny": null,
         "riskLevel": "high",
         "enabled": true,
-        "createdAt": "2026-09-11T18:43:31.783Z",
-        "updatedAt": "2026-09-11T18:43:31.783Z"
+        "createdAt": "2026-09-13T23:46:25.069Z",
+        "updatedAt": "2026-09-13T23:46:25.069Z"
       },
       "costs": [],
       "tools": [
         {
-          "id": "tool_inv_6dea63b5-e6bf-4053-98fe-a9fe684aa0d7",
-          "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
-          "sessionId": "codex_plan_1a890b7_2",
-          "toolDefinitionId": "tenant_731d62f796e34c5a85f24a2d8fdfc475_tool_doc_extract",
+          "id": "tool_inv_8c35168f-80a6-4879-a7bb-279a45b72f42",
+          "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
+          "sessionId": "codex_plan_17ew7za_2",
+          "toolDefinitionId": "tenant_92b073f25765468bbd5efe8d269a7a47_tool_doc_extract",
           "capabilityId": "doc.extract",
           "actorRef": "employee:codex",
           "status": "completed",
           "args": {
             "path": "inbox\\SO-2026-0912.xlsx"
           },
-          "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\",\"sha256\":\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\",\"sizeBytes\":6603},\"sheets\":[{\"name\":\"订单明细\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"订单号\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"客户\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"金额\"},{\"address\":\"D1\",\"row\":1,\"column\":4,\"value\":\"交付要求\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"SO-2026-0912\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":\"华东制造集团\"},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":268000},{\"address\":\"D2\",\"row\":2,\"column\":4,\"value\":\"9 月 30 日前交付月报\"}]}],\"warnings\":[]},\"_meta\":null}",
-          "durationMs": 37,
+          "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\",\"sha256\":\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\",\"sizeBytes\":6603},\"sheets\":[{\"name\":\"订单明细\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"订单号\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"客户\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"金额\"},{\"address\":\"D1\",\"row\":1,\"column\":4,\"value\":\"交付要求\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"SO-2026-0912\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":\"华东制造集团\"},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":268000},{\"address\":\"D2\",\"row\":2,\"column\":4,\"value\":\"9 月 30 日前交付月报\"}]}],\"warnings\":[]},\"_meta\":null}",
+          "durationMs": 26,
           "evidenceRefs": [
-            "codex://items/exec-5c1726c4-3b71-41e4-8c33-6bfce8aa4023",
-            "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2"
+            "codex://items/exec-8092c28a-7a3a-4226-b905-1b8253aeb125",
+            "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493"
           ],
-          "occurredAt": "2026-09-11T18:43:05.624Z",
-          "idempotencyKey": "codex_plan_1a890b7_2:4:doc.extract"
+          "occurredAt": "2026-09-13T23:46:12.678Z",
+          "idempotencyKey": "codex_plan_17ew7za_2:4:doc.extract"
         },
         {
-          "id": "tool_inv_0d509376-ba5d-4cc6-b19b-621e7a806e66",
-          "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
-          "sessionId": "codex_plan_1a890b7_2",
-          "toolDefinitionId": "tenant_731d62f796e34c5a85f24a2d8fdfc475_tool_external_send_draft",
+          "id": "tool_inv_03a8afd6-3c4a-443f-8c30-62a69e8d78ae",
+          "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
+          "sessionId": "codex_plan_17ew7za_2",
+          "toolDefinitionId": "tenant_92b073f25765468bbd5efe8d269a7a47_tool_external_send_draft",
           "capabilityId": "external.send.draft",
           "actorRef": "employee:order-delivery-assistant",
           "status": "completed",
@@ -188,50 +192,50 @@
             "sha256": "ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7",
             "sizeBytes": 138
           },
-          "durationMs": 8,
+          "durationMs": 5,
           "evidenceRefs": [
             "evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7"
           ],
-          "occurredAt": "2026-09-11T18:43:31.761Z",
-          "idempotencyKey": "m5e-intake-draft:codex_plan_1a890b7_2"
+          "occurredAt": "2026-09-13T23:46:25.057Z",
+          "idempotencyKey": "m5e-intake-draft:codex_plan_17ew7za_2"
         }
       ],
       "totalCostCny": 0,
       "approval": {
-        "id": "approval_intake_codex_plan_1a890b7_2",
-        "sessionId": "codex_plan_1a890b7_2",
+        "id": "approval_intake_codex_plan_17ew7za_2",
+        "sessionId": "codex_plan_17ew7za_2",
         "status": "approved",
-        "requestedAt": "2026-09-11T18:43:31.759Z",
-        "decidedAt": "2026-09-11T18:43:31.762Z",
+        "requestedAt": "2026-09-13T23:46:25.055Z",
+        "decidedAt": "2026-09-13T23:46:25.058Z",
         "action": "external.send.draft",
         "requestedBy": "employee:order-delivery-assistant",
         "estimatedCostCny": null,
-        "policyId": "tenant_731d62f796e34c5a85f24a2d8fdfc475_policy_external_send",
-        "approverActorRef": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
-        "decisionActorRef": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
+        "policyId": "tenant_92b073f25765468bbd5efe8d269a7a47_policy_external_send",
+        "approverActorRef": "account:account_4925a48f7ecf49519f653911b6a8474b",
+        "decisionActorRef": "account:account_4925a48f7ecf49519f653911b6a8474b",
         "decisionEventType": "approval.authorized",
-        "eventHash": "c5a0b280f0926fedbed2a9536ad25cb59fe4299c3b1e5d359622f31eeb52186d"
+        "eventHash": "c0cbe029d3198954033bb95ceb7bd67c32465ce52865a12f3749129f04904692"
       },
       "chainIntegrity": {
         "valid": true,
-        "checked": 30
+        "checked": 34
       },
-      "receiptJson": "{\"approval\":{\"action\":\"external.send.draft\",\"approverActorRef\":\"account:account_1d12796018ab4f29ae69e1eabbd6a79e\",\"decidedAt\":\"2026-09-11T18:43:31.762Z\",\"decisionActorRef\":\"account:account_1d12796018ab4f29ae69e1eabbd6a79e\",\"decisionEventType\":\"approval.authorized\",\"estimatedCostCny\":null,\"eventHash\":\"c5a0b280f0926fedbed2a9536ad25cb59fe4299c3b1e5d359622f31eeb52186d\",\"id\":\"approval_intake_codex_plan_1a890b7_2\",\"policyId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475_policy_external_send\",\"requestedAt\":\"2026-09-11T18:43:31.759Z\",\"requestedBy\":\"employee:order-delivery-assistant\",\"sessionId\":\"codex_plan_1a890b7_2\",\"status\":\"approved\"},\"chainIntegrity\":{\"checked\":30,\"valid\":true},\"costs\":[],\"definition\":{\"acceptanceCriteria\":\"订单被读取，草稿经具名审批，回执可验链\",\"actionPattern\":\"order.intake.deliver\",\"createdAt\":\"2026-09-11T18:43:31.783Z\",\"enabled\":true,\"id\":\"outcome_def_94e34924f82e4cf3a5eac999ab2f8ba1\",\"riskLevel\":\"high\",\"tenantId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475\",\"title\":\"真实订单交付\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-11T18:43:31.783Z\"},\"generatedAt\":\"2026-09-11T18:43:31.792Z\",\"outcome\":{\"acceptedBy\":\"account:account_1d12796018ab4f29ae69e1eabbd6a79e\",\"approvalId\":\"approval_intake_codex_plan_1a890b7_2\",\"evidenceRef\":\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"id\":\"outcome_evt_e1e2b49a3be54692917b7cd8e2cade2c\",\"occurredAt\":\"2026-09-11T18:43:31.764Z\",\"outcomeDefinitionId\":\"outcome_def_94e34924f82e4cf3a5eac999ab2f8ba1\",\"sessionId\":\"codex_plan_1a890b7_2\",\"tenantId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475\",\"verdict\":\"accepted\",\"workOrderId\":\"wo_intake_31ab22a26cad2f44a1e168d8\"},\"tenantId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475\",\"tools\":[{\"actorRef\":\"employee:codex\",\"args\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\"},\"capabilityId\":\"doc.extract\",\"durationMs\":37,\"evidenceRefs\":[\"codex://items/exec-5c1726c4-3b71-41e4-8c33-6bfce8aa4023\",\"evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\"],\"id\":\"tool_inv_6dea63b5-e6bf-4053-98fe-a9fe684aa0d7\",\"idempotencyKey\":\"codex_plan_1a890b7_2:4:doc.extract\",\"occurredAt\":\"2026-09-11T18:43:05.624Z\",\"result\":\"{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"{\\\\\\\"format\\\\\\\":\\\\\\\"xlsx\\\\\\\",\\\\\\\"source\\\\\\\":{\\\\\\\"path\\\\\\\":\\\\\\\"inbox\\\\\\\\\\\\\\\\SO-2026-0912.xlsx\\\\\\\",\\\\\\\"sha256\\\\\\\":\\\\\\\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\\\\\\\",\\\\\\\"sizeBytes\\\\\\\":6603},\\\\\\\"sheets\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"订单明细\\\\\\\",\\\\\\\"cells\\\\\\\":[{\\\\\\\"address\\\\\\\":\\\\\\\"A1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"订单号\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":\\\\\\\"客户\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"C1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":\\\\\\\"金额\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"D1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":4,\\\\\\\"value\\\\\\\":\\\\\\\"交付要求\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"A2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"SO-2026-0912\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":\\\\\\\"华东制造集团\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"C2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":268000},{\\\\\\\"address\\\\\\\":\\\\\\\"D2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":4,\\\\\\\"value\\\\\\\":\\\\\\\"9 月 30 日前交付月报\\\\\\\"}]}],\\\\\\\"warnings\\\\\\\":[]}\\\"}],\\\"structuredContent\\\":{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]},\\\"_meta\\\":null}\",\"sessionId\":\"codex_plan_1a890b7_2\",\"status\":\"completed\",\"tenantId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475\",\"toolDefinitionId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475_tool_doc_extract\"},{\"actorRef\":\"employee:order-delivery-assistant\",\"args\":{\"relativePath\":\"deliverables/order-summary-draft.md\"},\"capabilityId\":\"external.send.draft\",\"durationMs\":8,\"evidenceRefs\":[\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\"],\"id\":\"tool_inv_0d509376-ba5d-4cc6-b19b-621e7a806e66\",\"idempotencyKey\":\"m5e-intake-draft:codex_plan_1a890b7_2\",\"occurredAt\":\"2026-09-11T18:43:31.761Z\",\"result\":{\"evidenceRef\":\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"relativePath\":\"deliverables/order-summary-draft.md\",\"sha256\":\"ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"sizeBytes\":138},\"sessionId\":\"codex_plan_1a890b7_2\",\"status\":\"completed\",\"tenantId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475\",\"toolDefinitionId\":\"tenant_731d62f796e34c5a85f24a2d8fdfc475_tool_external_send_draft\"}],\"totalCostCny\":0}"
+      "receiptJson": "{\"approval\":{\"action\":\"external.send.draft\",\"approverActorRef\":\"account:account_4925a48f7ecf49519f653911b6a8474b\",\"decidedAt\":\"2026-09-13T23:46:25.058Z\",\"decisionActorRef\":\"account:account_4925a48f7ecf49519f653911b6a8474b\",\"decisionEventType\":\"approval.authorized\",\"estimatedCostCny\":null,\"eventHash\":\"c0cbe029d3198954033bb95ceb7bd67c32465ce52865a12f3749129f04904692\",\"id\":\"approval_intake_codex_plan_17ew7za_2\",\"policyId\":\"tenant_92b073f25765468bbd5efe8d269a7a47_policy_external_send\",\"requestedAt\":\"2026-09-13T23:46:25.055Z\",\"requestedBy\":\"employee:order-delivery-assistant\",\"sessionId\":\"codex_plan_17ew7za_2\",\"status\":\"approved\"},\"chainIntegrity\":{\"checked\":34,\"valid\":true},\"costs\":[],\"definition\":{\"acceptanceCriteria\":\"订单被读取，草稿经具名审批，回执可验链\",\"actionPattern\":\"order.intake.deliver\",\"createdAt\":\"2026-09-13T23:46:25.069Z\",\"enabled\":true,\"id\":\"outcome_def_e74f0375f88049a782c0564dc099b201\",\"riskLevel\":\"high\",\"tenantId\":\"tenant_92b073f25765468bbd5efe8d269a7a47\",\"title\":\"真实订单交付\",\"unitPriceCny\":null,\"updatedAt\":\"2026-09-13T23:46:25.069Z\"},\"generatedAt\":\"2026-09-13T23:46:25.074Z\",\"outcome\":{\"acceptedBy\":\"account:account_4925a48f7ecf49519f653911b6a8474b\",\"approvalId\":\"approval_intake_codex_plan_17ew7za_2\",\"evidenceRef\":\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"id\":\"outcome_evt_63d80202b41f4e6db6b5b05f16009f6d\",\"occurredAt\":\"2026-09-13T23:46:25.060Z\",\"outcomeDefinitionId\":\"outcome_def_e74f0375f88049a782c0564dc099b201\",\"sessionId\":\"codex_plan_17ew7za_2\",\"tenantId\":\"tenant_92b073f25765468bbd5efe8d269a7a47\",\"verdict\":\"accepted\",\"workOrderId\":\"wo_intake_9c4e1993829acbfcfceba14e\"},\"tenantId\":\"tenant_92b073f25765468bbd5efe8d269a7a47\",\"tools\":[{\"actorRef\":\"employee:codex\",\"args\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\"},\"capabilityId\":\"doc.extract\",\"durationMs\":26,\"evidenceRefs\":[\"codex://items/exec-8092c28a-7a3a-4226-b905-1b8253aeb125\",\"evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\"],\"id\":\"tool_inv_8c35168f-80a6-4879-a7bb-279a45b72f42\",\"idempotencyKey\":\"codex_plan_17ew7za_2:4:doc.extract\",\"occurredAt\":\"2026-09-13T23:46:12.678Z\",\"result\":\"{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"{\\\\\\\"format\\\\\\\":\\\\\\\"xlsx\\\\\\\",\\\\\\\"source\\\\\\\":{\\\\\\\"path\\\\\\\":\\\\\\\"inbox\\\\\\\\\\\\\\\\SO-2026-0912.xlsx\\\\\\\",\\\\\\\"sha256\\\\\\\":\\\\\\\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\\\\\\\",\\\\\\\"sizeBytes\\\\\\\":6603},\\\\\\\"sheets\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"订单明细\\\\\\\",\\\\\\\"cells\\\\\\\":[{\\\\\\\"address\\\\\\\":\\\\\\\"A1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"订单号\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":\\\\\\\"客户\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"C1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":\\\\\\\"金额\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"D1\\\\\\\",\\\\\\\"row\\\\\\\":1,\\\\\\\"column\\\\\\\":4,\\\\\\\"value\\\\\\\":\\\\\\\"交付要求\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"A2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":1,\\\\\\\"value\\\\\\\":\\\\\\\"SO-2026-0912\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"B2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":2,\\\\\\\"value\\\\\\\":\\\\\\\"华东制造集团\\\\\\\"},{\\\\\\\"address\\\\\\\":\\\\\\\"C2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":3,\\\\\\\"value\\\\\\\":268000},{\\\\\\\"address\\\\\\\":\\\\\\\"D2\\\\\\\",\\\\\\\"row\\\\\\\":2,\\\\\\\"column\\\\\\\":4,\\\\\\\"value\\\\\\\":\\\\\\\"9 月 30 日前交付月报\\\\\\\"}]}],\\\\\\\"warnings\\\\\\\":[]}\\\"}],\\\"structuredContent\\\":{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]},\\\"_meta\\\":null}\",\"sessionId\":\"codex_plan_17ew7za_2\",\"status\":\"completed\",\"tenantId\":\"tenant_92b073f25765468bbd5efe8d269a7a47\",\"toolDefinitionId\":\"tenant_92b073f25765468bbd5efe8d269a7a47_tool_doc_extract\"},{\"actorRef\":\"employee:order-delivery-assistant\",\"args\":{\"relativePath\":\"deliverables/order-summary-draft.md\"},\"capabilityId\":\"external.send.draft\",\"durationMs\":5,\"evidenceRefs\":[\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\"],\"id\":\"tool_inv_03a8afd6-3c4a-443f-8c30-62a69e8d78ae\",\"idempotencyKey\":\"m5e-intake-draft:codex_plan_17ew7za_2\",\"occurredAt\":\"2026-09-13T23:46:25.057Z\",\"result\":{\"evidenceRef\":\"evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"relativePath\":\"deliverables/order-summary-draft.md\",\"sha256\":\"ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7\",\"sizeBytes\":138},\"sessionId\":\"codex_plan_17ew7za_2\",\"status\":\"completed\",\"tenantId\":\"tenant_92b073f25765468bbd5efe8d269a7a47\",\"toolDefinitionId\":\"tenant_92b073f25765468bbd5efe8d269a7a47_tool_external_send_draft\"}],\"totalCostCny\":0}"
     },
     "integrity": {
       "valid": true,
-      "checked": 30
+      "checked": 34
     }
   },
   "restart": {
     "intake": {
-      "id": "intake_18b54cab42cdc687b77af059b0370a3c",
-      "tenantId": "tenant_731d62f796e34c5a85f24a2d8fdfc475",
+      "id": "intake_f4076d48b46afa34301ad36f522bd72d",
+      "tenantId": "tenant_92b073f25765468bbd5efe8d269a7a47",
       "source": "folder",
-      "externalRef": "folder:inbox\\SO-2026-0912.xlsx:b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
-      "receivedAt": "2026-09-11T18:42:30.409Z",
+      "externalRef": "folder:inbox\\SO-2026-0912.xlsx:12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
+      "receivedAt": "2026-09-13T23:45:41.645Z",
       "status": "confirmed",
-      "payloadEvidenceRef": "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2",
+      "payloadEvidenceRef": "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
       "payload": {
         "assignee": "自动推荐",
         "attachmentNames": [
@@ -240,55 +244,57 @@
         "dueAt": null,
         "executable": true,
         "expectedDeliverable": "订单处理结果与可验证回执",
-        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，提取订单目标与交付要求，生成一份可验收的订单处理结果。",
+        "preReadSummary": "工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
+        "sourceSha256": "12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493",
         "suggestedCapabilities": [
           "doc.extract"
         ],
         "target": "读取订单资料并完成明确交付",
         "title": "处理新订单：inbox\\SO-2026-0912.xlsx"
       },
-      "workOrderId": "wo_intake_31ab22a26cad2f44a1e168d8",
-      "confirmedBy": "account:account_1d12796018ab4f29ae69e1eabbd6a79e",
-      "confirmedAt": "2026-09-11T18:42:33.527Z",
-      "createdAt": "2026-09-11T18:42:30.409Z",
-      "updatedAt": "2026-09-11T18:42:33.527Z"
+      "workOrderId": "wo_intake_9c4e1993829acbfcfceba14e",
+      "confirmedBy": "account:account_4925a48f7ecf49519f653911b6a8474b",
+      "confirmedAt": "2026-09-13T23:45:44.803Z",
+      "createdAt": "2026-09-13T23:45:41.645Z",
+      "updatedAt": "2026-09-13T23:45:44.803Z"
     },
     "session": {
       "plan": {
         "approvalMode": "L2",
         "assignees": [
-          "订单处理专员（自动推荐）"
+          "订单处理智能体（自动推荐）"
         ],
         "attachmentNames": [
           "inbox\\SO-2026-0912.xlsx"
         ],
-        "estimate": "规划确认后约10分钟完成提取与可验收结果整理",
+        "estimate": "约 5 分钟",
         "humanGates": [],
-        "id": "plan_1a890b7",
-        "intakeId": "intake_18b54cab42cdc687b77af059b0370a3c",
+        "id": "plan_17ew7za",
+        "intakeId": "intake_f4076d48b46afa34301ad36f522bd72d",
         "modelProfile": "旗舰",
         "planning": {
           "costUnavailableReason": "该运行时模型未配置价格，成本未记录",
           "label": "模型生成计划",
-          "planningSessionId": "codex_planning_plan_1a890b7_1",
-          "receiptOutcomeEventId": "outcome_evt_829dc1f5982c462388a007689751f2e1",
+          "planningSessionId": "codex_planning_plan_17ew7za_1",
+          "receiptOutcomeEventId": "outcome_evt_ad69dc87cf794caaafd37c218387fa26",
           "runtimeId": "codex-cli",
           "source": "runtime"
         },
-        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，提取订单目标与交付要求，生成一份可验收的订单处理结果。",
+        "prompt": "使用 doc.extract 读取 inbox\\SO-2026-0912.xlsx，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：工作表 订单明细：A1=订单号；B1=客户；C1=金额；D1=交付要求；A2=SO-2026-0912；B2=华东制造集团；C2=268000；D2=9 月 30 日前交付月报",
         "tools": [
           "doc.extract"
         ],
         "understanding": [
-          "使用 doc.extract 读取“inbox\\SO-2026-0912.xlsx”，识别订单编号、客户需求、业务目标及关键约束。",
-          "提取交付物、数量或范围、质量标准、交付时间、交付方式及其他验收要求。",
-          "整理缺失、冲突或含糊信息，并标注其对订单处理和验收的影响。",
-          "形成包含订单目标、处理结果、交付清单、验收标准和待确认事项的结构化结果。",
-          "逐项建立交付要求与验收证据的对应关系，确保结果可核验、可判定。"
+          "使用 doc.extract 只读提取 inbox\\SO-2026-0912.xlsx 的“订单明细”工作表，并以本地预读摘要作为核验依据",
+          "确认订单目标：处理订单 SO-2026-0912，客户为华东制造集团，订单金额为 268000 元",
+          "确认交付要求：在 2026 年 9 月 30 日前交付月报",
+          "形成包含订单标识、客户、金额、交付物、截止日期和验收条件的结构化订单处理结果",
+          "将源文件提取值与预读摘要逐项比对，并记录一致性与可追溯证据；规划阶段不执行交付或外部发送"
         ],
         "workContext": "我的工作空间",
-        "workOrderId": "wo_intake_31ab22a26cad2f44a1e168d8",
-        "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读），仅限 inbox\\SO-2026-0912.xlsx"
+        "workOrderId": "wo_intake_9c4e1993829acbfcfceba14e",
+        "workspaceScope": "我的工作空间 · 我的工作空间（规划阶段只读；仅限 inbox\\SO-2026-0912.xlsx）"
       },
       "handle": {
         "engine": {
@@ -298,9 +304,9 @@
           "sandbox": "read-only",
           "tier": "flagship"
         },
-        "nativeSessionId": "01a091c7-90d8-7910-b62f-374266acb872",
+        "nativeSessionId": "01a09d29-d5d3-7411-8e4a-a9168670f665",
         "runtimeId": "codex-cli",
-        "sessionId": "codex_plan_1a890b7_2"
+        "sessionId": "codex_plan_17ew7za_2"
       },
       "events": [
         {
@@ -309,10 +315,10 @@
           "evidenceRefs": [
             "codex://host/stderr"
           ],
-          "occurredAt": "2026-09-11T18:42:50.495Z",
-          "result": "{\"timestamp\":\"2026-09-11T18:42:50.386808Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}",
+          "occurredAt": "2026-09-13T23:46:00.010Z",
+          "result": "{\"timestamp\":\"2026-09-13T23:45:59.915731Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}",
           "sequence": 1,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "status": "completed",
           "title": "Runtime 诊断",
           "type": "step"
@@ -323,10 +329,10 @@
           "evidenceRefs": [
             "codex://turn/started"
           ],
-          "occurredAt": "2026-09-11T18:42:50.711Z",
+          "occurredAt": "2026-09-13T23:46:00.195Z",
           "result": "已建立非交互运行，等待结构化事件。",
           "sequence": 2,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "status": "running",
           "title": "执行内核开始运行",
           "type": "step"
@@ -335,12 +341,12 @@
           "actorRef": "employee:codex",
           "category": "message",
           "evidenceRefs": [
-            "codex://items/msg_0bc51a300e081c15016aa44bb496f887d297ce82b9729b7bd9"
+            "codex://items/msg_0142a88405ce6da2016aa735becfc487d09ac3c3802c47e57c"
           ],
-          "occurredAt": "2026-09-11T18:43:01.600Z",
-          "result": "我会严格限定在 `inbox\\SO-2026-0912.xlsx`，先用 `doc.extract` 提取工作簿内容，再按“目标—交付—验收证据—待确认项”整理为可判定结果。",
+          "occurredAt": "2026-09-13T23:46:08.075Z",
+          "result": "我会严格按已确认计划，只读提取指定 Excel 的“订单明细”工作表，并将提取值逐项对照预读摘要；不会执行交付、外发或访问其他路径。",
           "sequence": 3,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "status": "completed",
           "title": "执行进展",
           "type": "step"
@@ -351,15 +357,15 @@
             "path": "inbox\\SO-2026-0912.xlsx"
           },
           "costCny": null,
-          "durationMs": 37,
+          "durationMs": 26,
           "evidenceRefs": [
-            "codex://items/exec-5c1726c4-3b71-41e4-8c33-6bfce8aa4023",
-            "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2"
+            "codex://items/exec-8092c28a-7a3a-4226-b905-1b8253aeb125",
+            "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493"
           ],
-          "occurredAt": "2026-09-11T18:43:05.624Z",
-          "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\",\"sha256\":\"b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2\",\"sizeBytes\":6603},\"sheets\":[{\"name\":\"订单明细\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"订单号\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"客户\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"金额\"},{\"address\":\"D1\",\"row\":1,\"column\":4,\"value\":\"交付要求\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"SO-2026-0912\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":\"华东制造集团\"},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":268000},{\"address\":\"D2\",\"row\":2,\"column\":4,\"value\":\"9 月 30 日前交付月报\"}]}],\"warnings\":[]},\"_meta\":null}",
+          "occurredAt": "2026-09-13T23:46:12.678Z",
+          "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"format\\\":\\\"xlsx\\\",\\\"source\\\":{\\\"path\\\":\\\"inbox\\\\\\\\SO-2026-0912.xlsx\\\",\\\"sha256\\\":\\\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\\\",\\\"sizeBytes\\\":6603},\\\"sheets\\\":[{\\\"name\\\":\\\"订单明细\\\",\\\"cells\\\":[{\\\"address\\\":\\\"A1\\\",\\\"row\\\":1,\\\"column\\\":1,\\\"value\\\":\\\"订单号\\\"},{\\\"address\\\":\\\"B1\\\",\\\"row\\\":1,\\\"column\\\":2,\\\"value\\\":\\\"客户\\\"},{\\\"address\\\":\\\"C1\\\",\\\"row\\\":1,\\\"column\\\":3,\\\"value\\\":\\\"金额\\\"},{\\\"address\\\":\\\"D1\\\",\\\"row\\\":1,\\\"column\\\":4,\\\"value\\\":\\\"交付要求\\\"},{\\\"address\\\":\\\"A2\\\",\\\"row\\\":2,\\\"column\\\":1,\\\"value\\\":\\\"SO-2026-0912\\\"},{\\\"address\\\":\\\"B2\\\",\\\"row\\\":2,\\\"column\\\":2,\\\"value\\\":\\\"华东制造集团\\\"},{\\\"address\\\":\\\"C2\\\",\\\"row\\\":2,\\\"column\\\":3,\\\"value\\\":268000},{\\\"address\\\":\\\"D2\\\",\\\"row\\\":2,\\\"column\\\":4,\\\"value\\\":\\\"9 月 30 日前交付月报\\\"}]}],\\\"warnings\\\":[]}\"}],\"structuredContent\":{\"format\":\"xlsx\",\"source\":{\"path\":\"inbox\\\\SO-2026-0912.xlsx\",\"sha256\":\"12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493\",\"sizeBytes\":6603},\"sheets\":[{\"name\":\"订单明细\",\"cells\":[{\"address\":\"A1\",\"row\":1,\"column\":1,\"value\":\"订单号\"},{\"address\":\"B1\",\"row\":1,\"column\":2,\"value\":\"客户\"},{\"address\":\"C1\",\"row\":1,\"column\":3,\"value\":\"金额\"},{\"address\":\"D1\",\"row\":1,\"column\":4,\"value\":\"交付要求\"},{\"address\":\"A2\",\"row\":2,\"column\":1,\"value\":\"SO-2026-0912\"},{\"address\":\"B2\",\"row\":2,\"column\":2,\"value\":\"华东制造集团\"},{\"address\":\"C2\",\"row\":2,\"column\":3,\"value\":268000},{\"address\":\"D2\",\"row\":2,\"column\":4,\"value\":\"9 月 30 日前交付月报\"}]}],\"warnings\":[]},\"_meta\":null}",
           "sequence": 4,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "status": "completed",
           "title": "调用 MCP 工具 doc_extract",
           "tool": "doc.extract",
@@ -369,12 +375,12 @@
           "actorRef": "employee:codex",
           "category": "message",
           "evidenceRefs": [
-            "codex://items/msg_0bc51a300e081c15016aa44bc5eb7887d2b62d7531bf46d1c2"
+            "codex://items/msg_0142a88405ce6da2016aa735cab18887d080404a01ab979324"
           ],
-          "occurredAt": "2026-09-11T18:43:31.633Z",
-          "result": "## 订单处理结果\n\n**处理结论：有条件受理，暂不可完成最终交付验收。**\n\n| 项目 | 提取结果 | 来源证据 |\n|---|---|---|\n| 订单编号 | SO-2026-0912 | `订单明细!A2` |\n| 客户 | 华东制造集团 | `订单明细!B2` |\n| 订单金额 | 268,000，币种未注明 | `订单明细!C2` |\n| 订单目标 | 向客户交付月报 | `订单明细!D2` |\n| 交付期限 | “9月30日前”，年份及具体截止时间未注明 | `订单明细!D2` |\n| 提取状态 | 成功，无解析警告 | `doc.extract` 结果 |\n\n### 交付与验收清单\n\n| 交付要求 | 验收标准 | 所需验收证据 | 当前状态 |\n|---|---|---|---|\n| 月报 | 提交约定范围、格式和内容的月报 | 月报最终文件、版本号或文件哈希 | 待交付 |\n| 按期交付 | 在确认后的截止时间前完成提交 | 带时间戳的邮件、系统回执或签收记录 | 待确认截止口径 |\n| 客户接收 | 华东制造集团收到交付物 | 客户签收或书面确认 | 待交付后取得 |\n\n### 待确认事项\n\n1. 月报对应的统计月份、业务范围、内容模板和数据口径。\n2. 交付数量、文件格式、语言及质量标准。\n3. “9月30日前”的年份、时区、具体时点，以及是否包含9月30日当天。\n4. 交付渠道、接收人及有效签收方式。\n5. 订单金额的币种、税费口径及付款条件。\n6. 客户是否需要审批、盖章或整改复验。\n\n**验收判定规则：** 月报文件符合确认后的范围与质量标准，并有截止时间内的提交记录及客户接收证据，方可判定交付通过；当前只能确认订单基本信息与“交付月报”这一要求，不能判定订单已完成。\n\n证据源：[SO-2026-0912.xlsx](<C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5e-intake\\workspace\\inbox\\SO-2026-0912.xlsx>)；SHA-256：`b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2`。",
+          "occurredAt": "2026-09-13T23:46:24.966Z",
+          "result": "## 订单处理结果\n\n| 验收字段 | 结果 |\n|---|---|\n| 订单标识 | SO-2026-0912 |\n| 客户 | 华东制造集团 |\n| 订单金额 | ¥268,000 |\n| 交付物 | 月报 |\n| 截止日期 | 2026-09-30 前 |\n| 当前状态 | 已确认交付要求，未执行交付或外部发送 |\n\n验收条件：\n\n- 月报对应订单 `SO-2026-0912` 和客户“华东制造集团”。\n- 月报须在 2026 年 9 月 30 日前交付。\n- 交付内容应完整、可打开，并具备可追溯的交付记录。\n\n证据与核验：\n\n- 来源：`inbox\\SO-2026-0912.xlsx`，“订单明细”工作表。\n- 提取单元格：`A2=SO-2026-0912`、`B2=华东制造集团`、`C2=268000`、`D2=9 月 30 日前交付月报`。\n- 与本地预读摘要逐项一致，无提取警告。\n- 文件 SHA-256：`12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493`。\n- 截止年份按已确认计划规范化为 2026 年；源单元格仅载明“9 月 30 日前”。",
           "sequence": 5,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "status": "completed",
           "title": "执行进展",
           "type": "step"
@@ -388,32 +394,32 @@
               "name": "最终回复"
             }
           ],
-          "durationMs": 40991,
+          "durationMs": 24821,
           "evidenceRefs": [
             "codex://turn/completed",
-            "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2"
+            "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493"
           ],
-          "occurredAt": "2026-09-11T18:43:31.702Z",
+          "occurredAt": "2026-09-13T23:46:25.016Z",
           "rollback": {
             "supported": false
           },
           "sequence": 6,
-          "sessionId": "codex_plan_1a890b7_2",
-          "summary": "## 订单处理结果\n\n**处理结论：有条件受理，暂不可完成最终交付验收。**\n\n| 项目 | 提取结果 | 来源证据 |\n|---|---|---|\n| 订单编号 | SO-2026-0912 | `订单明细!A2` |\n| 客户 | 华东制造集团 | `订单明细!B2` |\n| 订单金额 | 268,000，币种未注明 | `订单明细!C2` |\n| 订单目标 | 向客户交付月报 | `订单明细!D2` |\n| 交付期限 | “9月30日前”，年份及具体截止时间未注明 | `订单明细!D2` |\n| 提取状态 | 成功，无解析警告 | `doc.extract` 结果 |\n\n### 交付与验收清单\n\n| 交付要求 | 验收标准 | 所需验收证据 | 当前状态 |\n|---|---|---|---|\n| 月报 | 提交约定范围、格式和内容的月报 | 月报最终文件、版本号或文件哈希 | 待交付 |\n| 按期交付 | 在确认后的截止时间前完成提交 | 带时间戳的邮件、系统回执或签收记录 | 待确认截止口径 |\n| 客户接收 | 华东制造集团收到交付物 | 客户签收或书面确认 | 待交付后取得 |\n\n### 待确认事项\n\n1. 月报对应的统计月份、业务范围、内容模板和数据口径。\n2. 交付数量、文件格式、语言及质量标准。\n3. “9月30日前”的年份、时区、具体时点，以及是否包含9月30日当天。\n4. 交付渠道、接收人及有效签收方式。\n5. 订单金额的币种、税费口径及付款条件。\n6. 客户是否需要审批、盖章或整改复验。\n\n**验收判定规则：** 月报文件符合确认后的范围与质量标准，并有截止时间内的提交记录及客户接收证据，方可判定交付通过；当前只能确认订单基本信息与“交付月报”这一要求，不能判定订单已完成。\n\n证据源：[SO-2026-0912.xlsx](<C:\\Users\\Administrator\\Documents\\HUMMER项目组\\hummer-github-latest\\spikes\\m5e-intake\\workspace\\inbox\\SO-2026-0912.xlsx>)；SHA-256：`b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2`。",
+          "sessionId": "codex_plan_17ew7za_2",
+          "summary": "## 订单处理结果\n\n| 验收字段 | 结果 |\n|---|---|\n| 订单标识 | SO-2026-0912 |\n| 客户 | 华东制造集团 |\n| 订单金额 | ¥268,000 |\n| 交付物 | 月报 |\n| 截止日期 | 2026-09-30 前 |\n| 当前状态 | 已确认交付要求，未执行交付或外部发送 |\n\n验收条件：\n\n- 月报对应订单 `SO-2026-0912` 和客户“华东制造集团”。\n- 月报须在 2026 年 9 月 30 日前交付。\n- 交付内容应完整、可打开，并具备可追溯的交付记录。\n\n证据与核验：\n\n- 来源：`inbox\\SO-2026-0912.xlsx`，“订单明细”工作表。\n- 提取单元格：`A2=SO-2026-0912`、`B2=华东制造集团`、`C2=268000`、`D2=9 月 30 日前交付月报`。\n- 与本地预读摘要逐项一致，无提取警告。\n- 文件 SHA-256：`12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493`。\n- 截止年份按已确认计划规范化为 2026 年；源单元格仅载明“9 月 30 日前”。",
           "title": "任务运行完成",
           "type": "result",
           "usage": {
             "cacheWriteInputTokens": 0,
-            "cachedInputTokens": 14208,
-            "inputTokens": 16788,
-            "outputTokens": 1047,
-            "reasoningOutputTokens": 439,
-            "totalTokens": 17835
+            "cachedInputTokens": 15488,
+            "inputTokens": 16083,
+            "outputTokens": 503,
+            "reasoningOutputTokens": 154,
+            "totalTokens": 16586
           }
         },
         {
           "actorRef": "employee:order-delivery-assistant",
-          "approvalId": "approval_intake_codex_plan_1a890b7_2",
+          "approvalId": "approval_intake_codex_plan_17ew7za_2",
           "args": {
             "relativePath": "deliverables/order-summary-draft.md"
           },
@@ -421,25 +427,25 @@
           "durationMs": null,
           "evidenceRefs": [],
           "message": "只生成本地草稿，不执行投递。",
-          "occurredAt": "2026-09-11T18:43:31.759Z",
+          "occurredAt": "2026-09-13T23:46:25.055Z",
           "result": "pending",
           "sequence": 7,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "title": "确认生成客户外发草稿",
           "tool": "external.send.draft",
           "type": "approval_required"
         },
         {
           "actorRef": "account:owner",
-          "approvalId": "approval_intake_codex_plan_1a890b7_2",
+          "approvalId": "approval_intake_codex_plan_17ew7za_2",
           "approved": true,
           "evidenceRefs": [
             "evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7"
           ],
-          "occurredAt": "2026-09-11T18:43:31.762Z",
+          "occurredAt": "2026-09-13T23:46:25.058Z",
           "result": "已批准生成本地外发草稿。",
           "sequence": 8,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "type": "approval_resolved"
         },
         {
@@ -455,11 +461,11 @@
           "durationMs": null,
           "evidenceRefs": [
             "evidence://sha256/ae670e2c2bc6066f98e1cf4cc14b2ba8bcaa4fc2cafe1008124c05dab3c05cd7",
-            "evidence://sha256/b30ef56c30fd14c1fda6223c998995619f7753c796836b81d5f093f689bd41d2"
+            "evidence://sha256/12d7d0f577ba82ec2e43b6eaf74975dd2c45a6f52c44b123511fa96fcccae493"
           ],
-          "occurredAt": "2026-09-11T18:43:31.763Z",
+          "occurredAt": "2026-09-13T23:46:25.059Z",
           "sequence": 9,
-          "sessionId": "codex_plan_1a890b7_2",
+          "sessionId": "codex_plan_17ew7za_2",
           "summary": "已读取真实订单并生成经批准的外发草稿。",
           "title": "订单交付完成",
           "type": "result"
@@ -468,7 +474,7 @@
     },
     "integrity": {
       "valid": true,
-      "checked": 30
+      "checked": 35
     }
   }
 }

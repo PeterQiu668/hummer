@@ -449,3 +449,9 @@ M5-G does not change the `RuntimeAdapter` method set. Codex remains a read-only 
 The other side of the boundary is owned by the desktop host. A session-bound, random lease authorizes one `workOrderId`; the main process then stages validated files into a unique container volume, runs a non-root image with a read-only root filesystem and no network, validates and hashes the returned snapshot, records `tool_invocations`, and removes the volume. User-configured MCP servers are explicitly disabled for embedded execution, so a runtime cannot bypass the HUMMER registry through inherited tools.
 
 The five-probe startup self-check is a control-plane prerequisite, not an advisory health badge. Missing container support, duplicate or incomplete probe output, or any successful network/DNS/raw-socket probe disables `workspace.exec` before the broker can execute it. Evidence and the packaging limits are recorded in `docs/decisions/ADR-012-m5g-hummer-owned-execution-sandbox.md`.
+
+## 19. M5-H controlled delivery boundary (2026-09-14)
+
+`external.send` is a HUMMER-owned builtin capability, not a runtime shell action and not a channel connector. Its first target is a user-selected local directory. The renderer can request an export approval, but it cannot pass an arbitrary source path: the Electron main process validates the authenticated tenant session, the matching `workOrderId`, and the artifact's path inside that order's sandbox before copying it.
+
+The main process requires an approved `external.send` evidence record whose requester exactly matches the request. It then records destination, content SHA-256, delivery timestamp, evidence reference, tool invocation, and `egress.delivered` in the append-only chain. Rejection or failed authorization produces no target-side file. SMTP and IM/CRM channels are intentionally out of scope for this milestone.

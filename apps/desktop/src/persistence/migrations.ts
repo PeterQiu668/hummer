@@ -548,6 +548,30 @@ export const migrations: readonly Migration[] = [
         ON workspace_exec_jobs (tenant_id, session_id, occurred_at);
     `,
   },
+  {
+    version: 10,
+    name: 'm5h_egress_delivery',
+    sql: `
+      CREATE TABLE egress_deliveries (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        approval_id TEXT NOT NULL,
+        capability_id TEXT NOT NULL,
+        target TEXT NOT NULL,
+        content_sha256 TEXT NOT NULL,
+        evidence_ref TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('delivered', 'failed')),
+        result_json TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key)
+      );
+
+      CREATE INDEX egress_deliveries_session
+        ON egress_deliveries (tenant_id, session_id, occurred_at);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

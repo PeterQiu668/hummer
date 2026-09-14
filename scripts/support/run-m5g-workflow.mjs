@@ -208,7 +208,7 @@ export async function runM5gWorkflow(kind) {
       tool: product.tool,
       startupIsolation: product.environment.workspaceExec,
       branches: product.branches.map(({ receipt, ...branch }) => branch), wireProof: { workspaceExecCall, shellCall, inheritedMcpServers }, chainIntegrity: product.integrity,
-      disclosure: '出境批准分支只记录策略决策；本里程碑明确不接入渠道，因此未宣称真实外发。',
+      disclosure: '本工作流证明隔离沙箱产物与出境审批决策。M5-H 的受控本地目录导出由独立 egress E2E 验证；本工作流不宣称 SMTP、IM、CRM 或其他网络渠道投递。',
     };
     writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
     await page.screenshot({ path: screenshotPath, fullPage: true });

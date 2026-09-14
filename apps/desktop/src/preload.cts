@@ -109,7 +109,7 @@ contextBridge.exposeInMainWorld('hummerProjects', {
 });
 contextBridge.exposeInMainWorld('hummerEnvironmentDoctor', {
   check: (force = false) => ipcRenderer.invoke('hummer:environment:check', force),
-  openInstallGuide: () => ipcRenderer.invoke('hummer:environment:install-guide'),
+  openInstallGuide: (target: 'codex' | 'container') => ipcRenderer.invoke('hummer:environment:install-guide', target),
 });
 contextBridge.exposeInMainWorld('hummerApprovalPolicy', {
   preview: (request: unknown) => ipcRenderer.invoke('hummer:approval-policy:preview', request),
@@ -130,6 +130,9 @@ contextBridge.exposeInMainWorld('hummerToolRegistry', {
   list: (token: string) => ipcRenderer.invoke('hummer:tools:list', token),
   verifyLocalMcp: (token: string) => ipcRenderer.invoke('hummer:tools:verify-local-mcp', token),
   createExternalSendDraft: (request: unknown) => ipcRenderer.invoke('hummer:tools:create-external-draft', request),
+  chooseEgressDirectory: (token: string) => ipcRenderer.invoke('hummer:tools:choose-egress-directory', token),
+  exportApprovedArtifact: (request: unknown) => ipcRenderer.invoke('hummer:tools:export-approved-artifact', request),
+  listEgressDeliveries: (request: unknown) => ipcRenderer.invoke('hummer:tools:list-egress-deliveries', request),
 });
 
 contextBridge.exposeInMainWorld('hummerWorkOrderIntake', {

@@ -57,7 +57,7 @@ export function probeLocalMcp(input: {
     });
     child.stdin.write(`${JSON.stringify({
       jsonrpc: '2.0', id: 1, method: 'initialize',
-      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'hummer-desktop-probe', version: '0.5.0' } },
+      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'hummer-desktop-probe', version: '0.6.0' } },
     })}\n`);
   });
 }

@@ -110,7 +110,7 @@ try {
   if (!product.receipt.tools.some((tool) => tool.capabilityId === 'workspace.exec')) throw new Error('Receipt omitted workspace.exec invocation');
   if (!product.integrity.valid) throw new Error(`Hash chain is invalid: ${JSON.stringify(product.integrity)}`);
   const capabilities = product.definitions.map((tool) => tool.capabilityId).sort();
-  if (capabilities.join(',') !== 'doc.extract,external.send.draft,fs.read,workspace.exec') throw new Error(`Unexpected capability catalog: ${capabilities.join(',')}`);
+  if (capabilities.join(',') !== 'doc.extract,external.send,external.send.draft,fs.read,workspace.exec') throw new Error(`Unexpected capability catalog: ${capabilities.join(',')}`);
 
   const wire = readWireMessages(wireLogPath);
   const workspaceExecCall = wire.some(({ raw }) => raw?.method === 'item/started' && raw.params?.item?.type === 'mcpToolCall'

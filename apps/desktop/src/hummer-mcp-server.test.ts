@@ -39,6 +39,18 @@ describe('HUMMER local MCP server', () => {
     expect(response).toMatchObject({ id: 5, result: { structuredContent: { exitCode: 0 } } });
   });
 
+  it('returns a readable Chinese failure for a sandbox execution error', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'hummer-mcp-'));
+    directories.push(workspace);
+    const response = await handleMcpRequest({
+      jsonrpc: '2.0', id: 6, method: 'tools/call', params: {
+        name: 'workspace_exec', arguments: { argv: ['python', 'build.py'], files: [] },
+      },
+    }, workspace, vi.fn().mockRejectedValue(new Error('Container execution timed out after 120000ms')));
+
+    expect(response).toMatchObject({ error: { code: -32000, message: '沙箱内任务超时，请缩小任务范围或检查运行依赖后重试。' } });
+  });
+
   it('rejects traversal and every unregistered tool', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'hummer-mcp-'));
     directories.push(workspace);

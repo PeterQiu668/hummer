@@ -274,3 +274,28 @@ This section supersedes the DeepSeek-key blocker and conclusion above; the other
 
 - `.env.local` is absent in this checkout on 2026-09-13. The DeepSeek planner, credential restart, and wedge commands were not run; no mock or internal profile result substitutes for them.
 - Code signing remains unstarted and a clean Windows host was unavailable. `docs/release/m5g-windows-internal-release.md` records the exact open gates. No M5-G installer is claimed.
+
+## M5-H partial status update - 2026-09-14
+
+### P0.1 runtime distribution decision
+
+- ADR-013 selects Podman Desktop plus WSL2 guidance as the production recommendation. Docker remains detected as a current-machine POC compatibility runtime; HUMMER does not silently install, elevate, or alter Windows features.
+- At local assessment time, Podman was absent, WSL2 was present with an outdated-kernel notice, and Docker Engine 28.3.2 was available. A clean Windows installation was not available; installer-to-runtime acceptance remains blocked and is not claimed.
+- RuntimeSetupGate now gives a Chinese Podman/WSL2 remediation path. Any missing runtime or failed five-probe isolation result still disables `workspace.exec`.
+
+### P1 local egress product-chain evidence
+
+- `scripts/e2e-desktop-egress.mjs` completed in Electron on 2026-09-14. Evidence: `spikes/m5h-egress/egress-evidence.json` and `egress-receipt.json`.
+- An approved `external.send` copied a sandbox artifact to the selected local delivery directory and recorded destination, SHA-256 content hash, timestamp, tool invocation, approval, and `egress.delivered` in the domain chain. The rejected branch left no target file. Independent receipt verification passed; chain integrity was `valid=true, checked=16`.
+- This is local product-chain evidence for controlled local-directory export. It is not an SMTP, Feishu, WeCom, WeChat, CRM, or other network/channel delivery claim.
+
+### P2 intake pre-read evidence
+
+- `scripts/e2e-desktop-intake.mjs` completed on 2026-09-14 with a new XLSX inbox file. Before confirmation it produced one pending work order, zero sessions, a local `doc.extract` pre-read summary containing the order customer, and a 64-character source SHA-256. It then completed real Codex planning plus `doc.extract`; restart preserved the intake/session chain with `valid=true, checked=35`.
+- The run proves inbound folder -> local pre-read -> human confirmation -> existing planning/runtime chain. The subsequent external step in this retained M5-E script is still `external.send.draft`; M5-H's actual local-directory export is proven separately above. These evidence classes are deliberately not merged.
+
+### Remaining blockers
+
+- The repository-root `.env.local` has not yet been populated with a usable DeepSeek key. `planner:deepseek`, `credentials`, and `wedge` remain unrun and are not replaced by mock or OpenAI validation results.
+- Full M5-H all-workflow reruns with actual local-directory export, clean-Windows runtime installation, code-signing, and final packaging remain open gates.
+- A website workflow rerun was started on 2026-09-14 at 07:55 Asia/Shanghai, but did not reach `hummer_local/workspace_exec`. The real Codex app-server recorded two `responses_retry` stream-disconnect warnings (WebSocket close, then TLS EOF) in `spikes/m5g-workflows/website/website-wire.jsonl`; the harness timed out at 120 seconds. This is external-runtime instability, not a passed workflow or a sandbox failure. The six M5-G historical workflow records remain the evidence for isolated production; their M5-H reruns with actual local-directory export remain open.

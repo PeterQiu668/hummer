@@ -16,6 +16,7 @@ describe('tenant tool registry', () => {
       persistence.tools.ensureDefaults(owner.tenant.id, `account:${owner.account.id}`);
       expect(persistence.tools.listDefinitions(owner.tenant.id).map((tool) => tool.capabilityId)).toEqual([
         'doc.extract',
+        'external.send',
         'external.send.draft',
         'fs.read',
         'workspace.exec',

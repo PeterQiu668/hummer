@@ -45,14 +45,15 @@ describe('desktop persistence migrations', () => {
     persistence.close();
   });
 
-  it('keeps v6-v8 state while adding the v9 HUMMER execution sandbox through an additive migration', () => {
+  it('keeps v6-v9 state while adding the v10 egress ledger through an additive migration', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
 
-    expect(persistence.schemaVersion()).toBe(9);
+    expect(persistence.schemaVersion()).toBe(10);
     expect(persistence.listTables()).toContain('engine_credentials');
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['tool_definitions', 'tool_invocations']));
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['work_order_intake', 'work_order_inbox']));
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['execution_sandbox_checks', 'workspace_exec_jobs']));
+    expect(persistence.listTables()).toContain('egress_deliveries');
     persistence.close();
   });
 

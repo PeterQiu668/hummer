@@ -351,7 +351,7 @@ export function mapCodexMessage(message: unknown, lastAgentMessage?: string, met
         type: 'tool',
         status: stringValue(item.status) === 'failed' ? 'blocked' : 'completed',
         actorRef: 'employee:codex',
-        title: `调用 MCP 工具 ${tool}`,
+        title: server === 'hummer_local' && tool === 'workspace_exec' ? '正在隔离工作区生成成果' : `调用 MCP 工具 ${tool}`,
         tool: stableMcpCapabilityId(server, tool),
         args: isRecord(item.arguments) ? item.arguments : {},
         result: stringifyResult(item.result ?? item.error ?? item.status),

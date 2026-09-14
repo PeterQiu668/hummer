@@ -13,6 +13,9 @@ export interface WorkOrderIntakePayload {
   prompt: string;
   executable?: boolean;
   suggestedCapabilities?: string[];
+  preReadSummary?: string;
+  preReadError?: string;
+  sourceSha256?: string;
 }
 
 export interface WorkOrderIntakeRecord {

@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Upload,
   UserRound,
   Workflow,
   X,
@@ -50,6 +51,7 @@ import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type 
 import { desktopOutcomePort } from '../../features/outcomes/outcomeClient';
 import type { Planner } from '../../features/planning/planner';
 import { createDefaultPlanner } from '../../features/planning/plannerFactory';
+import { desktopToolRegistryPort } from '../../features/tools/toolRegistryClient';
 import {
   desktopWorkOrderIntakePort,
   type WorkOrderInboxRecord,
@@ -112,10 +114,13 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const [intakeInbox, setIntakeInbox] = useState<WorkOrderInboxRecord | null>(null);
   const [intakeFormOpen, setIntakeFormOpen] = useState(false);
   const [intakeError, setIntakeError] = useState<string | null>(null);
+  const [egressError, setEgressError] = useState<string | null>(null);
+  const [egressBusy, setEgressBusy] = useState(false);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
   const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
   const intakePort = useMemo(() => desktopWorkOrderIntakePort(), []);
+  const toolRegistryPort = useMemo(() => desktopToolRegistryPort(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +255,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     }));
   };
 
-  const persistAndAppend = (record: RuntimeRecord, event: RuntimeEvent) => {
+  const persistAndAppend = (record: RuntimeRecord, event: RuntimeEvent): Promise<void> => {
     const previous = persistenceQueues.current.get(record.handle.sessionId) ?? Promise.resolve();
     const next = previous
       .then(() => store.appendEvent(record.handle, record.plan, event))
@@ -259,7 +264,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     const cleanup = () => {
       if (persistenceQueues.current.get(record.handle.sessionId) === next) persistenceQueues.current.delete(record.handle.sessionId);
     };
-    void next.then(cleanup, cleanup);
+    return next.then(cleanup, cleanup);
   };
 
   const attachHandle = async (nextPlan: SessionPlan, handle: RuntimeHandle) => {
@@ -342,6 +347,11 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
         finalApproved = authorization.approved;
         if (approved && !finalApproved) setPolicyError(`企业审批策略已拒绝：${authorization.reason}`);
       }
+      if (pendingApproval.tool === 'external.send') {
+        await resolveLocalExportApproval(activeRecord, pendingApproval, finalApproved);
+        if (!approved || finalApproved) setPolicyError(null);
+        return;
+      }
       await runtime.respondToApproval(activeRecord.handle, pendingApproval.approvalId, finalApproved);
       if (policy) void openApprovalEvidence(pendingApproval.approvalId);
       if (!approved || finalApproved) setPolicyError(null);
@@ -363,6 +373,101 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
       setApprovalEvidenceOpen(true);
     } catch (error) {
       setPolicyError(error instanceof Error ? error.message : '审批证据读取失败');
+    }
+  };
+
+  const requestArtifactExport = async (artifactPath: string) => {
+    if (!activeRecord || !activeRecord.plan.workOrderId || !toolRegistryPort || egressBusy) return;
+    setEgressBusy(true);
+    setEgressError(null);
+    try {
+      const destinationDirectory = await toolRegistryPort.chooseEgressDirectory();
+      if (!destinationDirectory) return;
+      const sequence = Math.max(...activeRecord.events.map((event) => event.sequence), 0) + 1;
+      await persistAndAppend(activeRecord, {
+        sessionId: activeRecord.handle.sessionId,
+        sequence,
+        occurredAt: new Date().toISOString(),
+        actorRef: 'employee:codex',
+        type: 'approval_required',
+        approvalId: `approval_egress_${activeRecord.handle.sessionId}_${sequence}`,
+        title: '确认导出成果',
+        message: '成果将复制到你选择的本地目录。确认前不会写入该目录。',
+        tool: 'external.send',
+        args: { workOrderId: activeRecord.plan.workOrderId, sourceRelativePath: artifactPath, destinationDirectory },
+        result: '等待具名审批',
+        durationMs: null,
+        costCny: null,
+        evidenceRefs: [],
+      });
+    } catch (error) {
+      setEgressError(error instanceof Error ? error.message : '无法创建成果导出审批');
+    } finally {
+      setEgressBusy(false);
+    }
+  };
+
+  const resolveLocalExportApproval = async (
+    record: RuntimeRecord,
+    approval: Extract<RuntimeEvent, { type: 'approval_required' }>,
+    approved: boolean,
+  ) => {
+    const args = approval.args;
+    const workOrderId = typeof args.workOrderId === 'string' ? args.workOrderId : '';
+    const sourceRelativePath = typeof args.sourceRelativePath === 'string' ? args.sourceRelativePath : '';
+    const destinationDirectory = typeof args.destinationDirectory === 'string' ? args.destinationDirectory : '';
+    if (!workOrderId || !sourceRelativePath || !destinationDirectory || !toolRegistryPort) throw new Error('成果导出审批缺少受控目标信息');
+    const baseSequence = Math.max(...record.events.map((event) => event.sequence), 0) + 1;
+    let evidenceRefs: string[] = [];
+    if (approved) {
+      const delivery = await toolRegistryPort.exportApprovedArtifact({
+        sessionId: record.handle.sessionId,
+        approvalId: approval.approvalId,
+        requestedBy: approval.actorRef,
+        workOrderId,
+        sourceRelativePath,
+        destinationDirectory,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `ui-egress:${approval.approvalId}`,
+      });
+      evidenceRefs = [delivery.evidenceRef];
+      await persistAndAppend(record, {
+        sessionId: record.handle.sessionId,
+        sequence: baseSequence,
+        occurredAt: new Date().toISOString(),
+        actorRef: approval.actorRef,
+        type: 'tool',
+        title: '已导出受控成果',
+        tool: 'external.send',
+        status: 'completed',
+        args: { sourceRelativePath, destinationDirectory },
+        result: `已导出 ${delivery.fileName}，内容哈希 ${delivery.contentSha256}`,
+        durationMs: null,
+        costCny: null,
+        evidenceRefs,
+      });
+    }
+    await persistAndAppend(record, {
+      sessionId: record.handle.sessionId,
+      sequence: approved ? baseSequence + 1 : baseSequence,
+      occurredAt: new Date().toISOString(),
+      actorRef: 'human:operator',
+      type: 'approval_resolved',
+      approvalId: approval.approvalId,
+      approved,
+      result: approved ? '已批准并完成成果导出。' : '已拒绝成果导出，目标目录未写入。',
+      evidenceRefs,
+    });
+    if (approved) {
+      await persistAndAppend(record, {
+        sessionId: record.handle.sessionId,
+        sequence: baseSequence + 2,
+        occurredAt: new Date().toISOString(),
+        actorRef: approval.actorRef,
+        type: 'status',
+        status: 'delivered',
+        evidenceRefs,
+      });
     }
   };
 
@@ -679,7 +784,8 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
                   </dl>
                 </section>
               )}
-              {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence))} />}
+              {egressError && <div role="alert" className="rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-[11px] text-danger">{egressError}</div>}
+              {session.resultPackage && <ResultPanel session={session} onFork={() => forkFrom(Math.max(1, session.checkpointSequence))} onExport={activeRecord?.plan.workOrderId && firstWorkspaceArtifact(activeRecord.events) ? () => { void requestArtifactExport(firstWorkspaceArtifact(activeRecord.events)!); } : undefined} exportBusy={egressBusy} />}
 
               <ExecutionComposer value={followUp} onChange={setFollowUp} onSubmit={sendFollowUp} disabled={session.status === 'cancelled' || session.status === 'delivered' || session.status === 'interrupted'} />
             </main>
@@ -720,6 +826,8 @@ function PendingWorkOrders({ records, busy, onConfirm }: { records: WorkOrderInt
                 {record.payload.executable === false && <span className="hum-chip is-warning">文件类型暂不支持</span>}
               </div>
               <div className="mt-1 truncate text-[10.5px] text-neutral-500">{record.payload.target} · {record.payload.expectedDeliverable}</div>
+              {record.payload.preReadSummary && <div className="mt-1 line-clamp-2 text-[10.5px] leading-4 text-neutral-600">本地预读：{record.payload.preReadSummary}</div>}
+              {record.payload.preReadError && <div className="mt-1 text-[10.5px] text-danger">{record.payload.preReadError}</div>}
               <div className="mt-1 font-mono text-[9.5px] text-neutral-400">{record.payloadEvidenceRef}</div>
             </div>
             <button
@@ -939,7 +1047,7 @@ function DesktopKeyframe({ onTakeover, disabled }: { onTakeover: () => void; dis
   );
 }
 
-function ResultPanel({ session, onFork }: { session: ExecutionSession; onFork: () => void }) {
+function ResultPanel({ session, onFork, onExport, exportBusy }: { session: ExecutionSession; onFork: () => void; onExport?: () => void; exportBusy: boolean }) {
   const result = session.resultPackage;
   if (!result) return null;
   return (
@@ -954,10 +1062,25 @@ function ResultPanel({ session, onFork }: { session: ExecutionSession; onFork: (
           <p className="text-[12px] leading-5 text-neutral-700">{result.summary}</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2"><Detail label="交付物" value={result.deliverables[0]?.name ?? '--'} /><Detail label="证据与回滚" value={`${result.evidenceRefs.length} 条证据 · ${result.rollback.supported ? '支持回滚' : '不支持回滚'}`} /></div>
         </div>
-        <div className="flex items-end gap-2"><button type="button" onClick={onFork} className="hum-btn is-sm flex-1"><GitFork size={12} /> 打回复跑</button></div>
+        <div className="flex items-end gap-2">
+          {onExport && <button type="button" onClick={onExport} disabled={exportBusy} className="hum-btn is-sm flex-1 disabled:opacity-50"><Upload size={12} /> {exportBusy ? '准备导出' : '导出成果'}</button>}
+          <button type="button" onClick={onFork} className="hum-btn is-sm flex-1"><GitFork size={12} /> 打回复跑</button>
+        </div>
       </div>
     </section>
   );
+}
+
+function firstWorkspaceArtifact(events: RuntimeEvent[]): string | undefined {
+  const completed = [...events].reverse().find((event): event is Extract<RuntimeEvent, { type: 'tool' }> => event.type === 'tool' && event.tool === 'workspace.exec' && event.status === 'completed');
+  if (!completed) return undefined;
+  try {
+    const result = JSON.parse(completed.result) as { artifacts?: Array<{ path?: unknown }> };
+    const path = result.artifacts?.find((artifact) => typeof artifact.path === 'string')?.path;
+    return typeof path === 'string' ? path : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function ExecutionComposer({ value, onChange, onSubmit, disabled }: { value: string; onChange: (value: string) => void; onSubmit: () => void; disabled: boolean }) {

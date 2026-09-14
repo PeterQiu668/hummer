@@ -31,7 +31,7 @@ export async function handleMcpRequest(
       result: {
         protocolVersion: protocolVersion(request.params),
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'hummer-local-tools', version: '0.5.0' },
+        serverInfo: { name: 'hummer-local-tools', version: '0.6.0' },
       },
     };
     if (request.method === 'ping') return { jsonrpc: '2.0', id, result: {} };
@@ -64,8 +64,18 @@ export async function handleMcpRequest(
     }
     return failure(id, -32601, `Unknown method ${String(request.method ?? '')}`);
   } catch (error) {
-    return failure(id, -32000, error instanceof Error ? error.message : String(error));
+    return failure(id, -32000, userFacingToolError(request, error));
   }
+}
+
+function userFacingToolError(request: JsonRpcRequest, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const tool = record(request.params).name;
+  if (tool !== 'workspace_exec') return message;
+  if (/timed out/i.test(message)) return '沙箱内任务超时，请缩小任务范围或检查运行依赖后重试。';
+  if (/network isolation|runtime is unavailable|执行能力不可用/i.test(message)) return '执行能力不可用：本机网络隔离未生效，请先完成环境自检。';
+  if (/artifacts exceed|too many artifacts/i.test(message)) return '沙箱产物超过安全限制，请减少文件数量或大小后重试。';
+  return '沙箱内任务执行失败，请检查生成内容或运行依赖后重试。';
 }
 
 export function readWorkspaceFile(workspaceDirectory: string, requestedPath: string) {

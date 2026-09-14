@@ -48,6 +48,7 @@
     "test:desktop:doc-extract": "node scripts/e2e-desktop-doc-extract.mjs",
     "test:desktop:intake": "node scripts/e2e-desktop-intake.mjs",
     "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs",
+    "test:desktop:egress": "node scripts/e2e-desktop-egress.mjs",
     "test:desktop:workspace-exec": "node scripts/e2e-desktop-workspace-exec.mjs",
     "test:workflow:website": "node scripts/e2e-workflow-website.mjs",
     "test:workflow:deck": "node scripts/e2e-workflow-deck.mjs",

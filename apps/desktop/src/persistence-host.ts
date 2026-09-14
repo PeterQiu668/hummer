@@ -22,6 +22,7 @@ import type { PersistableRuntimeEvent } from './persistence/runtime-event-store.
 import type { RuntimeConnectorRecord } from './mcp-connector-registry.js';
 import { probeLocalMcp } from './mcp-connection-probe.js';
 import { WorkOrderInboxWatcher } from './work-order-inbox-watcher.js';
+import { preReadInboxFile } from './inbox-pre-reader.js';
 import { requireWorkspaceDirectory, requireWorkspaceFile } from './workspace-file-guard.js';
 import type { WorkspaceExecLeaseContext } from './workspace-exec-broker.js';
 import type { WorkspaceExecHealth, WorkspaceExecRequest, WorkspaceExecResult } from './workspace-exec-service.js';
@@ -95,6 +96,9 @@ const CHANNELS = [
   'hummer:tools:list',
   'hummer:tools:verify-local-mcp',
   'hummer:tools:create-external-draft',
+  'hummer:tools:choose-egress-directory',
+  'hummer:tools:export-approved-artifact',
+  'hummer:tools:list-egress-deliveries',
   'hummer:intake:list',
   'hummer:intake:list-all',
   'hummer:intake:submit-form',
@@ -107,6 +111,7 @@ const CHANNELS = [
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
   const dataDirectory = resolve(process.env.HUMMER_DATA_DIR ?? join(app.getPath('userData'), 'facts'));
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
+  const executionWorkspaceRoot = resolve(process.env.HUMMER_EXEC_WORKSPACE_ROOT ?? join(app.getPath('userData'), 'workspace'));
   const persistence = openPersistence({ dataDirectory });
   const inboxWatcher = new WorkOrderInboxWatcher();
   const credentialVault = new CredentialVault(persistence.engineCredentials, {
@@ -184,6 +189,44 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       tenantId: context.tenant.id,
       workspaceDirectory,
     });
+  });
+  ipcMain.handle('hummer:tools:choose-egress-directory', async (_event, token: string) => {
+    persistence.identity.currentTenantId(token);
+    const selected = await dialog.showOpenDialog({
+      title: '选择成果导出目录',
+      defaultPath: app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return selected.canceled ? null : selected.filePaths[0] ?? null;
+  });
+  ipcMain.handle('hummer:tools:export-approved-artifact', (_event, request: Authenticated<{
+    sessionId: string;
+    approvalId: string;
+    requestedBy: string;
+    workOrderId: string;
+    sourceRelativePath: string;
+    destinationDirectory: string;
+    occurredAt: string;
+    idempotencyKey: string;
+  }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
+    const session = persistence.runtimeEvents.listSessions().find((candidate) => (
+      candidate.tenantId === context.tenant.id && candidate.sessionId === request.input.sessionId
+    ));
+    if (!session || session.workOrderId !== request.input.workOrderId) {
+      throw new Error('The requested artifact does not belong to this tenant session and work order');
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(request.input.workOrderId)) throw new Error('Invalid work order id');
+    return persistence.builtinTools.exportApprovedArtifact({
+      ...request.input,
+      tenantId: context.tenant.id,
+      sourceWorkspaceDirectory: resolve(executionWorkspaceRoot, request.input.workOrderId),
+    });
+  });
+  ipcMain.handle('hummer:tools:list-egress-deliveries', (_event, request: { token: string; sessionId: string }) => {
+    const tenantId = persistence.identity.currentTenantId(request.token);
+    return persistence.egressDeliveries.list(tenantId, request.sessionId);
   });
   const watchInbox = (tenantId: string, directory: string) => inboxWatcher.watch({
     tenantId,
@@ -487,24 +530,38 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   };
 }
 
-function ingestInboxFile(persistence: DesktopPersistence, tenantId: string, workspaceDirectory: string, requestedPath: string): void {
+async function ingestInboxFile(persistence: DesktopPersistence, tenantId: string, workspaceDirectory: string, requestedPath: string): Promise<void> {
   const file = requireWorkspaceFile({ workspaceDirectory, requestedPath, capability: 'work_order_intake', maxBytes: 25 * 1024 * 1024 });
   const bytes = readFileSync(file.absolutePath);
   const digest = createHash('sha256').update(bytes).digest('hex');
-  const office = ['.xlsx', '.docx', '.pdf'].includes(file.extension);
-  const text = ['.txt', '.md', '.json', '.csv'].includes(file.extension);
-  const executable = office || text;
-  const tool = office ? 'doc.extract' : text ? 'fs.read' : null;
-  const prompt = tool
-    ? `使用 ${tool} 读取 ${requestedPath}，提取订单目标与交付要求，生成一份可验收的订单处理结果。`
-    : `收到文件 ${requestedPath}；当前没有实现该文件类型的读取能力，请先转换为 XLSX、DOCX、PDF、TXT、MD、JSON 或 CSV。`;
-  persistence.workOrderIntakes.intake({
+  const preRead = await preReadInboxFile(workspaceDirectory, requestedPath);
+  const prompt = preRead.executable && preRead.capabilityId
+    ? `使用 ${preRead.capabilityId} 读取 ${requestedPath}，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：${preRead.summary}`
+    : `收到文件 ${requestedPath}；${preRead.error ?? '当前没有实现该文件类型的读取能力。'}`;
+  const intake = persistence.workOrderIntakes.intake({
     tenantId, source: 'folder', externalRef: `folder:${requestedPath}:${digest}`, actorRef: 'system:inbox-watcher',
     receivedAt: new Date().toISOString(), payloadBytes: bytes, payloadMediaType: intakeMediaType(file.extension), payloadName: requestedPath,
     payload: {
       title: `处理新订单：${requestedPath}`, target: '读取订单资料并完成明确交付', expectedDeliverable: '订单处理结果与可验证回执',
-      assignee: '自动推荐', dueAt: null, attachmentNames: [requestedPath], prompt, executable, suggestedCapabilities: tool ? [tool] : [],
+      assignee: '自动推荐', dueAt: null, attachmentNames: [requestedPath], prompt, executable: preRead.executable,
+      suggestedCapabilities: preRead.capabilityId ? [preRead.capabilityId] : [], preReadSummary: preRead.summary,
+      sourceSha256: preRead.sourceSha256, ...(preRead.error ? { preReadError: preRead.error } : {}),
     },
+  });
+  if (!preRead.capabilityId) return;
+  persistence.tools.ensureDefaults(tenantId, 'system:inbox-watcher');
+  persistence.tools.recordInvocation({
+    tenantId,
+    sessionId: intake.id,
+    capabilityId: preRead.capabilityId,
+    actorRef: 'system:inbox-watcher',
+    status: preRead.executable ? 'completed' : 'failed',
+    args: { path: requestedPath },
+    result: preRead.executable ? { sourceSha256: preRead.sourceSha256, summaryAvailable: Boolean(preRead.summary) } : { error: preRead.error ?? '附件无法预读' },
+    durationMs: null,
+    evidenceRefs: preRead.executable ? [intake.payloadEvidenceRef] : [],
+    occurredAt: intake.receivedAt,
+    idempotencyKey: `inbox-pre-read:${intake.id}`,
   });
 }
 

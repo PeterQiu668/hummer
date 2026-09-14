@@ -64,6 +64,9 @@ try {
     };
   }, { token });
   if (preConfirm.pending.length !== 1 || preConfirm.sessions.length !== 0) throw new Error(`Unconfirmed intake triggered execution: ${JSON.stringify(preConfirm)}`);
+  if (!preConfirm.pending[0]?.payload?.preReadSummary?.includes('华东制造集团') || preConfirm.pending[0]?.payload?.sourceSha256?.length !== 64) {
+    throw new Error(`Inbox attachment was not locally pre-read into the pending work order: ${JSON.stringify(preConfirm.pending[0])}`);
+  }
 
   await page.getByRole('button', { name: `确认工单：${orderTitle}` }).click();
   await page.getByText('模型生成计划', { exact: true }).waitFor({ state: 'visible', timeout: 120_000 });

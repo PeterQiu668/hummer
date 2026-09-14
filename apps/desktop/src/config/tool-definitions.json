@@ -16,6 +16,19 @@
       }
     },
     {
+      "id": "tool_external_send",
+      "capabilityId": "external.send",
+      "displayName": "受控成果导出",
+      "transport": "builtin",
+      "riskLevel": "high",
+      "policyActionPattern": "external.send*",
+      "enabled": true,
+      "endpoint": {
+        "handler": "approved-local-export",
+        "deliveryTarget": "user-selected-directory"
+      }
+    },
+    {
       "id": "tool_external_send_draft",
       "capabilityId": "external.send.draft",
       "displayName": "外发草稿",

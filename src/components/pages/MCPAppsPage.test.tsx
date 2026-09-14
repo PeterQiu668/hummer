@@ -65,6 +65,9 @@ describe('Capabilities and connections page', () => {
       list: vi.fn().mockResolvedValue([pending]),
       verifyLocalMcp,
       createExternalSendDraft: vi.fn(),
+      chooseEgressDirectory: vi.fn(),
+      exportApprovedArtifact: vi.fn(),
+      listEgressDeliveries: vi.fn().mockResolvedValue([]),
     };
     window.hummerRuntimeConnectors = {
       list: vi.fn().mockResolvedValue([]),

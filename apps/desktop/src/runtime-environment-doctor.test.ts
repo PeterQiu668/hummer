@@ -14,6 +14,7 @@ describe('inspectRuntimeEnvironment', () => {
       ready: true,
       node: { available: true, version: '22.22.3', source: 'embedded' },
       codex: { available: true, compatible: true, version: '0.153.4' },
+      container: { available: true, runtime: 'docker', preferredRuntime: 'podman', productionRecommended: false },
       workspaceExec: { available: true, runtime: 'docker', passed: 5, total: 5 },
     });
   });
@@ -27,6 +28,22 @@ describe('inspectRuntimeEnvironment', () => {
     expect(result.ready).toBe(true);
     expect(result.workspaceExec).toMatchObject({ available: false, passed: 4, total: 5 });
     expect(result.workspaceExec?.issue).toBe('执行能力不可用：本机网络隔离未生效');
+  });
+
+  it('gives a Chinese Podman and WSL2 setup path when no container runtime exists', () => {
+    const result = inspectRuntimeEnvironment({ PATH: 'C:\\tools' }, {
+      platform: 'win32', nodeVersion: '22.22.3', exists: () => true,
+      runVersion: vi.fn().mockReturnValue({ status: 0, stdout: 'codex-cli 0.153.4\n', stderr: '' }),
+    }, { available: false, checkedAt: '2026-09-14T08:00:00.000Z', runtime: 'unavailable', passed: 0, total: 5, issue: '执行能力不可用：未找到 Podman 或 Docker 容器运行时', probes: [] });
+
+    expect(result.ready).toBe(true);
+    expect(result.container).toEqual({
+      available: false,
+      runtime: 'unavailable',
+      preferredRuntime: 'podman',
+      productionRecommended: false,
+      issue: '未检测到容器运行时。请先安装 Podman Desktop，并按引导启用 WSL2。',
+    });
   });
 
   it('returns a repairable missing status instead of throwing', () => {

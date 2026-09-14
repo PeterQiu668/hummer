@@ -5,6 +5,7 @@ import { BuiltinToolExecutor } from './builtin-tool-executor.js';
 import { ControlledWriteStore } from './controlled-write-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
 import { EngineCredentialStore } from './engine-credential-store.js';
+import { EgressDeliveryStore } from './egress-delivery-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
 import { EvidenceStore, type StoredEvidence } from './evidence-store.js';
 import { IdentityStore } from './identity-store.js';
@@ -107,6 +108,7 @@ export class DesktopPersistence {
   readonly builtinTools: BuiltinToolExecutor;
   readonly executionNodes: ExecutionNodeStore;
   readonly engineCredentials: EngineCredentialStore;
+  readonly egressDeliveries: EgressDeliveryStore;
   readonly identity: IdentityStore;
   readonly projects: ProjectStore;
   readonly outcomes: OutcomeLedgerStore;
@@ -129,13 +131,14 @@ export class DesktopPersistence {
     this.controlledWrites = new ControlledWriteStore(database, this.approvalPolicies, this.evidence);
     this.executionNodes = new ExecutionNodeStore(database);
     this.engineCredentials = new EngineCredentialStore(database, now);
+    this.egressDeliveries = new EgressDeliveryStore(database, this.approvalPolicies, this.evidence);
     this.identity = new IdentityStore(database, now);
     this.projects = new ProjectStore(database, now);
     this.outcomes = new OutcomeLedgerStore(database, now);
     this.tools = new ToolRegistryStore(database);
     this.workOrderIntakes = new WorkOrderIntakeStore(database, this.evidence);
     this.workspaceExec = new WorkspaceExecStore(database);
-    this.builtinTools = new BuiltinToolExecutor(this.controlledWrites, this.tools);
+    this.builtinTools = new BuiltinToolExecutor(this.controlledWrites, this.tools, this.egressDeliveries);
   }
 
   close(): void {

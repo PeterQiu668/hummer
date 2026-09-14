@@ -1,7 +1,7 @@
 {
   "name": "@hummer/desktop",
   "private": true,
-  "version": "0.5.0-internal.1",
+  "version": "0.6.0-internal.1",
   "description": "HUMMER trusted enterprise agent desktop",
   "author": "HUMMER",
   "type": "module",
