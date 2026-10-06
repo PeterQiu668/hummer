@@ -83,6 +83,32 @@ function runEvents(index: number) {
   ];
 }
 
+function outcomeReceipt(index: number) {
+  const outcomeDefinitionId = `outcome-definition-${index}`;
+  return {
+    schema: 'hummer.outcome-receipt', version: 1,
+    receipt: {
+      generatedAt: NOW,
+      tenantId: TENANT,
+      outcome: {
+        id: `outcome-${index}`, tenantId: TENANT, outcomeDefinitionId,
+        workOrderId: `work-${index}`, sessionId: `session-${index}`,
+        approvalId: `decision-${index}`, verdict: 'accepted', acceptedBy: 'human:operator',
+        evidenceRef: null, occurredAt: NOW,
+      },
+      definition: {
+        id: outcomeDefinitionId, tenantId: TENANT, actionPattern: 'workspace.exec',
+        title: `Task ${index} completion`, acceptanceCriteria: 'Approved task completed',
+        unitPriceCny: null, riskLevel: 'high', enabled: true, createdAt: NOW, updatedAt: NOW,
+      },
+      costs: [], tools: [], totalCostCny: 0, approval: null,
+      chainIntegrity: { valid: true, checked: 0 },
+    },
+    domainEvents: [],
+    manifest: { algorithm: 'SHA-256', rootHash: 'a'.repeat(64), fieldHashes: {} },
+  } as const;
+}
+
 function badge(token: string, tenantId: string, nodeId: string | undefined, scopes: readonly BadgeScope[]) {
   return { token, tokenId: `badge-${token}`, tenantId, actorRef: nodeId ? `system:${nodeId}` : 'human:operator', nodeId, scopes, expiresAt: FUTURE };
 }
@@ -136,7 +162,7 @@ function createAgent(client: RelayHttpClient, executions: unknown[], index: numb
     executor: {
       execute: async (input: unknown) => {
         executions.push(input);
-        return { events: runEvents(index), receipt: { id: `receipt-${index}` } };
+        return { events: runEvents(index), receipt: outcomeReceipt(index) };
       },
     },
     journal: new MemoryExecutionJournal(),
