@@ -1,0 +1,21 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-w5.1",
+  "generatedAt": "2026-10-06T23:01:55.508Z",
+  "gitCommit": "56e61c47620051ef59ba6a55468cc60567ccdec0",
+  "prevManifestRootHash": "636728c8f779c05fcfafceca823fc6b6682879a6dfa0c2c44b10f88fd2f3e60c",
+  "files": [
+    {
+      "path": "evidence/round-w5.1/gates.json",
+      "sha256": "2076eeb238b688d9e0b9439f8aff7dcd1979704d2608ddbe558a3261fb486091",
+      "bytes": 172144
+    },
+    {
+      "path": "evidence/round-w5.1/report.md",
+      "sha256": "b40d36e4025e2172b154c6819004da08a6a541acba88b2689cbed856dd82b22e",
+      "bytes": 5180
+    }
+  ],
+  "rootHash": "49b6ed7cd19aaa2262fb9159436d5c5a7d4a68d201c1cdc30f7da25160209546"
+}
