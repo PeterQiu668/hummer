@@ -5,6 +5,8 @@ export type FleetRejectionCode =
   | 'tenant_mismatch'
   | 'node_offline'
   | 'node_unknown'
+  | 'heartbeat_load_mismatch'
+  | 'clock_regression'
   | 'task_expired'
   | 'lease_expired'
   | 'lease_owner_mismatch'

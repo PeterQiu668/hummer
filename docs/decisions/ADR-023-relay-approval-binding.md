@@ -22,8 +22,8 @@ database.
 1. The Relay adds three Relay-only append-only tables:
    `fleet_approval_requests`, `fleet_approval_decisions`, and
    `fleet_approval_consumptions`. They live only in the dedicated Relay SQLite
-   database. Relay migration marker 12 does not modify or share the desktop
-   v1-v11 database.
+   database. Relay migration marker 13 follows ADR-022's Relay-only clock
+   marker 12 and does not modify or share the desktop v1-v11 database.
 2. A node-bound badge with `approval.request` may append a request only for a
    currently leased claim owned by that same tenant and node. The authenticated
    actor must equal `requestedBy`; WorkOrder and node bindings must match the

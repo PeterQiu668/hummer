@@ -129,8 +129,8 @@
       {
         "workOrderId": "wo_child_a",
         "receiptPath": "children/child-a.json",
-        "receiptSha256": "8ed0739a917fee19d0612868f76641e812ba6954a4d87c9ad63a21e09b598886",
-        "receiptRootHash": "0a2c42c3fe735ed11db36b7518182f3fe12c71ba3cc08d40df0ee6d163950e79",
+        "receiptSha256": "a9ac8efdeddd9bc1f63291d1b39b0635d51d4fc4cb290a35cc38830db753a446",
+        "receiptRootHash": "5cd2b29ddf54e1f0a7aae570d1fe0ce778e4d2766c10b0bd3658aac696ae5e06",
         "nodeId": "node-a",
         "agentId": "agent-a",
         "runtime": "codex",
@@ -140,6 +140,8 @@
           {
             "artifactId": "artifact-report",
             "path": "artifacts/report.txt",
+            "mediaType": "text/plain; charset=utf-8",
+            "bytes": 36,
             "sha256": "ed2638a6a76b5a157eb3a86c385fad32839fd867ced70b94aad2d060b00d86f9"
           }
         ]
@@ -147,8 +149,8 @@
       {
         "workOrderId": "wo_child_b",
         "receiptPath": "children/child-b.json",
-        "receiptSha256": "43029962f0016ffb9d8071f504e97195cc4b92af00231dd70b797823748ec096",
-        "receiptRootHash": "04ee5f229e69344bc298fcdd48b4d602da27f33fa2fcb96d8e62e1df648943bc",
+        "receiptSha256": "2b7012d921c3f1a1f92eed641a5ffd02328e1519eb5945ba918f509561577c15",
+        "receiptRootHash": "bfa8c4585d1af5c1b92d59cdb80717249e9ff0b199c1a4ff393202c52447ea2e",
         "nodeId": "node-b",
         "agentId": "agent-b",
         "runtime": "claude",
@@ -158,6 +160,8 @@
           {
             "artifactId": "artifact-summary",
             "path": "artifacts/summary.json",
+            "mediaType": "application/json",
+            "bytes": 39,
             "sha256": "0c9ced564de9cc8a38a15f28e7c21787f3a81cc2cdc61c81acaf415dd8fa7b64"
           }
         ]
@@ -172,7 +176,7 @@
     },
     "manifest": {
       "algorithm": "SHA-256",
-      "rootHash": "a1c50c0916b97ac3c98fd8433cce892186095bb6d238cb6b455a496e3ea6ed6c",
+      "rootHash": "5b9b192307dec79d906b211ebfbdaed0471b4da84c5a7405ebd2dcbe3230b4bc",
       "fieldHashes": {
         "/parentWorkOrderId": "31619991c7a13a98138745b1a77cecbf1a50b27783bddd75e10b50c55115cdc3",
         "/nodes/0/nodeId": "875f4b24a78704fc21b20497b72575b76193810f11da9505b6e6ad333020b071",
@@ -185,8 +189,8 @@
         "/nodes/1/artifactIds/0": "997fe079d84e8eb869457246a138e9fc1917a54a1021b2c059cf79598bb52d89",
         "/childReceipts/0/workOrderId": "99b4e3f5de0bf31ed62d9b857fa824f9659e7fc215731f8458ed5b859ab09c61",
         "/childReceipts/0/receiptPath": "360535fa044e4e6d7de78251a1c569910ec03f442f8aa7ea375c3817b7f40564",
-        "/childReceipts/0/receiptSha256": "6af881f23ee397d4a08bb3b31022ed1e8f43626731ca7d7fee8fafe0ee7973f6",
-        "/childReceipts/0/receiptRootHash": "e4708c32424fd336a997043031e076d3a0fdd86a15fa02a7773dae6dbbf7582a",
+        "/childReceipts/0/receiptSha256": "420629e4489a883760db7f33548e7f92d2e6f4ce185763928db0473d254702c3",
+        "/childReceipts/0/receiptRootHash": "09dc32daae37bd095f31df69cbee1449770320fd8f033ab2ec7cb874d1fb5ef0",
         "/childReceipts/0/nodeId": "875f4b24a78704fc21b20497b72575b76193810f11da9505b6e6ad333020b071",
         "/childReceipts/0/agentId": "cd62a392d95539b272330e55ac86f0d52f46b61d9915931a43011fa9e7db85ef",
         "/childReceipts/0/runtime": "08f6b585592467d20717e8abd8dd02b9fb430ba65eb4b745c373ce3001ef5dae",
@@ -194,11 +198,13 @@
         "/childReceipts/0/completedAt": "1760c57a762926d15cfaa35c8f4e156d7b27f253a7e8f0332e94df5e95d2f6b8",
         "/childReceipts/0/artifactRefs/0/artifactId": "db0807b4a7cfaa61ac708f09a0035343b49b1b33d43df37f9b3a065742c2a78e",
         "/childReceipts/0/artifactRefs/0/path": "8bbe3b0dd6f22a0d382a2bbff9f2a2b2e2a48282214ee423e5c99a4f97d83172",
+        "/childReceipts/0/artifactRefs/0/mediaType": "a59c309f5c1acfc709d278f020bc764cc93ec7a57272d18439092291b8d92e01",
+        "/childReceipts/0/artifactRefs/0/bytes": "76a50887d8f1c2e9301755428990ad81479ee21c25b43215cf524541e0503269",
         "/childReceipts/0/artifactRefs/0/sha256": "5d09ac099286e51ad3758cf2db42366e8330c06075777f1b1b6427b88c1ce4c1",
         "/childReceipts/1/workOrderId": "ba9a67a56480971efbfe7c6a70671268c84fab9b498b16aa633061b325483e25",
         "/childReceipts/1/receiptPath": "df6c6d795733009595223efdb3e1c32775c3694ed6a574e571932df4e899b327",
-        "/childReceipts/1/receiptSha256": "a14aac360ecc427bb21edbada98b66440cab8da426e67e6dafa833cc2707689a",
-        "/childReceipts/1/receiptRootHash": "20a0584aede8aed750b52700d3f2c0c967e86d0d52bf06a31201cf2a130cd41a",
+        "/childReceipts/1/receiptSha256": "3cbc44608ac636d352ac8eb1ff019cd5c81f9c2e933a0eeca62838a94b9b1b58",
+        "/childReceipts/1/receiptRootHash": "9d5bdfedb66301b76a65863bacb7821b5563d3752033c0b7a7527cf437af1517",
         "/childReceipts/1/nodeId": "66db3b3d46e58ac89fe6f65e58468c2201af8ce3440df3164bb0bc9f02cb7523",
         "/childReceipts/1/agentId": "e937769f076fe55412f533cf0f035f06aed6b47f712f038bc4939d45d7df1f9a",
         "/childReceipts/1/runtime": "389432cbf83f3d1b64029a75864ec96f8fd06451b4c99d7b28385d395d480bfa",
@@ -206,6 +212,8 @@
         "/childReceipts/1/completedAt": "b25ca9e9590fef8800c2c6263f96bdaf77bac2cb30de2d8d10548e97b765fc34",
         "/childReceipts/1/artifactRefs/0/artifactId": "997fe079d84e8eb869457246a138e9fc1917a54a1021b2c059cf79598bb52d89",
         "/childReceipts/1/artifactRefs/0/path": "145e9defab157a640eed3040142e880eaee16407b3ce8c6e7c956beb982ae66c",
+        "/childReceipts/1/artifactRefs/0/mediaType": "86e656fac293c0e97f0e566503c9c66941942e5ba446d82f58fffe486b822972",
+        "/childReceipts/1/artifactRefs/0/bytes": "0b918943df0962bc7a1824c0555a389347b4febdc7cf9d1254406d80ce44e3f9",
         "/childReceipts/1/artifactRefs/0/sha256": "4c686d11b0ad9c1da0e976f7b72594d3dcaba474e8a8ae7cc730ccced9e91050",
         "/chainHead/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
         "/chainHead/nodeId": "875f4b24a78704fc21b20497b72575b76193810f11da9505b6e6ad333020b071",

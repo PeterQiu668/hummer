@@ -18,6 +18,7 @@ import {
   type TaskClaims,
 } from './ports.js';
 import { canonicalJson } from './canonical-json.js';
+import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 
 const key = (tenantId: string, id: string) => `${tenantId}\u0000${id}`;
 const clone = <T>(value: T): T => structuredClone(value);
@@ -71,23 +72,40 @@ export class MemoryFleetStore implements FleetStore {
   readonly #approvalDecisions = new Map<string, ApprovalDecisionRecord>();
   readonly #approvalDecisionIds = new Set<string>();
   readonly #approvalConsumptions = new Set<string>();
+  #clockHighWaterMs = 0;
 
   async registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord> {
+    this.advanceClock(now);
     const record: FleetNodeRecord = { ...claims, tenantIds: [...claims.tenantIds], tenantId, manifest: clone(manifest), status: 'online', lastSeenAt: now, offlineAfterMs };
     this.#nodes.set(key(tenantId, claims.nodeId), record);
     return clone(record);
   }
 
   async heartbeat(tenantId: string, claims: HeartbeatClaims, now: string): Promise<FleetNodeRecord> {
+    this.advanceClock(now);
     const nodeKey = key(tenantId, claims.nodeId);
     const node = this.#nodes.get(nodeKey);
     if (!node) throw new FleetRejectedError('node_unknown', 'heartbeat node is not registered for this tenant');
+    const activeLeases = [...this.#tasks.values()].filter((task) =>
+      task.tenantId === tenantId
+      && task.status === 'leased'
+      && task.leaseOwnerNodeId === claims.nodeId
+      && task.leaseExpiresAt !== null
+      && Date.parse(task.leaseExpiresAt) > Date.parse(now)).length;
+    if (claims.running !== activeLeases) {
+      throw new FleetRejectedError(
+        'heartbeat_load_mismatch',
+        `heartbeat reports ${claims.running} running tasks but Relay has ${activeLeases} active leases`,
+      );
+    }
+    this.recoverExpiredLeases(tenantId, now);
     node.lastSeenAt = now;
     node.status = 'online';
     return clone(node);
   }
 
   async getNode(tenantId: string, nodeId: string, now: string): Promise<FleetNodeRecord | null> {
+    this.advanceClock(now);
     const node = this.#nodes.get(key(tenantId, nodeId));
     if (!node) return null;
     this.refreshNode(node, now);
@@ -95,7 +113,9 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   async enqueueTask(tenantId: string, envelope: FleetObject, claims: TaskClaims, retryOfTaskId: string | null, now: string): Promise<EnqueueResult> {
-    if (Date.parse(claims.expiresAt) <= Date.parse(now)) throw new FleetRejectedError('task_expired', 'expired task cannot be queued');
+    this.advanceClock(now);
+    const expiresAt = canonicalUtcTimestamp(claims.expiresAt, 'task expiresAt');
+    if (Date.parse(expiresAt) <= Date.parse(now)) throw new FleetRejectedError('task_expired', 'expired task cannot be queued');
     const duplicateTaskId = this.#taskByIdempotency.get(key(tenantId, claims.idempotencyKey));
     if (duplicateTaskId) {
       const duplicate = this.#tasks.get(key(tenantId, duplicateTaskId))!;
@@ -106,6 +126,7 @@ export class MemoryFleetStore implements FleetStore {
     }
     const record: FleetTaskRecord = {
       ...claims,
+      expiresAt,
       tenantId,
       envelope: clone(envelope),
       status: 'queued',
@@ -122,6 +143,7 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   async claimTask(tenantId: string, nodeId: string, now: string): Promise<FleetTaskRecord | null> {
+    this.advanceClock(now);
     const node = this.#nodes.get(key(tenantId, nodeId));
     if (!node) throw new FleetRejectedError('node_unknown', 'claiming node is not registered');
     this.refreshNode(node, now);
@@ -138,6 +160,7 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   async putEvent(tenantId: string, event: FleetObject, claims: RunEventClaims, now: string): Promise<EventResult> {
+    this.advanceClock(now);
     const duplicate = this.#eventByIdempotency.get(key(tenantId, claims.idempotencyKey));
     if (duplicate) {
       const stored = (this.#events.get(key(tenantId, claims.workOrderId)) ?? [])
@@ -154,6 +177,7 @@ export class MemoryFleetStore implements FleetStore {
     const task = [...this.#tasks.values()].reverse().find((candidate) => candidate.tenantId === tenantId && candidate.workOrderId === claims.workOrderId);
     if (!task) throw new FleetRejectedError('invalid_transition', 'event work order is not queued');
     this.assertActiveLease(task, claims.nodeId, now);
+    assertEventWithinLease(claims.occurredAt, now, task.leaseExpiresAt!, task.leaseMs);
     const events = this.#events.get(key(tenantId, claims.workOrderId)) ?? [];
     const expectedSeq = events.length + 1;
     if (claims.seq !== expectedSeq) throw new FleetRejectedError('sequence_gap', `expected event sequence ${expectedSeq}`);
@@ -175,6 +199,7 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   async stopTask(tenantId: string, taskId: string, actorRef: string, now: string): Promise<FleetTaskRecord> {
+    this.advanceClock(now);
     const task = this.#tasks.get(key(tenantId, taskId));
     if (!task) throw new FleetRejectedError('invalid_transition', 'task was not found');
     if (task.status === 'completed' || task.status === 'failed') throw new FleetRejectedError('invalid_transition', 'terminal task cannot be stopped');
@@ -186,6 +211,7 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   async getTask(tenantId: string, taskId: string, now: string): Promise<FleetTaskRecord | null> {
+    this.advanceClock(now);
     this.recoverExpiredLeases(tenantId, now);
     const task = this.#tasks.get(key(tenantId, taskId));
     return task ? clone(task) : null;
@@ -198,6 +224,7 @@ export class MemoryFleetStore implements FleetStore {
     claims: ApprovalRequestClaims,
     now: string,
   ): Promise<ApprovalRequestRecord> {
+    this.advanceClock(now);
     if (Date.parse(claims.expiresAt) <= Date.parse(now)) {
       throw new FleetRejectedError('approval_expired', 'expired approval request cannot be recorded');
     }
@@ -228,6 +255,7 @@ export class MemoryFleetStore implements FleetStore {
     claims: ApprovalDecisionClaims,
     now: string,
   ): Promise<ApprovalDecisionRecord> {
+    this.advanceClock(now);
     const request = this.#approvalRequests.get(key(tenantId, claims.requestId));
     if (!request) throw new FleetRejectedError('approval_not_found', 'approval request was not found');
     if (this.#approvalDecisions.has(key(tenantId, claims.requestId)) || this.#approvalDecisionIds.has(key(tenantId, claims.decisionId))) {
@@ -252,6 +280,7 @@ export class MemoryFleetStore implements FleetStore {
     requestId: string,
     now: string,
   ): Promise<ApprovalBundle> {
+    this.advanceClock(now);
     const request = this.#approvalRequests.get(key(tenantId, requestId));
     const decision = this.#approvalDecisions.get(key(tenantId, requestId));
     if (!request || request.taskId !== taskId) throw new FleetRejectedError('approval_not_found', 'approval request is not bound to this claim');
@@ -289,6 +318,15 @@ export class MemoryFleetStore implements FleetStore {
   }
 
   close(): void {}
+
+  private advanceClock(now: string): void {
+    const observedMs = Date.parse(now);
+    if (!Number.isFinite(observedMs)) throw new FleetRejectedError('clock_regression', 'Relay clock produced an invalid timestamp');
+    if (observedMs < this.#clockHighWaterMs) {
+      throw new FleetRejectedError('clock_regression', 'Relay clock moved behind its last accepted timestamp');
+    }
+    this.#clockHighWaterMs = observedMs;
+  }
 
   private refreshNode(node: FleetNodeRecord, now: string): void {
     if (Date.parse(now) - Date.parse(node.lastSeenAt) >= node.offlineAfterMs) node.status = 'offline';

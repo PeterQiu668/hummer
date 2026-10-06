@@ -33,6 +33,21 @@ first stored result only when the canonical validated payload is identical. A
 reused key with different content is rejected as `duplicate_delivery`; it never
 silently aliases two commands.
 
+Heartbeat lease accounting is also fail closed. In one store operation Relay
+evaluates/reclaims leases at `leaseExpiresAt <= receiveNow`, then requires the validated
+`NodeManifest.load.running` to equal that node's remaining active lease count.
+`heartbeat_load_mismatch` does not renew `lastSeenAt` or online status. Node
+liveness changes to offline at exactly `receiveNow - lastSeenAt >= 60_000ms`.
+
+Relay receive time is monotonic store state. Equal observations are accepted;
+clock rollback is rejected as `clock_regression`, while a forward jump is
+authoritative and immediately evaluates liveness, task expiry, and lease expiry.
+Task expiry is normalized to UTC ISO milliseconds before storage. Run-event
+`occurredAt` never controls timers and must fall inside the current lease window;
+this rejects an ordinary late event from a previous retry attempt without adding
+fields to the frozen fleet contract. See ADR-022 for the residual same-node
+restamping limitation.
+
 ## HTTP, badge token, and stream boundary
 
 The Fastify adapter exposes only the Phase 0 operations needed to register and
@@ -64,7 +79,8 @@ not claimed by this slice.
 - `SqliteFleetStore` enables WAL, foreign keys, and a 5-second busy timeout.
 - Relay migration marker `11` creates `fleet_nodes`, `fleet_tasks`,
   `fleet_task_leases`, `fleet_run_events`, and `relay_audit`.
-- Relay-only marker `12` adds append-only `fleet_approval_requests`,
+- Relay-only migration marker `12` adds the singleton `relay_clock` high-water
+  table. Relay-only marker `13` adds append-only `fleet_approval_requests`,
   `fleet_approval_decisions`, and `fleet_approval_consumptions`; it does not
   modify or share the desktop v1-v11 database.
 - `fleet_task_leases` contains the integration columns
@@ -105,12 +121,17 @@ npm.cmd run test -w @hummer/relay
 ```
 
 The suite runs the same store behaviors against both memory and SQLite stores,
-plus shared-contract adapter and real Fastify/node integration tests. Negative cases cover unknown fields, tenant mismatch, stale nodes,
+plus shared-contract adapter and real Fastify/node integration tests. Negative
+cases cover unknown fields, tenant mismatch, exact
+offline and expiry boundaries, heartbeat/lease disagreement, Relay clock rollback,
+forward jumps, late prior-attempt events, offset timestamps, stale nodes,
 wrong lease ownership, sequence gaps, completion without an artifact, stopped
 tasks, expired tasks, retry-key reuse, wrong/expired/under-scoped badge tokens,
 cross-node binding, and unauthorized SSE reconnect after disconnect. A 10-task scenario double-delivers
 every envelope and completion event, then proves exactly ten claims and ten
-stored completion events on one store instance.
+stored completion events on one store instance. A separate fault-injection case
+replays the same task and each run-event key 100 times and proves one claim and
+one stored completion.
 
 ## Remaining integration work
 
@@ -118,6 +139,7 @@ stored completion events on one store instance.
    SSE is the implemented Phase 0 event channel.
 2. Replace the in-process static badge registry with the deployment identity
    issuer/revocation source; do not put plaintext tokens in config committed to Git.
-3. Run two real nodes through disconnect/reconnect, clock skew, and 100-task
-   duplicate-delivery tests. Until that evidence exists, do not describe D3 or
-   AC-P0-04 as complete.
+3. Run two real nodes through disconnect/reconnect, independent-process clock
+   skew, competing claims, and 100-task duplicate-delivery tests. Include a
+   same-node restamped old-attempt event probe. Until that evidence exists, do
+   not describe the two-machine portion of D3 or AC-P0-04 as complete.

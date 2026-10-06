@@ -169,7 +169,8 @@ export class FleetService implements FleetIngress {
   }
 
   async retry(session: AuthenticatedFleetSession, previousTaskId: string, nextEnvelope: unknown): Promise<EnqueueResult> {
-    const previous = await this.store.getTask(session.tenantId, previousTaskId, this.isoNow());
+    const now = this.isoNow();
+    const previous = await this.store.getTask(session.tenantId, previousTaskId, now);
     if (!previous) throw new FleetRejectedError('invalid_transition', 'retry source task was not found');
     if (previous.status !== 'failed' && previous.status !== 'blocked') {
       throw new FleetRejectedError('invalid_transition', 'only failed or blocked tasks may be retried');
@@ -183,7 +184,7 @@ export class FleetService implements FleetIngress {
     if (result.meta.workOrderId !== previous.workOrderId || result.meta.originRef !== previous.originRef) {
       throw new FleetRejectedError('invalid_transition', 'retry must stay in the same work-order lineage');
     }
-    return this.store.enqueueTask(session.tenantId, result.value, result.meta, previous.taskId, this.isoNow());
+    return this.store.enqueueTask(session.tenantId, result.value, result.meta, previous.taskId, now);
   }
 
   private isoNow(): string {

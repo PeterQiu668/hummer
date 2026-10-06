@@ -115,6 +115,41 @@ const tests = [
     field: '/fleet/childReceipts/0/artifactRefs/0/sha256',
   },
   {
+    name: 'unrelated existing artifact is rejected even when its hash and fleet manifest are refreshed',
+    mutate(fixture) {
+      mutateParent(fixture.parentPath, (parent) => {
+        const artifact = parent.fleet.childReceipts[0].artifactRefs[0];
+        const unrelatedBytes = readFileSync(fixture.artifactPaths[1]);
+        artifact.path = 'artifacts/summary.json';
+        artifact.sha256 = sha256(unrelatedBytes);
+        artifact.bytes = unrelatedBytes.length;
+        artifact.mediaType = 'application/json';
+      });
+    },
+    expectedStatus: 1,
+    field: '/fleet/childReceipts/0/artifactRefs/0/sha256',
+  },
+  {
+    name: 'wrong artifact byte length is rejected',
+    mutate(fixture) {
+      mutateParent(fixture.parentPath, (parent) => {
+        parent.fleet.childReceipts[0].artifactRefs[0].bytes += 1;
+      });
+    },
+    expectedStatus: 1,
+    field: '/fleet/childReceipts/0/artifactRefs/0/bytes',
+  },
+  {
+    name: 'wrong artifact media type is rejected',
+    mutate(fixture) {
+      mutateParent(fixture.parentPath, (parent) => {
+        parent.fleet.childReceipts[0].artifactRefs[0].mediaType = 'application/octet-stream';
+      });
+    },
+    expectedStatus: 1,
+    field: '/fleet/childReceipts/0/artifactRefs/0/mediaType',
+  },
+  {
     name: 'child without artifact provenance is rejected',
     mutate(fixture) {
       mutateParent(fixture.parentPath, (parent) => {
@@ -204,8 +239,14 @@ function createScenario(root) {
   const artifactPaths = [join(artifactDirectory, 'report.txt'), join(artifactDirectory, 'summary.json')];
   writeFileSync(artifactPaths[0], 'Synthetic fleet report from node-a.\n', 'utf8');
   writeFileSync(artifactPaths[1], '{"status":"synthetic","node":"node-b"}\n', 'utf8');
-  writeJson(childPaths[0], createV1Receipt('wo_child_a', 'tenant_fixture', 'employee:agent-a'));
-  writeJson(childPaths[1], createV1Receipt('wo_child_b', 'tenant_fixture', 'employee:agent-b'));
+  writeJson(childPaths[0], createV1Receipt('wo_child_a', 'tenant_fixture', 'employee:agent-a', {
+    file: artifactPaths[0],
+    mediaType: 'text/plain; charset=utf-8',
+  }));
+  writeJson(childPaths[1], createV1Receipt('wo_child_b', 'tenant_fixture', 'employee:agent-b', {
+    file: artifactPaths[1],
+    mediaType: 'application/json',
+  }));
 
   const childReceipts = [
     childReference({
@@ -220,6 +261,7 @@ function createScenario(root) {
       artifactId: 'artifact-report',
       artifactPath: 'artifacts/report.txt',
       artifactFile: artifactPaths[0],
+      mediaType: 'text/plain; charset=utf-8',
     }),
     childReference({
       workOrderId: 'wo_child_b',
@@ -233,6 +275,7 @@ function createScenario(root) {
       artifactId: 'artifact-summary',
       artifactPath: 'artifacts/summary.json',
       artifactFile: artifactPaths[1],
+      mediaType: 'application/json',
     }),
   ];
   const fleetContent = {
@@ -259,6 +302,7 @@ function createScenario(root) {
 
 function childReference(input) {
   const receipt = JSON.parse(readFileSync(input.receiptFile, 'utf8'));
+  const artifactBytes = readFileSync(input.artifactFile);
   return {
     workOrderId: input.workOrderId,
     receiptPath: input.receiptPath,
@@ -272,12 +316,19 @@ function childReference(input) {
     artifactRefs: [{
       artifactId: input.artifactId,
       path: input.artifactPath,
-      sha256: sha256(readFileSync(input.artifactFile)),
+      mediaType: input.mediaType,
+      bytes: artifactBytes.length,
+      sha256: sha256(artifactBytes),
     }],
   };
 }
 
-function createV1Receipt(workOrderId, tenantId, actorRef) {
+function createV1Receipt(workOrderId, tenantId, actorRef, artifactEvidence) {
+  const artifactBytes = artifactEvidence ? readFileSync(artifactEvidence.file) : null;
+  const artifactSha256 = artifactBytes ? sha256(artifactBytes) : null;
+  const evidenceRef = artifactSha256
+    ? `evidence://sha256/${artifactSha256}`
+    : `evidence://sha256/${'b'.repeat(64)}`;
   const eventWithoutHash = {
     position: 1,
     id: `evt_${workOrderId}`,
@@ -318,7 +369,7 @@ function createV1Receipt(workOrderId, tenantId, actorRef) {
       approvalId: null,
       verdict: 'accepted',
       acceptedBy: actorRef,
-      evidenceRef: `evidence://sha256/${'b'.repeat(64)}`,
+      evidenceRef,
       occurredAt: '2026-10-07T01:00:00.000Z',
     },
     definition: {
@@ -334,7 +385,26 @@ function createV1Receipt(workOrderId, tenantId, actorRef) {
       updatedAt: '2026-10-07T01:00:00.000Z',
     },
     costs: [],
-    tools: [],
+    tools: artifactBytes ? [{
+      id: `tool_${workOrderId}_artifact`,
+      toolDefinitionId: 'tool_definition_fleet_fixture',
+      tenantId,
+      sessionId: `session_${workOrderId}`,
+      capabilityId: 'fleet.artifact.publish',
+      actorRef,
+      status: 'completed',
+      args: {},
+      result: {
+        evidenceRef,
+        sha256: artifactSha256,
+        sizeBytes: artifactBytes.length,
+        mediaType: artifactEvidence.mediaType,
+      },
+      durationMs: 0,
+      evidenceRefs: [evidenceRef],
+      occurredAt: '2026-10-07T01:00:00.000Z',
+      idempotencyKey: `publish-${workOrderId}`,
+    }] : [],
     totalCostCny: 0,
     approval: null,
     chainIntegrity: { valid: true, checked: 1 },
