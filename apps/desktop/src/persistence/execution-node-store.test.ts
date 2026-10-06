@@ -18,7 +18,7 @@ describe('ExecutionNodeStore', () => {
     expect(persistence.executionNodes.list('tenant_demo')).toEqual([expect.objectContaining({
       id: 'node_local', status: 'online', cwd: 'C:\\workspace', currentSessionId: 'ses_node',
     })]);
-    persistence.executionNodes.markOffline('node_local', '2026-08-28T11:05:00.000Z');
+    persistence.executionNodes.markOffline('tenant_demo', 'node_local', '2026-08-28T11:05:00.000Z');
     expect(persistence.executionNodes.list('tenant_demo')[0].status).toBe('offline');
     persistence.close();
   });

@@ -31,7 +31,7 @@ export class ExecutionNodeStore {
   constructor(private readonly database: SqliteDatabase) {}
 
   registerLocal(input: RegisterExecutionNodeInput): ExecutionNodeRecord {
-    this.database.prepare(`
+    const write = this.database.prepare(`
       INSERT INTO execution_nodes
         (id, tenant_id, display_name, runtime_id, status, cwd, permission_scope,
          current_session_id, last_seen_at, payload_json)
@@ -44,8 +44,10 @@ export class ExecutionNodeStore {
         permission_scope = excluded.permission_scope,
         last_seen_at = excluded.last_seen_at,
         payload_json = excluded.payload_json
+      WHERE execution_nodes.tenant_id = excluded.tenant_id
     `).run(input.id, input.tenantId, input.displayName, input.runtimeId, input.cwd, input.permissionScope, input.lastSeenAt, canonicalJson({ host: 'electron-main' }));
-    return this.require(input.id);
+    if (write.changes !== 1) throw unavailableNode();
+    return this.require(input.tenantId, input.id);
   }
 
   list(tenantId: string): ExecutionNodeRecord[] {
@@ -53,6 +55,7 @@ export class ExecutionNodeStore {
       SELECT id, tenant_id, display_name, runtime_id, status, cwd, permission_scope,
         (SELECT id FROM sessions
           WHERE sessions.runtime_id = execution_nodes.runtime_id
+            AND sessions.tenant_id = execution_nodes.tenant_id
             AND sessions.status IN ('running', 'awaiting_approval', 'paused')
           ORDER BY sessions.started_at DESC LIMIT 1) AS current_session_id,
         last_seen_at
@@ -60,19 +63,27 @@ export class ExecutionNodeStore {
     `).all<NodeRow>(tenantId).map(mapNode);
   }
 
-  markOffline(id: string, occurredAt: string): void {
-    this.database.prepare(`UPDATE execution_nodes SET status = 'offline', current_session_id = NULL, last_seen_at = ? WHERE id = ?`)
-      .run(occurredAt, id);
+  markOffline(tenantId: string, id: string, occurredAt: string): void {
+    const write = this.database.prepare(`
+      UPDATE execution_nodes
+      SET status = 'offline', current_session_id = NULL, last_seen_at = ?
+      WHERE tenant_id = ? AND id = ?
+    `).run(occurredAt, tenantId, id);
+    if (write.changes !== 1) throw unavailableNode();
   }
 
-  private require(id: string): ExecutionNodeRecord {
+  private require(tenantId: string, id: string): ExecutionNodeRecord {
     const row = this.database.prepare(`
       SELECT id, tenant_id, display_name, runtime_id, status, cwd, permission_scope,
-        current_session_id, last_seen_at FROM execution_nodes WHERE id = ?
-    `).get<NodeRow>(id);
-    if (!row) throw new Error(`Execution node ${id} was not persisted`);
+        current_session_id, last_seen_at FROM execution_nodes WHERE tenant_id = ? AND id = ?
+    `).get<NodeRow>(tenantId, id);
+    if (!row) throw unavailableNode();
     return mapNode(row);
   }
+}
+
+function unavailableNode(): Error {
+  return new Error('Execution node is unavailable in the current tenant');
 }
 
 function mapNode(row: NodeRow): ExecutionNodeRecord {

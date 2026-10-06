@@ -93,10 +93,13 @@ describe('M3 organization persistence', () => {
   it('keeps a hired employee under one durable id and appends the hire to the hash chain', () => {
     const directory = temporaryDirectory();
     const first = openPersistence({ dataDirectory: directory });
+    const owner = first.identity.createCompany({
+      companyName: '持久化测试公司', displayName: '负责人', email: 'persistence-owner@example.test',
+    });
     const hired = first.organization.hireDigitalEmployee({
       id: 'employee_market-sales-01',
-      tenantId: 'tenant_demo',
-      sponsorActorRef: 'human:owner',
+      tenantId: owner.tenant.id,
+      sponsorActorRef: `human:${owner.membership.humanUserId}`,
       departmentId: 'department_sales',
       name: '华东客户研究员',
       jobTitle: '客户研究员',
@@ -106,20 +109,20 @@ describe('M3 organization persistence', () => {
     });
 
     expect(hired.id).toBe('employee_market-sales-01');
-    expect(first.organization.listDigitalEmployees('tenant_demo')).toHaveLength(1);
-    expect(first.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
+    expect(first.organization.listDigitalEmployees(owner.tenant.id)).toHaveLength(1);
+    expect(first.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 2 });
     first.close();
 
     const reopened = openPersistence({ dataDirectory: directory });
-    expect(reopened.organization.listDigitalEmployees('tenant_demo')).toEqual([
+    expect(reopened.organization.listDigitalEmployees(owner.tenant.id)).toEqual([
       expect.objectContaining({
         id: 'employee_market-sales-01',
-        sponsorActorRef: 'human:owner',
+        sponsorActorRef: `human:${owner.membership.humanUserId}`,
         departmentId: 'department_sales',
         runtimeProfile: 'standard',
       }),
     ]);
-    expect(reopened.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
+    expect(reopened.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 2 });
     reopened.close();
   });
 });

@@ -60,19 +60,9 @@ export class OrganizationStore {
       if (existing) return mapEmployee(existing);
 
       const now = new Date().toISOString();
-      const ownerHumanId = input.sponsorActorRef.startsWith('human:')
-        ? input.sponsorActorRef.slice('human:'.length)
-        : 'owner';
-      this.database.prepare(`
-        INSERT OR IGNORE INTO human_users
-          (id, tenant_id, display_name, role, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'active', ?, ?)
-      `).run(ownerHumanId, input.tenantId, ownerHumanId, 'accountable_owner', now, now);
-      this.database.prepare(`
-        INSERT OR IGNORE INTO departments
-          (id, tenant_id, name, owner_human_id, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'active', ?, ?)
-      `).run(input.departmentId, input.tenantId, input.departmentId, ownerHumanId, now, now);
+      this.assertIdentifierTenant('digital_employees', input.id, input.tenantId);
+      const ownerHumanId = this.resolveSponsorHuman(input.tenantId, input.sponsorActorRef);
+      this.ensureDepartment(input.tenantId, input.departmentId, ownerHumanId, now);
 
       const payload = JSON.stringify({
         source: 'employee_marketplace',
@@ -117,7 +107,7 @@ export class OrganizationStore {
           status: 'probation',
         },
       });
-      return this.requireEmployee(input.id);
+      return this.requireEmployee(input.tenantId, input.id);
     });
     return run();
   }
@@ -130,15 +120,53 @@ export class OrganizationStore {
     `).all<EmployeeRow>(tenantId).map(mapEmployee);
   }
 
-  private requireEmployee(id: string): DigitalEmployeeRecord {
+  private requireEmployee(tenantId: string, id: string): DigitalEmployeeRecord {
     const row = this.database.prepare(`
       SELECT id, tenant_id, sponsor_actor_ref, department_id, name, job_title,
         runtime_profile, autonomy_level, status, created_at, updated_at
-      FROM digital_employees WHERE id = ?
-    `).get<EmployeeRow>(id);
-    if (!row) throw new Error(`Digital employee ${id} was not persisted`);
+      FROM digital_employees WHERE tenant_id = ? AND id = ?
+    `).get<EmployeeRow>(tenantId, id);
+    if (!row) throw unavailableOrganizationResource();
     return mapEmployee(row);
   }
+
+  private resolveSponsorHuman(tenantId: string, actorRef: string): string {
+    if (actorRef.startsWith('twin:')) {
+      const twinId = actorRef.slice('twin:'.length);
+      const twin = this.database.prepare(`
+        SELECT owner_human_id FROM digital_twins WHERE tenant_id = ? AND id = ? AND status = 'active'
+      `).get<{ owner_human_id: string }>(tenantId, twinId);
+      if (!twin) throw unavailableOrganizationResource();
+      return twin.owner_human_id;
+    }
+
+    const humanId = actorRef.slice('human:'.length);
+    const existing = this.database.prepare('SELECT id FROM human_users WHERE tenant_id = ? AND id = ?')
+      .get<{ id: string }>(tenantId, humanId);
+    if (!existing) throw unavailableOrganizationResource();
+    return humanId;
+  }
+
+  private ensureDepartment(tenantId: string, departmentId: string, ownerHumanId: string, now: string): void {
+    this.assertIdentifierTenant('departments', departmentId, tenantId);
+    const existing = this.database.prepare('SELECT id FROM departments WHERE tenant_id = ? AND id = ?')
+      .get<{ id: string }>(tenantId, departmentId);
+    if (!existing) this.database.prepare(`
+      INSERT INTO departments
+        (id, tenant_id, name, owner_human_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
+    `).run(departmentId, tenantId, departmentId, ownerHumanId, now, now);
+  }
+
+  private assertIdentifierTenant(table: 'human_users' | 'departments' | 'digital_employees', id: string, tenantId: string): void {
+    const row = this.database.prepare(`SELECT tenant_id FROM ${table} WHERE id = ?`)
+      .get<{ tenant_id: string }>(id);
+    if (row && row.tenant_id !== tenantId) throw unavailableOrganizationResource();
+  }
+}
+
+function unavailableOrganizationResource(): Error {
+  return new Error('Organization resource is unavailable in the current tenant');
 }
 
 function validateHire(input: HireDigitalEmployeeInput): void {
