@@ -17,7 +17,15 @@ function createHarness(overrides = {}) {
   };
   const contractValidator = {
     validateNodeManifest: (value) => ({ ok: true, value }),
-    validateTaskEnvelope: (value) => ({ ok: true, value }),
+    validateTaskEnvelope: (value) => ({
+      ok: true,
+      value: {
+        ...value,
+        tenantId: 'tenant_a',
+        targetNodeId: 'node_a',
+        expiresAt: '2026-10-07T01:00:00.000Z',
+      },
+    }),
     validateApprovalDecision: (value) => ({
       ok: true,
       value: {
@@ -181,6 +189,66 @@ test('executes exactly once after a valid human approval and returns events plus
   assert.equal(calls.executions.length, 1);
   assert.equal(calls.events.length, 1);
   assert.equal(calls.receipts.length, 1);
+});
+
+test('a relay stop makes a pending claim permanently non-executable', async () => {
+  const { agent, calls } = createHarness();
+  await agent.pollOnce();
+
+  assert.deepEqual(agent.stopClaim('claim_1'), { state: 'stopped', claimId: 'claim_1' });
+  assert.deepEqual(
+    await agent.confirmAndExecute('claim_1', { requestId: 'claim_1' }),
+    { state: 'stopped', claimId: 'claim_1' },
+  );
+  assert.equal(calls.executions.length, 0);
+});
+
+test('rejects a shared-contract TaskEnvelope bound to another tenant', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateTaskEnvelope: (value) => ({
+        ok: true,
+        value: { ...value, tenantId: 'tenant_other', targetNodeId: 'node_a', expiresAt: '2026-10-07T01:00:00.000Z' },
+      }),
+    },
+  });
+
+  const result = await agent.pollOnce();
+
+  assert.deepEqual(result, { state: 'rejected', claimId: 'claim_1', reasonCode: 'task_scope_mismatch' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('rejects a shared-contract TaskEnvelope targeted at another node', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateTaskEnvelope: (value) => ({
+        ok: true,
+        value: { ...value, tenantId: 'tenant_a', targetNodeId: 'node_other', expiresAt: '2026-10-07T01:00:00.000Z' },
+      }),
+    },
+  });
+
+  const result = await agent.pollOnce();
+
+  assert.deepEqual(result, { state: 'rejected', claimId: 'claim_1', reasonCode: 'task_scope_mismatch' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('rejects an expired shared-contract TaskEnvelope', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateTaskEnvelope: (value) => ({
+        ok: true,
+        value: { ...value, tenantId: 'tenant_a', targetNodeId: 'node_a', expiresAt: '2026-10-06T23:59:59.000Z' },
+      }),
+    },
+  });
+
+  const result = await agent.pollOnce();
+
+  assert.deepEqual(result, { state: 'rejected', claimId: 'claim_1', reasonCode: 'task_expired' });
+  assert.equal(calls.executions.length, 0);
 });
 
 test('does not transmit an invalid outcome receipt', async () => {
