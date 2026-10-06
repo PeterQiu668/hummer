@@ -841,6 +841,166 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'demo session segments are retained as deletion tombstones'); END;
     `,
   },
+  {
+    version: 15,
+    name: 'p2_w10_public_marketplace_kernel',
+    sql: `
+      CREATE TABLE capability_packages (
+        source_tenant_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL CHECK (package_version > 0),
+        package_digest TEXT NOT NULL CHECK (length(package_digest) = 64),
+        package_json TEXT NOT NULL,
+        integrity_kind TEXT NOT NULL CHECK (integrity_kind = 'package_digest'),
+        integrity_digest TEXT NOT NULL CHECK (length(integrity_digest) = 64),
+        verified_by_actor_ref TEXT NOT NULL CHECK (verified_by_actor_ref GLOB 'human:*'),
+        verified_at TEXT NOT NULL,
+        PRIMARY KEY (source_tenant_id, package_id, package_version),
+        UNIQUE (package_digest),
+        UNIQUE (source_tenant_id, package_id, package_version, package_digest),
+        FOREIGN KEY (source_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE TABLE skill_trials (
+        source_tenant_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL,
+        trial_id TEXT NOT NULL,
+        package_digest TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('shadow', 'live')),
+        ok INTEGER NOT NULL CHECK (ok IN (0, 1)),
+        trial_json TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (source_tenant_id, package_id, package_version, trial_id),
+        FOREIGN KEY (source_tenant_id, package_id, package_version, package_digest)
+          REFERENCES capability_packages(source_tenant_id, package_id, package_version, package_digest)
+      );
+
+      CREATE INDEX skill_trials_package
+        ON skill_trials (source_tenant_id, package_id, package_version, recorded_at);
+
+      CREATE TABLE listings (
+        listing_id TEXT PRIMARY KEY,
+        source_tenant_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL,
+        package_digest TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('public', 'taken_down')),
+        public_projection_json TEXT NOT NULL,
+        published_by_actor_ref TEXT NOT NULL CHECK (published_by_actor_ref GLOB 'human:*'),
+        published_at TEXT NOT NULL,
+        taken_down_at TEXT,
+        FOREIGN KEY (source_tenant_id, package_id, package_version, package_digest)
+          REFERENCES capability_packages(source_tenant_id, package_id, package_version, package_digest)
+      );
+
+      CREATE UNIQUE INDEX listings_one_public_package
+        ON listings (source_tenant_id, package_id, package_version) WHERE status = 'public';
+      CREATE INDEX listings_public_feed
+        ON listings (status, published_at, listing_id);
+
+      CREATE TABLE marketplace_reports (
+        report_id TEXT PRIMARY KEY,
+        listing_id TEXT NOT NULL,
+        reporter_tenant_id TEXT NOT NULL,
+        reporter_actor_ref TEXT NOT NULL CHECK (reporter_actor_ref GLOB 'human:*'),
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('open', 'resolved_actioned')),
+        created_at TEXT NOT NULL,
+        resolved_at TEXT,
+        UNIQUE (report_id, listing_id),
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (reporter_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE INDEX marketplace_reports_queue
+        ON marketplace_reports (status, created_at, report_id);
+
+      CREATE TABLE marketplace_moderation_actions (
+        action_id TEXT PRIMARY KEY,
+        report_id TEXT NOT NULL,
+        listing_id TEXT NOT NULL,
+        moderation_tenant_id TEXT NOT NULL,
+        moderator_actor_ref TEXT NOT NULL CHECK (moderator_actor_ref GLOB 'human:*'),
+        action TEXT NOT NULL CHECK (action = 'taken_down'),
+        reason TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (report_id, listing_id) REFERENCES marketplace_reports(report_id, listing_id),
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (moderation_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE TABLE marketplace_install_attempts (
+        attempt_id TEXT PRIMARY KEY,
+        listing_id TEXT NOT NULL,
+        target_tenant_id TEXT NOT NULL,
+        gate_id TEXT NOT NULL,
+        decision TEXT NOT NULL CHECK (decision IN ('approved', 'denied')),
+        reasons_json TEXT NOT NULL,
+        request_digest TEXT NOT NULL CHECK (length(request_digest) = 64),
+        decided_at TEXT NOT NULL,
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (target_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE TRIGGER capability_packages_no_delete
+        BEFORE DELETE ON capability_packages
+        BEGIN SELECT RAISE(ABORT, 'verified capability packages are append-only'); END;
+      CREATE TRIGGER capability_packages_member_guard
+        BEFORE INSERT ON capability_packages
+        WHEN NOT EXISTS (
+          SELECT 1 FROM memberships
+          WHERE tenant_id = NEW.source_tenant_id AND status = 'active'
+            AND human_user_id = substr(NEW.verified_by_actor_ref, 7)
+        )
+        BEGIN SELECT RAISE(ABORT, 'marketplace authorization denied'); END;
+      CREATE TRIGGER skill_trials_no_delete
+        BEFORE DELETE ON skill_trials
+        BEGIN SELECT RAISE(ABORT, 'skill trials are append-only'); END;
+      CREATE TRIGGER listings_no_delete
+        BEFORE DELETE ON listings
+        BEGIN SELECT RAISE(ABORT, 'marketplace listings are retained for audit'); END;
+      CREATE TRIGGER listings_member_guard
+        BEFORE INSERT ON listings
+        WHEN NOT EXISTS (
+          SELECT 1 FROM memberships
+          WHERE tenant_id = NEW.source_tenant_id AND status = 'active'
+            AND human_user_id = substr(NEW.published_by_actor_ref, 7)
+        )
+        BEGIN SELECT RAISE(ABORT, 'marketplace authorization denied'); END;
+      CREATE TRIGGER marketplace_reports_member_guard
+        BEFORE INSERT ON marketplace_reports
+        WHEN NOT EXISTS (
+          SELECT 1 FROM memberships
+          WHERE tenant_id = NEW.reporter_tenant_id AND status = 'active'
+            AND human_user_id = substr(NEW.reporter_actor_ref, 7)
+        )
+        BEGIN SELECT RAISE(ABORT, 'marketplace authorization denied'); END;
+      CREATE TRIGGER moderation_actions_member_guard
+        BEFORE INSERT ON marketplace_moderation_actions
+        WHEN NOT EXISTS (
+          SELECT 1 FROM memberships
+          WHERE tenant_id = NEW.moderation_tenant_id AND status = 'active'
+            AND human_user_id = substr(NEW.moderator_actor_ref, 7)
+        )
+        BEGIN SELECT RAISE(ABORT, 'marketplace authorization denied'); END;
+      CREATE TRIGGER listings_takedown_requires_action
+        BEFORE UPDATE OF status ON listings
+        WHEN NEW.status = 'taken_down' AND OLD.status != 'taken_down'
+          AND NOT EXISTS (
+            SELECT 1 FROM marketplace_moderation_actions
+            WHERE listing_id = NEW.listing_id AND action = 'taken_down'
+          )
+        BEGIN SELECT RAISE(ABORT, 'listing takedown requires a human moderation action'); END;
+      CREATE TRIGGER listings_no_republish
+        BEFORE UPDATE OF status ON listings
+        WHEN OLD.status = 'taken_down' AND NEW.status != 'taken_down'
+        BEGIN SELECT RAISE(ABORT, 'taken-down listing cannot be republished'); END;
+      CREATE TRIGGER moderation_actions_no_delete
+        BEFORE DELETE ON marketplace_moderation_actions
+        BEGIN SELECT RAISE(ABORT, 'moderation actions are append-only'); END;
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

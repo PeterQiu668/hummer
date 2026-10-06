@@ -8,6 +8,7 @@
     { "path": "./packages/contracts" },
     { "path": "./packages/capability-runtime" },
     { "path": "./packages/distillation" },
-    { "path": "./packages/skill-replay" }
+    { "path": "./packages/skill-replay" },
+    { "path": "./packages/public-market" }
   ]
 }

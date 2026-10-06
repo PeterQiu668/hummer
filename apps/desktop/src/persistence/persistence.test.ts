@@ -64,7 +64,7 @@ describe('desktop persistence migrations', () => {
 
     const persistence = openPersistence({ dataDirectory: directory });
 
-    expect(persistence.schemaVersion()).toBe(14);
+    expect(persistence.schemaVersion()).toBe(15);
     expect(persistence.listTables()).toEqual(expect.arrayContaining([
       'fleet_nodes',
       'fleet_task_leases',
@@ -74,14 +74,20 @@ describe('desktop persistence migrations', () => {
       'demo_sessions',
       'demo_session_segments',
       'demo_session_records',
+      'capability_packages',
+      'skill_trials',
+      'listings',
+      'marketplace_reports',
+      'marketplace_moderation_actions',
+      'marketplace_install_attempts',
     ]));
     expect(persistence.appliedMigrations().find((migration) => migration.version === 11)).toMatchObject({
       version: 11,
       name: 'phase0_fleet_nodes_and_task_leases',
     });
     expect(persistence.appliedMigrations().at(-1)).toMatchObject({
-      version: 14,
-      name: 'p2_w7_demo_session_privacy_kernel',
+      version: 15,
+      name: 'p2_w10_public_marketplace_kernel',
     });
     persistence.close();
   });

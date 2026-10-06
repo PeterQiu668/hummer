@@ -26,6 +26,7 @@
     "test:distillation": "node scripts/test-distillation.mjs",
     "test:upgrade-rollback": "node scripts/test-upgrade-rollback.mjs",
     "test:diagnostics": "node scripts/test-diagnostics.mjs",
+    "test:public-market": "node scripts/test-public-market.mjs",
     "test:fleet": "node scripts/test-fleet.mjs",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
