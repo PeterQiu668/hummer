@@ -10,6 +10,7 @@ import {
 import {
   decideStartWorkPlan,
   totalEstimatedCostCny,
+  validateDispatchableStartWorkPlan,
   validatePendingStartWorkPlan,
   type StartWorkDecision,
   type StartWorkPlan,
@@ -26,6 +27,10 @@ const riskLabels: Record<StartWorkRiskClass, string> = {
   network: '新网络端点',
   unknown: '未知 · 最高风险',
 };
+
+const dispatchRiskClasses: StartWorkRiskClass[] = [
+  'egress', 'write', 'spend', 'delete', 'privilege', 'network', 'unknown',
+];
 
 export interface StartWorkPageProps {
   plan: StartWorkPlan | null;
@@ -62,11 +67,17 @@ export default function StartWorkPage({
     [currentPlan, localDecision, plan],
   );
   const actorIsHuman = decisionActorRef.startsWith('human:') && decisionActorRef.length > 'human:'.length;
-  const canDecide = Boolean(currentPlan && validation.ok && actorIsHuman);
+  const dispatchValidation = currentPlan ? validateDispatchableStartWorkPlan(currentPlan) : { ok: false, errors: [] };
+  const canReject = Boolean(currentPlan && validation.ok && actorIsHuman);
+  const canConfirm = Boolean(canReject && dispatchValidation.ok);
 
   const decide = (decision: StartWorkDecision) => {
     if (!currentPlan) {
       setDecisionError('还没有可确认计划');
+      return;
+    }
+    if (decision === 'confirm' && !dispatchValidation.ok) {
+      setDecisionError(dispatchValidation.errors.join('；'));
       return;
     }
     const transition = decideStartWorkPlan(currentPlan, decision, decisionActorRef, now());
@@ -105,7 +116,7 @@ export default function StartWorkPage({
               </button>
             </div>
           </div>
-          <DecisionBar canDecide={false} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
+          <DecisionBar canConfirm={false} canReject={false} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
         </section>
       </main>
     );
@@ -127,7 +138,7 @@ export default function StartWorkPage({
             </ul>
             <p className="mt-3 text-xs hum-faint">已按 fail-closed 处理，没有派发或执行任何任务。</p>
           </div>
-          <DecisionBar canDecide={false} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
+          <DecisionBar canConfirm={false} canReject={false} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
         </section>
       </main>
     );
@@ -180,7 +191,27 @@ export default function StartWorkPage({
               </li>
             ))}
           </ol>
+          <div className="mt-4 border-t border-[var(--border-soft)] pt-3" aria-label="七类受控风险">
+            <p className="text-xs hum-muted">七类受控风险</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {dispatchRiskClasses.map((riskClass) => (
+                <span key={riskClass} className={`hum-chip ${riskClass === 'unknown' ? 'is-error' : 'is-muted'}`}>
+                  {riskLabels[riskClass]}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {!terminal && !dispatchValidation.ok ? (
+          <div className="hum-card border-[var(--error)] p-4" role="alert">
+            <div className="flex items-center gap-2 font-medium text-[var(--error)]"><AlertTriangle size={16} />无法生成派发意图</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs hum-muted">
+              {dispatchValidation.errors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
+            <p className="mt-2 text-xs hum-faint">已按 fail-closed 处理；你仍可以明确拒绝此计划。</p>
+          </div>
+        ) : null}
 
         {terminal ? (
           <div className="hum-card p-4" role="status">
@@ -195,7 +226,7 @@ export default function StartWorkPage({
             </div>
           </div>
         ) : (
-          <DecisionBar canDecide={canDecide} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
+          <DecisionBar canConfirm={canConfirm} canReject={canReject} onConfirm={() => decide('confirm')} onReject={() => decide('reject')} />
         )}
 
         {decisionError ? <p className="text-sm text-[var(--error)]" role="alert">{decisionError}</p> : null}
@@ -214,8 +245,9 @@ function Header() {
   );
 }
 
-function DecisionBar({ canDecide, onConfirm, onReject }: {
-  canDecide: boolean;
+function DecisionBar({ canConfirm, canReject, onConfirm, onReject }: {
+  canConfirm: boolean;
+  canReject: boolean;
   onConfirm: () => void;
   onReject: () => void;
 }) {
@@ -223,8 +255,8 @@ function DecisionBar({ canDecide, onConfirm, onReject }: {
     <div className="hum-card flex flex-wrap items-center justify-between gap-3 p-4" aria-label="计划确认">
       <p className="text-xs hum-muted">确认后仍需由受控任务入口创建 pending 工单。</p>
       <div className="flex gap-2">
-        <button type="button" className="hum-btn is-danger" disabled={!canDecide} onClick={onReject}>拒绝计划</button>
-        <button type="button" className="hum-btn is-primary" disabled={!canDecide} onClick={onConfirm}>确认计划</button>
+        <button type="button" className="hum-btn is-danger" disabled={!canReject} onClick={onReject}>拒绝计划</button>
+        <button type="button" className="hum-btn is-primary" disabled={!canConfirm} onClick={onConfirm}>确认计划</button>
       </div>
     </div>
   );

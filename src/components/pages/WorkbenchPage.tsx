@@ -52,6 +52,9 @@ import { desktopOutcomePort } from '../../features/outcomes/outcomeClient';
 import type { Planner } from '../../features/planning/planner';
 import { createDefaultPlanner } from '../../features/planning/plannerFactory';
 import { desktopToolRegistryPort } from '../../features/tools/toolRegistryClient';
+import { desktopExecutionNodePort } from '../../features/execution-nodes/executionNodeClient';
+import StartWorkFlow from '../../features/home/StartWorkFlow';
+import type { StartWorkDispatchIntentPort } from '../../features/home/startWorkDispatch';
 import {
   desktopWorkOrderIntakePort,
   type WorkOrderInboxRecord,
@@ -73,7 +76,7 @@ interface RuntimeRecord {
   events: RuntimeEvent[];
 }
 
-export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore, planner }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore; planner?: Planner }) {
+export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore, planner, dispatchIntentPort }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore; planner?: Planner; dispatchIntentPort?: StartWorkDispatchIntentPort }) {
   const [defaultSessionStore] = useState(createDefaultSessionStore);
   const store = sessionStore ?? defaultSessionStore;
   const personalSettings = useAppStore((state) => state.personalSettings);
@@ -95,6 +98,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const [rightTab, setRightTab] = useState<'collab' | 'capability' | 'sop'>('collab');
   const [sopDraft, setSopDraft] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [startWorkOpen, setStartWorkOpen] = useState(false);
 
   useEffect(() => {
     if (!workbenchPrefill) return;
@@ -120,6 +124,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
   const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
   const intakePort = useMemo(() => desktopWorkOrderIntakePort(), []);
+  const executionNodePort = useMemo(() => desktopExecutionNodePort(), []);
   const toolRegistryPort = useMemo(() => desktopToolRegistryPort(), []);
 
   useEffect(() => {
@@ -320,6 +325,7 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     setComposerText('');
     setTakeover(false);
     setContextOpen(false);
+    setStartWorkOpen(false);
   };
 
   const forkFrom = async (sequence: number) => {
@@ -549,9 +555,27 @@ export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore,
     </span>
   );
 
+  if (!session && startWorkOpen) {
+    const profile = engineProfileForLabel(engineProfiles, modelProfile);
+    return (
+      <WorkspacePage
+        title="开始做"
+        sub="先生成可审阅计划；只有你的明确确认才会产生 pending 派发意图。"
+        actions={<><button type="button" className="hum-btn is-sm" onClick={() => setStartWorkOpen(false)}>返回工作台</button>{prototypeBadge}</>}
+      >
+        <StartWorkFlow
+          planner={activePlanner}
+          nodePort={executionNodePort}
+          planDefaults={{ assignee, approvalMode, attachmentNames, modelProfile, engineProfileId: profile.id, workContext }}
+          dispatchIntentPort={dispatchIntentPort}
+        />
+      </WorkspacePage>
+    );
+  }
+
   if (!session) {
     return (
-      <WorkspacePage title="工作台" sub="看清今天的重点，再和你的分身及数字同事一起推进。" actions={prototypeBadge}>
+      <WorkspacePage title="工作台" sub="看清今天的重点，再和你的分身及数字同事一起推进。" actions={<><button type="button" className="hum-btn is-sm is-primary" onClick={() => setStartWorkOpen(true)}><Target size={12} /> 开始做</button>{prototypeBadge}</>}>
         <div className="min-h-full px-4 py-5 sm:px-6">
           {plan ? (
             <div className="mx-auto w-full max-w-[920px] space-y-4 py-4">

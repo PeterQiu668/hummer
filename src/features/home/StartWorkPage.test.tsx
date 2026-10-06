@@ -15,8 +15,8 @@ function pendingPlan(overrides: Partial<StartWorkPlan> = {}): StartWorkPlan {
     decidedBy: null,
     decidedAt: null,
     steps: [
-      { id: 'step_1', title: '读取指定工作区', nodeLabel: '办公室电脑', riskClass: 'none', estimatedCostCny: 0 },
-      { id: 'step_2', title: '生成摘要草稿', nodeLabel: '家用电脑', riskClass: 'write', estimatedCostCny: 0.8 },
+      { id: 'step_1', title: '读取指定工作区', nodeLabel: '办公室电脑', targetNodeId: 'node_office', targetRuntime: 'codex', riskClass: 'none', estimatedCostCny: 0 },
+      { id: 'step_2', title: '生成摘要草稿', nodeLabel: '办公室电脑', targetNodeId: 'node_office', targetRuntime: 'codex', riskClass: 'write', estimatedCostCny: 0.8 },
     ],
     ...overrides,
   };
@@ -34,8 +34,8 @@ describe('StartWorkPage', () => {
 
     expect(screen.getByRole('heading', { name: '先看计划，再决定是否继续' })).toBeInTheDocument();
     expect(screen.getByText('整理两台设备上的客户资料并生成可核验摘要')).toBeInTheDocument();
-    expect(screen.getByText('办公室电脑')).toBeInTheDocument();
-    expect(screen.getByText('写入或覆盖')).toBeInTheDocument();
+    expect(screen.getAllByText('办公室电脑')).toHaveLength(2);
+    expect(screen.getAllByText('写入或覆盖')).toHaveLength(2);
     expect(screen.getAllByText('预估 ¥0.80')).toHaveLength(2);
     expect(screen.getByText('等待你的确认')).toBeInTheDocument();
 
@@ -99,6 +99,28 @@ describe('StartWorkPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('只有具名人类操作者');
     expect(screen.getByRole('button', { name: '确认计划' })).toBeDisabled();
     expect(onDecision).not.toHaveBeenCalled();
+  });
+
+  it('shows all seven controlled risk classes and fails closed for unknown risk while allowing rejection', () => {
+    const onDecision = vi.fn();
+    render(<StartWorkPage
+      plan={pendingPlan({ steps: [pendingPlan().steps[0], { ...pendingPlan().steps[1], riskClass: 'unknown' }] })}
+      onDecision={onDecision}
+    />);
+
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('对外发送');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('写入或覆盖');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('产生费用');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('删除');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('权限变更');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('新网络端点');
+    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('未知 · 最高风险');
+    expect(screen.getByRole('alert')).toHaveTextContent('风险未知，必须先澄清');
+    expect(screen.getByRole('button', { name: '确认计划' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '拒绝计划' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '拒绝计划' }));
+    expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({ status: 'rejected' }), 'reject');
   });
 });
 

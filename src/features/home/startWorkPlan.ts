@@ -17,6 +17,8 @@ export interface StartWorkPlanStep {
   id: string;
   title: string;
   nodeLabel: string;
+  targetNodeId: string | null;
+  targetRuntime: 'codex' | 'claude' | 'deepseek' | 'cli-other' | 'gui-exec' | null;
   riskClass: StartWorkRiskClass;
   estimatedCostCny: number | null;
 }
@@ -71,6 +73,23 @@ export function validatePendingStartWorkPlan(plan: StartWorkPlan): StartWorkPlan
       errors.push(`${prefix}预估成本无效`);
     }
   }
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateDispatchableStartWorkPlan(plan: StartWorkPlan): StartWorkPlanValidation {
+  const pending = validatePendingStartWorkPlan(plan);
+  if (!pending.ok) return pending;
+
+  const errors: string[] = [];
+  for (const [index, step] of plan.steps.entries()) {
+    const prefix = `第 ${index + 1} 步`;
+    if (!step.targetNodeId || !step.targetRuntime) errors.push(`${prefix}没有可用执行节点`);
+    if (step.riskClass === 'unknown') errors.push(`${prefix}风险未知，必须先澄清`);
+  }
+  const nodeIds = new Set(plan.steps.map((step) => step.targetNodeId).filter(Boolean));
+  const runtimes = new Set(plan.steps.map((step) => step.targetRuntime).filter(Boolean));
+  if (nodeIds.size > 1 || runtimes.size > 1) errors.push('单个派发意图不能跨多个节点或运行时');
 
   return { ok: errors.length === 0, errors };
 }
