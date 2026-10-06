@@ -1,3 +1,5 @@
+import type { CapabilityCatalogItem } from '../capabilities/capabilityCatalogClient';
+
 export interface RemoteRelayNode {
   nodeId: string;
   tenantId: string;
@@ -93,6 +95,15 @@ export class RemoteRelayClient {
 
   async listApprovalRequests(): Promise<readonly RemoteRelayApprovalRequest[]> {
     return (await this.request<{ approvalRequests: RemoteRelayApprovalRequest[] }>('/v1/control/approval-requests')).approvalRequests;
+  }
+
+  async listCapabilities(): Promise<readonly CapabilityCatalogItem[]> {
+    const payload = await this.request<{ capabilities?: unknown }>('/v1/capabilities');
+    const { isCapabilityCatalogItem } = await import('../capabilities/capabilityResponseValidator');
+    if (!Array.isArray(payload.capabilities) || payload.capabilities.some((item) => !isCapabilityCatalogItem(item))) {
+      throw new RemoteRelayError(502, 'invalid_response', 'Relay returned an invalid capability catalog');
+    }
+    return payload.capabilities;
   }
 
   async getApprovalRequest(requestId: string): Promise<RemoteRelayApprovalRequest> {

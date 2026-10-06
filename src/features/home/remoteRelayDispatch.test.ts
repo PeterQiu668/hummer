@@ -6,6 +6,7 @@ import {
   remoteBatchDispatchPort,
   remoteStartWorkDispatchPort,
 } from './remoteRelayDispatch';
+import { capabilityCatalogPort } from '../capabilities/capabilityCatalogClient';
 
 const envelope = {
   schema: 'hummer.task-envelope', version: 1,
@@ -27,6 +28,7 @@ describe('remote Relay deployment dispatch', () => {
   it('stays unavailable until baseUrl and an in-memory badge provider are explicitly injected', () => {
     expect(remoteStartWorkDispatchPort()).toBeUndefined();
     expect(remoteBatchDispatchPort()).toBeUndefined();
+    expect(capabilityCatalogPort()).toBeUndefined();
   });
 
   it('consumes the one-shot browser deployment injection before React boot', () => {
@@ -42,6 +44,24 @@ describe('remote Relay deployment dispatch', () => {
     expect(window.hummerRemoteRelayDeployment).toBeUndefined();
     expect(remoteStartWorkDispatchPort()).toBeDefined();
     expect(remoteBatchDispatchPort()).toBeDefined();
+    expect(capabilityCatalogPort()).toBeDefined();
+    expect(capabilityCatalogPort()?.installerAvailable).toBe(false);
+  });
+
+  it('one-shot consumes the trusted installer into a module closure without exposing a long-lived window bridge', () => {
+    vi.stubGlobal('window', {
+      hummerRemoteRelayDeployment: {
+        baseUrl: 'https://relay.example.test',
+        getBadge: () => 'one-shot-badge',
+        capabilityInstaller: { evaluateAndInstall: vi.fn() },
+      },
+    });
+
+    dispose = consumeInjectedRemoteRelayDeployment();
+
+    expect(window.hummerRemoteRelayDeployment).toBeUndefined();
+    expect(capabilityCatalogPort()?.installerAvailable).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(window, 'hummerCapabilityInstaller')).toBe(false);
   });
 
   it('connects start-work dispatch without storing or logging the Relay badge', async () => {

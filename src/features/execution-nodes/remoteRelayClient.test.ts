@@ -87,4 +87,58 @@ describe('RemoteRelayClient', () => {
     expect(result).toEqual([{ index: 0, ok: false, status: 0, code: 'network_error', message: 'Relay request failed' }]);
     expect(JSON.stringify(result)).not.toContain(badge);
   });
+
+  it('reads the tenant-scoped capability catalog through the authenticated Relay route', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe('https://relay.example.test/v1/capabilities');
+      return new Response(JSON.stringify({ capabilities: [validOwnerCatalogItem()] }), { status: 200 });
+    });
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => 'opaque-badge',
+      fetch: fetchMock as typeof fetch,
+    });
+
+    expect((await client.listCapabilities()).map((item) => item.record.packageId)).toEqual(['cap-draft']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when a catalog item has malformed nested provenance or permissions', async () => {
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => 'opaque-badge',
+      fetch: vi.fn(async () => new Response(JSON.stringify({ capabilities: [{
+        access: 'owner',
+        record: {
+          tenantId: 'tenant-a', packageId: 'cap-a', packageVersion: 1, packageDigest: 'a'.repeat(64),
+          author: { title: 'shallow object without provenance' }, trialRecord: null, status: 'draft',
+          sourceTaskId: 'task-a', artifactEventId: 'artifact-a', completedEventId: 'completed-a', createdAt: '2026-10-07T08:00:00.000Z',
+        },
+        share: null,
+      }] }), { status: 200 })) as typeof fetch,
+    });
+
+    await expect(client.listCapabilities()).rejects.toMatchObject({ status: 502, code: 'invalid_response' });
+  });
 });
+
+function validOwnerCatalogItem() {
+  return {
+    access: 'owner',
+    record: {
+      tenantId: 'tenant-a', packageId: 'cap-draft', packageVersion: 1, packageDigest: 'a'.repeat(64),
+      author: {
+        schema: 'hummer.capability-package-author-input', version: 1, tenantId: 'tenant-a', packageId: 'cap-draft', packageVersion: 1,
+        title: 'Draft capability', goal: 'Create a reviewable result.', preset: 'team-sop',
+        capabilityTrack: { responsibilities: [], workflows: [], standards: [], heuristics: [], pitfalls: [], examples: [] },
+        behaviorTrack: { expressionPreferences: [], interactionRules: [], corrections: [] },
+        runtimeProfile: 'codex-default', toolIds: [], requiredCapabilities: [], acceptanceCriteria: ['Result exists.'],
+        sourceBoundary: { apps: [], windows: [], includePaths: [], excludePaths: [] },
+        provenance: { demoSessionIds: ['demo-1'], expertActorRef: 'expert:owner', nodeId: 'node-a', device: 'Windows', runtime: 'codex', runtimeVersion: '1.0.0', agentVersion: '1.0.0', capturedAt: '2026-10-07T08:00:00.000Z' },
+        evidenceRefs: ['evidence-1'], failureNotes: [], declaredPermissions: [], regressionSuiteRef: 'regression-1', receiptRef: 'receipt-1', status: 'draft', deletionAudit: {},
+      },
+      trialRecord: null, status: 'draft', sourceTaskId: 'task-a', artifactEventId: 'artifact-a', completedEventId: 'completed-a', createdAt: '2026-10-07T08:00:00.000Z',
+    },
+    share: null,
+  };
+}

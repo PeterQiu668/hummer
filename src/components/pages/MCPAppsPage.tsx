@@ -18,6 +18,12 @@ import WorkspacePage from './WorkspacePage';
 import { useAppStore } from '../../store/useAppStore';
 import { desktopRuntimeConnectorPort, type RuntimeConnectorRecord } from '../../features/connectors/runtimeConnectorClient';
 import { desktopToolRegistryPort, type ToolDefinitionRecord } from '../../features/tools/toolRegistryClient';
+import {
+  CapabilityInstallError,
+  capabilityCatalogPort,
+  type CapabilityCatalogItem,
+} from '../../features/capabilities/capabilityCatalogClient';
+import { RemoteRelayError } from '../../features/execution-nodes/remoteRelayClient';
 
 type CapabilityTab = 'apps' | 'experts' | 'skills' | 'knowledge' | 'models';
 
@@ -30,15 +36,6 @@ const tabs: Array<{ key: CapabilityTab; label: string; icon: typeof Blocks }> = 
 ];
 
 const featuredAppIds = ['feishu', 'dingtalk', 'wework', 'salesforce', 'mail', 'github', 'notion', 'kingdee'];
-
-const skillCatalog = [
-  { id: 'lead-followup', name: '线索整理与跟进', category: '销售', detail: '汇总多来源线索，补齐负责人和下一步动作，更新前先确认。', usedBy: '4 位数字同事', score: '96%' },
-  { id: 'meeting-actions', name: '会议纪要与行动项', category: '协作', detail: '从会议内容提炼决定、负责人和截止时间，并同步给相关同事。', usedBy: '全公司可用', score: '94%' },
-  { id: 'contract-check', name: '合同条款检查', category: '法务', detail: '对照公司模板标出付款、交付和责任条款差异。', usedBy: '法务团队', score: '91%' },
-  { id: 'weekly-review', name: '经营周报', category: '管理', detail: '把目标、结果、风险和下周动作整理成一页复盘。', usedBy: '6 位负责人', score: '97%' },
-  { id: 'customer-research', name: '客户研究', category: '研究', detail: '在允许的公开来源中核验公司、联系人和业务信号。', usedBy: '销售与市场', score: '93%' },
-  { id: 'data-insight', name: '数据解读', category: '分析', detail: '读取授权报表，解释异常、趋势和可能原因。', usedBy: '3 个部门', score: '95%' },
-];
 
 const experts = [
   { name: '林知远', role: '企业销售增长顾问', focus: '账户策略、销售方法与复杂客户推进', availability: '今天 16:30 可约', supported: '支持 8 位数字同事' },
@@ -61,14 +58,16 @@ export default function MCPAppsPage() {
   const [runtimeConnectors, setRuntimeConnectors] = useState<RuntimeConnectorRecord[]>([]);
   const [toolDefinitions, setToolDefinitions] = useState<ToolDefinitionRecord[]>([]);
   const [verifyingTool, setVerifyingTool] = useState(false);
+  const [capabilityItems, setCapabilityItems] = useState<readonly CapabilityCatalogItem[]>([]);
+  const [capabilityLoad, setCapabilityLoad] = useState<'unconfigured' | 'loading' | 'ready' | 'error'>('loading');
+  const [capabilityLoadMessage, setCapabilityLoadMessage] = useState('');
+  const [capabilityInstallState, setCapabilityInstallState] = useState<Record<string, { status: 'installing' | 'installed' | 'failed'; message: string }>>({});
   const mcpApps = useAppStore((state) => state.mcpApps);
-  const installedSkills = useAppStore((state) => state.installedSkills);
-  const installSkill = useAppStore((state) => state.installSkill);
-  const toggleSkill = useAppStore((state) => state.toggleSkill);
   const settings = useAppStore((state) => state.personalSettings);
   const updateSettings = useAppStore((state) => state.updatePersonalSettings);
   const connectorPort = desktopRuntimeConnectorPort();
   const toolRegistry = useMemo(() => desktopToolRegistryPort(), []);
+  const capabilityPort = useMemo(() => capabilityCatalogPort(), []);
   const connectedCount = runtimeConnectors.filter((connector) => connector.status === 'connected').length;
 
   useEffect(() => {
@@ -88,6 +87,46 @@ export default function MCPAppsPage() {
     return () => { active = false; };
   }, [toolRegistry]);
 
+  useEffect(() => {
+    let active = true;
+    if (!capabilityPort) {
+      setCapabilityLoad('unconfigured');
+      setCapabilityLoadMessage('能力仓未配置 Remote Relay；当前不会展示样例数据，也不能安装。');
+      return () => { active = false; };
+    }
+    setCapabilityLoad('loading');
+    void capabilityPort.listCapabilities().then((items) => {
+      if (!active) return;
+      setCapabilityItems(items);
+      setCapabilityLoad('ready');
+      setCapabilityLoadMessage('');
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setCapabilityItems([]);
+      setCapabilityLoad('error');
+      setCapabilityLoadMessage(capabilityFailureMessage(error, '读取能力仓失败'));
+    });
+    return () => { active = false; };
+  }, [capabilityPort]);
+
+  const installCapability = async (item: CapabilityCatalogItem) => {
+    if (!capabilityPort) return;
+    const key = capabilityItemKey(item);
+    setCapabilityInstallState((current) => ({ ...current, [key]: { status: 'installing', message: '正在调用可信安装门禁…' } }));
+    try {
+      const installed = await capabilityPort.install(item);
+      setCapabilityInstallState((current) => ({
+        ...current,
+        [key]: { status: 'installed', message: `门禁已批准并完成安装 · 请求摘要 ${installed.requestDigest.slice(0, 12)}…` },
+      }));
+    } catch (error) {
+      setCapabilityInstallState((current) => ({
+        ...current,
+        [key]: { status: 'failed', message: capabilityFailureMessage(error, '安装失败') },
+      }));
+    }
+  };
+
   const verifyLocalMcp = async () => {
     if (!toolRegistry || verifyingTool) return;
     setVerifyingTool(true);
@@ -103,7 +142,7 @@ export default function MCPAppsPage() {
     <div className="mx-auto max-w-[1280px] p-5">
       {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} connectors={runtimeConnectors} tools={toolDefinitions} hostAvailable={Boolean(connectorPort && toolRegistry)} verifyingTool={verifyingTool} onVerifyLocalMcp={verifyLocalMcp} />}
       {tab === 'experts' && <ExpertsPanel query={query} />}
-      {tab === 'skills' && <SkillsPanel query={query} installed={installedSkills} onInstall={installSkill} onToggle={toggleSkill} />}
+      {tab === 'skills' && <SkillsPanel query={query} items={capabilityItems} load={capabilityLoad} loadMessage={capabilityLoadMessage} installerAvailable={Boolean(capabilityPort?.installerAvailable)} installState={capabilityInstallState} onInstall={installCapability} />}
       {tab === 'knowledge' && <KnowledgePanel query={query} />}
       {tab === 'models' && <ModelsPanel selected={settings.preferredModel} onSelect={(preferredModel) => updateSettings({ preferredModel })} />}
     </div>
@@ -157,8 +196,101 @@ function ExpertsPanel({ query }: { query: string }) {
   return <section><SectionTitle icon={<UsersRound size={15} />} title="专家支持" detail="专家负责定义方法、处理复杂例外并辅导数字同事，不直接获得你的业务数据。" /><div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{experts.filter((expert) => matches(query, `${expert.name} ${expert.role} ${expert.focus}`)).map((expert) => <div key={expert.name} className="hum-card p-4"><div className="flex items-start gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-neutral-900 text-[12px] font-semibold text-white">{expert.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{expert.name}</div><div className="mt-0.5 text-[11px] text-neutral-500">{expert.role}</div></div><span className="hum-chip is-muted">预约未开放</span></div><p className="mt-3 text-[11.5px] leading-5 text-neutral-600">{expert.focus}</p><div className="mt-3 flex flex-wrap gap-2 text-[10.5px]"><span className="hum-chip is-brand">{expert.availability}</span><span className="hum-chip">{expert.supported}</span></div></div>)}</div></section>;
 }
 
-function SkillsPanel({ query, installed, onInstall, onToggle }: { query: string; installed: Record<string, { id: string; enabled: boolean; installedAt: string }>; onInstall: (id: string) => void; onToggle: (id: string, enabled?: boolean) => void }) {
-  return <section><SectionTitle icon={<Wrench size={15} />} title="团队技能" detail="技能是经过验证、可复用的工作方法，可以分配给个人分身和数字同事。" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{skillCatalog.filter((skill) => matches(query, `${skill.name} ${skill.category} ${skill.detail}`)).map((skill) => { const state = installed[skill.id]; return <div key={skill.id} className="hum-card flex min-h-[185px] flex-col p-4"><div className="flex items-start gap-3"><div className="grid h-9 w-9 place-items-center rounded-md bg-primary-50 text-primary-700"><Wrench size={15} /></div><div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-neutral-900">{skill.name}</div><div className="mt-0.5 text-[10.5px] text-neutral-500">{skill.category}</div></div><span className="hum-chip is-success">{skill.score}</span></div><p className="mt-3 flex-1 text-[11px] leading-5 text-neutral-600">{skill.detail}</p><div className="mt-3 flex items-center gap-2 border-t border-neutral-100 pt-3"><span className="min-w-0 flex-1 truncate text-[10.5px] text-neutral-500">{skill.usedBy}</span>{state ? <button type="button" onClick={() => onToggle(skill.id)} className={`hum-btn is-sm ${state.enabled ? '' : 'is-primary'}`}>{state.enabled ? '已启用' : '启用'}</button> : <button type="button" onClick={() => onInstall(skill.id)} className="hum-btn is-sm is-primary">添加到团队</button>}</div></div>; })}</div></section>;
+function SkillsPanel({
+  query,
+  items,
+  load,
+  loadMessage,
+  installerAvailable,
+  installState,
+  onInstall,
+}: {
+  query: string;
+  items: readonly CapabilityCatalogItem[];
+  load: 'unconfigured' | 'loading' | 'ready' | 'error';
+  loadMessage: string;
+  installerAvailable: boolean;
+  installState: Record<string, { status: 'installing' | 'installed' | 'failed'; message: string }>;
+  onInstall: (item: CapabilityCatalogItem) => Promise<void>;
+}) {
+  const visible = items.filter((item) => matches(query, capabilitySearchText(item)));
+  return <section>
+    <SectionTitle icon={<Wrench size={15} />} title="团队能力仓" detail="这里仅展示 Relay 返回的真实能力包与团队只读分享；安装必须经过可信门禁和本地安装器。" />
+    {load !== 'ready' && <div role={load === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-md border px-4 py-3 text-[11px] leading-5 ${load === 'error' ? 'border-danger/30 bg-danger-soft text-danger' : 'border-neutral-200 bg-white text-neutral-600'}`}>{load === 'loading' ? '正在从 Remote Relay 读取能力仓…' : loadMessage}</div>}
+    {load === 'ready' && !installerAvailable && <div role="status" className="mb-3 rounded-md border border-warning/30 bg-warning-soft px-4 py-3 text-[11px] leading-5 text-neutral-700">可信安装器未连接。能力仓保持只读；不会把按钮点击写入 localStorage，也不会显示假成功。</div>}
+    {load === 'ready' && visible.length === 0 && <div className="rounded-md border border-dashed border-neutral-300 bg-white px-4 py-5 text-[11px] text-neutral-500">{items.length ? '没有匹配当前搜索条件的能力包。' : '当前租户能力仓为空。'}</div>}
+    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{visible.map((item) => {
+      const { record } = item;
+      const author = record.author;
+      const trial = record.trialRecord;
+      const state = installState[capabilityItemKey(item)];
+      const readOnly = item.access === 'read_only';
+      return <article data-testid="capability-card" key={capabilityItemKey(item)} className="hum-card min-w-0 overflow-hidden p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-50 text-primary-700"><Wrench size={15} /></div><div className="min-w-0"><h3 className="break-words text-[13px] font-semibold text-neutral-900">{author.title}</h3><div className="mt-0.5 break-all font-mono text-[10px] text-neutral-500">{record.packageId} · v{record.packageVersion}</div></div></div>
+          <div className="flex shrink-0 flex-wrap gap-1.5"><span className={`hum-chip ${record.status === 'verified' || record.status === 'shared' ? 'is-success' : 'is-muted'}`}>{capabilityStatusLabel(record.status)}</span><span className={`hum-chip ${readOnly ? 'is-brand' : 'is-muted'}`}>{readOnly ? '团队只读' : '我拥有'}</span></div>
+        </div>
+        <p className="mt-3 break-words text-[11px] leading-5 text-neutral-600">{author.goal}</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 text-[10.5px] text-neutral-600 sm:grid-cols-2">
+          <CapabilityFact label="来源" value={`${author.provenance.expertActorRef} · ${author.provenance.device} · ${author.provenance.runtime} ${author.provenance.runtimeVersion}`} />
+          <CapabilityFact label="边界" value={sourceBoundaryLabel(author.sourceBoundary)} />
+          <CapabilityFact label="试运行" value={trial ? `${trial.success} 成功 / ${trial.failure} 失败 / ${trial.shadowRuns} 次影子运行${trial.regressionPassed ? ' · 回归通过' : ' · 回归未通过'}` : '尚无受信试运行记录'} />
+          <CapabilityFact label="回执" value={author.receiptRef} mono />
+        </div>
+        <div className="mt-3 border-t border-neutral-100 pt-3">
+          <div className="text-[10px] font-semibold text-neutral-700">声明权限</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">{author.declaredPermissions.length ? author.declaredPermissions.map((permission) => <span key={`${permission.capability}:${permission.access}:${permission.paths.join('|')}`} className="hum-chip break-all">{permission.capability} · {permission.access}{permission.paths.length ? ` · ${permission.paths.join(', ')}` : ''}</span>) : <span className="text-[10.5px] text-neutral-500">未声明额外权限</span>}</div>
+        </div>
+        <div className="mt-3 rounded-md bg-neutral-25 px-3 py-2 text-[10.5px] leading-4 text-neutral-600"><span className="font-semibold text-neutral-700">失败说明：</span>{author.failureNotes.length ? author.failureNotes.join('；') : '无已记录失败说明'}</div>
+        <div className="mt-3 flex flex-col gap-2 border-t border-neutral-100 pt-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1 break-words text-[10.5px] text-neutral-500">{readOnly ? '来源边界与内容只读，不可编辑、复制为本租户资产或改写出处。' : `包摘要 ${record.packageDigest.slice(0, 16)}…`}</div>
+          {readOnly && <button type="button" disabled={!installerAvailable || state?.status === 'installing'} onClick={() => { void onInstall(item); }} className="hum-btn is-sm is-primary w-full sm:w-auto">{state?.status === 'installing' ? '门禁校验中' : installerAvailable ? '经门禁安装' : '安装器未连接'}</button>}
+        </div>
+        {state && <div role={state.status === 'failed' ? 'alert' : 'status'} className={`mt-2 break-words rounded-md px-3 py-2 text-[10.5px] ${state.status === 'failed' ? 'bg-danger-soft text-danger' : state.status === 'installed' ? 'bg-success-soft text-success' : 'bg-neutral-50 text-neutral-600'}`}>{state.message}</div>}
+      </article>;
+    })}</div>
+  </section>;
+}
+
+function CapabilityFact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return <div className="min-w-0 rounded-md border border-neutral-100 bg-neutral-25 px-3 py-2"><div className="text-[9.5px] font-semibold text-neutral-500">{label}</div><div className={`mt-1 break-words leading-4 ${mono ? 'break-all font-mono' : ''}`}>{value}</div></div>;
+}
+
+function capabilityItemKey(item: CapabilityCatalogItem): string {
+  return `${item.record.packageId}:${item.record.packageVersion}:${item.record.packageDigest}`;
+}
+
+function capabilitySearchText(item: CapabilityCatalogItem): string {
+  const author = item.record.author;
+  return [author.title, author.goal, author.preset, item.record.packageId, item.record.status, item.access,
+    ...author.failureNotes, ...author.declaredPermissions.flatMap((permission) => [permission.capability, permission.access, ...permission.paths])].join(' ');
+}
+
+function sourceBoundaryLabel(boundary: CapabilityCatalogItem['record']['author']['sourceBoundary']): string {
+  const parts = [
+    boundary.apps.length ? `应用 ${boundary.apps.join('、')}` : '',
+    boundary.windows.length ? `窗口 ${boundary.windows.join('、')}` : '',
+    boundary.includePaths.length ? `包含 ${boundary.includePaths.join('、')}` : '',
+    boundary.excludePaths.length ? `排除 ${boundary.excludePaths.join('、')}` : '',
+  ].filter(Boolean);
+  return parts.join('；') || '未声明采集范围';
+}
+
+function capabilityStatusLabel(status: CapabilityCatalogItem['record']['status']): string {
+  if (status === 'draft') return '草稿';
+  if (status === 'shadow') return '影子验证';
+  if (status === 'verified') return '已验证';
+  return '已分享';
+}
+
+function capabilityFailureMessage(error: unknown, fallback: string): string {
+  if (error instanceof RemoteRelayError) {
+    if (error.status === 401) return `${fallback}：工牌缺失、无效或已过期。`;
+    if (error.status === 403) return `${fallback}：当前工牌没有所需能力范围。`;
+    return `${fallback}：Relay 返回 ${error.code}。`;
+  }
+  if (error instanceof CapabilityInstallError) return `${fallback}：${error.message}`;
+  return `${fallback}：连接或可信边界不可用。`;
 }
 
 function KnowledgePanel({ query }: { query: string }) {
