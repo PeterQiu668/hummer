@@ -143,12 +143,21 @@ export class ApprovalPolicyStore {
     const authorization: ApprovalAuthorization = { ...decision, approved };
     const run = this.database.transaction(() => {
       const current = this.database.prepare(`
-        SELECT id, session_id, sequence, status, requested_at, resolved_at, payload_json FROM approvals WHERE id = ? AND session_id = ?
-      `).get<ApprovalRow>(input.approvalId, input.sessionId);
-      if (!current) throw new Error(`Approval ${input.approvalId} is not pending for session ${input.sessionId}`);
+        SELECT a.id, a.session_id, a.sequence, a.status, a.requested_at, a.resolved_at, a.payload_json
+        FROM approvals a
+        JOIN sessions s ON s.id = a.session_id
+        WHERE s.tenant_id = ? AND a.id = ? AND a.session_id = ?
+      `).get<ApprovalRow>(input.tenantId, input.approvalId, input.sessionId);
+      if (!current) throw new Error('Approval is unavailable in the current tenant');
       const payload = parsePayload(current.payload_json);
-      this.database.prepare(`
-        UPDATE approvals SET status = ?, resolved_at = ?, payload_json = ? WHERE id = ? AND session_id = ?
+      const updated = this.database.prepare(`
+        UPDATE approvals
+        SET status = ?, resolved_at = ?, payload_json = ?
+        WHERE id = ? AND session_id = ?
+          AND EXISTS (
+            SELECT 1 FROM sessions s
+            WHERE s.id = approvals.session_id AND s.tenant_id = ?
+          )
       `).run(
         approved ? 'approved' : 'declined',
         input.occurredAt,
@@ -160,7 +169,9 @@ export class ApprovalPolicyStore {
         }),
         input.approvalId,
         input.sessionId,
+        input.tenantId,
       );
+      if (updated.changes !== 1) throw new Error('Approval is unavailable in the current tenant');
       this.events.append({
         id: `evt_${randomUUID()}`,
         tenantId: input.tenantId,

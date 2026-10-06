@@ -48,7 +48,7 @@ describe('ApprovalPolicyStore', () => {
     });
 
     expect(result).toEqual(expect.objectContaining({ approved: true, approverActorRef: 'human:owner' }));
-    expect(persistence.listApprovals('ses_policy')[0].status).toBe('approved');
+    expect(persistence.listApprovals('tenant_demo', 'ses_policy')[0].status).toBe('approved');
     expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 2 });
     persistence.close();
   });
@@ -62,7 +62,7 @@ describe('ApprovalPolicyStore', () => {
     persistence.runtimeEvents.save({ sessionId: 'ses_deny', sequence: 1, occurredAt: '2026-08-28T09:10:01.000Z', actorRef: 'employee_m-1', type: 'approval_required', approvalId: 'apr_deny', tool: 'shell.command', evidenceRefs: [] }, { tenantId: 'tenant_demo', runtimeId: 'codex-cli', correlationId: 'corr_ses_deny' });
 
     expect(persistence.approvalPolicies.authorize({ tenantId: 'tenant_demo', sessionId: 'ses_deny', approvalId: 'apr_deny', action: 'shell.command', requestedBy: 'employee_m-1', estimatedCostCny: null, approverActorRef: 'human:other', approved: true, occurredAt: '2026-08-28T09:10:02.000Z' }).approved).toBe(false);
-    expect(persistence.listApprovals('ses_deny')[0].status).toBe('declined');
+    expect(persistence.listApprovals('tenant_demo', 'ses_deny')[0].status).toBe('declined');
     expect(persistence.approvalPolicies.getEvidence('tenant_demo', 'ses_deny', 'apr_deny')).toMatchObject({ decisionEventType: 'approval.denied' });
     persistence.close();
   });
@@ -86,7 +86,7 @@ describe('ApprovalPolicyStore', () => {
     }, { tenantId: 'tenant_demo', runtimeId: 'codex-cli', correlationId: 'corr_ses_reject' });
 
     expect(authorization.approved).toBe(false);
-    expect(persistence.listApprovals('ses_reject')).toEqual([expect.objectContaining({ id: 'apr_reject', status: 'declined' })]);
+    expect(persistence.listApprovals('tenant_demo', 'ses_reject')).toEqual([expect.objectContaining({ id: 'apr_reject', status: 'declined' })]);
     expect(persistence.approvalPolicies.getEvidence('tenant_demo', 'ses_reject', 'apr_reject')).toMatchObject({
       status: 'declined', action: 'file.write.report', requestedBy: 'employee_m-1', estimatedCostCny: 8,
       policyId: 'tenant_demo_policy_file_write', decisionEventType: 'approval.rejected', decisionActorRef: 'account_owner',

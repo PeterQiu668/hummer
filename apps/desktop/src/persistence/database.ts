@@ -205,19 +205,22 @@ export class DesktopPersistence {
     throw new Error('Domain events are append-only and cannot be replaced');
   }
 
-  getSession(sessionId: string): SessionProjection | undefined {
+  getSession(tenantId: string, sessionId: string): SessionProjection | undefined {
     const row = this.database.prepare(`
       SELECT id, tenant_id, work_order_id, runtime_id, status, started_at, ended_at, last_sequence
-      FROM sessions WHERE id = ?
-    `).get<SessionRow>(sessionId);
+      FROM sessions WHERE tenant_id = ? AND id = ?
+    `).get<SessionRow>(tenantId, sessionId);
     return row ? mapSession(row) : undefined;
   }
 
-  listApprovals(sessionId: string): ApprovalProjection[] {
+  listApprovals(tenantId: string, sessionId: string): ApprovalProjection[] {
     return this.database.prepare(`
-      SELECT id, session_id, sequence, status, requested_at, resolved_at
-      FROM approvals WHERE session_id = ? ORDER BY sequence
-    `).all<ApprovalRow>(sessionId).map((row) => ({
+      SELECT a.id, a.session_id, a.sequence, a.status, a.requested_at, a.resolved_at
+      FROM approvals a
+      JOIN sessions s ON s.id = a.session_id
+      WHERE s.tenant_id = ? AND a.session_id = ?
+      ORDER BY a.sequence
+    `).all<ApprovalRow>(tenantId, sessionId).map((row) => ({
       id: row.id,
       sessionId: row.session_id,
       sequence: row.sequence,
@@ -227,11 +230,11 @@ export class DesktopPersistence {
     }));
   }
 
-  listResultPackages(sessionId: string): ResultPackageProjection[] {
+  listResultPackages(tenantId: string, sessionId: string): ResultPackageProjection[] {
     return this.database.prepare(`
       SELECT id, tenant_id, session_id, work_order_id, status, created_at
-      FROM result_packages WHERE session_id = ? ORDER BY created_at, id
-    `).all<ResultPackageRow>(sessionId).map((row) => ({
+      FROM result_packages WHERE tenant_id = ? AND session_id = ? ORDER BY created_at, id
+    `).all<ResultPackageRow>(tenantId, sessionId).map((row) => ({
       id: row.id,
       tenantId: row.tenant_id,
       sessionId: row.session_id,
@@ -241,8 +244,8 @@ export class DesktopPersistence {
     }));
   }
 
-  listEvidence(sessionId: string): StoredEvidence[] {
-    return this.evidence.listBySession(sessionId);
+  listEvidence(tenantId: string, sessionId: string): StoredEvidence[] {
+    return this.evidence.listBySession(tenantId, sessionId);
   }
 }
 

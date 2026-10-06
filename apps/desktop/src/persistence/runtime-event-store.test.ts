@@ -31,7 +31,7 @@ describe('RuntimeEvent persistence', () => {
     persistence.close();
 
     const reopened = openPersistence({ dataDirectory: directory });
-    expect(reopened.runtimeEvents.listSessions()).toEqual([expect.objectContaining({
+    expect(reopened.runtimeEvents.listSessions('tenant_demo')).toEqual([expect.objectContaining({
       sessionId: 'ses_descriptor',
       plan: { id: 'plan_1', prompt: 'persist me' },
       handle: { runtimeId: 'codex-cli', sessionId: 'ses_descriptor', nativeSessionId: 'thread_1' },
@@ -63,8 +63,8 @@ describe('RuntimeEvent persistence', () => {
       correlationId: 'corr_runtime_001',
     });
 
-    expect(persistence.runtimeEvents.listBySession(event.sessionId)).toEqual([event]);
-    expect(persistence.runtimeEvents.listBySession(event.sessionId, { afterSequence: 1 })).toEqual([]);
+    expect(persistence.runtimeEvents.listBySession('tenant_demo', event.sessionId)).toEqual([event]);
+    expect(persistence.runtimeEvents.listBySession('tenant_demo', event.sessionId, { afterSequence: 1 })).toEqual([]);
     expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
     persistence.close();
   });
@@ -92,8 +92,8 @@ describe('RuntimeEvent persistence', () => {
     persistence.runtimeEvents.save(event, options);
     persistence.runtimeEvents.save(event, options);
 
-    expect(persistence.runtimeEvents.listBySession(event.sessionId)).toHaveLength(1);
-    expect(persistence.listApprovals(event.sessionId)).toMatchObject([
+    expect(persistence.runtimeEvents.listBySession('tenant_demo', event.sessionId)).toHaveLength(1);
+    expect(persistence.listApprovals('tenant_demo', event.sessionId)).toMatchObject([
       { id: 'apr_001', status: 'pending', sessionId: event.sessionId, sequence: 7 },
     ]);
     expect(() => persistence.runtimeEvents.save({ ...event, result: '冲突内容' }, options)).toThrow(/conflicting runtime event/i);
@@ -127,10 +127,10 @@ describe('RuntimeEvent persistence', () => {
     persistence.close();
 
     const reopened = openPersistence({ dataDirectory: directory });
-    expect(reopened.runtimeEvents.listBySession('ses_restart')).toHaveLength(4);
-    expect(reopened.getSession('ses_restart')).toMatchObject({ status: 'delivered', runtimeId: 'codex-cli' });
-    expect(reopened.listApprovals('ses_restart')).toMatchObject([{ id: 'apr_restart', status: 'approved' }]);
-    expect(reopened.listResultPackages('ses_restart')).toMatchObject([{ sessionId: 'ses_restart', status: 'delivered' }]);
+    expect(reopened.runtimeEvents.listBySession('tenant_demo', 'ses_restart')).toHaveLength(4);
+    expect(reopened.getSession('tenant_demo', 'ses_restart')).toMatchObject({ status: 'delivered', runtimeId: 'codex-cli' });
+    expect(reopened.listApprovals('tenant_demo', 'ses_restart')).toMatchObject([{ id: 'apr_restart', status: 'approved' }]);
+    expect(reopened.listResultPackages('tenant_demo', 'ses_restart')).toMatchObject([{ sessionId: 'ses_restart', status: 'delivered' }]);
     reopened.close();
   });
 
@@ -154,11 +154,11 @@ describe('RuntimeEvent persistence', () => {
     }, { tenantId: 'tenant_demo', runtimeId: 'mock-runtime', correlationId: 'corr_mock' });
 
     expect(persistence.runtimeEvents.interruptStaleRealSessions('2026-08-28T10:05:00.000Z')).toBe(1);
-    expect(persistence.runtimeEvents.listBySession('ses_stale_real')).toEqual([
+    expect(persistence.runtimeEvents.listBySession('tenant_demo', 'ses_stale_real')).toEqual([
       expect.objectContaining({ sequence: 1, evidenceRefs: ['evidence://sha256/kept'] }),
       expect.objectContaining({ sequence: 2, type: 'status', status: 'interrupted' }),
     ]);
-    expect(persistence.getSession('ses_stale_real')).toMatchObject({ status: 'interrupted', lastSequence: 2 });
+    expect(persistence.getSession('tenant_demo', 'ses_stale_real')).toMatchObject({ status: 'interrupted', lastSequence: 2 });
     expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 3 });
     persistence.close();
   });
@@ -181,9 +181,9 @@ describe('RuntimeEvent persistence', () => {
     persistence.runtimeEvents.save({ ...required, sessionId: 'ses_fork' }, options);
     persistence.runtimeEvents.save({ ...resolved, sessionId: 'ses_fork' }, options);
 
-    expect(persistence.runtimeEvents.listBySession('ses_fork')).toHaveLength(2);
-    expect(persistence.listApprovals('ses_source')).toMatchObject([{ id: 'apr_shared', status: 'approved' }]);
-    expect(persistence.listApprovals('ses_fork')).toEqual([]);
+    expect(persistence.runtimeEvents.listBySession('tenant_demo', 'ses_fork')).toHaveLength(2);
+    expect(persistence.listApprovals('tenant_demo', 'ses_source')).toMatchObject([{ id: 'apr_shared', status: 'approved' }]);
+    expect(persistence.listApprovals('tenant_demo', 'ses_fork')).toEqual([]);
     expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 4 });
     persistence.close();
   });

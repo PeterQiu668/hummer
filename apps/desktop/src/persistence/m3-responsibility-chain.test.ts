@@ -46,14 +46,14 @@ describe('M3 responsibility chain', () => {
 
       expect(authorization.approved).toBe(true);
       expect(persistence.organization.listDigitalEmployees('tenant_demo')[0].id).toBe(employeeId);
-      expect(persistence.runtimeEvents.listSessions()[0].plan).toMatchObject({ assignees: [employeeId] });
-      expect(persistence.runtimeEvents.listBySession(sessionId)).toEqual(expect.arrayContaining([
+      expect(persistence.runtimeEvents.listSessions('tenant_demo')[0].plan).toMatchObject({ assignees: [employeeId] });
+      expect(persistence.runtimeEvents.listBySession('tenant_demo', sessionId)).toEqual(expect.arrayContaining([
         expect.objectContaining({ actorRef: employeeId, type: 'approval_required' }),
         expect.objectContaining({ actorRef: employeeId, type: 'result' }),
       ]));
-      expect(persistence.listApprovals(sessionId)).toEqual([expect.objectContaining({ id: approvalId, status: 'approved' })]);
-      expect(persistence.listResultPackages(sessionId)).toEqual([expect.objectContaining({ sessionId, status: 'delivered' })]);
-      expect(persistence.getSession(sessionId)).toMatchObject({ status: 'delivered', lastSequence: 4 });
+      expect(persistence.listApprovals('tenant_demo', sessionId)).toEqual([expect.objectContaining({ id: approvalId, status: 'approved' })]);
+      expect(persistence.listResultPackages('tenant_demo', sessionId)).toEqual([expect.objectContaining({ sessionId, status: 'delivered' })]);
+      expect(persistence.getSession('tenant_demo', sessionId)).toMatchObject({ status: 'delivered', lastSequence: 4 });
       expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 6 });
     } finally {
       persistence.close();

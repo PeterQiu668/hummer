@@ -95,7 +95,7 @@ describe('structured task file', () => {
       payloadName: 'inbox/a.hummer-task.json', payload: parsed.payload,
     });
     expect(accepted).toMatchObject({ status: 'pending', workOrderId: null, payload: { assignee: '销售运营分身' } });
-    expect(persistence.runtimeEvents.listSessions().filter((session) => session.tenantId === owner.tenant.id)).toHaveLength(0);
+    expect(persistence.runtimeEvents.listSessions(owner.tenant.id)).toHaveLength(0);
 
     const rejected = persistence.workOrderIntakes.intake({
       tenantId: owner.tenant.id, source: 'folder', externalRef: 'folder:inbox/b.hummer-task.json:sha-b', actorRef,
