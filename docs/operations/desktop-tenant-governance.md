@@ -24,6 +24,11 @@ authorize tenant deletion.
   `governance.exportChainHead(tenantId, deviceId)`.
 - Hand the returned `{device_id,tenant_id,position,hash,at}` object to the
   approved agent-hub adapter for writing under its node report history.
+- Before handoff, run `npm run verify:tenant-export -- chain-head ...` as
+  documented in `docs/operations/tenant-export-verifier.md`. When advancing the
+  stable device projection, pass the previously trusted hash through
+  `--expected-current-hash`; rollback, forks, and tenant/device replacement are
+  rejected.
 - Never let agent-hub open, copy, or query a live `hummer.sqlite3`, `-wal`, or
   `-shm` file.
 
