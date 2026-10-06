@@ -33,6 +33,8 @@ interface MemberRow extends MembershipRow {
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+const IDENTITY_UNAVAILABLE = 'Identity is unavailable';
+const INVITATION_UNAVAILABLE = 'Invitation is invalid or unavailable';
 
 export class IdentityStore {
   private readonly events: DomainEventStore;
@@ -49,7 +51,7 @@ export class IdentityStore {
     const token = randomToken();
     return this.database.transaction(() => {
       const now = this.now().toISOString();
-      const account = this.findOrCreateAccount(input.displayName, input.email, input.phone, now);
+      const account = this.createAccount(input.displayName, input.email, input.phone, now);
       const tenant = { id: prefixedId('tenant'), name: input.companyName.trim(), slug: `${slugify(input.companyName)}-${randomUUID().slice(0, 8)}` };
       this.database.prepare(`
         INSERT INTO tenants (id, name, slug, status, created_at, updated_at)
@@ -104,20 +106,26 @@ export class IdentityStore {
         SELECT id, tenant_id, contact_type, contact_value, role, status, expires_at
         FROM invitations WHERE token_hash = ?
       `).get<InvitationRow>(digest(input.token));
-      if (!invitation || invitation.status !== 'pending') throw new Error('Invitation is invalid or already used');
+      if (!invitation || invitation.status !== 'pending') throw new Error(INVITATION_UNAVAILABLE);
       const now = this.now();
-      if (Date.parse(invitation.expires_at) <= now.getTime()) throw new Error('Invitation has expired');
+      if (Date.parse(invitation.expires_at) <= now.getTime()) throw new Error(INVITATION_UNAVAILABLE);
       const suppliedContact = invitation.contact_type === 'email' ? input.email : input.phone;
       if (!suppliedContact || normalizeContact(invitation.contact_type, suppliedContact) !== invitation.contact_value) {
-        throw new Error('Invitation contact does not match');
+        throw new Error(INVITATION_UNAVAILABLE);
       }
-      const account = this.findOrCreateAccount(input.displayName, input.email, input.phone, now.toISOString());
+      const account = this.findOrCreateInvitedAccount(invitation, input, now.toISOString());
       const tenant = this.requireTenant(invitation.tenant_id);
+      const existingMembership = this.database.prepare(`
+        SELECT id FROM memberships WHERE tenant_id = ? AND account_id = ?
+      `).get<{ id: string }>(tenant.id, account.id);
+      if (existingMembership) throw new Error(INVITATION_UNAVAILABLE);
       const membership = this.createMembership(tenant.id, account, invitation.role, now.toISOString());
       const session = this.insertSession(account.id, tenant.id, sessionToken, now.toISOString());
-      this.database.prepare(`
-        UPDATE invitations SET status = 'accepted', accepted_by_account_id = ?, accepted_at = ? WHERE id = ?
-      `).run(account.id, now.toISOString(), invitation.id);
+      const accepted = this.database.prepare(`
+        UPDATE invitations SET status = 'accepted', accepted_by_account_id = ?, accepted_at = ?
+        WHERE id = ? AND tenant_id = ? AND status = 'pending'
+      `).run(account.id, now.toISOString(), invitation.id, tenant.id);
+      if (accepted.changes !== 1) throw new Error(INVITATION_UNAVAILABLE);
       this.events.append({
         id: prefixedId('evt'), tenantId: tenant.id, aggregateType: 'invitation', aggregateId: invitation.id,
         type: 'invitation.accepted', occurredAt: now.toISOString(), actorRef: `account:${account.id}`,
@@ -220,19 +228,55 @@ export class IdentityStore {
     `).get<{ account_id: string; display_name: string }>(tenantId, humanUserId);
     return row ? { accountId: row.account_id, displayName: row.display_name } : undefined;
   }
-  private findOrCreateAccount(displayName: string, email: string | undefined, phone: string | undefined, now: string): AccountRecord {
+  private createAccount(displayName: string, email: string | undefined, phone: string | undefined, now: string): AccountRecord {
     const normalizedEmail = email ? normalizeContact('email', email) : null;
     const normalizedPhone = phone ? normalizeContact('phone', phone) : null;
-    const existing = normalizedEmail
-      ? this.database.prepare('SELECT id, email, phone, display_name FROM accounts WHERE email = ?').get<AccountRow>(normalizedEmail)
-      : this.database.prepare('SELECT id, email, phone, display_name FROM accounts WHERE phone = ?').get<AccountRow>(normalizedPhone);
-    if (existing) return mapAccount(existing);
+    if (this.findAccountByContact(normalizedEmail, normalizedPhone)) throw new Error(IDENTITY_UNAVAILABLE);
     const account = { id: prefixedId('account'), email: normalizedEmail, phone: normalizedPhone, displayName: displayName.trim() };
-    this.database.prepare(`
-      INSERT INTO accounts (id, email, phone, display_name, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'active', ?, ?)
-    `).run(account.id, account.email, account.phone, account.displayName, now, now);
+    try {
+      this.database.prepare(`
+        INSERT INTO accounts (id, email, phone, display_name, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'active', ?, ?)
+      `).run(account.id, account.email, account.phone, account.displayName, now, now);
+    } catch (error) {
+      if (isUniqueConstraint(error)) throw new Error(IDENTITY_UNAVAILABLE);
+      throw error;
+    }
     return account;
+  }
+
+  private findOrCreateInvitedAccount(
+    invitation: InvitationRow,
+    input: { displayName: string; email?: string; phone?: string },
+    now: string,
+  ): AccountRecord {
+    const normalizedEmail = input.email ? normalizeContact('email', input.email) : null;
+    const normalizedPhone = input.phone ? normalizeContact('phone', input.phone) : null;
+    const invitedAccount = invitation.contact_type === 'email'
+      ? this.findAccountByContact(invitation.contact_value, null)
+      : this.findAccountByContact(null, invitation.contact_value);
+    if (invitedAccount) {
+      if ((normalizedEmail && normalizedEmail !== invitedAccount.email)
+        || (normalizedPhone && normalizedPhone !== invitedAccount.phone)) {
+        throw new Error(INVITATION_UNAVAILABLE);
+      }
+      return invitedAccount;
+    }
+    if (this.findAccountByContact(normalizedEmail, normalizedPhone)) throw new Error(INVITATION_UNAVAILABLE);
+    try {
+      return this.createAccount(input.displayName, input.email, input.phone, now);
+    } catch (error) {
+      if (error instanceof Error && error.message === IDENTITY_UNAVAILABLE) throw new Error(INVITATION_UNAVAILABLE);
+      throw error;
+    }
+  }
+
+  private findAccountByContact(email: string | null, phone: string | null): AccountRecord | undefined {
+    const row = this.database.prepare(`
+      SELECT id, email, phone, display_name FROM accounts
+      WHERE (? IS NOT NULL AND email = ?) OR (? IS NOT NULL AND phone = ?)
+    `).get<AccountRow>(email, email, phone, phone);
+    return row ? mapAccount(row) : undefined;
   }
 
   private createMembership(tenantId: string, account: AccountRecord, role: MembershipRole, now: string): MembershipRecord {
@@ -306,6 +350,9 @@ function normalizeContact(type: 'email' | 'phone', value: string): string {
 }
 function randomToken(): string { return randomBytes(32).toString('base64url'); }
 function digest(value: string): string { return createHash('sha256').update(value).digest('hex'); }
+function isUniqueConstraint(error: unknown): boolean {
+  return error instanceof Error && /unique constraint failed/i.test(error.message);
+}
 function prefixedId(prefix: string): string { return `${prefix}_${randomUUID().replaceAll('-', '')}`; }
 function slugify(value: string): string {
   const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
