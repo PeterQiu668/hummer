@@ -1,4 +1,5 @@
 import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js';
+import { createHash } from 'node:crypto';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Static, TSchema } from '@sinclair/typebox';
 import {
@@ -76,24 +77,46 @@ function validateDecisionSemantics(
 }
 
 function validateVersionSemantics<T extends { packageVersion: number; supersedesVersion?: number }>(
-  input: T,
+  input: T & { previousPackageDigest?: string },
 ): CapabilityValidationResult<T> {
-  if (input.packageVersion === 1 && input.supersedesVersion !== undefined) {
-    return issue('/supersedesVersion is forbidden for the first package version', ['supersedesVersion']);
+  if (input.packageVersion === 1 &&
+      (input.supersedesVersion !== undefined || input.previousPackageDigest !== undefined)) {
+    return issue('/supersedesVersion and /previousPackageDigest are forbidden for the first package version', ['supersedesVersion']);
   }
-  if (input.packageVersion > 1 && input.supersedesVersion !== input.packageVersion - 1) {
-    return issue('/supersedesVersion must identify the immediately preceding version', ['supersedesVersion']);
+  if (input.packageVersion > 1 &&
+      (input.supersedesVersion !== input.packageVersion - 1 || input.previousPackageDigest === undefined)) {
+    return issue('/supersedesVersion and /previousPackageDigest must identify the immediately preceding version', ['supersedesVersion']);
   }
   return { value: input };
 }
 
 function validatePackageSemantics(pkg: CapabilityPackageV1): CapabilityValidationResult<CapabilityPackageV1> {
+  if (pkg.packageDigest !== computeCapabilityPackageDigest(pkg)) {
+    return issue('/packageDigest does not match the immutable package content', ['packageDigest']);
+  }
+  if (pkg.trialRecord.tenantId !== pkg.tenantId ||
+      pkg.trialRecord.packageId !== pkg.packageId ||
+      pkg.trialRecord.packageVersion !== pkg.packageVersion ||
+      pkg.trialRecord.packageDigest !== pkg.packageDigest) {
+    return issue('/trialRecord is not bound to this package identity and digest', ['trialRecord']);
+  }
+  if (pkg.trialRecord.trialIds.length !== pkg.trialRecord.shadowRuns) {
+    return issue('/trialRecord trialIds must account for every shadow run', ['trialRecord', 'trialIds']);
+  }
   if (pkg.trialRecord.success + pkg.trialRecord.failure !== pkg.trialRecord.shadowRuns) {
     return issue('/trialRecord success plus failure must equal shadowRuns', ['trialRecord']);
   }
   const capabilities = pkg.declaredPermissions.map((permission) => permission.capability);
   if (new Set(capabilities).size !== capabilities.length) {
     return issue('/declaredPermissions contains a duplicate capability', ['declaredPermissions']);
+  }
+  if (pkg.status === 'shared' && (
+    pkg.trialRecord.shadowRuns < 5 ||
+    pkg.trialRecord.success !== pkg.trialRecord.shadowRuns ||
+    pkg.trialRecord.failure !== 0 ||
+    !pkg.trialRecord.regressionPassed
+  )) {
+    return issue('/shared package requires at least five unique successful shadow runs and a passing regression', ['status']);
   }
   const versionValidation = validateVersionSemantics(pkg);
   return versionValidation.issues ? versionValidation : { value: pkg };
@@ -108,8 +131,25 @@ function validateShareSemantics(share: TeamReadOnlyShare): CapabilityValidationR
   if (share.package.tenantId !== share.sourceTenantId) {
     return issue('/sourceTenantId must match the package tenant', ['sourceTenantId']);
   }
-  if (share.targetTenantId !== share.sourceTenantId && !share.invitationRef) {
-    return issue('/invitationRef is required for a cross-tenant team share', ['invitationRef']);
+  if (share.packageId !== share.package.packageId ||
+      share.packageVersion !== share.package.packageVersion ||
+      share.packageDigest !== share.package.packageDigest) {
+    return issue('/share package identity and digest do not match the embedded package', ['packageDigest']);
+  }
+  if (share.shareDigest !== computeTeamReadOnlyShareDigest(share)) {
+    return issue('/shareDigest does not match the share payload', ['shareDigest']);
+  }
+  if (share.targetTenantId !== share.sourceTenantId) {
+    const invitation = share.invitation;
+    if (!invitation ||
+        invitation.sourceTenantId !== share.sourceTenantId ||
+        invitation.targetTenantId !== share.targetTenantId ||
+        invitation.packageId !== share.packageId ||
+        invitation.packageVersion !== share.packageVersion ||
+        invitation.packageDigest !== share.packageDigest ||
+        invitation.expiresAt <= share.sharedAt) {
+      return issue('/invitation must be accepted, unexpired, and bound to the exact cross-tenant share', ['invitation']);
+    }
   }
   return { value: share };
 }
@@ -146,6 +186,22 @@ export function validateCapabilityContract<Name extends CapabilityContractName>(
       >;
       if (gate.targetTenantId !== gate.share.targetTenantId) {
         return issue('/targetTenantId must match the share target tenant', ['targetTenantId']) as CapabilityValidationResult<
+          Static<(typeof CapabilityContractSchemas)[Name]>
+        >;
+      }
+      if (gate.shareDigest !== gate.share.shareDigest) {
+        return issue('/shareDigest must match the verified share', ['shareDigest']) as CapabilityValidationResult<
+          Static<(typeof CapabilityContractSchemas)[Name]>
+        >;
+      }
+      if (gate.share.targetTenantId !== gate.share.sourceTenantId &&
+          (!gate.share.invitation || gate.share.invitation.expiresAt <= gate.evaluatedAt)) {
+        return issue('/share invitation must remain valid at install evaluation time', ['share', 'invitation']) as CapabilityValidationResult<
+          Static<(typeof CapabilityContractSchemas)[Name]>
+        >;
+      }
+      if (gate.requestDigest !== computeCapabilityInstallRequestDigest(gate)) {
+        return issue('/requestDigest does not match the install gate request', ['requestDigest']) as CapabilityValidationResult<
           Static<(typeof CapabilityContractSchemas)[Name]>
         >;
       }
@@ -197,7 +253,7 @@ export type CapabilityVersionAppendDecision =
   | { allowed: true }
   | {
       allowed: false;
-      reason: 'invalid_candidate' | 'invalid_existing' | 'identity_mismatch' | 'version_already_exists' | 'version_not_next';
+      reason: 'invalid_candidate' | 'invalid_existing' | 'identity_mismatch' | 'version_already_exists' | 'version_not_next' | 'digest_chain_mismatch';
     };
 
 /** Enforces append-only package versions. Existing records are never mutated. */
@@ -229,13 +285,25 @@ export function evaluateCapabilityVersionAppend(
       [...Array(latest).keys()].some((index) => !existingVersions.has(index + 1))) {
     return { allowed: false, reason: 'invalid_existing' };
   }
+  const ordered = [...acceptedExisting].sort((left, right) => left.packageVersion - right.packageVersion);
+  if (ordered.some((item, index) => index === 0
+    ? item.previousPackageDigest !== undefined
+    : item.previousPackageDigest !== ordered[index - 1]!.packageDigest)) {
+    return { allowed: false, reason: 'digest_chain_mismatch' };
+  }
   if (next.packageVersion !== latest + 1 || (latest > 0 && next.supersedesVersion !== latest)) {
     return { allowed: false, reason: 'version_not_next' };
+  }
+  if (latest > 0 && next.previousPackageDigest !== ordered.at(-1)!.packageDigest) {
+    return { allowed: false, reason: 'digest_chain_mismatch' };
   }
   return { allowed: true };
 }
 
-export function createTrialRecordFromSystemTrials(trials: readonly unknown[]): TrialRecord {
+export function createTrialRecordFromSystemTrials(
+  trials: readonly unknown[],
+  regression: { passed: boolean; evidenceDigest: string },
+): TrialRecord {
   if (trials.length === 0) throw new Error('at least one system-recorded SkillTrial is required');
 
   const accepted = trials.map((trial) => {
@@ -247,23 +315,38 @@ export function createTrialRecordFromSystemTrials(trials: readonly unknown[]): T
   if (accepted.some((trial) =>
     trial.tenantId !== first.tenantId ||
     trial.packageId !== first.packageId ||
-    trial.packageVersion !== first.packageVersion
+    trial.packageVersion !== first.packageVersion ||
+    trial.packageDigest !== first.packageDigest
   )) {
     throw new Error('SkillTrial records must belong to one tenant and package version');
   }
   if (accepted.some((trial) => trial.mode !== 'shadow')) {
     throw new Error('TrialRecord shadowRuns can only aggregate shadow SkillTrial records');
   }
+  const trialIds = accepted.map((trial) => trial.trialId);
+  if (new Set(trialIds).size !== trialIds.length) {
+    throw new Error('SkillTrial trialId values must be unique');
+  }
+  if (!/^[a-f0-9]{64}$/.test(regression.evidenceDigest)) {
+    throw new Error('regression evidence digest must be a lowercase SHA-256 digest');
+  }
 
   const environments = [...new Map(
     accepted.map((trial) => [JSON.stringify(trial.environment), trial.environment]),
   ).values()];
   return {
+    tenantId: first.tenantId,
+    packageId: first.packageId,
+    packageVersion: first.packageVersion,
+    packageDigest: first.packageDigest,
+    trialIds,
     shadowRuns: accepted.length,
     success: accepted.filter((trial) => trial.ok).length,
     failure: accepted.filter((trial) => !trial.ok).length,
     lastRunAt: accepted.reduce((latest, trial) => trial.endedAt > latest ? trial.endedAt : latest, first.endedAt),
     environments,
+    regressionPassed: regression.passed,
+    regressionEvidenceDigest: regression.evidenceDigest,
   };
 }
 
@@ -277,14 +360,20 @@ export function assessCapabilityInstallGate(input: unknown): InstallGateAssessme
   if (validated.issues) return { allowed: false, reasons: ['invalid_contract'] };
   const gate = validated.value;
   const reasons: string[] = [];
-  if (!gate.staticCheck.passed || gate.staticCheck.findings.length > 0) reasons.push('static_check_failed');
-  if (!gate.sourceVerification.provenanceVerified) reasons.push('provenance_unverified');
-  if (!gate.sourceVerification.receiptVerified) reasons.push('receipt_unverified');
-  if (!gate.sourceVerification.digestVerified) reasons.push('digest_unverified');
+  if (gate.staticCheck.status !== 'passed' || gate.staticCheck.findings.length > 0) reasons.push('static_check_failed');
+  if (gate.sourceVerification.provenance.status !== 'passed') reasons.push('provenance_unverified');
+  if (gate.sourceVerification.receipt.status !== 'passed') reasons.push('receipt_unverified');
+  if (gate.sourceVerification.packageDigest.status !== 'passed') reasons.push('digest_unverified');
+  if (gate.share.targetTenantId !== gate.share.sourceTenantId &&
+      gate.sourceVerification.invitation?.status !== 'passed') reasons.push('invitation_unverified');
+  if (gate.sourceVerification.regression.status !== 'passed') reasons.push('regression_unverified');
   if (gate.permissionReview.deniedPermissions.length > 0) reasons.push('permission_denied');
 
-  const permissionKey = (permission: CapabilityPackageV1['declaredPermissions'][number]) =>
-    `${permission.capability}\u0000${permission.access}\u0000${[...permission.paths].sort().join('\u0000')}`;
+  const permissionKey = (permission: CapabilityPackageV1['declaredPermissions'][number]) => canonicalJson({
+    capability: permission.capability,
+    access: permission.access,
+    paths: [...permission.paths].sort(),
+  });
   const declared = new Set(gate.share.package.declaredPermissions.map(permissionKey));
   const approved = new Set(gate.permissionReview.approvedPermissions.map(permissionKey));
   if (declared.size !== approved.size || [...declared].some((permission) => !approved.has(permission))) {
@@ -311,6 +400,42 @@ export function createCapabilityInstallGateDecision(input: unknown): CapabilityI
     decision: assessment.allowed ? 'approved' : 'denied',
     reasons: assessment.reasons,
     packageDigest: gate.share.packageDigest,
+    shareDigest: gate.shareDigest,
+    requestDigest: gate.requestDigest,
+    decidedBy: 'system:capability-install-gate',
     evaluatedAt: gate.evaluatedAt,
   };
+}
+
+export function computeCapabilityPackageDigest(
+  value: CapabilityPackageAuthorInput | CapabilityPackageV1,
+): string {
+  const record = value as unknown as Record<string, unknown>;
+  const immutable = Object.fromEntries(Object.entries(record).filter(([key]) => ![
+    'schema', 'status', 'deletionAudit', 'trialRecord', 'packageDigest',
+  ].includes(key)));
+  return sha256(canonicalJson(immutable));
+}
+
+export function computeTeamReadOnlyShareDigest(value: TeamReadOnlyShare): string {
+  const { shareDigest: _shareDigest, ...payload } = value;
+  return sha256(canonicalJson(payload));
+}
+
+export function computeCapabilityInstallRequestDigest(value: CapabilityInstallGateInput): string {
+  const { requestDigest: _requestDigest, ...payload } = value;
+  return sha256(canonicalJson(payload));
+}
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }

@@ -9,6 +9,9 @@ import {
   CapabilityPackageV1StandardSchema,
   createCapabilityInstallGateDecision,
   createTrialRecordFromSystemTrials,
+  computeCapabilityInstallRequestDigest,
+  computeCapabilityPackageDigest,
+  computeTeamReadOnlyShareDigest,
   evaluateCapabilityVersionAppend,
   SkillTrialSystemRecordInputStandardSchema,
   TeamReadOnlyShareStandardSchema,
@@ -31,7 +34,10 @@ function authorInput(version = 1): CapabilityPackageAuthorInput {
     tenantId: 'tenant-a',
     packageId: 'cap-research',
     packageVersion: version,
-    ...(version > 1 ? { supersedesVersion: version - 1 } : {}),
+    ...(version > 1 ? {
+      supersedesVersion: version - 1,
+      previousPackageDigest: packageV1(version - 1, 'verified').packageDigest,
+    } : {}),
     title: 'Research synthesis',
     goal: 'Produce an evidence-grounded synthesis.',
     preset: 'expert-work',
@@ -79,13 +85,15 @@ function authorInput(version = 1): CapabilityPackageAuthorInput {
 }
 
 function systemTrial(overrides: Partial<SkillTrialSystemRecordInput> = {}): SkillTrialSystemRecordInput {
+  const packageVersion = overrides.packageVersion ?? 1;
   return {
     schema: 'hummer.skill-trial-system-record-input',
     version: 1,
     tenantId: 'tenant-a',
     trialId: 'trial-1',
     packageId: 'cap-research',
-    packageVersion: 1,
+    packageVersion,
+    packageDigest: computeCapabilityPackageDigest(authorInput(packageVersion)),
     recordedBy: 'system:skill-trial',
     mode: 'shadow',
     ok: true,
@@ -105,45 +113,73 @@ function systemTrial(overrides: Partial<SkillTrialSystemRecordInput> = {}): Skil
 
 function packageV1(version = 1, status: CapabilityPackageV1['status'] = 'shared'): CapabilityPackageV1 {
   const input = authorInput(version);
+  const packageDigest = computeCapabilityPackageDigest(input);
   return {
     ...input,
     schema: 'hummer.capability-package',
     status,
+    packageDigest,
     trialRecord: {
-      shadowRuns: 1,
-      success: 1,
+      tenantId: input.tenantId,
+      packageId: input.packageId,
+      packageVersion: input.packageVersion,
+      packageDigest,
+      trialIds: ['trial-1', 'trial-2', 'trial-3', 'trial-4', 'trial-5'],
+      shadowRuns: 5,
+      success: 5,
       failure: 0,
       lastRunAt: at,
       environments: [systemTrial({ packageVersion: version }).environment],
+      regressionPassed: true,
+      regressionEvidenceDigest: digest,
     },
   };
 }
 
 function share(): TeamReadOnlyShare {
-  return {
+  const pkg = packageV1();
+  const value: TeamReadOnlyShare = {
     schema: 'hummer.capability-team-share',
     version: 1,
     shareId: 'share-1',
     sourceTenantId: 'tenant-a',
     targetTenantId: 'tenant-b',
-    invitationRef: 'invite-1',
+    packageId: pkg.packageId,
+    packageVersion: pkg.packageVersion,
+    invitation: {
+      invitationId: 'invite-1',
+      sourceTenantId: 'tenant-a',
+      targetTenantId: 'tenant-b',
+      packageId: pkg.packageId,
+      packageVersion: pkg.packageVersion,
+      packageDigest: pkg.packageDigest,
+      status: 'accepted',
+      expiresAt: '2026-10-08T01:00:00Z',
+      evidenceDigest: digest,
+    },
     access: 'read_only',
     allowEdit: false,
     allowCopyToTenant: false,
-    packageDigest: digest,
-    package: packageV1(),
+    packageDigest: pkg.packageDigest,
+    shareDigest: digest,
+    package: pkg,
     sharedByActorRef: 'human:alice',
     sharedAt: at,
   };
+  value.shareDigest = computeTeamReadOnlyShareDigest(value);
+  return value;
 }
 
 function gateInput(): CapabilityInstallGateInput {
   const fileDigest = digest;
-  return {
+  const value: CapabilityInstallGateInput = {
     schema: 'hummer.capability-install-gate-input',
     version: 1,
     gateId: 'gate-1',
     share: share(),
+    recordedBy: 'system:capability-install-gate',
+    requestDigest: digest,
+    shareDigest: share().shareDigest,
     exportDescriptor: {
       format: 'agent-skills',
       installEntry: 'manifest.json',
@@ -163,18 +199,29 @@ function gateInput(): CapabilityInstallGateInput {
     },
     targetTenantId: 'tenant-b',
     requestedByActorRef: 'human:bob',
-    staticCheck: { passed: true, findings: [] },
+    staticCheck: { status: 'passed', evidenceDigest: digest, findings: [] },
     permissionReview: {
       approvedPermissions: [{ capability: 'network.read', access: 'read', paths: [] }],
       deniedPermissions: [],
+      evidenceDigest: digest,
     },
     sourceVerification: {
-      provenanceVerified: true,
-      receiptVerified: true,
-      digestVerified: true,
+      provenance: { status: 'passed', evidenceDigest: digest },
+      receipt: { status: 'passed', evidenceDigest: digest },
+      packageDigest: { status: 'passed', evidenceDigest: digest },
+      invitation: { status: 'passed', evidenceDigest: digest },
+      regression: { status: 'passed', evidenceDigest: digest },
     },
     evaluatedAt: at,
   };
+  value.requestDigest = computeCapabilityInstallRequestDigest(value);
+  return value;
+}
+
+function gateWith(overrides: Partial<CapabilityInstallGateInput>): CapabilityInstallGateInput {
+  const value = { ...gateInput(), ...overrides } as CapabilityInstallGateInput;
+  value.requestDigest = computeCapabilityInstallRequestDigest(value);
+  return value;
 }
 
 const standards = {
@@ -267,22 +314,28 @@ describe('[CAPABILITY-TRIAL-SYSTEM-ONLY] trial provenance and aggregation', () =
     const result = createTrialRecordFromSystemTrials([
       systemTrial(),
       systemTrial({ trialId: 'trial-2', ok: false, failureStepRef: 'step-2', endedAt: '2026-10-07T01:05:00Z' }),
-    ]);
+    ], { passed: false, evidenceDigest: digest });
     expect(result).toMatchObject({ shadowRuns: 2, success: 1, failure: 1, lastRunAt: '2026-10-07T01:05:00Z' });
     expect(result.environments).toHaveLength(1);
   });
 
   it('refuses empty, cross-tenant and cross-version trial aggregation', () => {
-    expect(() => createTrialRecordFromSystemTrials([])).toThrow('at least one');
+    expect(() => createTrialRecordFromSystemTrials([], { passed: true, evidenceDigest: digest })).toThrow('at least one');
     expect(() => createTrialRecordFromSystemTrials([
       systemTrial(), systemTrial({ trialId: 'trial-2', tenantId: 'tenant-b' }),
-    ])).toThrow('one tenant and package version');
+    ], { passed: true, evidenceDigest: digest })).toThrow('one tenant and package version');
     expect(() => createTrialRecordFromSystemTrials([
       systemTrial(), systemTrial({ trialId: 'trial-2', packageVersion: 2 }),
-    ])).toThrow('one tenant and package version');
+    ], { passed: true, evidenceDigest: digest })).toThrow('one tenant and package version');
     expect(() => createTrialRecordFromSystemTrials([
       systemTrial({ mode: 'live', liveApprovalRef: 'approval-1' }),
-    ])).toThrow('shadow SkillTrial');
+    ], { passed: true, evidenceDigest: digest })).toThrow('shadow SkillTrial');
+    expect(() => createTrialRecordFromSystemTrials([
+      systemTrial(), systemTrial(),
+    ], { passed: true, evidenceDigest: digest })).toThrow('trialId values must be unique');
+    expect(() => createTrialRecordFromSystemTrials([
+      systemTrial(), systemTrial({ trialId: 'trial-2', packageDigest: 'b'.repeat(64) }),
+    ], { passed: true, evidenceDigest: digest })).toThrow('one tenant and package version');
   });
 
   it('rejects a fabricated aggregate count and missing shared trust fields', () => {
@@ -297,6 +350,36 @@ describe('[CAPABILITY-TRIAL-SYSTEM-ONLY] trial provenance and aggregation', () =
       const invalid = copy(packageV1()) as Record<string, unknown>;
       delete invalid[field];
       expect(validateCapabilityContract('CapabilityPackageV1', invalid), field).toHaveProperty('issues');
+    }
+  });
+
+  it('binds aggregate trials to one package digest and enforces the shared promotion threshold', () => {
+    const transplanted = copy(packageV1());
+    transplanted.tenantId = 'tenant-b';
+    transplanted.packageDigest = computeCapabilityPackageDigest(transplanted);
+    expect(validateCapabilityContract('CapabilityPackageV1', transplanted)).toHaveProperty('issues');
+
+    for (const trialRecord of [
+      { ...packageV1().trialRecord, trialIds: ['trial-1'], shadowRuns: 1, success: 1 },
+      { ...packageV1().trialRecord, success: 4, failure: 1 },
+      { ...packageV1().trialRecord, regressionPassed: false },
+    ]) {
+      expect(validateCapabilityContract('CapabilityPackageV1', {
+        ...packageV1(), trialRecord,
+      })).toHaveProperty('issues');
+    }
+  });
+
+  it('rejects absolute, traversal, empty-segment, backslash and control-character paths', () => {
+    for (const path of [
+      'C:/secret', '/secret', '../secret', 'safe/../secret', 'safe//secret', 'safe\\secret', 'safe/\u0000secret',
+      'foo/C:/bar', 'name<bad', 'name>bad', 'name:bad', 'name"bad', 'name|bad', 'name?bad', 'name*bad',
+      'trailing.', 'trailing ', 'safe/trailing.', 'CON', 'con.txt', 'PRN', 'AUX.log', 'NUL.txt', 'COM1', 'com9.log',
+      'LPT1', 'lpt9.txt',
+    ]) {
+      const invalid = copy(authorInput()) as CapabilityPackageAuthorInput;
+      invalid.sourceBoundary.includePaths = [path];
+      expect(validateCapabilityContract('CapabilityPackageAuthorInput', invalid), path).toHaveProperty('issues');
     }
   });
 });
@@ -323,6 +406,9 @@ describe('[CAPABILITY-VERSION-APPEND-ONLY] package versions are immutable', () =
     expect(evaluateCapabilityVersionAppend([packageV1(2)], authorInput(3))).toEqual({
       allowed: false, reason: 'invalid_existing',
     });
+    expect(evaluateCapabilityVersionAppend([packageV1(1)], {
+      ...authorInput(2), previousPackageDigest: 'b'.repeat(64),
+    })).toEqual({ allowed: false, reason: 'digest_chain_mismatch' });
   });
 });
 
@@ -339,12 +425,18 @@ describe('[CAPABILITY-TEAM-READ-ONLY] share and install gate', () => {
 
   it('requires an invitation for cross-tenant sharing but not same-tenant sharing', () => {
     const crossTenant = { ...share() };
-    delete (crossTenant as Partial<TeamReadOnlyShare>).invitationRef;
+    delete (crossTenant as Partial<TeamReadOnlyShare>).invitation;
     expect(validateCapabilityContract('TeamReadOnlyShare', crossTenant)).toHaveProperty('issues');
 
     const sameTenant = { ...share(), targetTenantId: 'tenant-a' };
-    delete (sameTenant as Partial<TeamReadOnlyShare>).invitationRef;
+    delete (sameTenant as Partial<TeamReadOnlyShare>).invitation;
+    sameTenant.shareDigest = computeTeamReadOnlyShareDigest(sameTenant);
     expect(validateCapabilityContract('TeamReadOnlyShare', sameTenant)).toHaveProperty('value');
+
+    const wrongTarget = copy(share());
+    wrongTarget.invitation!.targetTenantId = 'tenant-c';
+    wrongTarget.shareDigest = computeTeamReadOnlyShareDigest(wrongTarget);
+    expect(validateCapabilityContract('TeamReadOnlyShare', wrongTarget)).toHaveProperty('issues');
   });
 
   it('rejects edit, tenant-copy, public visibility, price and payment additions', () => {
@@ -366,13 +458,14 @@ describe('[CAPABILITY-TEAM-READ-ONLY] share and install gate', () => {
     });
 
     const invalidCases: Array<[Partial<CapabilityInstallGateInput>, string]> = [
-      [{ staticCheck: { passed: false, findings: [{ code: 'malware', message: 'blocked' }] } }, 'static_check_failed'],
-      [{ sourceVerification: { provenanceVerified: false, receiptVerified: true, digestVerified: true } }, 'provenance_unverified'],
-      [{ sourceVerification: { provenanceVerified: true, receiptVerified: false, digestVerified: true } }, 'receipt_unverified'],
-      [{ sourceVerification: { provenanceVerified: true, receiptVerified: true, digestVerified: false } }, 'digest_unverified'],
+      [{ staticCheck: { status: 'failed', evidenceDigest: digest, findings: [{ code: 'malware', message: 'blocked' }] } }, 'static_check_failed'],
+      [{ sourceVerification: { ...gateInput().sourceVerification, provenance: { status: 'failed', evidenceDigest: digest } } }, 'provenance_unverified'],
+      [{ sourceVerification: { ...gateInput().sourceVerification, receipt: { status: 'failed', evidenceDigest: digest } } }, 'receipt_unverified'],
+      [{ sourceVerification: { ...gateInput().sourceVerification, packageDigest: { status: 'failed', evidenceDigest: digest } } }, 'digest_unverified'],
       [{ permissionReview: {
         approvedPermissions: [],
         deniedPermissions: [{ capability: 'network.read', access: 'read', paths: [] }],
+        evidenceDigest: digest,
       } }, 'permission_denied'],
       [{ permissionReview: {
         approvedPermissions: [
@@ -380,14 +473,16 @@ describe('[CAPABILITY-TEAM-READ-ONLY] share and install gate', () => {
           { capability: 'filesystem.write', access: 'write', paths: ['outputs'] },
         ],
         deniedPermissions: [],
+        evidenceDigest: digest,
       } }, 'permission_declaration_mismatch'],
       [{ permissionReview: {
         approvedPermissions: [{ capability: 'network.read', access: 'egress', paths: [] }],
         deniedPermissions: [],
+        evidenceDigest: digest,
       } }, 'permission_declaration_mismatch'],
     ];
     for (const [override, reason] of invalidCases) {
-      const assessment = assessCapabilityInstallGate({ ...gateInput(), ...override });
+      const assessment = assessCapabilityInstallGate(gateWith(override));
       expect(assessment.allowed, reason).toBe(false);
       expect(assessment.reasons, reason).toContain(reason);
     }
@@ -403,6 +498,27 @@ describe('[CAPABILITY-TEAM-READ-ONLY] share and install gate', () => {
     expect(assessCapabilityInstallGate({
       ...gateInput(), share: { ...share(), access: 'write' },
     })).toEqual({ allowed: false, reasons: ['invalid_contract'] });
+    expect(assessCapabilityInstallGate({
+      ...gateInput(),
+      staticCheck: { passed: true, findings: [] },
+      sourceVerification: { provenanceVerified: true, receiptVerified: true, digestVerified: true },
+    })).toEqual({ allowed: false, reasons: ['invalid_contract'] });
+
+    expect(assessCapabilityInstallGate(gateWith({ evaluatedAt: '2026-10-09T01:00:00Z' }))).toEqual({
+      allowed: false, reasons: ['invalid_contract'],
+    });
+
+    const sameTenantShare = { ...share(), targetTenantId: 'tenant-a' };
+    delete (sameTenantShare as Partial<TeamReadOnlyShare>).invitation;
+    sameTenantShare.shareDigest = computeTeamReadOnlyShareDigest(sameTenantShare);
+    const sameTenantVerification = { ...gateInput().sourceVerification };
+    delete sameTenantVerification.invitation;
+    expect(assessCapabilityInstallGate(gateWith({
+      share: sameTenantShare,
+      shareDigest: sameTenantShare.shareDigest,
+      targetTenantId: 'tenant-a',
+      sourceVerification: sameTenantVerification,
+    }))).toEqual({ allowed: true, reasons: ['install_gate_passed'] });
   });
 
   it('requires the complete Agent Skills export and forbids unsafe bundle claims', () => {
