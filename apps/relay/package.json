@@ -1,0 +1,21 @@
+{
+  "name": "@hummer/relay",
+  "private": true,
+  "version": "0.1.0-alpha.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11"
+  }
+}
