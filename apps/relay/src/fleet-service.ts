@@ -1,6 +1,9 @@
 import {
   FleetRejectedError,
   type AuthenticatedFleetSession,
+  type ApprovalBundle,
+  type ApprovalDecisionRecord,
+  type ApprovalRequestRecord,
   type EnqueueResult,
   type EventResult,
   type FleetIngress,
@@ -29,6 +32,12 @@ function assertTenant(actual: string, expected: string, subject: string): void {
 function assertNode(session: AuthenticatedFleetSession, actual: string, subject: string): void {
   if (session.nodeId && session.nodeId !== actual) {
     throw new FleetRejectedError('lease_owner_mismatch', `${subject} node does not match the authenticated session`);
+  }
+}
+
+function assertActor(actual: string, expected: string, subject: string): void {
+  if (actual !== expected) {
+    throw new FleetRejectedError('actor_mismatch', `${subject} actor does not match the authenticated session`);
   }
 }
 
@@ -89,6 +98,54 @@ export class FleetService implements FleetIngress {
 
   async fail(session: AuthenticatedFleetSession, input: unknown): Promise<EventResult> {
     return this.ingestEvent(session, input, 'failed');
+  }
+
+  async requestApproval(
+    session: AuthenticatedFleetSession,
+    taskId: string,
+    input: unknown,
+  ): Promise<ApprovalRequestRecord> {
+    if (!taskId.trim()) throw new FleetRejectedError('invalid_transition', 'task id is required');
+    if (!session.nodeId) throw new FleetRejectedError('actor_mismatch', 'approval requests require a node-bound session');
+    const result = this.validators.approvalRequest.validate(input);
+    accepted(result);
+    assertTenant(result.meta.tenantId, session.tenantId, 'approval request');
+    assertNode(session, result.meta.nodeId, 'approval request');
+    assertActor(result.meta.requestedBy, session.actorRef, 'approval request');
+    return this.store.putApprovalRequest(session.tenantId, taskId, result.value, result.meta, this.isoNow());
+  }
+
+  async decideApproval(
+    session: AuthenticatedFleetSession,
+    requestId: string,
+    input: unknown,
+  ): Promise<ApprovalDecisionRecord> {
+    if (!requestId.trim()) throw new FleetRejectedError('approval_not_found', 'approval request id is required');
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('actor_mismatch', 'approval decisions require a human/account control session');
+    }
+    const result = this.validators.approvalDecision.validate(input);
+    accepted(result);
+    assertTenant(result.meta.tenantId, session.tenantId, 'approval decision');
+    if (result.meta.requestId !== requestId) {
+      throw new FleetRejectedError('approval_not_found', 'approval decision does not match the requested record');
+    }
+    assertActor(result.meta.deciderActorRef, session.actorRef, 'approval decision');
+    return this.store.putApprovalDecision(session.tenantId, result.value, result.meta, this.isoNow());
+  }
+
+  async consumeApproval(
+    session: AuthenticatedFleetSession,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+  ): Promise<ApprovalBundle> {
+    if (!taskId.trim() || !requestId.trim()) {
+      throw new FleetRejectedError('approval_not_found', 'task id and approval request id are required');
+    }
+    if (!session.nodeId) throw new FleetRejectedError('actor_mismatch', 'approval consumption requires a node-bound session');
+    assertNode(session, nodeId, 'approval consumption');
+    return this.store.consumeApprovalDecision(session.tenantId, nodeId, taskId, requestId, this.isoNow());
   }
 
   private async ingestEvent(

@@ -116,6 +116,35 @@ export class RelayHttpClient {
     return this.#request('POST', '/v1/tasks/fail', event, context);
   }
 
+  /** @param {string} taskId @param {unknown} request @param {TransportContext} context */
+  async submitApprovalRequest(taskId, request, context) {
+    const response = requireRecord(await this.#request(
+      'POST',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/approval-requests`,
+      request,
+      context,
+    ), 'approval request response');
+    return requireRecord(response.request, 'approval request record').request;
+  }
+
+  /** @param {string} requestId @param {unknown} decision */
+  async decideApproval(requestId, decision) {
+    const response = requireRecord(await this.#request(
+      'POST', `/v1/approval-requests/${segment(requestId)}/decision`, decision,
+    ), 'approval decision response');
+    return requireRecord(response.decision, 'approval decision record').decisionRecord;
+  }
+
+  /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
+  async consumeApprovalDecision(taskId, requestId, context) {
+    return this.#request(
+      'POST',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/approval-requests/${segment(requestId)}/consume`,
+      undefined,
+      context,
+    );
+  }
+
   /** Outcome receipts remain owned by HUMMER and are not persisted by Relay. */
   async submitReceipt() {}
 

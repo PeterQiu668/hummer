@@ -14,7 +14,7 @@ The implementation preserves these rules:
 
 - `NodeManifest`, claimed tasks, approval decisions, run events, and outcome receipts are all validated by the injected shared contract validator. Invalid data does not cross the transport boundary.
 - A valid claimed task is staged as `pending_confirmation`. Claiming never confirms or executes it.
-- Execution requires an unexpired capability grant with `task.execute` plus a shared-contract approval by a `human:*` or `account:*` actor for that exact claim and tenant. Its `grantedScope` must independently include an unexpired `task.execute` capability.
+- Execution requires an unexpired capability grant with `task.execute` plus a Relay-persisted shared-contract approval by a `human:*` or `account:*` actor for that exact claim and tenant. Its `grantedScope` must independently include an unexpired `task.execute` capability.
 - A terminal claim is never executed twice. Failures are reported and are not automatically retried.
 - The short-lived grant token is private process state. Status objects, probe output, exceptions, and documentation never include it.
 - Unknown claim fields, unknown runtime providers, unknown tools, missing scopes, expired grants, and non-human approvals fail closed.
@@ -38,13 +38,15 @@ A missing runtime is a normal reported state, not a silent fallback. An unknown 
 
 ## Heartbeat and transport port
 
-The heartbeat interval is restricted to 15–30 seconds. The injected `FleetTransport` supplies five operations:
+The heartbeat interval is restricted to 15–30 seconds. The injected `FleetTransport` supplies seven operations:
 
 - `sendHeartbeat(manifest, context)`
 - `claimTask(context)`
 - `reportClaimStatus(status, context)`
 - `submitRunEvent(event, context)`
 - `submitReceipt(receipt, context)`
+- `submitApprovalRequest(claimId, request, context)`
+- `consumeApprovalDecision(claimId, requestId, context)`
 
 `context` carries the node/tenant binding and the ephemeral grant token to the transport adapter. Adapters must redact the token and must not put it in logs, evidence, diagnostics, URLs, or argv. The Relay, not this skeleton, determines the 60-second offline projection and must exclude offline nodes from dispatch.
 
@@ -57,13 +59,23 @@ Relay claim (unknown bytes)
   -> exact local delivery wrapper validation
   -> injected TaskEnvelope contract validation
   -> pending_confirmation status
-  -> human ApprovalDecision contract validation
+  -> node badge appends the bound ApprovalRequest to Relay
+  -> human/account control badge appends immutable ApprovalDecision to Relay
+  -> node badge atomically reads/consumes the bound decision from Relay
+  -> ApprovalRequest and ApprovalDecision contract validation
   -> grant expiry/scope check
   -> injected executor exactly once
   -> injected RunEvent(s) and OutcomeReceipt transport
 ```
 
-`createSharedFleetContractValidator` now binds `NodeManifest`, `TaskEnvelope`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. The existing v1 outcome-receipt verifier remains an injected authority because OutcomeReceipt is not redefined as a sixth Fleet contract.
+`createSharedFleetContractValidator` now binds `NodeManifest`, `TaskEnvelope`, `ApprovalRequest`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. The existing v1 outcome-receipt verifier remains an injected authority because OutcomeReceipt is not redefined as a sixth Fleet contract.
+
+`confirmAndExecute(claimId)` deliberately has no decision parameter. It accepts
+only the request/decision bundle returned by the authenticated Relay consume
+route, revalidates both frozen contracts, and checks that the returned request
+is exactly the one staged for the pending claim. Passing a local decision is a
+hard error. SSE may wake polling or stop a claim, but it never carries approval
+authority or triggers execution.
 
 ## MCP tool facade
 

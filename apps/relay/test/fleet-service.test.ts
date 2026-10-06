@@ -7,6 +7,8 @@ import {
   type FleetObject,
   type FleetStore,
   type FleetValidators,
+  type ApprovalDecisionClaims,
+  type ApprovalRequestClaims,
   type HeartbeatClaims,
   type NodeClaims,
   type RunEventClaims,
@@ -18,6 +20,8 @@ const TENANT = 'tenant-a';
 const OTHER_TENANT = 'tenant-b';
 const NODE = 'node-a';
 const SESSION = { tenantId: TENANT, actorRef: 'human:owner' };
+const NODE_SESSION = { tenantId: TENANT, actorRef: `system:${NODE}`, nodeId: NODE };
+const CONTROL_SESSION = { tenantId: TENANT, actorRef: 'human:owner' };
 
 let currentTime = Date.parse('2026-10-07T00:00:00.000Z');
 const openStores: FleetStore[] = [];
@@ -75,6 +79,24 @@ const validators: FleetValidators = {
     type: value.type as RunEventClaims['type'],
     idempotencyKey: String(value.idempotencyKey),
   })),
+  approvalRequest: strict<ApprovalRequestClaims>('test.approval-request', [
+    'schema', 'requestId', 'tenantId', 'workOrderId', 'nodeId', 'runId', 'riskClass',
+    'action', 'target', 'requestedScope', 'expiresAt', 'requestedBy',
+  ], (value) => ({
+    requestId: String(value.requestId), tenantId: String(value.tenantId), workOrderId: String(value.workOrderId),
+    nodeId: String(value.nodeId), runId: String(value.runId), riskClass: String(value.riskClass),
+    action: String(value.action), target: String(value.target),
+    requestedScope: value.requestedScope as ApprovalRequestClaims['requestedScope'],
+    expiresAt: String(value.expiresAt), requestedBy: String(value.requestedBy),
+  })),
+  approvalDecision: strict<ApprovalDecisionClaims>('test.approval-decision', [
+    'schema', 'decisionId', 'requestId', 'tenantId', 'deciderActorRef', 'decidedAt', 'decision', 'grantedScope',
+  ], (value) => ({
+    decisionId: String(value.decisionId), requestId: String(value.requestId), tenantId: String(value.tenantId),
+    deciderActorRef: String(value.deciderActorRef), decidedAt: String(value.decidedAt),
+    decision: value.decision as ApprovalDecisionClaims['decision'],
+    ...(value.grantedScope ? { grantedScope: value.grantedScope as NonNullable<ApprovalDecisionClaims['grantedScope']> } : {}),
+  })),
 };
 
 function node(tenantIds = [TENANT]) {
@@ -116,6 +138,27 @@ function event(index: number, seq: number, type: RunEventClaims['type'], overrid
   };
 }
 
+function approvalRequest(index = 1, overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    schema: 'test.approval-request', requestId: `request-${index}`, tenantId: TENANT,
+    workOrderId: `work-${index}`, nodeId: NODE, runId: `run-${index}`, riskClass: 'write',
+    action: 'task.execute', target: `task-${index}`,
+    requestedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1 },
+    expiresAt: new Date(currentTime + 3_600_000).toISOString(), requestedBy: `system:${NODE}`,
+    ...overrides,
+  };
+}
+
+function approvalDecision(index = 1, overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    schema: 'test.approval-decision', decisionId: `decision-${index}`, requestId: `request-${index}`,
+    tenantId: TENANT, deciderActorRef: 'human:owner', decidedAt: new Date(currentTime).toISOString(),
+    decision: 'approved',
+    grantedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1, expiresAt: new Date(currentTime + 1_800_000).toISOString() },
+    ...overrides,
+  };
+}
+
 function harness(factory: () => FleetStore) {
   currentTime = Date.parse('2026-10-07T00:00:00.000Z');
   const store = factory();
@@ -139,6 +182,45 @@ for (const [name, factory] of [
       await service.heartbeat(SESSION, heartbeat());
       expect((await service.enqueue(SESSION, task())).inserted).toBe(true);
       expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-1', status: 'leased', attempt: 1 });
+    });
+
+    it('persists and atomically consumes one immutable approval bound to the pending claim', async () => {
+      const { service, store } = harness(factory);
+      await service.register(NODE_SESSION, node());
+      await service.enqueue(SESSION, task());
+      await service.claim(NODE_SESSION, NODE);
+      expect(await service.requestApproval(NODE_SESSION, 'task-1', approvalRequest())).toMatchObject({
+        requestId: 'request-1', taskId: 'task-1', workOrderId: 'work-1', nodeId: NODE, runId: 'run-1',
+      });
+      expect(await service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision())).toMatchObject({
+        decisionId: 'decision-1', decision: 'approved', deciderActorRef: 'human:owner',
+      });
+      expect(await service.consumeApproval(NODE_SESSION, NODE, 'task-1', 'request-1')).toMatchObject({
+        request: { requestId: 'request-1' }, decision: { decisionId: 'decision-1' },
+      });
+      await expect(service.consumeApproval(NODE_SESSION, NODE, 'task-1', 'request-1'))
+        .rejects.toMatchObject({ code: 'approval_replayed' });
+      expect(await store.getApprovalRequest(TENANT, 'request-1')).toMatchObject({ action: 'task.execute', target: 'task-1' });
+      expect(await store.getApprovalDecision(TENANT, 'request-1')).toMatchObject({ decision: 'approved' });
+    });
+
+    it('rejects cross-binding, expanded scope, expiry, and a second immutable decision', async () => {
+      const { service } = harness(factory);
+      await service.register(NODE_SESSION, node());
+      await service.enqueue(SESSION, task());
+      await service.claim(NODE_SESSION, NODE);
+      await expect(service.requestApproval(NODE_SESSION, 'task-1', approvalRequest(1, { workOrderId: 'work-other' })))
+        .rejects.toMatchObject({ code: 'lease_owner_mismatch' });
+      await service.requestApproval(NODE_SESSION, 'task-1', approvalRequest());
+      await expect(service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision(1, {
+        grantedScope: { capabilities: ['task.execute', 'workspace.admin'], expiresAt: new Date(currentTime + 1_000).toISOString() },
+      }))).rejects.toMatchObject({ code: 'approval_scope_exceeded' });
+      await expect(service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision(1, {
+        grantedScope: { capabilities: ['task.execute'], expiresAt: new Date(currentTime - 1).toISOString() },
+      }))).rejects.toMatchObject({ code: 'approval_expired' });
+      await service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision());
+      await expect(service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision(1, { decisionId: 'decision-second' })))
+        .rejects.toMatchObject({ code: 'approval_replayed' });
     });
 
     it('rejects unknown input fields through the injected contract validator', async () => {

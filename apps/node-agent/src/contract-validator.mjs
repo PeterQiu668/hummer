@@ -17,6 +17,8 @@ export function createSharedFleetContractValidator(receiptValidator) {
     /** @param {unknown} value */
     validateTaskEnvelope(value) { return adapt('TaskEnvelope', value); },
     /** @param {unknown} value */
+    validateApprovalRequest(value) { return adapt('ApprovalRequest', value); },
+    /** @param {unknown} value */
     validateApprovalDecision(value) { return adapt('ApprovalDecision', value); },
     /** @param {unknown} value */
     validateRunEvent(value) { return adapt('RunEvent', value); },
@@ -25,7 +27,7 @@ export function createSharedFleetContractValidator(receiptValidator) {
   };
 }
 
-/** @param {'NodeManifest'|'TaskEnvelope'|'ApprovalDecision'|'RunEvent'} name @param {unknown} value */
+/** @param {'NodeManifest'|'TaskEnvelope'|'ApprovalRequest'|'ApprovalDecision'|'RunEvent'} name @param {unknown} value */
 function adapt(name, value) {
   const result = validateFleetContract(name, value);
   if (result.issues) {

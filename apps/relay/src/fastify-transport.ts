@@ -125,8 +125,8 @@ function assertNoFields(body: unknown): void {
 
 function fleetStatus(error: FleetRejectedError): number {
   if (error.code === 'invalid_contract') return 400;
-  if (error.code === 'tenant_mismatch' || error.code === 'lease_owner_mismatch') return 403;
-  if (error.code === 'node_unknown') return 404;
+  if (error.code === 'tenant_mismatch' || error.code === 'lease_owner_mismatch' || error.code === 'actor_mismatch') return 403;
+  if (error.code === 'node_unknown' || error.code === 'approval_not_found') return 404;
   return 409;
 }
 
@@ -168,7 +168,9 @@ export function createFleetRelayServer(
     if (error instanceof FleetRejectedError) {
       return reply.status(fleetStatus(error)).send({ error: { code: error.code, message: error.message } });
     }
-    const statusCode = 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
+    const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number'
+      ? error.statusCode
+      : 500;
     if (statusCode >= 400 && statusCode < 500) {
       return reply.status(statusCode).send({ error: { code: 'invalid_request', message: 'request was rejected' } });
     }
@@ -224,6 +226,36 @@ export function createFleetRelayServer(
     const nodeId = body && typeof body.nodeId === 'string' ? body.nodeId : '';
     const { session } = await authorize(request, 'task.event', nodeId);
     return ingress.event(session, request.body);
+  });
+
+  app.post('/v1/nodes/:nodeId/tasks/:taskId/approval-requests', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'approval.request', nodeId);
+    return {
+      request: await ingress.requestApproval(session, pathParam(request, 'taskId'), request.body),
+    };
+  });
+
+  app.post('/v1/approval-requests/:requestId/decision', async (request) => {
+    const { claims, session } = await authorize(request, 'approval.decide');
+    if (claims.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(claims.actorRef)) {
+      throw new TransportHttpError(403, 'control_badge_required', 'approval decisions require a human/account control badge');
+    }
+    return {
+      decision: await ingress.decideApproval(session, pathParam(request, 'requestId'), request.body),
+    };
+  });
+
+  app.post('/v1/nodes/:nodeId/tasks/:taskId/approval-requests/:requestId/consume', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'approval.consume', nodeId);
+    assertNoFields(request.body);
+    return ingress.consumeApproval(
+      session,
+      nodeId,
+      pathParam(request, 'taskId'),
+      pathParam(request, 'requestId'),
+    );
   });
 
   app.post('/v1/tasks/:taskId/stop', async (request) => {

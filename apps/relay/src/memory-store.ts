@@ -1,5 +1,10 @@
 import {
   FleetRejectedError,
+  type ApprovalBundle,
+  type ApprovalDecisionClaims,
+  type ApprovalDecisionRecord,
+  type ApprovalRequestClaims,
+  type ApprovalRequestRecord,
   type EnqueueResult,
   type EventResult,
   type FleetNodeRecord,
@@ -17,6 +22,38 @@ import { canonicalJson } from './canonical-json.js';
 const key = (tenantId: string, id: string) => `${tenantId}\u0000${id}`;
 const clone = <T>(value: T): T => structuredClone(value);
 
+function isSubset(granted: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
+  if (!granted) return true;
+  if (!requested) return false;
+  const allowed = new Set(requested);
+  return granted.every((value) => allowed.has(value));
+}
+
+function assertDecisionWithinRequest(
+  request: ApprovalRequestRecord,
+  decision: ApprovalDecisionClaims,
+  now: string,
+): void {
+  if (Date.parse(request.expiresAt) <= Date.parse(now)) {
+    throw new FleetRejectedError('approval_expired', 'approval request has expired');
+  }
+  const decidedAt = Date.parse(decision.decidedAt);
+  if (!Number.isFinite(decidedAt) || decidedAt > Date.parse(now) || decidedAt < Date.parse(request.createdAt)) {
+    throw new FleetRejectedError('invalid_contract', 'approval decision time is outside the request lifetime');
+  }
+  if (decision.decision !== 'approved') return;
+  const granted = decision.grantedScope;
+  if (!granted || !isSubset(granted.capabilities, request.requestedScope.capabilities)
+    || !isSubset(granted.paths, request.requestedScope.paths)
+    || (request.requestedScope.maxUses !== undefined && (granted.maxUses ?? 1) > request.requestedScope.maxUses)) {
+    throw new FleetRejectedError('approval_scope_exceeded', 'approval grant exceeds the requested scope');
+  }
+  const grantedExpiry = Date.parse(granted.expiresAt);
+  if (!Number.isFinite(grantedExpiry) || grantedExpiry <= Date.parse(now) || grantedExpiry > Date.parse(request.expiresAt)) {
+    throw new FleetRejectedError('approval_expired', 'approval grant expiry is outside the request lifetime');
+  }
+}
+
 interface StoredEvent {
   claims: RunEventClaims;
   event: FleetObject;
@@ -29,6 +66,11 @@ export class MemoryFleetStore implements FleetStore {
   readonly #events = new Map<string, StoredEvent[]>();
   readonly #eventByIdempotency = new Map<string, EventResult>();
   readonly #audit: RelayAuditEntry[] = [];
+  readonly #approvalRequests = new Map<string, ApprovalRequestRecord>();
+  readonly #approvalRequestByTask = new Map<string, string>();
+  readonly #approvalDecisions = new Map<string, ApprovalDecisionRecord>();
+  readonly #approvalDecisionIds = new Set<string>();
+  readonly #approvalConsumptions = new Set<string>();
 
   async registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord> {
     const record: FleetNodeRecord = { ...claims, tenantIds: [...claims.tenantIds], tenantId, manifest: clone(manifest), status: 'online', lastSeenAt: now, offlineAfterMs };
@@ -147,6 +189,95 @@ export class MemoryFleetStore implements FleetStore {
     this.recoverExpiredLeases(tenantId, now);
     const task = this.#tasks.get(key(tenantId, taskId));
     return task ? clone(task) : null;
+  }
+
+  async putApprovalRequest(
+    tenantId: string,
+    taskId: string,
+    request: FleetObject,
+    claims: ApprovalRequestClaims,
+    now: string,
+  ): Promise<ApprovalRequestRecord> {
+    if (Date.parse(claims.expiresAt) <= Date.parse(now)) {
+      throw new FleetRejectedError('approval_expired', 'expired approval request cannot be recorded');
+    }
+    const task = this.#tasks.get(key(tenantId, taskId));
+    if (!task) throw new FleetRejectedError('approval_not_found', 'pending claim was not found');
+    this.assertActiveLease(task, claims.nodeId, now);
+    if (task.workOrderId !== claims.workOrderId || task.leaseOwnerNodeId !== claims.nodeId) {
+      throw new FleetRejectedError('lease_owner_mismatch', 'approval request does not match the pending claim');
+    }
+    if (this.#approvalRequests.has(key(tenantId, claims.requestId)) || this.#approvalRequestByTask.has(key(tenantId, taskId))) {
+      throw new FleetRejectedError('approval_replayed', 'pending claim already has an approval request');
+    }
+    const record: ApprovalRequestRecord = {
+      ...claims,
+      requestedScope: clone(claims.requestedScope),
+      taskId,
+      request: clone(request),
+      createdAt: now,
+    };
+    this.#approvalRequests.set(key(tenantId, claims.requestId), record);
+    this.#approvalRequestByTask.set(key(tenantId, taskId), claims.requestId);
+    return clone(record);
+  }
+
+  async putApprovalDecision(
+    tenantId: string,
+    decision: FleetObject,
+    claims: ApprovalDecisionClaims,
+    now: string,
+  ): Promise<ApprovalDecisionRecord> {
+    const request = this.#approvalRequests.get(key(tenantId, claims.requestId));
+    if (!request) throw new FleetRejectedError('approval_not_found', 'approval request was not found');
+    if (this.#approvalDecisions.has(key(tenantId, claims.requestId)) || this.#approvalDecisionIds.has(key(tenantId, claims.decisionId))) {
+      throw new FleetRejectedError('approval_replayed', 'approval request already has an immutable decision');
+    }
+    assertDecisionWithinRequest(request, claims, now);
+    const record: ApprovalDecisionRecord = {
+      ...claims,
+      ...(claims.grantedScope ? { grantedScope: clone(claims.grantedScope) } : {}),
+      decisionRecord: clone(decision),
+      createdAt: now,
+    };
+    this.#approvalDecisions.set(key(tenantId, claims.requestId), record);
+    this.#approvalDecisionIds.add(key(tenantId, claims.decisionId));
+    return clone(record);
+  }
+
+  async consumeApprovalDecision(
+    tenantId: string,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+    now: string,
+  ): Promise<ApprovalBundle> {
+    const request = this.#approvalRequests.get(key(tenantId, requestId));
+    const decision = this.#approvalDecisions.get(key(tenantId, requestId));
+    if (!request || request.taskId !== taskId) throw new FleetRejectedError('approval_not_found', 'approval request is not bound to this claim');
+    if (request.nodeId !== nodeId) throw new FleetRejectedError('lease_owner_mismatch', 'approval request is not bound to this node');
+    const task = this.#tasks.get(key(tenantId, taskId));
+    if (!task) throw new FleetRejectedError('approval_not_found', 'pending claim was not found');
+    this.assertActiveLease(task, nodeId, now);
+    if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
+    if (decision.decision !== 'approved') throw new FleetRejectedError('invalid_transition', 'approval decision does not authorize execution');
+    assertDecisionWithinRequest(request, decision, now);
+    const consumptionKey = key(tenantId, requestId);
+    if (this.#approvalConsumptions.has(consumptionKey)) {
+      throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
+    }
+    this.#approvalConsumptions.add(consumptionKey);
+    return { request: clone(request.request), decision: clone(decision.decisionRecord) };
+  }
+
+  async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
+    const record = this.#approvalRequests.get(key(tenantId, requestId));
+    return record ? clone(record) : null;
+  }
+
+  async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
+    const record = this.#approvalDecisions.get(key(tenantId, requestId));
+    return record ? clone(record) : null;
   }
 
   async listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]> {

@@ -1,4 +1,5 @@
 import { NodeAgentError } from './errors.mjs';
+import { isDeepStrictEqual } from 'node:util';
 import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
 
 /**
@@ -9,16 +10,19 @@ import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './vali
  *   claimTask(context: TransportContext): Promise<unknown|null>,
  *   reportClaimStatus(input: unknown, context: TransportContext): Promise<void>,
  *   submitRunEvent(input: unknown, context: TransportContext): Promise<void>,
- *   submitReceipt(input: unknown, context: TransportContext): Promise<void>
+ *   submitReceipt(input: unknown, context: TransportContext): Promise<void>,
+ *   submitApprovalRequest(claimId: string, input: unknown, context: TransportContext): Promise<unknown>,
+ *   consumeApprovalDecision(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
  * }} FleetTransport
  * @typedef {{
  *   validateNodeManifest(input: unknown): ValidationResult,
  *   validateTaskEnvelope(input: unknown): ValidationResult,
+ *   validateApprovalRequest(input: unknown): ValidationResult,
  *   validateApprovalDecision(input: unknown): ApprovalValidationResult,
  *   validateRunEvent(input: unknown): ValidationResult,
  *   validateOutcomeReceipt(input: unknown): ValidationResult
  * }} FleetContractValidator
- * @typedef {{execute(input: {envelope: unknown, approval: unknown}): Promise<{events: unknown[], receipt: unknown}>}} NodeTaskExecutor
+ * @typedef {{execute(input: {envelope: unknown, approvalRequest: unknown, approval: unknown}): Promise<{events: unknown[], receipt: unknown}>}} NodeTaskExecutor
  * @typedef {{nodeId: string, tenantId: string, grantToken: string}} TransportContext
  */
 
@@ -29,7 +33,7 @@ export class HummerNodeAgent {
   /** @type {FleetContractValidator} */ #contractValidator;
   /** @type {NodeTaskExecutor} */ #executor;
   /** @type {() => Date} */ #clock;
-  /** @type {Map<string, {claimId: string, deliveryId: string, envelope: unknown}>} */ #pending = new Map();
+  /** @type {Map<string, {claimId: string, deliveryId: string, envelope: unknown, binding: ReturnType<typeof readValidatedEnvelopeBinding>, approvalRequest?: unknown}>} */ #pending = new Map();
   /** @type {Set<string>} */ #terminal = new Set();
   /** @type {Set<string>} */ #stopped = new Set();
   /** @type {NodeJS.Timeout|null} */ #heartbeatTimer = null;
@@ -129,23 +133,76 @@ export class HummerNodeAgent {
       this.#terminal.add(claim.claimId);
       return { state: 'rejected', claimId: claim.claimId, reasonCode: 'task_expired' };
     }
-    this.#pending.set(claim.claimId, { ...claim, envelope: validation.value });
+    this.#pending.set(claim.claimId, { ...claim, envelope: validation.value, binding: envelope });
     await this.#transport.reportClaimStatus({ claimId: claim.claimId, state: 'pending_confirmation' }, this.#context());
     return { state: 'pending_confirmation', claimId: claim.claimId };
   }
 
-  /** @param {string} claimId @param {unknown} approval */
-  async confirmAndExecute(claimId, approval) {
+  /** @param {string} claimId @param {unknown} request */
+  async requestApproval(claimId, request) {
     if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
     const claim = this.#pending.get(claimId);
     if (!claim) throw new NodeAgentError('claim_not_pending', 'Claim is not waiting for confirmation');
+    if (claim.approvalRequest) throw new NodeAgentError('approval_replayed', 'Claim already has an approval request');
+    this.#assertActiveGrant('approval.request');
+    const validation = this.#contractValidator.validateApprovalRequest(request);
+    if (!validation || validation.ok !== true) throw new NodeAgentError('invalid_approval_request', 'Approval request failed the shared contract validator');
+    const approvalRequest = readValidatedApprovalRequest(validation.value);
+    if (
+      approvalRequest.tenantId !== this.tenantId ||
+      approvalRequest.nodeId !== this.nodeId ||
+      approvalRequest.workOrderId !== claim.binding.workOrderId ||
+      approvalRequest.target !== claimId
+    ) {
+      throw new NodeAgentError('approval_request_mismatch', 'Approval request is not bound to the pending claim');
+    }
+    if (Date.parse(approvalRequest.expiresAt) <= this.#clock().getTime()) {
+      throw new NodeAgentError('approval_expired', 'Approval request has expired');
+    }
+    if (!approvalRequest.requestedScope.capabilities.includes('task.execute')) {
+      throw new NodeAgentError('approval_scope_denied', 'Approval request does not request task.execute');
+    }
+    const persisted = await this.#transport.submitApprovalRequest(claimId, validation.value, this.#context());
+    const persistedValidation = this.#contractValidator.validateApprovalRequest(persisted);
+    if (!persistedValidation || persistedValidation.ok !== true || !isDeepStrictEqual(persistedValidation.value, validation.value)) {
+      throw new NodeAgentError('invalid_relay_response', 'Relay did not return the bound approval request');
+    }
+    claim.approvalRequest = validation.value;
+    await this.#transport.reportClaimStatus({ claimId, state: 'awaiting_approval', requestId: approvalRequest.requestId }, this.#context());
+    return { state: 'awaiting_approval', claimId, requestId: approvalRequest.requestId };
+  }
+
+  /**
+   * Fetch and consume the immutable decision from the authenticated Relay.
+   * A caller-supplied decision is deliberately rejected.
+   * @param {string} claimId
+   */
+  async confirmAndExecute(claimId) {
+    if (arguments.length !== 1) {
+      throw new NodeAgentError('local_approval_forbidden', 'Approval decisions must be consumed from the authenticated Relay');
+    }
+    if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
+    if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
+    const claim = this.#pending.get(claimId);
+    if (!claim) throw new NodeAgentError('claim_not_pending', 'Claim is not waiting for confirmation');
+    if (!claim.approvalRequest) throw new NodeAgentError('approval_not_requested', 'Claim has no persisted approval request');
     this.#assertActiveGrant('task.execute');
-    const validation = this.#contractValidator.validateApprovalDecision(approval);
+    const localRequest = readValidatedApprovalRequest(claim.approvalRequest);
+    const bundle = parseApprovalBundle(await this.#transport.consumeApprovalDecision(
+      claimId,
+      localRequest.requestId,
+      this.#context(),
+    ));
+    const requestValidation = this.#contractValidator.validateApprovalRequest(bundle.request);
+    if (!requestValidation || requestValidation.ok !== true || !isDeepStrictEqual(requestValidation.value, claim.approvalRequest)) {
+      throw new NodeAgentError('approval_request_mismatch', 'Relay approval request does not match the pending claim');
+    }
+    const validation = this.#contractValidator.validateApprovalDecision(bundle.decision);
     if (!validation || validation.ok !== true) throw new NodeAgentError('invalid_approval', 'Approval decision failed the shared contract validator');
     const decision = validation.value;
     if (
-      decision.requestId !== claimId ||
+      decision.requestId !== localRequest.requestId ||
       decision.tenantId !== this.tenantId ||
       decision.decision !== 'approved' ||
       !/^(?:human|account):/.test(decision.deciderActorRef)
@@ -161,7 +218,11 @@ export class HummerNodeAgent {
     this.#pending.delete(claimId);
     this.#terminal.add(claimId);
     try {
-      const outcome = await this.#executor.execute({ envelope: claim.envelope, approval });
+      const outcome = await this.#executor.execute({
+        envelope: claim.envelope,
+        approvalRequest: requestValidation.value,
+        approval: validation.value,
+      });
       if (!outcome || !Array.isArray(outcome.events) || outcome.receipt === undefined) {
         throw new NodeAgentError('invalid_execution_outcome', 'Executor must return events and a receipt');
       }
@@ -244,7 +305,43 @@ function readValidatedEnvelopeBinding(value) {
     tenantId: requireNonEmptyString(envelope.tenantId, 'invalid_task_envelope', 'TaskEnvelope tenantId'),
     targetNodeId: requireNonEmptyString(envelope.targetNodeId, 'invalid_task_envelope', 'TaskEnvelope targetNodeId'),
     expiresAt: requireIsoDate(envelope.expiresAt, 'invalid_task_envelope', 'TaskEnvelope expiresAt'),
+    workOrderId: requireNonEmptyString(envelope.originRef, 'invalid_task_envelope', 'TaskEnvelope originRef'),
   };
+}
+
+/** @param {unknown} value */
+function readValidatedApprovalRequest(value) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new NodeAgentError('invalid_approval_request', 'Validated ApprovalRequest must be an object');
+  }
+  const request = /** @type {Record<string, unknown>} */ (value);
+  const scope = request.requestedScope;
+  if (typeof scope !== 'object' || scope === null || Array.isArray(scope)) {
+    throw new NodeAgentError('invalid_approval_request', 'ApprovalRequest requestedScope must be an object');
+  }
+  const capabilities = /** @type {Record<string, unknown>} */ (scope).capabilities;
+  if (!Array.isArray(capabilities) || capabilities.some((capability) => typeof capability !== 'string')) {
+    throw new NodeAgentError('invalid_approval_request', 'ApprovalRequest capabilities must be strings');
+  }
+  return {
+    requestId: requireNonEmptyString(request.requestId, 'invalid_approval_request', 'ApprovalRequest requestId'),
+    tenantId: requireNonEmptyString(request.tenantId, 'invalid_approval_request', 'ApprovalRequest tenantId'),
+    workOrderId: requireNonEmptyString(request.workOrderId, 'invalid_approval_request', 'ApprovalRequest workOrderId'),
+    nodeId: requireNonEmptyString(request.nodeId, 'invalid_approval_request', 'ApprovalRequest nodeId'),
+    runId: requireNonEmptyString(request.runId, 'invalid_approval_request', 'ApprovalRequest runId'),
+    target: requireNonEmptyString(request.target, 'invalid_approval_request', 'ApprovalRequest target'),
+    expiresAt: requireIsoDate(request.expiresAt, 'invalid_approval_request', 'ApprovalRequest expiresAt'),
+    requestedScope: { capabilities: /** @type {string[]} */ (capabilities) },
+  };
+}
+
+/** @param {unknown} value */
+function parseApprovalBundle(value) {
+  const bundle = assertExactRecord(value, ['request', 'decision'], 'invalid_relay_response', 'approval bundle');
+  if (!Object.hasOwn(bundle, 'request') || !Object.hasOwn(bundle, 'decision')) {
+    throw new NodeAgentError('invalid_relay_response', 'Relay approval bundle requires request and decision');
+  }
+  return { request: bundle.request, decision: bundle.decision };
 }
 
 /** @param {FleetTransport} transport @param {FleetContractValidator} validator @param {NodeTaskExecutor} executor */
@@ -254,8 +351,11 @@ function validatePorts(transport, validator, executor) {
   if (typeof transport?.reportClaimStatus !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing reportClaimStatus');
   if (typeof transport?.submitRunEvent !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing submitRunEvent');
   if (typeof transport?.submitReceipt !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing submitReceipt');
+  if (typeof transport?.submitApprovalRequest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing submitApprovalRequest');
+  if (typeof transport?.consumeApprovalDecision !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing consumeApprovalDecision');
   if (typeof validator?.validateNodeManifest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateNodeManifest');
   if (typeof validator?.validateTaskEnvelope !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateTaskEnvelope');
+  if (typeof validator?.validateApprovalRequest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateApprovalRequest');
   if (typeof validator?.validateApprovalDecision !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateApprovalDecision');
   if (typeof validator?.validateRunEvent !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateRunEvent');
   if (typeof validator?.validateOutcomeReceipt !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateOutcomeReceipt');

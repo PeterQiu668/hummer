@@ -37,6 +37,19 @@ test('rejects a system-authored approval decision through the shared contract', 
   assert.equal(result.ok, false);
 });
 
+test('binds ApprovalRequest validation to the frozen shared contract', () => {
+  const value = {
+    schema: 'hummer.approval-request', version: 1, requestId: 'request_1', tenantId: 'tenant_a',
+    workOrderId: 'work_1', nodeId: 'node_a', runId: 'run_1', riskClass: 'write',
+    action: 'task.execute', target: 'claim_1', redactedPreview: 'safe preview',
+    requestedScope: { capabilities: ['task.execute'], maxUses: 1 },
+    expiresAt: '2026-10-07T01:00:00Z', requestedBy: 'system:node_a',
+  };
+
+  assert.equal(validator.validateApprovalRequest(value).ok, true);
+  assert.equal(validator.validateApprovalRequest({ ...value, autoApprove: true }).ok, false);
+});
+
 test('keeps the existing outcome receipt validator as the only receipt authority', () => {
   assert.deepEqual(validator.validateOutcomeReceipt({ receipt: true }), {
     ok: true,

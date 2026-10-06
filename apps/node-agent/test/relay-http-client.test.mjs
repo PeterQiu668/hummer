@@ -36,6 +36,15 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     if (String(url).endsWith('/tasks/claim')) {
       return jsonResponse({ task: { taskId: 'delivery-1', envelope: { schema: 'hummer.task-envelope' } } });
     }
+    if (String(url).endsWith('/approval-requests')) {
+      return jsonResponse({ request: { request: { schema: 'hummer.approval-request', requestId: 'request-1' } } });
+    }
+    if (String(url).endsWith('/decision')) {
+      return jsonResponse({ decision: { decisionRecord: { schema: 'hummer.approval-decision', requestId: 'request-1' } } });
+    }
+    if (String(url).endsWith('/consume')) {
+      return jsonResponse({ request: { requestId: 'request-1' }, decision: { requestId: 'request-1' } });
+    }
     return jsonResponse({ ok: true });
   };
   const client = new RelayHttpClient({
@@ -50,6 +59,9 @@ test('uses the injected base URL and opaque badge for Relay operations without e
   await client.submitRunEvent({ type: 'progress' }, context);
   await client.submitRunEvent({ type: 'completed' }, context);
   await client.submitRunEvent({ type: 'failed' }, context);
+  await client.submitApprovalRequest('delivery-1', { requestId: 'request-1' }, context);
+  await client.decideApproval('request-1', { requestId: 'request-1' });
+  await client.consumeApprovalDecision('delivery-1', 'request-1', context);
   await client.stopTask('delivery-2');
 
   assert.deepEqual(claim, {
@@ -63,6 +75,9 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     '/v1/tasks/events',
     '/v1/tasks/complete',
     '/v1/tasks/fail',
+    '/v1/nodes/node-a/tasks/delivery-1/approval-requests',
+    '/v1/approval-requests/request-1/decision',
+    '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/consume',
     '/v1/tasks/delivery-2/stop',
   ]);
   assert.ok(requests.every((entry) => entry.init.headers.authorization === `Bearer ${badgeToken}`));

@@ -2,6 +2,11 @@ import { createRequire } from 'node:module';
 import { canonicalJson } from './canonical-json.js';
 import {
   FleetRejectedError,
+  type ApprovalBundle,
+  type ApprovalDecisionClaims,
+  type ApprovalDecisionRecord,
+  type ApprovalRequestClaims,
+  type ApprovalRequestRecord,
   type EnqueueResult,
   type EventResult,
   type FleetNodeRecord,
@@ -71,7 +76,36 @@ interface EventRow {
   event_json: string;
 }
 
-export const RELAY_SCHEMA_VERSION = 11;
+interface ApprovalRequestRow {
+  tenant_id: string;
+  request_id: string;
+  task_id: string;
+  work_order_id: string;
+  node_id: string;
+  run_id: string;
+  risk_class: string;
+  action: string;
+  target: string;
+  requested_scope_json: string;
+  expires_at: string;
+  requested_by: string;
+  request_json: string;
+  created_at: string;
+}
+
+interface ApprovalDecisionRow {
+  tenant_id: string;
+  decision_id: string;
+  request_id: string;
+  decider_actor_ref: string;
+  decided_at: string;
+  decision: ApprovalDecisionClaims['decision'];
+  granted_scope_json: string | null;
+  decision_json: string;
+  created_at: string;
+}
+
+export const RELAY_SCHEMA_VERSION = 12;
 
 function openDatabase(path: string): SqliteDatabase {
   const require = createRequire(import.meta.url);
@@ -119,6 +153,73 @@ function toTask(row: TaskRow): FleetTaskRecord {
     leaseOwnerNodeId: row.lease_owner_node_id,
     leaseExpiresAt: row.lease_expires_at,
   };
+}
+
+function toApprovalRequest(row: ApprovalRequestRow): ApprovalRequestRecord {
+  return {
+    requestId: row.request_id,
+    tenantId: row.tenant_id,
+    taskId: row.task_id,
+    workOrderId: row.work_order_id,
+    nodeId: row.node_id,
+    runId: row.run_id,
+    riskClass: row.risk_class,
+    action: row.action,
+    target: row.target,
+    requestedScope: JSON.parse(row.requested_scope_json) as ApprovalRequestClaims['requestedScope'],
+    expiresAt: row.expires_at,
+    requestedBy: row.requested_by,
+    request: jsonObject(row.request_json),
+    createdAt: row.created_at,
+  };
+}
+
+function toApprovalDecision(row: ApprovalDecisionRow): ApprovalDecisionRecord {
+  return {
+    decisionId: row.decision_id,
+    requestId: row.request_id,
+    tenantId: row.tenant_id,
+    deciderActorRef: row.decider_actor_ref,
+    decidedAt: row.decided_at,
+    decision: row.decision,
+    ...(row.granted_scope_json
+      ? { grantedScope: JSON.parse(row.granted_scope_json) as NonNullable<ApprovalDecisionClaims['grantedScope']> }
+      : {}),
+    decisionRecord: jsonObject(row.decision_json),
+    createdAt: row.created_at,
+  };
+}
+
+function isSubset(granted: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
+  if (!granted) return true;
+  if (!requested) return false;
+  const allowed = new Set(requested);
+  return granted.every((value) => allowed.has(value));
+}
+
+function assertDecisionWithinRequest(
+  request: ApprovalRequestRecord,
+  decision: ApprovalDecisionClaims,
+  now: string,
+): void {
+  if (Date.parse(request.expiresAt) <= Date.parse(now)) {
+    throw new FleetRejectedError('approval_expired', 'approval request has expired');
+  }
+  const decidedAt = Date.parse(decision.decidedAt);
+  if (!Number.isFinite(decidedAt) || decidedAt > Date.parse(now) || decidedAt < Date.parse(request.createdAt)) {
+    throw new FleetRejectedError('invalid_contract', 'approval decision time is outside the request lifetime');
+  }
+  if (decision.decision !== 'approved') return;
+  const granted = decision.grantedScope;
+  if (!granted || !isSubset(granted.capabilities, request.requestedScope.capabilities)
+    || !isSubset(granted.paths, request.requestedScope.paths)
+    || (request.requestedScope.maxUses !== undefined && (granted.maxUses ?? 1) > request.requestedScope.maxUses)) {
+    throw new FleetRejectedError('approval_scope_exceeded', 'approval grant exceeds the requested scope');
+  }
+  const grantedExpiry = Date.parse(granted.expiresAt);
+  if (!Number.isFinite(grantedExpiry) || grantedExpiry <= Date.parse(now) || grantedExpiry > Date.parse(request.expiresAt)) {
+    throw new FleetRejectedError('approval_expired', 'approval grant expiry is outside the request lifetime');
+  }
 }
 
 export class SqliteFleetStore implements FleetStore {
@@ -316,6 +417,114 @@ export class SqliteFleetStore implements FleetStore {
     return row ? toTask(row) : null;
   }
 
+  async putApprovalRequest(
+    tenantId: string,
+    taskId: string,
+    request: FleetObject,
+    claims: ApprovalRequestClaims,
+    now: string,
+  ): Promise<ApprovalRequestRecord> {
+    return this.#db.transaction(() => {
+      if (Date.parse(claims.expiresAt) <= Date.parse(now)) {
+        throw new FleetRejectedError('approval_expired', 'expired approval request cannot be recorded');
+      }
+      const task = this.requireTask(tenantId, taskId);
+      this.assertActiveLease(task, claims.nodeId, now);
+      if (task.workOrderId !== claims.workOrderId || task.leaseOwnerNodeId !== claims.nodeId) {
+        throw new FleetRejectedError('lease_owner_mismatch', 'approval request does not match the pending claim');
+      }
+      const existing = this.#db.prepare(`
+        SELECT request_id FROM fleet_approval_requests
+        WHERE tenant_id = ? AND (request_id = ? OR task_id = ?) LIMIT 1
+      `).get<{ request_id: string }>(tenantId, claims.requestId, taskId);
+      if (existing) throw new FleetRejectedError('approval_replayed', 'pending claim already has an approval request');
+      this.#db.prepare(`
+        INSERT INTO fleet_approval_requests (
+          tenant_id, request_id, task_id, work_order_id, node_id, run_id, risk_class,
+          action, target, requested_scope_json, expires_at, requested_by, request_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        tenantId, claims.requestId, taskId, claims.workOrderId, claims.nodeId, claims.runId,
+        claims.riskClass, claims.action, claims.target, JSON.stringify(claims.requestedScope),
+        claims.expiresAt, claims.requestedBy, JSON.stringify(request), now,
+      );
+      return this.requireApprovalRequest(tenantId, claims.requestId);
+    })();
+  }
+
+  async putApprovalDecision(
+    tenantId: string,
+    decision: FleetObject,
+    claims: ApprovalDecisionClaims,
+    now: string,
+  ): Promise<ApprovalDecisionRecord> {
+    return this.#db.transaction(() => {
+      const request = this.findApprovalRequest(tenantId, claims.requestId);
+      if (!request) throw new FleetRejectedError('approval_not_found', 'approval request was not found');
+      const existing = this.#db.prepare(`
+        SELECT decision_id FROM fleet_approval_decisions
+        WHERE tenant_id = ? AND (request_id = ? OR decision_id = ?) LIMIT 1
+      `).get<{ decision_id: string }>(tenantId, claims.requestId, claims.decisionId);
+      if (existing) throw new FleetRejectedError('approval_replayed', 'approval request already has an immutable decision');
+      assertDecisionWithinRequest(request, claims, now);
+      this.#db.prepare(`
+        INSERT INTO fleet_approval_decisions (
+          tenant_id, decision_id, request_id, decider_actor_ref, decided_at, decision,
+          granted_scope_json, decision_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        tenantId, claims.decisionId, claims.requestId, claims.deciderActorRef, claims.decidedAt,
+        claims.decision, claims.grantedScope ? JSON.stringify(claims.grantedScope) : null,
+        JSON.stringify(decision), now,
+      );
+      return this.requireApprovalDecision(tenantId, claims.requestId);
+    })();
+  }
+
+  async consumeApprovalDecision(
+    tenantId: string,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+    now: string,
+  ): Promise<ApprovalBundle> {
+    return this.#db.transaction(() => {
+      const request = this.findApprovalRequest(tenantId, requestId);
+      if (!request || request.taskId !== taskId) {
+        throw new FleetRejectedError('approval_not_found', 'approval request is not bound to this claim');
+      }
+      if (request.nodeId !== nodeId) {
+        throw new FleetRejectedError('lease_owner_mismatch', 'approval request is not bound to this node');
+      }
+      const task = this.requireTask(tenantId, taskId);
+      this.assertActiveLease(task, nodeId, now);
+      const decision = this.findApprovalDecision(tenantId, requestId);
+      if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
+      if (decision.decision !== 'approved') {
+        throw new FleetRejectedError('invalid_transition', 'approval decision does not authorize execution');
+      }
+      assertDecisionWithinRequest(request, decision, now);
+      const consumed = this.#db.prepare(`
+        SELECT 1 AS present FROM fleet_approval_consumptions WHERE tenant_id = ? AND request_id = ?
+      `).get<{ present: number }>(tenantId, requestId);
+      if (consumed) throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
+      this.#db.prepare(`
+        INSERT INTO fleet_approval_consumptions (
+          tenant_id, request_id, decision_id, task_id, node_id, run_id, consumed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(tenantId, requestId, decision.decisionId, taskId, nodeId, request.runId, now);
+      return { request: request.request, decision: decision.decisionRecord };
+    })();
+  }
+
+  async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
+    return this.findApprovalRequest(tenantId, requestId);
+  }
+
+  async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
+    return this.findApprovalDecision(tenantId, requestId);
+  }
+
   async listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]> {
     return this.#db.prepare(`SELECT event_id, tenant_id, work_order_id, node_id, seq, occurred_at, type, idempotency_key, event_json
       FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? ORDER BY seq`)
@@ -414,6 +623,66 @@ export class SqliteFleetStore implements FleetStore {
         UNIQUE (tenant_id, idempotency_key),
         UNIQUE (tenant_id, work_order_id, seq)
       );
+      CREATE TABLE IF NOT EXISTS fleet_approval_requests (
+        tenant_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        work_order_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        risk_class TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target TEXT NOT NULL,
+        requested_scope_json TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        requested_by TEXT NOT NULL,
+        request_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, request_id),
+        UNIQUE (tenant_id, task_id),
+        FOREIGN KEY (tenant_id, task_id) REFERENCES fleet_tasks (tenant_id, task_id)
+      );
+      CREATE INDEX IF NOT EXISTS fleet_approval_requests_binding
+        ON fleet_approval_requests (tenant_id, task_id, node_id, run_id, expires_at);
+      CREATE TABLE IF NOT EXISTS fleet_approval_decisions (
+        tenant_id TEXT NOT NULL,
+        decision_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        decider_actor_ref TEXT NOT NULL,
+        decided_at TEXT NOT NULL,
+        decision TEXT NOT NULL CHECK (decision IN ('approved', 'denied', 'expired', 'revoked')),
+        granted_scope_json TEXT,
+        decision_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, decision_id),
+        UNIQUE (tenant_id, request_id),
+        FOREIGN KEY (tenant_id, request_id) REFERENCES fleet_approval_requests (tenant_id, request_id)
+      );
+      CREATE TABLE IF NOT EXISTS fleet_approval_consumptions (
+        tenant_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        decision_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        consumed_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, request_id),
+        UNIQUE (tenant_id, decision_id),
+        FOREIGN KEY (tenant_id, request_id) REFERENCES fleet_approval_requests (tenant_id, request_id),
+        FOREIGN KEY (tenant_id, decision_id) REFERENCES fleet_approval_decisions (tenant_id, decision_id)
+      );
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_requests_no_update
+        BEFORE UPDATE ON fleet_approval_requests BEGIN SELECT RAISE(ABORT, 'approval requests are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_requests_no_delete
+        BEFORE DELETE ON fleet_approval_requests BEGIN SELECT RAISE(ABORT, 'approval requests are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_decisions_no_update
+        BEFORE UPDATE ON fleet_approval_decisions BEGIN SELECT RAISE(ABORT, 'approval decisions are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_decisions_no_delete
+        BEFORE DELETE ON fleet_approval_decisions BEGIN SELECT RAISE(ABORT, 'approval decisions are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_consumptions_no_update
+        BEFORE UPDATE ON fleet_approval_consumptions BEGIN SELECT RAISE(ABORT, 'approval consumptions are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_consumptions_no_delete
+        BEFORE DELETE ON fleet_approval_consumptions BEGIN SELECT RAISE(ABORT, 'approval consumptions are append-only'); END;
       CREATE TABLE IF NOT EXISTS relay_audit (
         tenant_id TEXT NOT NULL,
         action TEXT NOT NULL CHECK (action IN ('stop', 'retry')),
@@ -423,8 +692,9 @@ export class SqliteFleetStore implements FleetStore {
         detail TEXT NOT NULL
       );
     `);
-    this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
-      .run(RELAY_SCHEMA_VERSION, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
+    const migration = this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
+    migration.run(11, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
+    migration.run(RELAY_SCHEMA_VERSION, 'relay_append_only_approval_binding', new Date(0).toISOString());
   }
 
   private refreshNode(tenantId: string, nodeId: string, now: string): void {
@@ -451,6 +721,30 @@ export class SqliteFleetStore implements FleetStore {
       .get<TaskRow>(tenantId, workOrderId);
     if (!row) throw new FleetRejectedError('invalid_transition', 'event work order is not queued');
     return toTask(row);
+  }
+
+  private findApprovalRequest(tenantId: string, requestId: string): ApprovalRequestRecord | null {
+    const row = this.#db.prepare(`SELECT * FROM fleet_approval_requests WHERE tenant_id = ? AND request_id = ?`)
+      .get<ApprovalRequestRow>(tenantId, requestId);
+    return row ? toApprovalRequest(row) : null;
+  }
+
+  private requireApprovalRequest(tenantId: string, requestId: string): ApprovalRequestRecord {
+    const request = this.findApprovalRequest(tenantId, requestId);
+    if (!request) throw new FleetRejectedError('approval_not_found', 'approval request was not found');
+    return request;
+  }
+
+  private findApprovalDecision(tenantId: string, requestId: string): ApprovalDecisionRecord | null {
+    const row = this.#db.prepare(`SELECT * FROM fleet_approval_decisions WHERE tenant_id = ? AND request_id = ?`)
+      .get<ApprovalDecisionRow>(tenantId, requestId);
+    return row ? toApprovalDecision(row) : null;
+  }
+
+  private requireApprovalDecision(tenantId: string, requestId: string): ApprovalDecisionRecord {
+    const decision = this.findApprovalDecision(tenantId, requestId);
+    if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision was not found');
+    return decision;
   }
 
   private assertActiveLease(task: FleetTaskRecord, nodeId: string, now: string): void {

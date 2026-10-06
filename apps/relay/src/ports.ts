@@ -11,7 +11,12 @@ export type FleetRejectionCode =
   | 'invalid_transition'
   | 'duplicate_delivery'
   | 'retry_key_reused'
-  | 'sequence_gap';
+  | 'sequence_gap'
+  | 'actor_mismatch'
+  | 'approval_not_found'
+  | 'approval_expired'
+  | 'approval_scope_exceeded'
+  | 'approval_replayed';
 
 export class FleetRejectedError extends Error {
   constructor(
@@ -87,11 +92,47 @@ export interface RunEventClaims {
   idempotencyKey: string;
 }
 
+export interface ApprovalScopeClaims {
+  capabilities: readonly string[];
+  paths?: readonly string[];
+  maxUses?: number;
+}
+
+export interface GrantedApprovalScopeClaims extends ApprovalScopeClaims {
+  expiresAt: string;
+}
+
+export interface ApprovalRequestClaims {
+  requestId: string;
+  tenantId: string;
+  workOrderId: string;
+  nodeId: string;
+  runId: string;
+  riskClass: string;
+  action: string;
+  target: string;
+  requestedScope: ApprovalScopeClaims;
+  expiresAt: string;
+  requestedBy: string;
+}
+
+export interface ApprovalDecisionClaims {
+  decisionId: string;
+  requestId: string;
+  tenantId: string;
+  deciderActorRef: string;
+  decidedAt: string;
+  decision: 'approved' | 'denied' | 'expired' | 'revoked';
+  grantedScope?: GrantedApprovalScopeClaims;
+}
+
 export interface FleetValidators {
   nodeManifest: InboundFleetValidator<NodeClaims>;
   heartbeat: InboundFleetValidator<HeartbeatClaims>;
   taskEnvelope: InboundFleetValidator<TaskClaims>;
   runEvent: InboundFleetValidator<RunEventClaims>;
+  approvalRequest: InboundFleetValidator<ApprovalRequestClaims>;
+  approvalDecision: InboundFleetValidator<ApprovalDecisionClaims>;
 }
 
 export interface AuthenticatedFleetSession {
@@ -130,6 +171,22 @@ export interface EventResult {
   task: FleetTaskRecord;
 }
 
+export interface ApprovalRequestRecord extends ApprovalRequestClaims {
+  taskId: string;
+  request: FleetObject;
+  createdAt: string;
+}
+
+export interface ApprovalDecisionRecord extends ApprovalDecisionClaims {
+  decisionRecord: FleetObject;
+  createdAt: string;
+}
+
+export interface ApprovalBundle {
+  request: FleetObject;
+  decision: FleetObject;
+}
+
 export interface RelayAuditEntry {
   tenantId: string;
   action: 'stop' | 'retry';
@@ -148,6 +205,11 @@ export interface FleetStore {
   putEvent(tenantId: string, event: FleetObject, claims: RunEventClaims, now: string): Promise<EventResult>;
   stopTask(tenantId: string, taskId: string, actorRef: string, now: string): Promise<FleetTaskRecord>;
   getTask(tenantId: string, taskId: string, now: string): Promise<FleetTaskRecord | null>;
+  putApprovalRequest(tenantId: string, taskId: string, request: FleetObject, claims: ApprovalRequestClaims, now: string): Promise<ApprovalRequestRecord>;
+  putApprovalDecision(tenantId: string, decision: FleetObject, claims: ApprovalDecisionClaims, now: string): Promise<ApprovalDecisionRecord>;
+  consumeApprovalDecision(tenantId: string, nodeId: string, taskId: string, requestId: string, now: string): Promise<ApprovalBundle>;
+  getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null>;
+  getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null>;
   listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]>;
   listAudit(tenantId: string): Promise<readonly RelayAuditEntry[]>;
   close(): void;
@@ -162,6 +224,9 @@ export interface FleetIngress {
   ack(session: AuthenticatedFleetSession, input: unknown): Promise<EventResult>;
   complete(session: AuthenticatedFleetSession, input: unknown): Promise<EventResult>;
   fail(session: AuthenticatedFleetSession, input: unknown): Promise<EventResult>;
+  requestApproval(session: AuthenticatedFleetSession, taskId: string, input: unknown): Promise<ApprovalRequestRecord>;
+  decideApproval(session: AuthenticatedFleetSession, requestId: string, input: unknown): Promise<ApprovalDecisionRecord>;
+  consumeApproval(session: AuthenticatedFleetSession, nodeId: string, taskId: string, requestId: string): Promise<ApprovalBundle>;
   stop(session: AuthenticatedFleetSession, taskId: string): Promise<FleetTaskRecord>;
   retry(session: AuthenticatedFleetSession, previousTaskId: string, nextEnvelope: unknown): Promise<EnqueueResult>;
 }

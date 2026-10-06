@@ -1,5 +1,7 @@
 import {
   validateFleetContract,
+  type ApprovalDecision,
+  type ApprovalRequest,
   type FleetContractName,
   type NodeManifest,
   type RunEvent,
@@ -8,6 +10,8 @@ import {
 import type {
   FleetObject,
   FleetValidators,
+  ApprovalDecisionClaims,
+  ApprovalRequestClaims,
   HeartbeatClaims,
   NodeClaims,
   RunEventClaims,
@@ -22,9 +26,13 @@ function validateAndProject<Name extends FleetContractName, Meta>(
     ? NodeManifest
     : Name extends 'TaskEnvelope'
       ? TaskEnvelope
-      : Name extends 'RunEvent'
+    : Name extends 'RunEvent'
         ? RunEvent
-        : never) => Meta,
+        : Name extends 'ApprovalRequest'
+          ? ApprovalRequest
+          : Name extends 'ApprovalDecision'
+            ? ApprovalDecision
+            : never) => Meta,
 ): ValidationResult<Meta> {
   const result = validateFleetContract(name, input);
   if (result.issues) {
@@ -85,6 +93,34 @@ export function createSharedFleetValidators(): FleetValidators {
         occurredAt: event.occurredAt,
         type: event.type,
         idempotencyKey: event.idempotencyKey,
+      })),
+    },
+    approvalRequest: {
+      validate: (input) => validateAndProject('ApprovalRequest', input, (request): ApprovalRequestClaims => ({
+        requestId: request.requestId,
+        tenantId: request.tenantId,
+        workOrderId: request.workOrderId,
+        nodeId: request.nodeId,
+        runId: request.runId,
+        riskClass: request.riskClass,
+        action: request.action,
+        target: request.target,
+        requestedScope: request.requestedScope,
+        expiresAt: request.expiresAt,
+        requestedBy: request.requestedBy,
+      })),
+    },
+    approvalDecision: {
+      validate: (input) => validateAndProject('ApprovalDecision', input, (decision): ApprovalDecisionClaims => ({
+        decisionId: decision.decisionId,
+        requestId: decision.requestId,
+        tenantId: decision.tenantId,
+        deciderActorRef: decision.deciderActorRef,
+        decidedAt: decision.decidedAt,
+        decision: decision.decision,
+        ...('grantedScope' in decision && decision.grantedScope
+          ? { grantedScope: decision.grantedScope }
+          : {}),
       })),
     },
   };

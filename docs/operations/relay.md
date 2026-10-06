@@ -44,7 +44,8 @@ schema. Body size is capped at the shared 64 KiB limit. Body-less claim and stop
 commands reject any unknown field.
 
 Bearer credentials are short-lived opaque badge tokens. The included static
-authenticator retains only SHA-256 token fingerprints. Each resolved badge is
+authenticator is a test/development substitute, not production identity
+authentication, and retains only SHA-256 token fingerprints. Each resolved badge is
 bound to one tenant, an actor, an explicit scope set, an expiry, and optionally
 one node. Node routes require the token's `nodeId` to match the route and shared
 contract body. Control routes derive tenant identity from the badge rather than
@@ -63,6 +64,9 @@ not claimed by this slice.
 - `SqliteFleetStore` enables WAL, foreign keys, and a 5-second busy timeout.
 - Relay migration marker `11` creates `fleet_nodes`, `fleet_tasks`,
   `fleet_task_leases`, `fleet_run_events`, and `relay_audit`.
+- Relay-only marker `12` adds append-only `fleet_approval_requests`,
+  `fleet_approval_decisions`, and `fleet_approval_consumptions`; it does not
+  modify or share the desktop v1-v11 database.
 - `fleet_task_leases` contains the integration columns
   `tenant_id/task_id/node_id/delivery_id/idempotency_key/envelope_json/state/lease_expires_at/attempt/result_json/created_at/updated_at`, with tenant-scoped unique keys for delivery and idempotency.
 - `fleet_tasks` and `fleet_run_events` are Relay-owned supporting tables. The
@@ -77,6 +81,20 @@ An expired lease returns its task to `queued`; the next valid claim increments
 and requires a new idempotency key while preserving the work-order/origin
 lineage; prior approvals are not copied.
 
+## Approval binding ledger
+
+ADR-023 requires a node badge to append one request for its active lease, a
+human/account control badge to append one decision, and the bound node to
+atomically consume that approved decision once while the lease is still active.
+Capabilities, paths, maximum uses, and expiry can only narrow. The request,
+decision, and consumption are protected by no-update/no-delete triggers and
+remain separate immutable records.
+
+Approval decisions are never delivered as SSE authority. The node must read and
+consume the persisted bundle over an authenticated Relay request. The static
+human badge in tests demonstrates this route shape only; replacement with a
+real issuer and revocation source remains required before production use.
+
 ## Verification
 
 From the repository root:
@@ -86,9 +104,8 @@ npm.cmd run typecheck -w @hummer/relay
 npm.cmd run test -w @hummer/relay
 ```
 
-The suite runs the same 20 store behaviors against both memory and SQLite stores,
-plus three shared-contract adapter assertions and five HTTP/SSE transport tests
-(48 tests total). Negative cases cover unknown fields, tenant mismatch, stale nodes,
+The suite runs the same store behaviors against both memory and SQLite stores,
+plus shared-contract adapter and real Fastify/node integration tests. Negative cases cover unknown fields, tenant mismatch, stale nodes,
 wrong lease ownership, sequence gaps, completion without an artifact, stopped
 tasks, expired tasks, retry-key reuse, wrong/expired/under-scoped badge tokens,
 cross-node binding, and unauthorized SSE reconnect after disconnect. A 10-task scenario double-delivers

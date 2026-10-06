@@ -9,7 +9,10 @@ import { MemoryFleetStore } from '../src/memory-store.js';
 const NOW = '2026-10-07T00:00:00.000Z';
 const TENANT = 'tenant-a';
 const NODE = 'node-main';
-const NODE_SCOPES = ['node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect'] as const;
+const NODE_SCOPES = [
+  'node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect',
+  'approval.request', 'approval.consume',
+] as const;
 
 const manifest = (nodeId = NODE, tenantIds = [TENANT]) => ({
   schema: 'hummer.node-manifest', version: 1, nodeId, tenantIds,
@@ -50,6 +53,24 @@ const runEvent = (
   ...overrides,
 });
 
+const approvalRequest = (index = 1, overrides: Record<string, unknown> = {}) => ({
+  schema: 'hummer.approval-request', version: 1, requestId: `request-${index}`,
+  tenantId: TENANT, workOrderId: `work-${index}`, nodeId: NODE, runId: `run-${index}`,
+  riskClass: 'write', action: 'task.execute', target: `delivery-${index}`,
+  redactedPreview: 'Execute the approved synthetic task',
+  requestedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1 },
+  expiresAt: '2026-10-07T01:00:00Z', requestedBy: `system:${NODE}`,
+  ...overrides,
+});
+
+const approvalDecision = (index = 1, overrides: Record<string, unknown> = {}) => ({
+  schema: 'hummer.approval-decision', version: 1, decisionId: `decision-${index}`,
+  requestId: `request-${index}`, tenantId: TENANT, deciderActorRef: 'human:operator',
+  decidedAt: NOW, decision: 'approved',
+  grantedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1, expiresAt: '2026-10-07T00:30:00Z' },
+  ...overrides,
+});
+
 function badge(token: string, tenantId: string, nodeId: string | undefined, scopes: readonly BadgeScope[], expiresAt = '2026-10-07T01:00:00Z') {
   return { token, tokenId: `badge-${token}`, tenantId, actorRef: nodeId ? `system:${nodeId}` : 'human:operator', nodeId, scopes, expiresAt };
 }
@@ -64,10 +85,14 @@ function harness() {
   const authenticator = createStaticBadgeTokenAuthenticator([
     badge('node-token', TENANT, NODE, NODE_SCOPES),
     badge('node-b-token', TENANT, 'node-b', NODE_SCOPES),
-    badge('control-token', TENANT, undefined, ['task.enqueue', 'task.stop']),
+    badge('control-token', TENANT, undefined, ['task.enqueue', 'task.stop', 'approval.decide']),
     badge('tenant-b-token', 'tenant-b', undefined, ['task.enqueue', 'task.stop']),
     badge('claim-only-token', TENANT, NODE, ['task.claim']),
     badge('expired-token', TENANT, NODE, NODE_SCOPES, '2026-10-06T23:59:59Z'),
+    {
+      token: 'system-control-token', tokenId: 'badge-system-control', tenantId: TENANT,
+      actorRef: 'system:auto', scopes: ['approval.decide'], expiresAt: '2026-10-07T01:00:00Z',
+    },
   ]);
   const result = createFleetRelayServer(service, { authenticator, now: () => new Date(NOW) });
   return { ...result, store, service };
@@ -121,6 +146,73 @@ describe('Fastify fleet relay transport', () => {
     const denied = await app.inject({ method: 'POST', url: '/v1/nodes/register', headers: authorization('claim-only-token'), payload: manifest() });
     expect(denied.statusCode).toBe(403);
     expect(denied.json()).toMatchObject({ error: { code: 'scope_denied' } });
+  });
+
+  it('binds approval request, human decision and one-time node consumption over authenticated HTTP', async () => {
+    const { app, events } = harness();
+    openApps.push({ app, events });
+    await register(app);
+    await enqueue(app);
+    await app.inject({ method: 'POST', url: `/v1/nodes/${NODE}/tasks/claim`, headers: authorization('node-token') });
+
+    const requested = await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
+      headers: authorization('node-token'), payload: approvalRequest(),
+    });
+    expect(requested.statusCode).toBe(200);
+    expect(requested.json()).toMatchObject({ request: { requestId: 'request-1', taskId: 'delivery-1', runId: 'run-1' } });
+
+    const decided = await app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('control-token'), payload: approvalDecision(),
+    });
+    expect(decided.statusCode).toBe(200);
+    expect(decided.json()).toMatchObject({ decision: { decisionId: 'decision-1', decision: 'approved' } });
+
+    const consumed = await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,
+      headers: authorization('node-token'),
+    });
+    expect(consumed.statusCode).toBe(200);
+    expect(consumed.json()).toMatchObject({ request: { requestId: 'request-1' }, decision: { decisionId: 'decision-1' } });
+    expect((await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,
+      headers: authorization('node-token'),
+    })).json()).toMatchObject({ error: { code: 'approval_replayed' } });
+  });
+
+  it('rejects unknown approval fields and system-authored decisions before persistence', async () => {
+    const { app, events, store } = harness();
+    openApps.push({ app, events });
+    await register(app);
+    await enqueue(app);
+    await app.inject({ method: 'POST', url: `/v1/nodes/${NODE}/tasks/claim`, headers: authorization('node-token') });
+    const unknown = await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
+      headers: authorization('node-token'), payload: approvalRequest(1, { autoApprove: true }),
+    });
+    expect(unknown.statusCode).toBe(400);
+    expect(await store.getApprovalRequest(TENANT, 'request-1')).toBeNull();
+
+    await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
+      headers: authorization('node-token'), payload: approvalRequest(),
+    });
+    const unknownDecision = await app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('control-token'),
+      payload: approvalDecision(1, { autoExecute: true }),
+    });
+    expect(unknownDecision.statusCode).toBe(400);
+    expect(await store.getApprovalDecision(TENANT, 'request-1')).toBeNull();
+    const systemDecision = await app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('system-control-token'),
+      payload: approvalDecision(1, { deciderActorRef: 'system:auto' }),
+    });
+    expect(systemDecision.statusCode).toBe(403);
+    expect(systemDecision.json()).toMatchObject({ error: { code: 'control_badge_required' } });
+    expect(await store.getApprovalDecision(TENANT, 'request-1')).toBeNull();
   });
 
   it('fails closed on cross-tenant access and node binding mismatches', async () => {

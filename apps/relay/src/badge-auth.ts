@@ -8,6 +8,9 @@ export const BADGE_SCOPES = [
   'task.event',
   'task.stop',
   'stream.connect',
+  'approval.request',
+  'approval.decide',
+  'approval.consume',
 ] as const;
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];
@@ -51,8 +54,10 @@ function validateStaticBadge(input: StaticBadgeToken): void {
 }
 
 /**
- * Minimal opaque-token registry for Phase 0. Only SHA-256 fingerprints are
- * retained; plaintext badge tokens stay with the caller that provisions them.
+ * Test/development-only opaque-token registry for Phase 0. This is a static
+ * substitute for an identity issuer, not production authentication. Only
+ * SHA-256 fingerprints are retained; plaintext badge tokens stay with the
+ * caller that provisions them.
  */
 export function createStaticBadgeTokenAuthenticator(tokens: readonly StaticBadgeToken[]): BadgeTokenAuthenticator {
   const entries = new Map<string, BadgeTokenClaims>();

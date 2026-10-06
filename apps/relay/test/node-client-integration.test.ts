@@ -18,7 +18,10 @@ const TENANT = 'tenant-a';
 const NODE = 'node-main';
 const NODE_TOKEN = 'integration-node-badge';
 const CONTROL_TOKEN = 'integration-control-badge';
-const NODE_SCOPES = ['node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect'] as const;
+const NODE_SCOPES = [
+  'node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect',
+  'approval.request', 'approval.consume',
+] as const;
 
 const manifest = {
   schema: 'hummer.node-manifest', version: 1, nodeId: NODE, tenantIds: [TENANT],
@@ -43,12 +46,24 @@ function envelope(index: number) {
   } as const;
 }
 
+function approvalRequest(index: number, overrides: Record<string, unknown> = {}) {
+  return {
+    schema: 'hummer.approval-request', version: 1,
+    requestId: `request-${index}`, tenantId: TENANT, workOrderId: `work-${index}`,
+    nodeId: NODE, runId: `run-${index}`, riskClass: 'write', action: 'task.execute',
+    target: `delivery-${index}`, redactedPreview: 'Execute the approved synthetic task',
+    requestedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1 },
+    expiresAt: FUTURE, requestedBy: `system:${NODE}`,
+    ...overrides,
+  };
+}
+
 function approval(index: number, overrides: Record<string, unknown> = {}) {
   return {
     schema: 'hummer.approval-decision', version: 1,
-    decisionId: `decision-${index}`, requestId: `delivery-${index}`, tenantId: TENANT,
-    deciderActorRef: 'human:owner', decidedAt: NOW, decision: 'approved',
-    grantedScope: { capabilities: ['task.execute'], expiresAt: FUTURE },
+    decisionId: `decision-${index}`, requestId: `request-${index}`, tenantId: TENANT,
+    deciderActorRef: 'human:operator', decidedAt: NOW, decision: 'approved',
+    grantedScope: { capabilities: ['task.execute'], paths: ['outputs/report.md'], maxUses: 1, expiresAt: FUTURE },
     ...overrides,
   };
 }
@@ -91,8 +106,9 @@ async function createHarness(): Promise<Harness> {
   const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
   const authenticator = createStaticBadgeTokenAuthenticator([
     badge(NODE_TOKEN, TENANT, NODE, NODE_SCOPES),
-    badge(CONTROL_TOKEN, TENANT, undefined, ['task.enqueue', 'task.stop']),
+    badge(CONTROL_TOKEN, TENANT, undefined, ['task.enqueue', 'task.stop', 'approval.decide']),
     badge('tenant-b-node-badge', 'tenant-b', NODE, NODE_SCOPES),
+    badge('tenant-b-control-badge', 'tenant-b', undefined, ['approval.decide']),
   ]);
   const { app, events } = createFleetRelayServer(service, { authenticator, now: () => new Date(NOW) });
   const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -109,7 +125,7 @@ function createAgent(client: RelayHttpClient, executions: unknown[], index: numb
     heartbeatIntervalMs: 20_000,
     grant: {
       token: 'local-capability-grant-not-a-relay-badge', nodeId: NODE, tenantId: TENANT,
-      expiresAt: FUTURE, scopes: ['node.heartbeat', 'task.claim', 'task.execute'],
+      expiresAt: FUTURE, scopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     },
     transport: client,
     contractValidator: createSharedFleetContractValidator({
@@ -157,8 +173,13 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
     await waitFor(() => states.some((state) => state.state === 'pending_confirmation'));
     expect(executions).toHaveLength(0);
 
-    expect(await agent.confirmAndExecute('delivery-1', approval(1))).toEqual({ state: 'completed', claimId: 'delivery-1' });
-    expect(await agent.confirmAndExecute('delivery-1', approval(1))).toEqual({ state: 'duplicate', claimId: 'delivery-1' });
+    expect(await agent.requestApproval('delivery-1', approvalRequest(1))).toEqual({
+      state: 'awaiting_approval', claimId: 'delivery-1', requestId: 'request-1',
+    });
+    const controlClient = new RelayHttpClient({ baseUrl, badgeToken: CONTROL_TOKEN });
+    await controlClient.decideApproval('request-1', approval(1));
+    expect(await agent.confirmAndExecute('delivery-1')).toEqual({ state: 'completed', claimId: 'delivery-1' });
+    expect(await agent.confirmAndExecute('delivery-1')).toEqual({ state: 'duplicate', claimId: 'delivery-1' });
     expect(executions).toHaveLength(1);
     expect((await store.listEvents(TENANT, 'work-1')).map((event) => event.type)).toEqual(['started', 'artifact', 'completed']);
     expect(await store.getTask(TENANT, 'delivery-1', NOW)).toMatchObject({ status: 'completed' });
@@ -167,7 +188,7 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
     await stream.done;
   });
 
-  it('keeps cross-tenant decisions, wrong badges and expired approval scopes at zero execution', async () => {
+  it('keeps local, cross-tenant, replayed, expanded and expired decisions at zero execution', async () => {
     const { baseUrl, client } = await createHarness();
     const executions: unknown[] = [];
     const states: Array<{ state: string }> = [];
@@ -178,10 +199,23 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
     await enqueue(baseUrl, 2);
     await waitFor(() => states.some((state) => state.state === 'pending_confirmation'));
 
-    await expect(agent.confirmAndExecute('delivery-2', approval(2, { tenantId: 'tenant-b' }))).rejects.toMatchObject({ code: 'approval_not_authorized' });
-    await expect(agent.confirmAndExecute('delivery-2', approval(2, {
+    await agent.requestApproval('delivery-2', approvalRequest(2));
+    await expect(agent.confirmAndExecute('delivery-2', approval(2))).rejects.toMatchObject({ code: 'local_approval_forbidden' });
+
+    const tenantBControl = new RelayHttpClient({ baseUrl, badgeToken: 'tenant-b-control-badge' });
+    await expect(tenantBControl.decideApproval('request-2', approval(2, { tenantId: 'tenant-b' })))
+      .rejects.toMatchObject({ code: 'approval_not_found' });
+
+    const controlClient = new RelayHttpClient({ baseUrl, badgeToken: CONTROL_TOKEN });
+    await expect(controlClient.decideApproval('request-2', approval(2, {
+      grantedScope: { capabilities: ['task.execute', 'workspace.admin'], expiresAt: FUTURE },
+    }))).rejects.toMatchObject({ code: 'approval_scope_exceeded' });
+    await expect(controlClient.decideApproval('request-2', approval(2, {
       grantedScope: { capabilities: ['task.execute'], expiresAt: '2026-10-06T23:59:59.000Z' },
     }))).rejects.toMatchObject({ code: 'approval_expired' });
+    await controlClient.decideApproval('request-2', approval(2));
+    await expect(controlClient.decideApproval('request-2', { ...approval(2), decisionId: 'decision-2-replay' }))
+      .rejects.toMatchObject({ code: 'approval_replayed' });
     expect(executions).toHaveLength(0);
 
     const wrongClient = new RelayHttpClient({ baseUrl, badgeToken: 'wrong-badge' });
@@ -203,11 +237,12 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
     await stream.ready;
     await enqueue(baseUrl, 3);
     await waitFor(() => states.some((state) => state.state === 'pending_confirmation'));
+    await agent.requestApproval('delivery-3', approvalRequest(3));
     const controlClient = new RelayHttpClient({ baseUrl, badgeToken: CONTROL_TOKEN });
     await controlClient.stopTask('delivery-3');
     await waitFor(() => states.some((state) => state.state === 'stopped'));
 
-    expect(await agent.confirmAndExecute('delivery-3', approval(3))).toEqual({ state: 'stopped', claimId: 'delivery-3' });
+    expect(await agent.confirmAndExecute('delivery-3')).toEqual({ state: 'stopped', claimId: 'delivery-3' });
     expect(executions).toHaveLength(0);
 
     stream.close();
