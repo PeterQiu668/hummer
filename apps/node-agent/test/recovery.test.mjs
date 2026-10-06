@@ -241,6 +241,10 @@ test('recovery rejects machine actors, unsafe reason text, unknown claims, and t
     { code: 'recovery_operator_forbidden' },
   );
   assert.throws(
+    () => agent.abandonRecovery('claim_1', { operatorActorRef: 'human:../../owner', reasonCode: 'unsafe_actor' }),
+    { code: 'recovery_operator_forbidden' },
+  );
+  assert.throws(
     () => agent.authorizeRecoveryRetry('claim_1', { operatorActorRef: 'human:owner', reasonCode: 'raw customer text!' }),
     { code: 'invalid_recovery_decision' },
   );

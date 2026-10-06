@@ -354,7 +354,7 @@ function recoveryResolution(record, type) {
 /** @param {unknown} value */
 function requiredOperatorActor(value) {
   const actor = requiredString(value, 'operatorActorRef');
-  if (!/^(?:human|account):[A-Za-z0-9._:@/-]+$/.test(actor)) {
+  if (!/^(?:human|account):[A-Za-z0-9_-]+$/.test(actor)) {
     throw new NodeAgentError('invalid_journal_record', 'operatorActorRef must identify a human or account operator');
   }
   return actor;

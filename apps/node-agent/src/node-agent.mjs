@@ -536,7 +536,7 @@ function safeErrorCode(error) {
 function parseRecoveryDecision(value) {
   const decision = assertExactRecord(value, ['operatorActorRef', 'reasonCode'], 'invalid_recovery_decision', 'recovery decision');
   const operatorActorRef = requireNonEmptyString(decision.operatorActorRef, 'invalid_recovery_decision', 'operatorActorRef');
-  if (!/^(?:human|account):[A-Za-z0-9._:@/-]+$/.test(operatorActorRef)) {
+  if (!/^(?:human|account):[A-Za-z0-9_-]+$/.test(operatorActorRef)) {
     throw new NodeAgentError('recovery_operator_forbidden', 'Recovery decisions require a human or account operator');
   }
   const reasonCode = requireNonEmptyString(decision.reasonCode, 'invalid_recovery_decision', 'reasonCode');
