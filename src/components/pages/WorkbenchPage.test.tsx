@@ -14,6 +14,7 @@ afterEach(() => {
   delete window.hummerApprovalPolicy;
   delete window.hummerOutcomes;
   delete window.hummerWorkOrderIntake;
+  delete window.hummerExecutionNodes;
   localStorage.removeItem('hummer.auth.session');
   useAppStore.setState({ workbenchPrefill: null });
 });
@@ -32,6 +33,15 @@ it('consumes a team assignment prefill into the task composer and assignee', asy
 
 
 describe('WorkbenchPage V5', () => {
+  it('routes the production workbench into the guarded start-work flow', () => {
+    renderWorkbench();
+
+    fireEvent.click(screen.getByRole('button', { name: '开始做' }));
+
+    expect(screen.getByRole('heading', { name: '先看计划，再决定是否继续' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '返回工作台' })).toBeInTheDocument();
+  });
+
   it('shows real pending intake only when present and confirms it into the existing plan flow', async () => {
     localStorage.setItem('hummer.auth.session', 'auth-intake-test');
     const pending = {
