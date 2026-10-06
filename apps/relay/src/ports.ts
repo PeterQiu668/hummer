@@ -18,7 +18,9 @@ export type FleetRejectionCode =
   | 'approval_not_found'
   | 'approval_expired'
   | 'approval_scope_exceeded'
-  | 'approval_replayed';
+  | 'approval_replayed'
+  | 'quota_exceeded'
+  | 'audit_export_not_found';
 
 export class FleetRejectedError extends Error {
   constructor(
@@ -202,6 +204,80 @@ export interface RelayAuditEntry {
   detail: string;
 }
 
+export type TenantAuditAction =
+  | 'node.registered'
+  | 'task.enqueued'
+  | 'task.claimed'
+  | 'run.event'
+  | 'task.stopped'
+  | 'task.retried'
+  | 'approval.requested'
+  | 'approval.decided'
+  | 'approval.consumed'
+  | 'quota.configured'
+  | 'quota.usage'
+  | 'quota.warning'
+  | 'quota.exceeded'
+  | 'audit.exported';
+
+export interface TenantAuditEvent {
+  tenantId: string;
+  position: number;
+  action: TenantAuditAction;
+  subjectRef: string;
+  nodeId: string | null;
+  actorRef: string;
+  at: string;
+  metadata: FleetObject;
+  previousHash: string | null;
+  hash: string;
+}
+
+export interface TenantChainHead {
+  tenantId: string;
+  position: number;
+  hash: string;
+  updatedAt: string;
+}
+
+export type TenantQuotaMetric = 'tasks' | 'tokens' | 'costCny';
+export type TenantQuotaLimits = Partial<Record<TenantQuotaMetric, number>>;
+export interface TenantQuotaUsage { tokens?: number; costCny?: number }
+
+export interface TenantQuotaCounter {
+  tenantId: string;
+  nodeId: string;
+  day: string;
+  metric: TenantQuotaMetric;
+  used: number;
+  limit: number | null;
+  warningEmitted: boolean;
+  updatedAt: string;
+}
+
+export interface TenantAuditExportManifest extends FleetObject {
+  schema: 'hummer.relay-audit-export';
+  version: 1;
+  tenantId: string;
+  rangeFrom: number;
+  rangeTo: number;
+  eventCount: number;
+  firstPreviousHash: string | null;
+  chainHeadHash: string;
+  entriesSha256: string;
+  createdAt: string;
+}
+
+export interface TenantAuditExport {
+  exportId: string;
+  tenantId: string;
+  rangeFrom: number;
+  rangeTo: number;
+  sha256: string;
+  createdAt: string;
+  manifest: TenantAuditExportManifest;
+}
+
 export interface FleetStore {
   registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, authorizedTenantIds: readonly string[], tenantGrantRef: string | undefined, now: string, offlineAfterMs: number): Promise<FleetNodeRecord>;
   heartbeat(tenantId: string, claims: HeartbeatClaims, now: string): Promise<FleetNodeRecord>;
@@ -218,6 +294,13 @@ export interface FleetStore {
   getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null>;
   listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]>;
   listAudit(tenantId: string): Promise<readonly RelayAuditEntry[]>;
+  configureQuota(tenantId: string, nodeId: string, day: string, limits: TenantQuotaLimits, actorRef: string, now: string): Promise<readonly TenantQuotaCounter[]>;
+  recordQuotaUsage(tenantId: string, nodeId: string, usage: TenantQuotaUsage, actorRef: string, now: string): Promise<readonly TenantQuotaCounter[]>;
+  listQuotaCounters(tenantId: string, nodeId: string, day: string): Promise<readonly TenantQuotaCounter[]>;
+  getTenantChainHead(tenantId: string): Promise<TenantChainHead | null>;
+  listTenantAudit(tenantId: string, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]>;
+  createAuditExport(tenantId: string, rangeFrom: number | undefined, rangeTo: number | undefined, actorRef: string, now: string): Promise<TenantAuditExport>;
+  getAuditExport(tenantId: string, exportId: string): Promise<TenantAuditExport | null>;
   close(): void;
 }
 
@@ -235,6 +318,13 @@ export interface FleetIngress {
   consumeApproval(session: AuthenticatedFleetSession, nodeId: string, taskId: string, requestId: string): Promise<ApprovalBundle>;
   stop(session: AuthenticatedFleetSession, taskId: string): Promise<FleetTaskRecord>;
   retry(session: AuthenticatedFleetSession, previousTaskId: string, nextEnvelope: unknown): Promise<EnqueueResult>;
+  configureQuota(session: AuthenticatedFleetSession, nodeId: string, day: string, input: unknown): Promise<readonly TenantQuotaCounter[]>;
+  recordQuotaUsage(session: AuthenticatedFleetSession, nodeId: string, input: unknown): Promise<readonly TenantQuotaCounter[]>;
+  listQuotaCounters(session: AuthenticatedFleetSession, nodeId: string, day: string): Promise<readonly TenantQuotaCounter[]>;
+  getTenantChainHead(session: AuthenticatedFleetSession): Promise<TenantChainHead | null>;
+  listTenantAudit(session: AuthenticatedFleetSession, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]>;
+  createAuditExport(session: AuthenticatedFleetSession, input: unknown): Promise<TenantAuditExport>;
+  getAuditExport(session: AuthenticatedFleetSession, exportId: string): Promise<TenantAuditExport | null>;
 }
 
 /** Thin delivery adapters (Fastify/WSS/SSE) must implement this port only. */

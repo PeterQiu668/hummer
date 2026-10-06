@@ -134,8 +134,27 @@ function assertNoFields(body: unknown): void {
 function fleetStatus(error: FleetRejectedError): number {
   if (error.code === 'invalid_contract') return 400;
   if (error.code === 'tenant_mismatch' || error.code === 'lease_owner_mismatch' || error.code === 'actor_mismatch') return 403;
-  if (error.code === 'node_unknown' || error.code === 'approval_not_found') return 404;
+  if (error.code === 'node_unknown' || error.code === 'approval_not_found' || error.code === 'audit_export_not_found') return 404;
+  if (error.code === 'quota_exceeded') return 429;
   return 409;
+}
+
+function auditRange(request: FastifyRequest): { rangeFrom?: number; rangeTo?: number } {
+  const query = (request.query ?? {}) as Record<string, unknown>;
+  if (Object.keys(query).some((key) => key !== 'rangeFrom' && key !== 'rangeTo')) {
+    throw new TransportHttpError(400, 'invalid_contract', 'audit query contains an unknown field');
+  }
+  const result: { rangeFrom?: number; rangeTo?: number } = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value !== 'string' || !/^\d+$/.test(value) || Number(value) < 1) {
+      throw new TransportHttpError(400, 'invalid_contract', `${key} must be a positive integer`);
+    }
+    result[key as 'rangeFrom' | 'rangeTo'] = Number(value);
+  }
+  if (result.rangeFrom !== undefined && result.rangeTo !== undefined && result.rangeTo < result.rangeFrom) {
+    throw new TransportHttpError(400, 'invalid_contract', 'audit range is invalid');
+  }
+  return result;
 }
 
 export function createFleetRelayServer(
@@ -282,6 +301,49 @@ export function createFleetRelayServer(
     const task = await ingress.stop(session, pathParam(request, 'taskId'));
     events.publish(task.tenantId, task.targetNodeId, 'task.stop', { taskId: task.taskId });
     return { task };
+  });
+
+  app.put('/v1/governance/nodes/:nodeId/quotas/:day', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'quota.manage');
+    return {
+      counters: await ingress.configureQuota(session, nodeId, pathParam(request, 'day'), request.body),
+    };
+  });
+
+  app.post('/v1/governance/nodes/:nodeId/usage', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'quota.record', nodeId);
+    return { counters: await ingress.recordQuotaUsage(session, nodeId, request.body) };
+  });
+
+  app.get('/v1/governance/nodes/:nodeId/quotas/:day', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'quota.read');
+    return { counters: await ingress.listQuotaCounters(session, nodeId, pathParam(request, 'day')) };
+  });
+
+  app.get('/v1/governance/chain-head', async (request) => {
+    const { session } = await authorize(request, 'audit.read');
+    return { chainHead: await ingress.getTenantChainHead(session) };
+  });
+
+  app.get('/v1/governance/audit', async (request) => {
+    const { session } = await authorize(request, 'audit.read');
+    const range = auditRange(request);
+    return { events: await ingress.listTenantAudit(session, range.rangeFrom, range.rangeTo) };
+  });
+
+  app.post('/v1/governance/audit-exports', async (request) => {
+    const { session } = await authorize(request, 'audit.export');
+    return { auditExport: await ingress.createAuditExport(session, request.body ?? {}) };
+  });
+
+  app.get('/v1/governance/audit-exports/:exportId', async (request) => {
+    const { session } = await authorize(request, 'audit.read');
+    const auditExport = await ingress.getAuditExport(session, pathParam(request, 'exportId'));
+    if (!auditExport) throw new TransportHttpError(404, 'audit_export_not_found', 'audit export was not found');
+    return { auditExport };
   });
 
   app.get('/v1/nodes/:nodeId/events', async (request, reply: FastifyReply) => {
