@@ -1,8 +1,8 @@
 {
   "schema": "hummer.phase0-gate-evidence",
   "version": 1,
-  "capturedAt": "2026-10-06T18:56:32.962Z",
-  "gitHead": "9a14d3c35a583dc0aa2a412150b221eee153db14",
+  "capturedAt": "2026-10-06T20:06:52.677Z",
+  "gitHead": "32aee2bd728fd103f846fe9231c20cbc1f348b09",
   "status": "passed",
   "checks": [
     {
@@ -14,13 +14,13 @@
     {
       "command": "npm run build",
       "exitCode": 0,
-      "stdout": "> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 1997 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.44 kB │ gzip:   0.33 kB\ndist/assets/index-DxdCqEpU.css   49.68 kB │ gzip:   9.70 kB\ndist/assets/index-grrJUFVh.js   573.63 kB │ gzip: 175.22 kB\n✓ built in 9.47s",
+      "stdout": "> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 1997 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.44 kB │ gzip:   0.33 kB\ndist/assets/index-DxdCqEpU.css   49.68 kB │ gzip:   9.70 kB\ndist/assets/index-GlogOwxv.js   573.70 kB │ gzip: 175.22 kB\n✓ built in 6.78s",
       "stderr": "(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
     },
     {
       "command": "npm test",
       "exitCode": 0,
-      "stdout": "> hummer-enterprise-workspace@0.2.0 test\n> npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:unit && npm run test:ui\n\n\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n\n> hummer-enterprise-workspace@0.2.0 audit:abandoned-3d\n> node scripts/audit-abandoned-3d-lineage.mjs\n\nAbandoned 3D lineage audit passed: no live paths, imports, routes, or root dependencies remain.\n\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  60 passed (60)\n      Tests  266 passed (266)\n   Start at  02:57:44\n   Duration  12.05s (transform 3.52s, setup 0ms, import 16.53s, tests 9.39s, environment 7ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  16 passed (16)\n      Tests  52 passed (52)\n   Start at  02:57:58\n   Duration  14.91s (transform 5.90s, setup 25.49s, import 10.93s, tests 18.36s, environment 68.62s)",
+      "stdout": "> hummer-enterprise-workspace@0.2.0 test\n> npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:unit && npm run test:ui\n\n\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n\n> hummer-enterprise-workspace@0.2.0 audit:abandoned-3d\n> node scripts/audit-abandoned-3d-lineage.mjs\n\nAbandoned 3D lineage audit passed: no live paths, imports, routes, or root dependencies remain.\n\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  61 passed (61)\n      Tests  289 passed (289)\n   Start at  04:07:59\n   Duration  10.75s (transform 2.29s, setup 0ms, import 14.12s, tests 8.71s, environment 8ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  16 passed (16)\n      Tests  53 passed (53)\n   Start at  04:08:12\n   Duration  16.57s (transform 8.26s, setup 22.52s, import 13.28s, tests 19.09s, environment 87.73s)",
       "stderr": ""
     }
   ],
@@ -30,6 +30,7 @@
     "globalDefaultsMutated": false
   },
   "openBlockers": [
-    "No true two-machine run, production badge issuance/revocation, offline recovery drill, or 100-task exactly-once evidence yet."
+    "No true two-machine run, production badge issuance/revocation, real executor, offline recovery drill, or 100-task cross-process evidence yet.",
+    "The in-doubt recovery_required state has no operator adjudication workflow yet."
   ]
 }

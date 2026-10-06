@@ -46,12 +46,13 @@ writeEvidence('round-d2/fleet.json', {
   version: 1,
   capturedAt,
   gitHead: head.stdout.trim(),
-  status: checks.nodeAgent.exitCode === 0 ? 'scaffold-verified' : 'failed',
+  status: checks.nodeAgent.exitCode === 0 ? 'network-gate-and-journal-verified' : 'failed',
   acceptance: [],
   limitations: [
-    'The node agent is not yet connected to the network Relay transport.',
-    'No real executor or two-machine run has been performed.',
-    'The host Node.js and Codex versions do not match the frozen D0 pins.',
+    'No real Codex, Claude, DeepSeek, or GUI executor has been run through the fleet path.',
+    'The static human/account badge registry is a development substitute, not a production identity provider.',
+    'No true two-machine run has been performed.',
+    'The durable journal deliberately returns recovery_required for in-doubt execution and never auto-retries.',
   ],
   check: checks.nodeAgent,
 });
@@ -118,7 +119,8 @@ writeEvidence('round-p0-integration/gates.json', {
     globalDefaultsMutated: false,
   },
   openBlockers: [
-    'No true two-machine run, production badge issuance/revocation, offline recovery drill, or 100-task exactly-once evidence yet.',
+    'No true two-machine run, production badge issuance/revocation, real executor, offline recovery drill, or 100-task cross-process evidence yet.',
+    'The in-doubt recovery_required state has no operator adjudication workflow yet.',
   ],
 });
 

@@ -1,8 +1,8 @@
 {
   "schema": "hummer.phase0-evidence",
   "version": 1,
-  "capturedAt": "2026-10-06T18:56:32.962Z",
-  "gitHead": "9a14d3c35a583dc0aa2a412150b221eee153db14",
+  "capturedAt": "2026-10-06T20:06:52.677Z",
+  "gitHead": "32aee2bd728fd103f846fe9231c20cbc1f348b09",
   "status": "network-transport-unit-verified",
   "acceptance": [],
   "limitations": [
@@ -18,7 +18,7 @@
     {
       "command": "npm test -w @hummer/relay",
       "exitCode": 0,
-      "stdout": "> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  3 passed (3)\n      Tests  48 passed (48)\n   Start at  02:56:47\n   Duration  2.89s (transform 1.13s, setup 0ms, import 4.94s, tests 497ms, environment 0ms)",
+      "stdout": "> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  4 passed (4)\n      Tests  71 passed (71)\n   Start at  04:07:05\n   Duration  3.74s (transform 1.12s, setup 0ms, import 6.57s, tests 1.00s, environment 0ms)",
       "stderr": ""
     }
   ]

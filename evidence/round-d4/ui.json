@@ -1,8 +1,8 @@
 {
   "schema": "hummer.phase0-evidence",
   "version": 1,
-  "capturedAt": "2026-10-06T18:56:32.962Z",
-  "gitHead": "9a14d3c35a583dc0aa2a412150b221eee153db14",
+  "capturedAt": "2026-10-06T20:06:52.677Z",
+  "gitHead": "32aee2bd728fd103f846fe9231c20cbc1f348b09",
   "status": "workbench-intent-verified",
   "acceptance": [],
   "limitations": [
@@ -12,7 +12,7 @@
   "check": {
     "command": "npx vitest run src/features/home/StartWorkPage.test.tsx src/features/home/StartWorkFlow.test.tsx src/components/pages/WorkbenchPage.test.tsx --config vitest.ui.config.ts",
     "exitCode": 0,
-    "stdout": "RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  3 passed (3)\n      Tests  29 passed (29)\n   Start at  02:56:53\n   Duration  6.86s (transform 919ms, setup 1.10s, import 1.96s, tests 4.54s, environment 4.88s)",
+    "stdout": "RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  3 passed (3)\n      Tests  30 passed (30)\n   Start at  04:07:13\n   Duration  8.62s (transform 1.08s, setup 2.99s, import 2.18s, tests 3.82s, environment 10.65s)",
     "stderr": ""
   }
 }
