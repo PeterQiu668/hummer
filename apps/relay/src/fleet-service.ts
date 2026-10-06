@@ -26,6 +26,12 @@ function assertTenant(actual: string, expected: string, subject: string): void {
   }
 }
 
+function assertNode(session: AuthenticatedFleetSession, actual: string, subject: string): void {
+  if (session.nodeId && session.nodeId !== actual) {
+    throw new FleetRejectedError('lease_owner_mismatch', `${subject} node does not match the authenticated session`);
+  }
+}
+
 export class FleetService implements FleetIngress {
   readonly #offlineAfterMs: number;
   readonly #now: () => Date;
@@ -42,6 +48,7 @@ export class FleetService implements FleetIngress {
   async register(session: AuthenticatedFleetSession, input: unknown): Promise<FleetNodeRecord> {
     const result = this.validators.nodeManifest.validate(input);
     accepted(result);
+    assertNode(session, result.meta.nodeId, 'node manifest');
     if (!result.meta.tenantIds.includes(session.tenantId)) {
       throw new FleetRejectedError('tenant_mismatch', 'node manifest is not authorized for this tenant');
     }
@@ -51,6 +58,7 @@ export class FleetService implements FleetIngress {
   async heartbeat(session: AuthenticatedFleetSession, input: unknown): Promise<FleetNodeRecord> {
     const result = this.validators.heartbeat.validate(input);
     accepted(result);
+    assertNode(session, result.meta.nodeId, 'heartbeat');
     return this.store.heartbeat(session.tenantId, result.meta, this.isoNow());
   }
 
@@ -63,6 +71,7 @@ export class FleetService implements FleetIngress {
 
   async claim(session: AuthenticatedFleetSession, nodeId: string): Promise<FleetTaskRecord | null> {
     if (!nodeId.trim()) throw new FleetRejectedError('node_unknown', 'node id is required');
+    assertNode(session, nodeId, 'claim');
     return this.store.claimTask(session.tenantId, nodeId, this.isoNow());
   }
 
@@ -90,6 +99,7 @@ export class FleetService implements FleetIngress {
     const result = this.validators.runEvent.validate(input);
     accepted(result);
     assertTenant(result.meta.tenantId, session.tenantId, 'run event');
+    assertNode(session, result.meta.nodeId, 'run event');
     if (expectedType && result.meta.type !== expectedType) {
       throw new FleetRejectedError('invalid_transition', `expected a ${expectedType} event`);
     }

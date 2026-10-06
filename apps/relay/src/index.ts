@@ -1,5 +1,7 @@
 export * from './canonical-json.js';
+export * from './badge-auth.js';
 export * from './contract-adapter.js';
+export * from './fastify-transport.js';
 export * from './fleet-service.js';
 export * from './memory-store.js';
 export * from './ports.js';
