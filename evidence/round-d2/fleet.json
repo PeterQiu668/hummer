@@ -1,0 +1,19 @@
+{
+  "schema": "hummer.phase0-evidence",
+  "version": 1,
+  "capturedAt": "2026-10-06T18:19:40.224Z",
+  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "status": "scaffold-verified",
+  "acceptance": [],
+  "limitations": [
+    "No network Relay transport is connected.",
+    "No real executor or two-machine run has been performed.",
+    "The host Node.js and Codex versions do not match the frozen D0 pins."
+  ],
+  "check": {
+    "command": "npm run check -w @hummer/node-agent",
+    "exitCode": 0,
+    "stdout": "> @hummer/node-agent@0.1.0-alpha.0 check\n> npm run typecheck && npm test\n\n\n> @hummer/node-agent@0.1.0-alpha.0 typecheck\n> tsc -p tsconfig.json --noEmit\n\n\n> @hummer/node-agent@0.1.0-alpha.0 test\n> node --test test/*.test.mjs\n\n✔ binds TaskEnvelope validation to the frozen shared contract (2.1029ms)\n✔ rejects a system-authored approval decision through the shared contract (1.3574ms)\n✔ keeps the existing outcome receipt validator as the only receipt authority (0.6796ms)\n✔ exposes only the three HUMMER local tool names (1.2121ms)\n✔ rejects an unknown MCP tool fail-closed (1.284ms)\n✔ rejects workspace execution without explicit confirmation (0.2231ms)\n✔ rejects a known tool when the grant scope is absent (0.2182ms)\n✔ delegates authorized calls without implementing host IO in the facade (0.2427ms)\n✔ stages a valid claim as pending and never executes before human confirmation (3.2822ms)\n✔ rejects an invalid NodeManifest before a heartbeat leaves the node (0.894ms)\n✔ rejects a malformed claim before contract validation or execution (0.3538ms)\n✔ rejects a task envelope that the shared contract validator does not accept (0.2827ms)\n✔ fails closed when the approval is not an approved human decision (0.5659ms)\n✔ fails closed when approval does not grant task.execute (0.3041ms)\n✔ fails closed when approval tenant does not match the node tenant (0.513ms)\n✔ executes exactly once after a valid human approval and returns events plus receipt (1.0331ms)\n✔ does not transmit an invalid outcome receipt (0.5377ms)\n✔ rejects an expired local grant and does not leak its token in the error (0.6645ms)\n✔ keeps Windows PATH precedence instead of preferring a later executable (1.4636ms)\n✔ reports a missing runtime with an explicit missing status and null path/version (1.5489ms)\n✔ rejects an unknown provider instead of probing an arbitrary command (0.9843ms)\n✔ requires an explicit executable for cli-other (0.2962ms)\n✔ probes all four runtime classes without hiding a failed version check (0.879ms)\nℹ tests 23\nℹ suites 0\nℹ pass 23\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 592.4099",
+    "stderr": ""
+  }
+}

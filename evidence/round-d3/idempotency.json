@@ -1,0 +1,26 @@
+{
+  "schema": "hummer.phase0-evidence",
+  "version": 1,
+  "capturedAt": "2026-10-06T18:19:40.224Z",
+  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "status": "local-store-verified",
+  "acceptance": [],
+  "limitations": [
+    "The Relay is an in-process service and dedicated SQLite store only.",
+    "Fastify, WSS/SSE transport, bearer-token authentication, and a two-machine 100-task run remain unimplemented."
+  ],
+  "checks": [
+    {
+      "command": "npm run typecheck -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "> @hummer/relay@0.1.0-alpha.0 typecheck\n> tsc -p tsconfig.json --noEmit",
+      "stderr": ""
+    },
+    {
+      "command": "npm test -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  2 passed (2)\n      Tests  43 passed (43)\n   Start at  02:19:50\n   Duration  1.22s (transform 257ms, setup 0ms, import 1.11s, tests 94ms, environment 0ms)",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "hummer.phase0-evidence",
+  "version": 1,
+  "capturedAt": "2026-10-06T18:19:40.224Z",
+  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "status": "component-verified",
+  "acceptance": [],
+  "limitations": [
+    "The StartWorkPage component is not yet routed into the production Workbench flow.",
+    "Planner, Relay dispatch, and real pending intake are not yet connected."
+  ],
+  "check": {
+    "command": "npx vitest run src/features/home/StartWorkPage.test.tsx --config vitest.ui.config.ts",
+    "exitCode": 0,
+    "stdout": "RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  02:19:55\n   Duration  2.17s (transform 114ms, setup 310ms, import 161ms, tests 254ms, environment 1.20s)",
+    "stderr": ""
+  }
+}

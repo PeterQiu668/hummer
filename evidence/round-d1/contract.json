@@ -1,0 +1,17 @@
+{
+  "schema": "hummer.phase0-evidence",
+  "version": 1,
+  "capturedAt": "2026-10-06T18:19:40.224Z",
+  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "status": "passed",
+  "acceptance": [
+    "AC-P0-01",
+    "AC-P0-02"
+  ],
+  "check": {
+    "command": "npm run test:contract",
+    "exitCode": 0,
+    "stdout": "> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":43,\"negativeCases\":28,\"maxBytes\":65536}",
+    "stderr": ""
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "hummer.phase0-gate-evidence",
+  "version": 1,
+  "capturedAt": "2026-10-06T18:19:40.224Z",
+  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "status": "passed",
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit",
+      "stderr": ""
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "stdout": "> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 1993 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BEF18JOn.css   49.61 kB │ gzip:   9.69 kB\ndist/assets/index-COVoSNix.js   557.92 kB │ gzip: 170.80 kB\n✓ built in 4.85s",
+      "stderr": "(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "stdout": "> hummer-enterprise-workspace@0.2.0 test\n> npm run audit:dead-controls && npm run test:unit && npm run test:ui\n\n\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  59 passed (59)\n      Tests  261 passed (261)\n   Start at  02:20:29\n   Duration  9.24s (transform 2.16s, setup 0ms, import 9.64s, tests 7.68s, environment 8ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  15 passed (15)\n      Tests  46 passed (46)\n   Start at  02:20:40\n   Duration  11.48s (transform 5.55s, setup 13.02s, import 8.65s, tests 17.04s, environment 47.35s)",
+      "stderr": ""
+    }
+  ],
+  "openBlockers": [
+    "D0 pin mismatch: host Node.js is 24.16.0 instead of 22.22.2 and Codex is 0.160.1 instead of 0.153.4.",
+    "No true two-machine run, transport authentication, offline recovery drill, or 100-task exactly-once evidence yet."
+  ]
+}
