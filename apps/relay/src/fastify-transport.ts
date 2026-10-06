@@ -131,6 +131,17 @@ function assertNoFields(body: unknown): void {
   throw new TransportHttpError(400, 'invalid_contract', 'request body must not contain fields');
 }
 
+function assertNoQueryFields(request: FastifyRequest): void {
+  const query = (request.query ?? {}) as Record<string, unknown>;
+  if (Object.keys(query).length > 0) {
+    throw new TransportHttpError(400, 'invalid_contract', 'control-plane query must not contain fields');
+  }
+}
+
+function controlResourceNotFound(): TransportHttpError {
+  return new TransportHttpError(404, 'control_resource_not_found', 'control-plane resource was not found');
+}
+
 function fleetStatus(error: FleetRejectedError): number {
   if (error.code === 'invalid_contract') return 400;
   if (error.code === 'tenant_mismatch' || error.code === 'lease_owner_mismatch' || error.code === 'actor_mismatch') return 403;
@@ -301,6 +312,48 @@ export function createFleetRelayServer(
     const task = await ingress.stop(session, pathParam(request, 'taskId'));
     events.publish(task.tenantId, task.targetNodeId, 'task.stop', { taskId: task.taskId });
     return { task };
+  });
+
+  app.get('/v1/control/nodes', async (request) => {
+    const { session } = await authorize(request, 'node.read');
+    assertNoQueryFields(request);
+    return { nodes: await ingress.listNodes(session) };
+  });
+
+  app.get('/v1/control/nodes/:nodeId', async (request) => {
+    const { session } = await authorize(request, 'node.read');
+    assertNoQueryFields(request);
+    const node = await ingress.getNode(session, pathParam(request, 'nodeId'));
+    if (!node) throw controlResourceNotFound();
+    return { node };
+  });
+
+  app.get('/v1/control/tasks', async (request) => {
+    const { session } = await authorize(request, 'task.read');
+    assertNoQueryFields(request);
+    return { tasks: await ingress.listTasks(session) };
+  });
+
+  app.get('/v1/control/tasks/:taskId', async (request) => {
+    const { session } = await authorize(request, 'task.read');
+    assertNoQueryFields(request);
+    const task = await ingress.getTask(session, pathParam(request, 'taskId'));
+    if (!task) throw controlResourceNotFound();
+    return { task };
+  });
+
+  app.get('/v1/control/approval-requests', async (request) => {
+    const { session } = await authorize(request, 'approval.read');
+    assertNoQueryFields(request);
+    return { approvalRequests: await ingress.listApprovalRequests(session) };
+  });
+
+  app.get('/v1/control/approval-requests/:requestId', async (request) => {
+    const { session } = await authorize(request, 'approval.read');
+    assertNoQueryFields(request);
+    const approvalRequest = await ingress.getApprovalRequest(session, pathParam(request, 'requestId'));
+    if (!approvalRequest) throw controlResourceNotFound();
+    return { approvalRequest };
   });
 
   app.put('/v1/governance/nodes/:nodeId/quotas/:day', async (request) => {

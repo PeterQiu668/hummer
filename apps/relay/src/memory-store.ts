@@ -145,6 +145,17 @@ export class MemoryFleetStore implements FleetStore {
     return clone(node);
   }
 
+  async listNodes(tenantId: string, now: string): Promise<readonly FleetNodeRecord[]> {
+    this.advanceClock(now);
+    return [...this.#nodes.values()]
+      .filter((node) => node.tenantId === tenantId)
+      .map((node) => {
+        this.refreshNode(node, now);
+        return clone(node);
+      })
+      .sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+  }
+
   async enqueueTask(tenantId: string, envelope: FleetObject, claims: TaskClaims, retryOfTaskId: string | null, now: string): Promise<EnqueueResult> {
     this.advanceClock(now);
     const expiresAt = canonicalUtcTimestamp(claims.expiresAt, 'task expiresAt');
@@ -261,6 +272,15 @@ export class MemoryFleetStore implements FleetStore {
     return task ? clone(task) : null;
   }
 
+  async listTasks(tenantId: string, now: string): Promise<readonly FleetTaskRecord[]> {
+    this.advanceClock(now);
+    this.recoverExpiredLeases(tenantId, now);
+    return [...this.#tasks.values()]
+      .filter((task) => task.tenantId === tenantId)
+      .map((task) => clone(task))
+      .sort((left, right) => left.taskId.localeCompare(right.taskId));
+  }
+
   async putApprovalRequest(
     tenantId: string,
     taskId: string,
@@ -351,6 +371,13 @@ export class MemoryFleetStore implements FleetStore {
   async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
     const record = this.#approvalRequests.get(key(tenantId, requestId));
     return record ? clone(record) : null;
+  }
+
+  async listApprovalRequests(tenantId: string): Promise<readonly ApprovalRequestRecord[]> {
+    return [...this.#approvalRequests.values()]
+      .filter((request) => request.tenantId === tenantId)
+      .map((request) => clone(request))
+      .sort((left, right) => left.requestId.localeCompare(right.requestId));
   }
 
   async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
