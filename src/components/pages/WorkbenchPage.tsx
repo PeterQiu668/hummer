@@ -54,7 +54,10 @@ import { createDefaultPlanner } from '../../features/planning/plannerFactory';
 import { desktopToolRegistryPort } from '../../features/tools/toolRegistryClient';
 import { desktopExecutionNodePort } from '../../features/execution-nodes/executionNodeClient';
 import StartWorkFlow from '../../features/home/StartWorkFlow';
+import BatchDispatchPanel from '../../features/home/BatchDispatchPanel';
 import type { StartWorkDispatchIntentPort } from '../../features/home/startWorkDispatch';
+import { remoteBatchDispatchPort, remoteStartWorkDispatchPort } from '../../features/home/remoteRelayDispatch';
+import { currentTenantId } from '../../features/identity/identityClient';
 import {
   desktopWorkOrderIntakePort,
   type WorkOrderInboxRecord,
@@ -122,9 +125,20 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
   const [egressBusy, setEgressBusy] = useState(false);
   const subscriptions = useRef(new Map<string, () => void>());
   const persistenceQueues = useRef(new Map<string, Promise<void>>());
+  const browserRelaySurface = typeof window !== 'undefined' && !window.hummerDesktop;
   const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
   const intakePort = useMemo(() => desktopWorkOrderIntakePort(), []);
   const executionNodePort = useMemo(() => desktopExecutionNodePort(), []);
+  const browserRemoteDispatchPort = useMemo(
+    () => browserRelaySurface ? remoteStartWorkDispatchPort() : undefined,
+    [],
+  );
+  const browserBatchDispatchPort = useMemo(
+    () => browserRelaySurface ? remoteBatchDispatchPort() : undefined,
+    [],
+  );
+  const effectiveDispatchIntentPort = dispatchIntentPort ?? browserRemoteDispatchPort;
+  const startWorkTenantId = currentTenantId() ?? 'tenant_demo';
   const toolRegistryPort = useMemo(() => desktopToolRegistryPort(), []);
 
   useEffect(() => {
@@ -563,12 +577,16 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
         sub="先生成可审阅计划；只有你的明确确认才会产生 pending 派发意图。"
         actions={<><button type="button" className="hum-btn is-sm" onClick={() => setStartWorkOpen(false)}>返回工作台</button>{prototypeBadge}</>}
       >
-        <StartWorkFlow
-          planner={activePlanner}
-          nodePort={executionNodePort}
-          planDefaults={{ assignee, approvalMode, attachmentNames, modelProfile, engineProfileId: profile.id, workContext }}
-          dispatchIntentPort={dispatchIntentPort}
-        />
+        <div className="min-h-full">
+          <StartWorkFlow
+            planner={activePlanner}
+            nodePort={executionNodePort}
+            tenantId={startWorkTenantId}
+            planDefaults={{ assignee, approvalMode, attachmentNames, modelProfile, engineProfileId: profile.id, workContext }}
+            dispatchIntentPort={effectiveDispatchIntentPort}
+          />
+          {browserRelaySurface ? <BatchDispatchPanel port={browserBatchDispatchPort} tenantId={startWorkTenantId} /> : null}
+        </div>
       </WorkspacePage>
     );
   }

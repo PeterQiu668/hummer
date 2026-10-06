@@ -41,7 +41,7 @@ describe('StartWorkPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '确认计划' }));
 
-    expect(screen.getByText('计划已确认，尚未派发')).toBeInTheDocument();
+    expect(screen.getByText('计划已确认，等待派发回执')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '确认计划' })).not.toBeInTheDocument();
     expect(onDecision).toHaveBeenCalledTimes(1);
     expect(onDecision).toHaveBeenCalledWith(

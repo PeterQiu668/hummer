@@ -3,6 +3,10 @@ export type { StartWorkPageProps } from './StartWorkPage';
 export { default as StartWorkFlow } from './StartWorkFlow';
 export type { StartWorkFlowProps } from './StartWorkFlow';
 export type { StartWorkDispatchIntent, StartWorkDispatchIntentPort } from './startWorkDispatch';
+export { configureRemoteRelayDeployment, consumeInjectedRemoteRelayDeployment } from './remoteRelayDispatch';
+export type { RemoteRelayDeploymentConfig } from './remoteRelayDispatch';
+export { default as BatchDispatchPanel } from './BatchDispatchPanel';
+export type { BatchDispatchPanelProps } from './BatchDispatchPanel';
 export {
   START_WORK_RISK_CLASSES,
   decideStartWorkPlan,

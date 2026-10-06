@@ -33,6 +33,7 @@ export default function StartWorkFlow({
   const [plan, setPlan] = useState<StartWorkPlan | null>(null);
   const [sourcePlan, setSourcePlan] = useState<SessionPlan | null>(null);
   const [intent, setIntent] = useState<StartWorkDispatchIntent | null>(null);
+  const [dispatching, setDispatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const requestPlan = async (target: string) => {
@@ -54,7 +55,11 @@ export default function StartWorkFlow({
 
   const decide = (decidedPlan: StartWorkPlan, decision: 'confirm' | 'reject') => {
     if (decision === 'reject') return;
-    if (!sourcePlan || intent) return;
+    if (!sourcePlan || intent || dispatching) return;
+    if (!dispatchIntentPort) {
+      setError('Relay 未配置，当前只读，无法派发任务');
+      return;
+    }
     try {
       const nextIntent = createStartWorkDispatchIntent({
         plan: { ...decidedPlan, status: 'pending', decidedBy: null, decidedAt: null },
@@ -64,8 +69,10 @@ export default function StartWorkFlow({
         confirmedAt: decidedPlan.decidedAt ?? now(),
       });
       setError(null);
-      setIntent(nextIntent);
-      void Promise.resolve(dispatchIntentPort?.record(nextIntent)).catch((cause) => {
+      setDispatching(true);
+      void Promise.resolve().then(() => dispatchIntentPort.record(nextIntent)).then(() => {
+        setIntent(nextIntent);
+      }).catch((cause) => {
         setIntent(null);
         setPlan({
           ...decidedPlan,
@@ -74,6 +81,8 @@ export default function StartWorkFlow({
           decidedAt: null,
         });
         setError(cause instanceof Error ? cause.message : '派发适配器未能记录意图');
+      }).finally(() => {
+        setDispatching(false);
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法生成派发意图');
@@ -86,10 +95,12 @@ export default function StartWorkFlow({
         plan={plan}
         decisionActorRef={decisionActorRef}
         now={now}
+        dispatchAvailable={Boolean(dispatchIntentPort)}
         onPlanRequest={(target) => { void requestPlan(target); }}
         onDecision={decide}
       />
-      {intent ? <output className="sr-only" aria-label="待派发意图">{intent.envelope.idempotencyKey}</output> : null}
+      {dispatching ? <p className="mx-auto mb-4 max-w-3xl text-sm hum-muted" role="status">正在提交到 Relay…</p> : null}
+      {intent ? <output className="mx-auto mb-4 block max-w-3xl text-sm text-[var(--success)]" aria-label="派发回执">任务已提交到 Relay · {intent.envelope.idempotencyKey}</output> : null}
       {error ? <p className="mx-auto mb-4 max-w-3xl text-sm text-[var(--error)]" role="alert">{error}</p> : null}
     </div>
   );
