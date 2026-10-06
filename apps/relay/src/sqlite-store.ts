@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import type { CapabilityInstallGateDecision, CapabilityInstallGateInput, CapabilityShareInvitation, SkillTrialSystemRecordInput, TeamReadOnlyShare } from '@hummer/contracts';
 import { canonicalJson } from './canonical-json.js';
 import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 import { assertNodeTenantAuthorization } from './tenant-boundary.js';
@@ -28,7 +29,19 @@ import {
   type TenantQuotaLimits,
   type TenantQuotaMetric,
   type TenantQuotaUsage,
+  type CapabilityCatalogItem,
+  type CapabilityRegistryRecord,
+  type CapabilityShareCreateInput,
+  type CapabilityTrialRecordInput,
+  type CapabilityVersionCreateInput,
 } from './ports.js';
+import {
+  assertCapabilityHistory,
+  capabilityRecordFromShare,
+  buildCapabilityShare,
+  createTrialAggregate,
+  rebindCapabilityInstallDecision,
+} from './capability-registry.js';
 import {
   TENANT_QUOTA_METRICS,
   assertQuotaDay,
@@ -165,7 +178,24 @@ interface TenantAuditExportRow {
   created_at: string;
 }
 
-export const RELAY_SCHEMA_VERSION = 14;
+interface CapabilityPackageRow {
+  tenant_id: string;
+  package_id: string;
+  package_version: number;
+  package_digest: string;
+  author_json: string;
+  trial_record_json: string | null;
+  status: CapabilityRegistryRecord['status'];
+  source_task_id: string;
+  artifact_event_id: string;
+  completed_event_id: string;
+  created_at: string;
+}
+
+interface CapabilityTrialRow { trial_json: string }
+interface CapabilityShareRow { share_json: string }
+
+export const RELAY_SCHEMA_VERSION = 15;
 
 function openDatabase(path: string): SqliteDatabase {
   const require = createRequire(import.meta.url);
@@ -212,6 +242,22 @@ function toTask(row: TaskRow): FleetTaskRecord {
     retryOfTaskId: row.retry_of_task_id,
     leaseOwnerNodeId: row.lease_owner_node_id,
     leaseExpiresAt: row.lease_expires_at,
+  };
+}
+
+function toCapabilityPackage(row: CapabilityPackageRow): CapabilityRegistryRecord {
+  return {
+    tenantId: row.tenant_id,
+    packageId: row.package_id,
+    packageVersion: row.package_version,
+    packageDigest: row.package_digest,
+    author: JSON.parse(row.author_json) as CapabilityRegistryRecord['author'],
+    trialRecord: row.trial_record_json ? JSON.parse(row.trial_record_json) as CapabilityRegistryRecord['trialRecord'] : null,
+    status: row.status,
+    sourceTaskId: row.source_task_id,
+    artifactEventId: row.artifact_event_id,
+    completedEventId: row.completed_event_id,
+    createdAt: row.created_at,
   };
 }
 
@@ -865,8 +911,196 @@ export class SqliteFleetStore implements FleetStore {
     return row ? toAuditExport(row) : null;
   }
 
+  async createCapabilityVersion(
+    tenantId: string,
+    input: CapabilityVersionCreateInput,
+    actorRef: string,
+    now: string,
+  ): Promise<CapabilityRegistryRecord> {
+    this.advanceClock(now);
+    if (input.author.tenantId !== tenantId || input.author.status !== 'draft') {
+      throw new FleetRejectedError('tenant_mismatch', 'capability author tenant does not match the authenticated session');
+    }
+    return this.#db.transaction(() => {
+      const task = this.#db.prepare(`SELECT * FROM fleet_tasks WHERE tenant_id = ? AND task_id = ? AND status = 'completed'`)
+        .get<TaskRow>(tenantId, input.sourceTaskId);
+      if (!task) throw new FleetRejectedError('capability_not_found', 'completed source task was not found');
+      const artifact = this.#db.prepare(`SELECT * FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ? AND type = 'artifact'`)
+        .get<EventRow>(tenantId, task.work_order_id, input.artifactEventId);
+      const completed = this.#db.prepare(`SELECT * FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ? AND type = 'completed'`)
+        .get<EventRow>(tenantId, task.work_order_id, input.completedEventId);
+      const referenced = input.author.evidenceRefs.map((reference) => this.#db.prepare(`
+        SELECT event_id FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ?
+      `).get<{ event_id: string }>(tenantId, task.work_order_id, reference));
+      const receipt = this.#db.prepare(`
+        SELECT event_id FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ?
+      `).get<{ event_id: string }>(tenantId, task.work_order_id, input.author.receiptRef);
+      if (!artifact || !completed || referenced.some((row) => !row) || !receipt) {
+        throw new FleetRejectedError('capability_not_found', 'completed task evidence was not found');
+      }
+      const history = this.#db.prepare(`SELECT * FROM capability_packages WHERE tenant_id = ? AND package_id = ? ORDER BY package_version`)
+        .all<CapabilityPackageRow>(tenantId, input.author.packageId).map(toCapabilityPackage);
+      const packageDigest = assertCapabilityHistory(history, input.author);
+      try {
+        this.#db.prepare(`
+          INSERT INTO capability_packages (
+            tenant_id, package_id, package_version, package_digest, author_json, trial_record_json, status,
+            source_task_id, artifact_event_id, completed_event_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, NULL, 'draft', ?, ?, ?, ?)
+        `).run(tenantId, input.author.packageId, input.author.packageVersion, packageDigest, JSON.stringify(input.author),
+          input.sourceTaskId, input.artifactEventId, input.completedEventId, now);
+      } catch {
+        throw new FleetRejectedError('capability_conflict', 'capability version already exists or lost the append CAS');
+      }
+      this.appendTenantAudit(tenantId, 'capability.version_created', `${input.author.packageId}:${input.author.packageVersion}`, null, actorRef, now, {
+        packageDigest, sourceTaskId: input.sourceTaskId,
+      });
+      return this.requireCapabilityPackage(tenantId, input.author.packageId, input.author.packageVersion);
+    })();
+  }
+
+  async recordCapabilityTrial(
+    tenantId: string,
+    input: CapabilityTrialRecordInput,
+    nodeId: string,
+    now: string,
+  ): Promise<CapabilityRegistryRecord> {
+    this.advanceClock(now);
+    const trial = input.trial;
+    if (trial.tenantId !== tenantId || trial.environment.nodeId !== nodeId) {
+      throw new FleetRejectedError('capability_trust_denied', 'trial identity does not match the trusted node session');
+    }
+    return this.#db.transaction(() => {
+      this.requireNode(tenantId, nodeId);
+      const record = this.requireCapabilityPackage(tenantId, trial.packageId, trial.packageVersion);
+      if (record.packageDigest !== trial.packageDigest) throw new FleetRejectedError('capability_not_found', 'capability version was not found');
+      if (record.status === 'shared') throw new FleetRejectedError('capability_conflict', 'shared capability trial snapshot is immutable');
+      const exists = this.#db.prepare(`SELECT 1 AS found FROM capability_trials WHERE tenant_id = ? AND trial_id = ?`)
+        .get<{ found: number }>(tenantId, trial.trialId);
+      if (exists) throw new FleetRejectedError('capability_conflict', 'SkillTrial trialId already exists');
+      const trials = this.#db.prepare(`SELECT trial_json FROM capability_trials WHERE tenant_id = ? AND package_id = ? AND package_version = ? ORDER BY trial_id`)
+        .all<CapabilityTrialRow>(tenantId, trial.packageId, trial.packageVersion)
+        .map((row) => JSON.parse(row.trial_json) as SkillTrialSystemRecordInput);
+      const aggregate = createTrialAggregate([...trials, trial], input.regression);
+      try {
+        this.#db.prepare(`
+          INSERT INTO capability_trials (tenant_id, trial_id, package_id, package_version, package_digest, node_id, trial_json, recorded_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(tenantId, trial.trialId, trial.packageId, trial.packageVersion, trial.packageDigest, nodeId, JSON.stringify(trial), now);
+      } catch {
+        throw new FleetRejectedError('capability_conflict', 'SkillTrial trialId already exists');
+      }
+      const status = aggregate.shadowRuns >= 5 && aggregate.failure === 0 && aggregate.regressionPassed ? 'verified' : 'shadow';
+      this.#db.prepare(`UPDATE capability_packages SET trial_record_json = ?, status = ? WHERE tenant_id = ? AND package_id = ? AND package_version = ?`)
+        .run(JSON.stringify(aggregate), status, tenantId, trial.packageId, trial.packageVersion);
+      this.appendTenantAudit(tenantId, 'capability.trial_recorded', trial.trialId, nodeId, 'system:skill-trial', now, {
+        packageId: trial.packageId, packageVersion: trial.packageVersion, packageDigest: trial.packageDigest, ok: trial.ok,
+      });
+      return this.requireCapabilityPackage(tenantId, trial.packageId, trial.packageVersion);
+    })();
+  }
+
+  async createCapabilityShare(
+    sourceTenantId: string,
+    input: CapabilityShareCreateInput,
+    invitation: CapabilityShareInvitation | undefined,
+    actorRef: string,
+    now: string,
+  ): Promise<TeamReadOnlyShare> {
+    this.advanceClock(now);
+    return this.#db.transaction(() => {
+      const record = this.requireCapabilityPackage(sourceTenantId, input.packageId, input.packageVersion);
+      if (record.status !== 'verified' && record.status !== 'shared') {
+        throw new FleetRejectedError('capability_trust_denied', 'capability has not passed trusted trials');
+      }
+      const share = buildCapabilityShare({ shareId: input.shareId, record, targetTenantId: input.targetTenantId, invitation, actorRef, now });
+      try {
+        this.#db.prepare(`
+          INSERT INTO capability_shares (
+            target_tenant_id, share_id, source_tenant_id, package_id, package_version, package_digest, share_json, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(input.targetTenantId, input.shareId, sourceTenantId, input.packageId, input.packageVersion,
+          record.packageDigest, JSON.stringify(share), now);
+      } catch {
+        throw new FleetRejectedError('capability_conflict', 'capability share already exists');
+      }
+      this.#db.prepare(`UPDATE capability_packages SET status = 'shared' WHERE tenant_id = ? AND package_id = ? AND package_version = ?`)
+        .run(sourceTenantId, input.packageId, input.packageVersion);
+      this.appendTenantAudit(sourceTenantId, 'capability.shared', input.shareId, null, actorRef, now, {
+        targetTenantId: input.targetTenantId, packageId: input.packageId, packageVersion: input.packageVersion, packageDigest: record.packageDigest,
+      });
+      return share;
+    })();
+  }
+
+  async listCapabilities(tenantId: string): Promise<readonly CapabilityCatalogItem[]> {
+    const owned = this.#db.prepare(`SELECT * FROM capability_packages WHERE tenant_id = ? ORDER BY package_id, package_version`)
+      .all<CapabilityPackageRow>(tenantId)
+      .map((row): CapabilityCatalogItem => ({ access: 'owner', record: toCapabilityPackage(row), share: null }));
+    const shares = this.#db.prepare(`SELECT share_json FROM capability_shares WHERE target_tenant_id = ? ORDER BY package_id, package_version`)
+      .all<CapabilityShareRow>(tenantId).map((row) => JSON.parse(row.share_json) as TeamReadOnlyShare);
+    const shared = shares.map((share): CapabilityCatalogItem => ({
+      access: 'read_only',
+      record: capabilityRecordFromShare(
+        this.requireCapabilityPackage(share.sourceTenantId, share.packageId, share.packageVersion),
+        share,
+      ),
+      share,
+    }));
+    return [...owned, ...shared];
+  }
+
+  async getCapability(tenantId: string, packageId: string, packageVersion?: number): Promise<CapabilityCatalogItem | null> {
+    const candidates = (await this.listCapabilities(tenantId)).filter((item) => item.record.packageId === packageId
+      && (packageVersion === undefined || item.record.packageVersion === packageVersion));
+    return candidates.sort((left, right) => right.record.packageVersion - left.record.packageVersion)[0] ?? null;
+  }
+
+  async getCapabilityShare(targetTenantId: string, shareId: string): Promise<TeamReadOnlyShare | null> {
+    const row = this.#db.prepare(`SELECT share_json FROM capability_shares WHERE target_tenant_id = ? AND share_id = ?`)
+      .get<CapabilityShareRow>(targetTenantId, shareId);
+    return row ? JSON.parse(row.share_json) as TeamReadOnlyShare : null;
+  }
+
+  async recordCapabilityInstallDecision(
+    targetTenantId: string,
+    input: CapabilityInstallGateInput,
+    actorRef: string,
+    now: string,
+  ): Promise<CapabilityInstallGateDecision> {
+    this.advanceClock(now);
+    return this.#db.transaction(() => {
+      const shareId = input.share.shareId;
+      const shareRow = this.#db.prepare(`SELECT share_json FROM capability_shares WHERE target_tenant_id = ? AND share_id = ?`)
+        .get<CapabilityShareRow>(targetTenantId, shareId);
+      if (!shareRow) throw new FleetRejectedError('capability_not_found', 'capability share was not found');
+      const share = JSON.parse(shareRow.share_json) as TeamReadOnlyShare;
+      const decision = rebindCapabilityInstallDecision({ share, targetTenantId, input, now });
+      try {
+        this.#db.prepare(`
+          INSERT INTO capability_install_decisions (target_tenant_id, gate_id, share_id, package_digest, request_digest, decision_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(targetTenantId, input.gateId, shareId, share.packageDigest, decision.requestDigest, JSON.stringify(decision), now);
+      } catch {
+        throw new FleetRejectedError('capability_conflict', 'install gate id already exists');
+      }
+      this.appendTenantAudit(targetTenantId, 'capability.install_evaluated', input.gateId, null, actorRef, now, {
+        shareId, packageDigest: share.packageDigest, decision: decision.decision, requestDigest: decision.requestDigest,
+      });
+      return decision;
+    })();
+  }
+
   close(): void {
     this.#db.close();
+  }
+
+  private requireCapabilityPackage(tenantId: string, packageId: string, packageVersion: number): CapabilityRegistryRecord {
+    const row = this.#db.prepare(`
+      SELECT * FROM capability_packages WHERE tenant_id = ? AND package_id = ? AND package_version = ?
+    `).get<CapabilityPackageRow>(tenantId, packageId, packageVersion);
+    if (!row) throw new FleetRejectedError('capability_not_found', 'capability version was not found');
+    return toCapabilityPackage(row);
   }
 
   private migrate(): void {
@@ -1064,12 +1298,95 @@ export class SqliteFleetStore implements FleetStore {
         BEFORE UPDATE ON audit_exports BEGIN SELECT RAISE(ABORT, 'audit exports are append-only'); END;
       CREATE TRIGGER IF NOT EXISTS audit_exports_no_delete
         BEFORE DELETE ON audit_exports BEGIN SELECT RAISE(ABORT, 'audit exports are append-only'); END;
+      CREATE TABLE IF NOT EXISTS capability_packages (
+        tenant_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL CHECK (package_version > 0),
+        package_digest TEXT NOT NULL,
+        author_json TEXT NOT NULL,
+        trial_record_json TEXT,
+        status TEXT NOT NULL CHECK (status IN ('draft', 'shadow', 'verified', 'shared')),
+        source_task_id TEXT NOT NULL,
+        artifact_event_id TEXT NOT NULL,
+        completed_event_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, package_id, package_version),
+        UNIQUE (tenant_id, package_id, package_digest),
+        FOREIGN KEY (tenant_id, source_task_id) REFERENCES fleet_tasks (tenant_id, task_id),
+        FOREIGN KEY (tenant_id, artifact_event_id) REFERENCES fleet_run_events (tenant_id, event_id),
+        FOREIGN KEY (tenant_id, completed_event_id) REFERENCES fleet_run_events (tenant_id, event_id)
+      );
+      CREATE TABLE IF NOT EXISTS capability_trials (
+        tenant_id TEXT NOT NULL,
+        trial_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL,
+        package_digest TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        trial_json TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, trial_id),
+        FOREIGN KEY (tenant_id, package_id, package_version)
+          REFERENCES capability_packages (tenant_id, package_id, package_version),
+        FOREIGN KEY (tenant_id, node_id) REFERENCES fleet_nodes (tenant_id, node_id)
+      );
+      CREATE INDEX IF NOT EXISTS capability_trials_package
+        ON capability_trials (tenant_id, package_id, package_version, trial_id);
+      CREATE TABLE IF NOT EXISTS capability_shares (
+        target_tenant_id TEXT NOT NULL,
+        share_id TEXT NOT NULL,
+        source_tenant_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        package_version INTEGER NOT NULL,
+        package_digest TEXT NOT NULL,
+        share_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (target_tenant_id, share_id),
+        FOREIGN KEY (source_tenant_id, package_id, package_version)
+          REFERENCES capability_packages (tenant_id, package_id, package_version)
+      );
+      CREATE INDEX IF NOT EXISTS capability_shares_source
+        ON capability_shares (source_tenant_id, package_id, package_version);
+      CREATE TABLE IF NOT EXISTS capability_install_decisions (
+        target_tenant_id TEXT NOT NULL,
+        gate_id TEXT NOT NULL,
+        share_id TEXT NOT NULL,
+        package_digest TEXT NOT NULL,
+        request_digest TEXT NOT NULL,
+        decision_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (target_tenant_id, gate_id),
+        FOREIGN KEY (target_tenant_id, share_id) REFERENCES capability_shares (target_tenant_id, share_id)
+      );
+      CREATE TRIGGER IF NOT EXISTS capability_packages_immutable_content
+        BEFORE UPDATE ON capability_packages
+        WHEN OLD.tenant_id != NEW.tenant_id OR OLD.package_id != NEW.package_id
+          OR OLD.package_version != NEW.package_version OR OLD.package_digest != NEW.package_digest
+          OR OLD.author_json != NEW.author_json OR OLD.source_task_id != NEW.source_task_id
+          OR OLD.artifact_event_id != NEW.artifact_event_id OR OLD.completed_event_id != NEW.completed_event_id
+          OR OLD.created_at != NEW.created_at
+        BEGIN SELECT RAISE(ABORT, 'capability package immutable content cannot be changed'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_packages_no_delete
+        BEFORE DELETE ON capability_packages BEGIN SELECT RAISE(ABORT, 'capability packages are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_trials_no_update
+        BEFORE UPDATE ON capability_trials BEGIN SELECT RAISE(ABORT, 'capability trials are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_trials_no_delete
+        BEFORE DELETE ON capability_trials BEGIN SELECT RAISE(ABORT, 'capability trials are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_shares_no_update
+        BEFORE UPDATE ON capability_shares BEGIN SELECT RAISE(ABORT, 'capability shares are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_shares_no_delete
+        BEFORE DELETE ON capability_shares BEGIN SELECT RAISE(ABORT, 'capability shares are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_install_decisions_no_update
+        BEFORE UPDATE ON capability_install_decisions BEGIN SELECT RAISE(ABORT, 'capability install decisions are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS capability_install_decisions_no_delete
+        BEFORE DELETE ON capability_install_decisions BEGIN SELECT RAISE(ABORT, 'capability install decisions are append-only'); END;
     `);
     const migration = this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
     migration.run(11, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
     migration.run(12, 'relay_monotonic_clock', new Date(0).toISOString());
     migration.run(13, 'relay_append_only_approval_binding', new Date(0).toISOString());
-    migration.run(RELAY_SCHEMA_VERSION, 'relay_tenant_governance', new Date(0).toISOString());
+    migration.run(14, 'relay_tenant_governance', new Date(0).toISOString());
+    migration.run(RELAY_SCHEMA_VERSION, 'relay_capability_registry', new Date(0).toISOString());
   }
 
   private advanceClock(now: string): void {

@@ -1,3 +1,13 @@
+import type {
+  CapabilityInstallGateDecision,
+  CapabilityInstallGateInput,
+  CapabilityPackageAuthorInput,
+  CapabilityShareInvitation,
+  SkillTrialSystemRecordInput,
+  TeamReadOnlyShare,
+  TrialRecord,
+} from '@hummer/contracts';
+
 export type FleetObject = Readonly<Record<string, unknown>>;
 
 export type FleetRejectionCode =
@@ -20,7 +30,10 @@ export type FleetRejectionCode =
   | 'approval_scope_exceeded'
   | 'approval_replayed'
   | 'quota_exceeded'
-  | 'audit_export_not_found';
+  | 'audit_export_not_found'
+  | 'capability_not_found'
+  | 'capability_conflict'
+  | 'capability_trust_denied';
 
 export class FleetRejectedError extends Error {
   constructor(
@@ -148,6 +161,8 @@ export interface AuthenticatedFleetSession {
   authorizedTenantIds?: readonly string[];
   /** Required opaque reference when `authorizedTenantIds` contains multiple tenants. */
   tenantGrantRef?: string;
+  /** Token expiry is transport-authenticated and bounds cross-tenant share invitations. */
+  authExpiresAt?: string;
 }
 
 export type NodeStatus = 'online' | 'offline';
@@ -218,7 +233,50 @@ export type TenantAuditAction =
   | 'quota.usage'
   | 'quota.warning'
   | 'quota.exceeded'
-  | 'audit.exported';
+  | 'audit.exported'
+  | 'capability.version_created'
+  | 'capability.trial_recorded'
+  | 'capability.shared'
+  | 'capability.install_evaluated';
+
+export interface CapabilityVersionSource {
+  sourceTaskId: string;
+  artifactEventId: string;
+  completedEventId: string;
+}
+
+export interface CapabilityVersionCreateInput extends CapabilityVersionSource {
+  author: CapabilityPackageAuthorInput;
+}
+
+export interface CapabilityRegistryRecord extends CapabilityVersionSource {
+  tenantId: string;
+  packageId: string;
+  packageVersion: number;
+  packageDigest: string;
+  author: CapabilityPackageAuthorInput;
+  trialRecord: TrialRecord | null;
+  status: 'draft' | 'shadow' | 'verified' | 'shared';
+  createdAt: string;
+}
+
+export interface CapabilityTrialRecordInput {
+  trial: SkillTrialSystemRecordInput;
+  regression: { passed: boolean; evidenceDigest: string };
+}
+
+export interface CapabilityShareCreateInput {
+  shareId: string;
+  packageId: string;
+  packageVersion: number;
+  targetTenantId: string;
+}
+
+export interface CapabilityCatalogItem {
+  access: 'owner' | 'read_only';
+  record: CapabilityRegistryRecord;
+  share: TeamReadOnlyShare | null;
+}
 
 export interface TenantAuditEvent {
   tenantId: string;
@@ -304,6 +362,13 @@ export interface FleetStore {
   listTenantAudit(tenantId: string, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]>;
   createAuditExport(tenantId: string, rangeFrom: number | undefined, rangeTo: number | undefined, actorRef: string, now: string): Promise<TenantAuditExport>;
   getAuditExport(tenantId: string, exportId: string): Promise<TenantAuditExport | null>;
+  createCapabilityVersion(tenantId: string, input: CapabilityVersionCreateInput, actorRef: string, now: string): Promise<CapabilityRegistryRecord>;
+  recordCapabilityTrial(tenantId: string, input: CapabilityTrialRecordInput, nodeId: string, now: string): Promise<CapabilityRegistryRecord>;
+  createCapabilityShare(sourceTenantId: string, input: CapabilityShareCreateInput, invitation: CapabilityShareInvitation | undefined, actorRef: string, now: string): Promise<TeamReadOnlyShare>;
+  listCapabilities(tenantId: string): Promise<readonly CapabilityCatalogItem[]>;
+  getCapability(tenantId: string, packageId: string, packageVersion?: number): Promise<CapabilityCatalogItem | null>;
+  getCapabilityShare(targetTenantId: string, shareId: string): Promise<TeamReadOnlyShare | null>;
+  recordCapabilityInstallDecision(targetTenantId: string, input: CapabilityInstallGateInput, actorRef: string, now: string): Promise<CapabilityInstallGateDecision>;
   close(): void;
 }
 
@@ -334,6 +399,12 @@ export interface FleetIngress {
   listTenantAudit(session: AuthenticatedFleetSession, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]>;
   createAuditExport(session: AuthenticatedFleetSession, input: unknown): Promise<TenantAuditExport>;
   getAuditExport(session: AuthenticatedFleetSession, exportId: string): Promise<TenantAuditExport | null>;
+  createCapabilityVersion(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityRegistryRecord>;
+  recordCapabilityTrial(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityRegistryRecord>;
+  createCapabilityShare(session: AuthenticatedFleetSession, input: unknown): Promise<TeamReadOnlyShare>;
+  listCapabilities(session: AuthenticatedFleetSession): Promise<readonly CapabilityCatalogItem[]>;
+  getCapability(session: AuthenticatedFleetSession, packageId: string, packageVersion?: number): Promise<CapabilityCatalogItem | null>;
+  evaluateCapabilityInstall(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityInstallGateDecision>;
 }
 
 /** Thin delivery adapters (Fastify/WSS/SSE) must implement this port only. */

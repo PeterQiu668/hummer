@@ -20,6 +20,11 @@ export const BADGE_SCOPES = [
   'quota.manage',
   'quota.read',
   'quota.record',
+  'capability.read',
+  'capability.write',
+  'capability.trial.record',
+  'capability.share',
+  'capability.install.evaluate',
 ] as const;
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];
