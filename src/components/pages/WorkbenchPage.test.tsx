@@ -6,7 +6,9 @@ import { draftPlanFromPrompt } from '../../features/sessions/model/session';
 import WorkbenchPage from './WorkbenchPage';
 import { useAppStore } from '../../store/useAppStore';
 
-function renderWorkbench(store = new MemorySessionStore()) {
+const memorySessionStore = () => new MemorySessionStore(() => 'tenant-test');
+
+function renderWorkbench(store = memorySessionStore()) {
   return render(<WorkbenchPage runtime={new MockRuntimeAdapter({ stepDelayMs: 1 })} sessionStore={store} />);
 }
 afterEach(() => {
@@ -61,7 +63,7 @@ describe('WorkbenchPage V5', () => {
     };
     const draft = vi.fn().mockResolvedValue(draftPlanFromPrompt(pending.payload.prompt));
 
-    render(<WorkbenchPage runtime={new MockRuntimeAdapter({ stepDelayMs: 1 })} sessionStore={new MemorySessionStore()} planner={{ draft }} />);
+    render(<WorkbenchPage runtime={new MockRuntimeAdapter({ stepDelayMs: 1 })} sessionStore={memorySessionStore()} planner={{ draft }} />);
 
     expect(await screen.findByText('待处理工单')).toBeInTheDocument();
     expect(screen.getByText('处理新订单：orders.xlsx')).toBeInTheDocument();
@@ -177,7 +179,7 @@ describe('WorkbenchPage V5', () => {
     window.hummerApprovalPolicy = { authorize, preview, evidence };
     const runtime = new MockRuntimeAdapter({ stepDelayMs: 1 });
     const respond = vi.spyOn(runtime, 'respondToApproval');
-    render(<WorkbenchPage runtime={runtime} sessionStore={new MemorySessionStore()} />);
+    render(<WorkbenchPage runtime={runtime} sessionStore={memorySessionStore()} />);
     const composer = screen.getByRole('textbox', { name: '任务描述' });
     fireEvent.change(composer, { target: { value: '整理本周线索' } });
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' });
@@ -288,7 +290,7 @@ describe('WorkbenchPage V5', () => {
   });
 
   it('restores a completed session by replaying persisted RuntimeEvents after remount', async () => {
-    const store = new MemorySessionStore();
+    const store = memorySessionStore();
     const first = renderWorkbench(store);
     const composer = screen.getByRole('textbox', { name: '任务描述' });
     fireEvent.change(composer, { target: { value: '整理本周线索' } });
@@ -306,7 +308,7 @@ describe('WorkbenchPage V5', () => {
   });
 
   it('restores a real runtime trajectory as interrupted without exposing a dead approval handle', async () => {
-    const store = new MemorySessionStore();
+    const store = memorySessionStore();
     const plan = draftPlanFromPrompt('读取真实目录并生成摘要');
     const handle = { runtimeId: 'codex-cli', sessionId: 'ses_real_restart', nativeSessionId: 'thread_dead' };
     await store.saveSession(plan, handle);

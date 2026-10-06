@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Building2, KeyRound, ShieldCheck } from 'lucide-react';
 import {
   acceptInvitation,
@@ -10,6 +10,7 @@ import {
   type IdentityContext as IdentityValue,
   type TenantRecord,
 } from './identityClient';
+import { activateTenantAppStore } from '../../store/useAppStore';
 
 interface IdentityState {
   identity: IdentityValue;
@@ -29,6 +30,8 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     let active = true;
     void resumeIdentity().then(async (value) => {
       if (!active) return;
+      if (value) await activateTenantAppStore(value.tenant.id);
+      if (!active) return;
       setIdentity(value);
       if (value) setTenants(await listTenants());
     }).finally(() => { if (active) setLoading(false); });
@@ -37,15 +40,22 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
 
   const refreshTenants = async () => setTenants(await listTenants());
   const selectTenant = async (tenantId: string) => {
-    const value = await switchTenant(tenantId);
-    setIdentity(value);
-    await refreshTenants();
+    setLoading(true);
+    try {
+      const value = await switchTenant(tenantId);
+      setIdentity(null);
+      await activateTenantAppStore(value.tenant.id);
+      setIdentity(value);
+      await refreshTenants();
+    } finally {
+      setLoading(false);
+    }
   };
   const value = useMemo(() => identity ? { identity, tenants, switchTenant: selectTenant, refreshTenants } : null, [identity, tenants]);
 
   if (loading) return <div className="grid h-full place-items-center bg-neutral-50 text-[12px] text-neutral-500">正在载入企业身份...</div>;
-  if (!identity) return <IdentityGate onReady={async (next) => { setIdentity(next); setTenants(await listTenants()); }} />;
-  return <IdentityContext.Provider value={value}>{children}</IdentityContext.Provider>;
+  if (!identity) return <IdentityGate onReady={async (next) => { await activateTenantAppStore(next.tenant.id); setIdentity(next); setTenants(await listTenants()); }} />;
+  return <IdentityContext.Provider value={value}><Fragment key={identity.tenant.id}>{children}</Fragment></IdentityContext.Provider>;
 }
 
 export function useOptionalIdentity(): IdentityState | null { return useContext(IdentityContext); }

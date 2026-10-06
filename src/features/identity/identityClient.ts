@@ -1,3 +1,5 @@
+import { clearLegacyUnscopedRendererCaches, clearTenantRendererCache } from './tenantCache';
+
 export type MembershipRole = 'owner' | 'admin' | 'member';
 export interface AccountRecord { id: string; email: string | null; phone: string | null; displayName: string }
 export interface TenantRecord { id: string; name: string; slug: string }
@@ -30,6 +32,12 @@ declare global {
 }
 
 export function currentIdentity(): IdentityContext | null { return currentContext; }
+export function currentTenantId(): string | null { return currentContext?.tenant.id ?? null; }
+export function requireCurrentTenantId(): string {
+  const tenantId = currentTenantId();
+  if (!tenantId) throw new Error('An authenticated tenant is required');
+  return tenantId;
+}
 export function currentSessionToken(): string | null { return currentContext?.session.token ?? readToken(); }
 export function isDesktopIdentity(): boolean { return typeof window !== 'undefined' && Boolean(window.hummerIdentity); }
 
@@ -93,6 +101,9 @@ export async function createInvitation(input: {
 }
 
 export function clearIdentity(): void {
+  const tenantId = currentContext?.tenant.id;
+  if (tenantId) clearTenantRendererCache(tenantId);
+  clearLegacyUnscopedRendererCaches();
   currentContext = null;
   if (typeof localStorage !== 'undefined') localStorage.removeItem(TOKEN_KEY);
   if (typeof localStorage !== 'undefined') localStorage.removeItem(`${TOKEN_KEY}.browser`);

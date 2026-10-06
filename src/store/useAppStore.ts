@@ -1,11 +1,20 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type {
   ZoneId, Employee, ScreenView, RiskAlert, SkillSlotInEvent,
   RoleKey, CollabTask, DeliverableExitAction, AuthorizationGrant, TrialDecision, ExpertTicket,
 } from '../lib/types';
 import { initialRiskAlerts } from '../data/tasks';
 import { a2aHandoffPool } from '../data/executives';
+import { clearLegacyUnscopedRendererCaches, clearTenantRendererCache, tenantCacheKey } from '../features/identity/tenantCache';
+
+let activeAppTenantId: string | null = null;
+let suppressAppStorePersistence = false;
+const guardedLocalStorage: StateStorage = {
+  getItem: (name) => typeof localStorage === 'undefined' ? null : localStorage.getItem(name),
+  setItem: (name, value) => { if (!suppressAppStorePersistence && typeof localStorage !== 'undefined') localStorage.setItem(name, value); },
+  removeItem: (name) => { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); },
+};
 
 interface CollabFeedItem {
   id: string;
@@ -515,8 +524,10 @@ export const useAppStore = create<AppState>()(
         })),
     }),
     {
-      name: 'hummer-v6',
-      version: 3,
+      name: 'hummer-v6-unbound',
+      version: 4,
+      storage: createJSONStorage(() => guardedLocalStorage),
+      skipHydration: true,
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as Record<string, unknown>;
         const activePage = normalizeV3Page(state.activePage);
@@ -527,14 +538,14 @@ export const useAppStore = create<AppState>()(
           : legacyModel === '公司私有模型' ? '增强' : '标准';
         return { ...state, activePage, leftNav: activePage, personalSettings: { ...settings, preferredModel } } as any;
       },
-      // Only persist user-state, not transient UI state (toasts/modals/slot-in/drawer)
+      // Persisted business UI state is tenant-scoped; authoritative writes still go through backend ports.
       partialize: (s) => ({
         activePage: s.activePage,
         leftNav: s.leftNav,
         mcpApps: s.mcpApps,
         installedSkills: s.installedSkills,
         taskStatuses: s.taskStatuses,
-        auditLog: s.auditLog.slice(0, 60),  // cap on disk
+        auditLog: s.auditLog.slice(0, 60),
         bootDone: s.bootDone,
         extraTasks: s.extraTasks.slice(0, 30),
         trialDecisions: s.trialDecisions,
@@ -544,6 +555,22 @@ export const useAppStore = create<AppState>()(
     },
   ),
 );
+
+export async function activateTenantAppStore(tenantId: string): Promise<void> {
+  if (!tenantId.trim()) throw new Error('Renderer state requires an authenticated tenant');
+  const previousTenantId = activeAppTenantId;
+  if (previousTenantId && previousTenantId !== tenantId) clearTenantRendererCache(previousTenantId);
+  clearLegacyUnscopedRendererCaches();
+  activeAppTenantId = tenantId;
+  useAppStore.persist.setOptions({ name: tenantCacheKey(tenantId, 'app-state') });
+  suppressAppStorePersistence = true;
+  try {
+    useAppStore.setState(useAppStore.getInitialState(), true);
+  } finally {
+    suppressAppStorePersistence = false;
+  }
+  await useAppStore.persist.rehydrate();
+}
 
 // Mock runtime — pushes periodic events to make the system feel alive.
 if (typeof window !== 'undefined') {

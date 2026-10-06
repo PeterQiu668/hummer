@@ -62,8 +62,6 @@ import {
   type WorkOrderIntakeRecord,
 } from '../../features/intake/workOrderIntakeClient';
 
-const DEFAULT_RUNTIME = createDefaultRuntimeAdapter();
-
 const approvalModes: Record<ApprovalMode, { label: string; detail: string }> = {
   L1: { label: '只查看和起草', detail: '可以读取指定资料并起草结果，不会修改任何系统。' },
   L2: { label: '执行前确认', detail: '可以准备变更，真正写入或发送前会停下来问你。' },
@@ -76,9 +74,11 @@ interface RuntimeRecord {
   events: RuntimeEvent[];
 }
 
-export default function WorkbenchPage({ runtime = DEFAULT_RUNTIME, sessionStore, planner, dispatchIntentPort }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore; planner?: Planner; dispatchIntentPort?: StartWorkDispatchIntentPort }) {
-  const [defaultSessionStore] = useState(createDefaultSessionStore);
-  const store = sessionStore ?? defaultSessionStore;
+export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, planner, dispatchIntentPort }: { runtime?: RuntimeAdapter; sessionStore?: SessionStore; planner?: Planner; dispatchIntentPort?: StartWorkDispatchIntentPort }) {
+  const [defaultRuntime] = useState<RuntimeAdapter | null>(() => providedRuntime ? null : createDefaultRuntimeAdapter());
+  const [defaultSessionStore] = useState<SessionStore | null>(() => sessionStore ? null : createDefaultSessionStore());
+  const runtime = providedRuntime ?? defaultRuntime!;
+  const store = sessionStore ?? defaultSessionStore!;
   const personalSettings = useAppStore((state) => state.personalSettings);
   const workbenchPrefill = useAppStore((state) => state.workbenchPrefill);
   const clearWorkbenchPrefill = useAppStore((state) => state.clearWorkbenchPrefill);

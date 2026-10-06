@@ -4,6 +4,8 @@
  * 后续手绘 chibi 形象单独抽进 ChibiSVG，确认稳定后再切回。
  */
 import { useEffect, useState } from 'react';
+import { currentTenantId } from '../../features/identity/identityClient';
+import { tenantCacheKey } from '../../features/identity/tenantCache';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 const SIZE_PX: Record<AvatarSize, number> = { xs: 20, sm: 28, md: 40, lg: 56, xl: 80 };
@@ -53,9 +55,11 @@ export default function AgentAvatar({
   const [uploaded, setUploaded] = useState<string | null>(null);
 
   useEffect(() => {
-    setUploaded(localStorage.getItem(`hummer-avatar-${id}`));
+    const tenantId = currentTenantId();
+    const cacheKey = tenantId ? tenantCacheKey(tenantId, `avatar-${id}`) : null;
+    setUploaded(cacheKey ? localStorage.getItem(cacheKey) : null);
     const onStorage = (ev: StorageEvent) => {
-      if (ev.key === `hummer-avatar-${id}`) setUploaded(ev.newValue);
+      if (cacheKey && ev.key === cacheKey) setUploaded(ev.newValue);
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);

@@ -20,6 +20,8 @@ import {
 import { buildCandidates } from '../../data/trial';
 import AgentAvatar from '../ui/AgentAvatar';
 import LifecycleBoard from '../onboarding/LifecycleBoard';
+import { currentTenantId } from '../../features/identity/identityClient';
+import { tenantCacheKey } from '../../features/identity/tenantCache';
 
 type Tab = 'browse' | 'packages' | 'wizard' | 'experts' | 'mine';
 
@@ -63,9 +65,12 @@ export default function Marketplace() {
   const [q, setQ] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [trialEmp, setTrialEmp] = useState<typeof marketEmployees[number] | null>(null);
-  const [installed, setInstalled] = useState<Record<string, boolean>>(
-    () => JSON.parse(localStorage.getItem('hummer-marketplace-hires') ?? '{}'),
-  );
+  const tenantId = currentTenantId();
+  const hiresCacheKey = tenantId ? tenantCacheKey(tenantId, 'marketplace-hires') : null;
+  const [installed, setInstalled] = useState<Record<string, boolean>>(() => {
+    if (!hiresCacheKey) return {};
+    return JSON.parse(localStorage.getItem(hiresCacheKey) ?? '{}') as Record<string, boolean>;
+  });
 
   // 「我的招聘」= 生命周期候选（seed）+ 从「浏览员工」新招聘的员工
   const mineCount = useMemo(() => buildCandidates(installed).length, [installed]);
@@ -82,7 +87,7 @@ export default function Marketplace() {
   const onHire = (m: typeof marketEmployees[number]) => {
     const next = { ...installed, [m.id]: true };
     setInstalled(next);
-    localStorage.setItem('hummer-marketplace-hires', JSON.stringify(next));
+    if (hiresCacheKey) localStorage.setItem(hiresCacheKey, JSON.stringify(next));
     window.dispatchEvent(new Event('hummer-hires-changed')); // 同 tab 通知 3D 场景 / 员工页
     pushAudit({ actor: '昆仑（您）', action: '招聘数字员工', target: m.name, result: 'ok', tags: ['marketplace', 'hire'] });
     pushToast({ kind: 'success', title: `${m.name} 已进入沙箱试岗`, detail: '试岗第 1 天 · 在「我的招聘」查看试岗报告与转正决策' });
