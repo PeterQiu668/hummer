@@ -227,7 +227,7 @@ function limitationsFor(mode) {
   if (mode === 'w4-21-case-matrix') {
     limitations.push(
       'The source prompt calls the matrix 21 items while its read/write/surface/side noun list contains 27 entries; this gate uses 21 non-duplicated executable attack cases and reports their category mapping explicitly.',
-      'Capability-package and recording-session storage are future-phase surfaces and are not claimed by this 21-case W4 gate.',
+      'Capability-package surfaces are covered by the separate W5 capability registry/runtime gates; recording-session storage remains future-phase, and neither is counted inside this fixed W4 21-case matrix.',
       'The implemented subscription transport is SSE; a future WebSocket transport needs its own behavior case before it can be claimed.',
     );
   }
