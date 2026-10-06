@@ -20,7 +20,24 @@ import {
   type RelayAuditEntry,
   type RunEventClaims,
   type TaskClaims,
+  type TenantAuditAction,
+  type TenantAuditEvent,
+  type TenantAuditExport,
+  type TenantChainHead,
+  type TenantQuotaCounter,
+  type TenantQuotaLimits,
+  type TenantQuotaMetric,
+  type TenantQuotaUsage,
 } from './ports.js';
+import {
+  TENANT_QUOTA_METRICS,
+  assertQuotaDay,
+  buildAuditExport,
+  buildTenantAuditEvent,
+  utcDay,
+  validateQuotaLimits,
+  validateQuotaUsage,
+} from './governance.js';
 
 interface RunResult { changes: number; lastInsertRowid: number | bigint }
 interface Statement {
@@ -107,7 +124,48 @@ interface ApprovalDecisionRow {
   created_at: string;
 }
 
-export const RELAY_SCHEMA_VERSION = 13;
+interface TenantAuditRow {
+  tenant_id: string;
+  position: number;
+  action: TenantAuditAction;
+  subject_ref: string;
+  node_id: string | null;
+  actor_ref: string;
+  at: string;
+  metadata_json: string;
+  previous_hash: string | null;
+  hash: string;
+}
+
+interface TenantChainHeadRow {
+  tenant_id: string;
+  position: number;
+  hash: string;
+  updated_at: string;
+}
+
+interface TenantQuotaRow {
+  tenant_id: string;
+  node_id: string;
+  day: string;
+  metric: TenantQuotaMetric;
+  used: number;
+  limit_value: number | null;
+  warning_emitted: number;
+  updated_at: string;
+}
+
+interface TenantAuditExportRow {
+  export_id: string;
+  tenant_id: string;
+  range_from: number;
+  range_to: number;
+  sha256: string;
+  manifest_json: string;
+  created_at: string;
+}
+
+export const RELAY_SCHEMA_VERSION = 14;
 
 function openDatabase(path: string): SqliteDatabase {
   const require = createRequire(import.meta.url);
@@ -192,6 +250,46 @@ function toApprovalDecision(row: ApprovalDecisionRow): ApprovalDecisionRecord {
   };
 }
 
+function toTenantAudit(row: TenantAuditRow): TenantAuditEvent {
+  return {
+    tenantId: row.tenant_id,
+    position: row.position,
+    action: row.action,
+    subjectRef: row.subject_ref,
+    nodeId: row.node_id,
+    actorRef: row.actor_ref,
+    at: row.at,
+    metadata: jsonObject(row.metadata_json),
+    previousHash: row.previous_hash,
+    hash: row.hash,
+  };
+}
+
+function toQuotaCounter(row: TenantQuotaRow): TenantQuotaCounter {
+  return {
+    tenantId: row.tenant_id,
+    nodeId: row.node_id,
+    day: row.day,
+    metric: row.metric,
+    used: row.used,
+    limit: row.limit_value,
+    warningEmitted: row.warning_emitted === 1,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toAuditExport(row: TenantAuditExportRow): TenantAuditExport {
+  return {
+    exportId: row.export_id,
+    tenantId: row.tenant_id,
+    rangeFrom: row.range_from,
+    rangeTo: row.range_to,
+    sha256: row.sha256,
+    createdAt: row.created_at,
+    manifest: JSON.parse(row.manifest_json) as TenantAuditExport['manifest'],
+  };
+}
+
 function isSubset(granted: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
   if (!granted) return true;
   if (!requested) return false;
@@ -243,18 +341,21 @@ export class SqliteFleetStore implements FleetStore {
   ): Promise<FleetNodeRecord> {
     this.advanceClock(now);
     assertNodeTenantAuthorization(tenantId, claims.tenantIds, authorizedTenantIds, tenantGrantRef);
-    this.#db.prepare(`
-      INSERT INTO fleet_nodes (tenant_id, node_id, tenant_ids_json, agent_version, manifest_json, last_seen_at, status, offline_after_ms)
-      VALUES (?, ?, ?, ?, ?, ?, 'online', ?)
-      ON CONFLICT (tenant_id, node_id) DO UPDATE SET
-        tenant_ids_json = excluded.tenant_ids_json,
-        agent_version = excluded.agent_version,
-        manifest_json = excluded.manifest_json,
-        last_seen_at = excluded.last_seen_at,
-        status = 'online',
-        offline_after_ms = excluded.offline_after_ms
-    `).run(tenantId, claims.nodeId, JSON.stringify(claims.tenantIds), claims.agentVersion, JSON.stringify(manifest), now, offlineAfterMs);
-    return this.requireNode(tenantId, claims.nodeId);
+    return this.#db.transaction(() => {
+      this.#db.prepare(`
+        INSERT INTO fleet_nodes (tenant_id, node_id, tenant_ids_json, agent_version, manifest_json, last_seen_at, status, offline_after_ms)
+        VALUES (?, ?, ?, ?, ?, ?, 'online', ?)
+        ON CONFLICT (tenant_id, node_id) DO UPDATE SET
+          tenant_ids_json = excluded.tenant_ids_json,
+          agent_version = excluded.agent_version,
+          manifest_json = excluded.manifest_json,
+          last_seen_at = excluded.last_seen_at,
+          status = 'online',
+          offline_after_ms = excluded.offline_after_ms
+      `).run(tenantId, claims.nodeId, JSON.stringify(claims.tenantIds), claims.agentVersion, JSON.stringify(manifest), now, offlineAfterMs);
+      this.appendTenantAudit(tenantId, 'node.registered', claims.nodeId, claims.nodeId, 'system:relay', now, { agentVersion: claims.agentVersion });
+      return this.requireNode(tenantId, claims.nodeId);
+    })();
   }
 
   async heartbeat(tenantId: string, claims: HeartbeatClaims, now: string): Promise<FleetNodeRecord> {
@@ -301,6 +402,19 @@ export class SqliteFleetStore implements FleetStore {
       }
       return { task: toTask(duplicate), inserted: false };
     }
+    const exceeded = this.exceededQuotaMetrics(tenantId, claims.targetNodeId, utcDay(now));
+    if (exceeded.length > 0) {
+      this.#db.transaction(() => {
+        this.appendTenantAudit(tenantId, 'quota.exceeded', `${claims.targetNodeId}:${utcDay(now)}`, claims.targetNodeId, 'system:relay', now, { metrics: exceeded });
+      })();
+      throw new FleetRejectedError('quota_exceeded', 'tenant node daily quota is exhausted');
+    }
+    const taskCounter = this.#db.prepare(`
+      SELECT used FROM quota_counters WHERE tenant_id = ? AND node_id = ? AND day = ? AND metric = 'tasks'
+    `).get<{ used: number }>(tenantId, claims.targetNodeId, utcDay(now));
+    if (!Number.isSafeInteger((taskCounter?.used ?? 0) + 1)) {
+      throw new FleetRejectedError('invalid_contract', 'quota usage exceeds the supported range');
+    }
     try {
       this.#db.transaction(() => {
         this.#db.prepare(`
@@ -321,9 +435,12 @@ export class SqliteFleetStore implements FleetStore {
           tenantId, claims.taskId, claims.targetNodeId, claims.taskId, claims.idempotencyKey,
           JSON.stringify(envelope), now, now,
         );
+        this.appendTenantAudit(tenantId, 'task.enqueued', claims.taskId, claims.targetNodeId, 'system:relay', now, { workOrderId: claims.workOrderId });
         if (retryOfTaskId) {
           this.insertAudit({ tenantId, action: 'retry', taskId: claims.taskId, actorRef: 'system:relay', at: now, detail: `retry-of:${retryOfTaskId}` });
+          this.appendTenantAudit(tenantId, 'task.retried', claims.taskId, claims.targetNodeId, 'system:relay', now, { retryOfTaskId });
         }
+        this.incrementQuota(tenantId, claims.targetNodeId, utcDay(now), 'tasks', 1, 'system:relay', now);
       })();
     } catch (error) {
       const raced = this.#db.prepare('SELECT * FROM fleet_tasks WHERE tenant_id = ? AND idempotency_key = ?')
@@ -367,6 +484,7 @@ export class SqliteFleetStore implements FleetStore {
         SET node_id = ?, state = 'leased', lease_expires_at = ?, attempt = ?, updated_at = ?
         WHERE tenant_id = ? AND task_id = ?
       `).run(nodeId, leaseExpiresAt, leased.attempt, now, tenantId, leased.taskId);
+      this.appendTenantAudit(tenantId, 'task.claimed', leased.taskId, nodeId, `system:${nodeId}`, now, { attempt: leased.attempt });
       return leased;
     })();
   }
@@ -419,6 +537,9 @@ export class SqliteFleetStore implements FleetStore {
           WHERE tenant_id = ? AND task_id = ?
         `).run(status, JSON.stringify(event), now, tenantId, task.taskId);
       }
+      this.appendTenantAudit(tenantId, 'run.event', claims.eventId, claims.nodeId, `system:${claims.nodeId}`, now, {
+        workOrderId: claims.workOrderId, seq: claims.seq, type: claims.type,
+      });
       return { inserted: true, task: this.requireTask(tenantId, task.taskId) };
     })();
   }
@@ -433,6 +554,7 @@ export class SqliteFleetStore implements FleetStore {
       this.#db.prepare(`UPDATE fleet_task_leases SET state = 'blocked', lease_expires_at = NULL, updated_at = ? WHERE tenant_id = ? AND task_id = ?`)
         .run(now, tenantId, taskId);
       this.insertAudit({ tenantId, action: 'stop', taskId, actorRef, at: now, detail: 'task-blocked' });
+      this.appendTenantAudit(tenantId, 'task.stopped', taskId, task.targetNodeId, actorRef, now, {});
       return this.requireTask(tenantId, taskId);
     })();
   }
@@ -482,6 +604,9 @@ export class SqliteFleetStore implements FleetStore {
         claims.riskClass, claims.action, claims.target, JSON.stringify(claims.requestedScope),
         claims.expiresAt, claims.requestedBy, JSON.stringify(request), now,
       );
+      this.appendTenantAudit(tenantId, 'approval.requested', claims.requestId, claims.nodeId, claims.requestedBy, now, {
+        taskId, workOrderId: claims.workOrderId,
+      });
       return this.requireApprovalRequest(tenantId, claims.requestId);
     })();
   }
@@ -512,6 +637,9 @@ export class SqliteFleetStore implements FleetStore {
         claims.decision, claims.grantedScope ? JSON.stringify(claims.grantedScope) : null,
         JSON.stringify(decision), now,
       );
+      this.appendTenantAudit(tenantId, 'approval.decided', claims.decisionId, request.nodeId, claims.deciderActorRef, now, {
+        requestId: claims.requestId, decision: claims.decision,
+      });
       return this.requireApprovalDecision(tenantId, claims.requestId);
     })();
   }
@@ -549,6 +677,9 @@ export class SqliteFleetStore implements FleetStore {
           tenant_id, request_id, decision_id, task_id, node_id, run_id, consumed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(tenantId, requestId, decision.decisionId, taskId, nodeId, request.runId, now);
+      this.appendTenantAudit(tenantId, 'approval.consumed', requestId, nodeId, `system:${nodeId}`, now, {
+        taskId, decisionId: decision.decisionId,
+      });
       return { request: request.request, decision: decision.decisionRecord };
     })();
   }
@@ -581,6 +712,133 @@ export class SqliteFleetStore implements FleetStore {
     return this.#db.prepare(`SELECT tenant_id, action, task_id, actor_ref, at, detail FROM relay_audit WHERE tenant_id = ? ORDER BY rowid`)
       .all<{ tenant_id: string; action: RelayAuditEntry['action']; task_id: string; actor_ref: string; at: string; detail: string }>(tenantId)
       .map((row) => ({ tenantId: row.tenant_id, action: row.action, taskId: row.task_id, actorRef: row.actor_ref, at: row.at, detail: row.detail }));
+  }
+
+  async configureQuota(
+    tenantId: string,
+    nodeId: string,
+    day: string,
+    limits: TenantQuotaLimits,
+    actorRef: string,
+    now: string,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    this.advanceClock(now);
+    assertQuotaDay(day);
+    const validated = validateQuotaLimits(limits);
+    return this.#db.transaction(() => {
+      this.requireNode(tenantId, nodeId);
+      const warnings: TenantQuotaCounter[] = [];
+      for (const metric of TENANT_QUOTA_METRICS) {
+        const limit = validated[metric];
+        if (limit === undefined) continue;
+        this.#db.prepare(`
+          INSERT INTO quota_counters (tenant_id, node_id, day, metric, used, limit_value, warning_emitted, updated_at)
+          VALUES (?, ?, ?, ?, 0, ?, 0, ?)
+          ON CONFLICT (tenant_id, node_id, day, metric) DO UPDATE SET
+            limit_value = excluded.limit_value,
+            warning_emitted = CASE WHEN quota_counters.used < excluded.limit_value * 0.8 THEN 0 ELSE quota_counters.warning_emitted END,
+            updated_at = excluded.updated_at
+        `).run(tenantId, nodeId, day, metric, limit, now);
+        const counter = this.requireQuotaCounter(tenantId, nodeId, day, metric);
+        if (counter.used >= limit * 0.8 && !counter.warningEmitted) {
+          this.#db.prepare(`UPDATE quota_counters SET warning_emitted = 1 WHERE tenant_id = ? AND node_id = ? AND day = ? AND metric = ?`)
+            .run(tenantId, nodeId, day, metric);
+          warnings.push({ ...counter, warningEmitted: true });
+        }
+      }
+      this.appendTenantAudit(tenantId, 'quota.configured', `${nodeId}:${day}`, nodeId, actorRef, now, { limits: validated });
+      for (const counter of warnings) this.appendQuotaWarning(counter, actorRef, now);
+      return this.readQuotaCounters(tenantId, nodeId, day);
+    })();
+  }
+
+  async recordQuotaUsage(
+    tenantId: string,
+    nodeId: string,
+    usage: TenantQuotaUsage,
+    actorRef: string,
+    now: string,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    this.advanceClock(now);
+    const validated = validateQuotaUsage(usage);
+    const day = utcDay(now);
+    return this.#db.transaction(() => {
+      this.requireNode(tenantId, nodeId);
+      const warnings: TenantQuotaCounter[] = [];
+      for (const metric of ['tokens', 'costCny'] as const) {
+        const amount = validated[metric];
+        if (amount === undefined) continue;
+        const warning = this.incrementQuota(tenantId, nodeId, day, metric, amount, actorRef, now, false);
+        if (warning) warnings.push(warning);
+      }
+      this.appendTenantAudit(tenantId, 'quota.usage', `${nodeId}:${day}`, nodeId, actorRef, now, { usage: validated });
+      for (const counter of warnings) this.appendQuotaWarning(counter, actorRef, now);
+      return this.readQuotaCounters(tenantId, nodeId, day);
+    })();
+  }
+
+  async listQuotaCounters(tenantId: string, nodeId: string, day: string): Promise<readonly TenantQuotaCounter[]> {
+    assertQuotaDay(day);
+    return this.readQuotaCounters(tenantId, nodeId, day);
+  }
+
+  async getTenantChainHead(tenantId: string): Promise<TenantChainHead | null> {
+    const row = this.#db.prepare(`SELECT tenant_id, position, hash, updated_at FROM tenant_chain_heads WHERE tenant_id = ?`)
+      .get<TenantChainHeadRow>(tenantId);
+    return row ? { tenantId: row.tenant_id, position: row.position, hash: row.hash, updatedAt: row.updated_at } : null;
+  }
+
+  async listTenantAudit(tenantId: string, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]> {
+    const from = rangeFrom ?? 1;
+    const to = rangeTo ?? Number.MAX_SAFE_INTEGER;
+    if (!Number.isInteger(from) || from < 1 || !Number.isInteger(to) || to < from) {
+      throw new FleetRejectedError('invalid_contract', 'audit range is invalid');
+    }
+    return this.#db.prepare(`
+      SELECT tenant_id, position, action, subject_ref, node_id, actor_ref, at, metadata_json, previous_hash, hash
+      FROM tenant_audit_events WHERE tenant_id = ? AND position >= ? AND position <= ? ORDER BY position
+    `).all<TenantAuditRow>(tenantId, from, to).map(toTenantAudit);
+  }
+
+  async createAuditExport(
+    tenantId: string,
+    rangeFrom: number | undefined,
+    rangeTo: number | undefined,
+    actorRef: string,
+    now: string,
+  ): Promise<TenantAuditExport> {
+    this.advanceClock(now);
+    return this.#db.transaction(() => {
+      const rows = this.#db.prepare(`
+        SELECT tenant_id, position, action, subject_ref, node_id, actor_ref, at, metadata_json, previous_hash, hash
+        FROM tenant_audit_events
+        WHERE tenant_id = ? AND position >= ? AND position <= ? ORDER BY position
+      `).all<TenantAuditRow>(tenantId, rangeFrom ?? 1, rangeTo ?? Number.MAX_SAFE_INTEGER);
+      if ((rangeFrom !== undefined && rows[0]?.position !== rangeFrom)
+        || (rangeTo !== undefined && rows.at(-1)?.position !== rangeTo)) {
+        throw new FleetRejectedError('audit_export_not_found', 'audit range was not found');
+      }
+      const auditExport = buildAuditExport(tenantId, rows.map(toTenantAudit), now);
+      const inserted = this.#db.prepare(`
+        INSERT OR IGNORE INTO audit_exports (export_id, tenant_id, range_from, range_to, sha256, manifest_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        auditExport.exportId, tenantId, auditExport.rangeFrom, auditExport.rangeTo,
+        auditExport.sha256, JSON.stringify(auditExport.manifest), now,
+      );
+      if (inserted.changes === 1) {
+        this.appendTenantAudit(tenantId, 'audit.exported', auditExport.exportId, null, actorRef, now, {
+          rangeFrom: auditExport.rangeFrom, rangeTo: auditExport.rangeTo, sha256: auditExport.sha256,
+        });
+      }
+      return this.requireAuditExport(tenantId, auditExport.exportId);
+    })();
+  }
+
+  async getAuditExport(tenantId: string, exportId: string): Promise<TenantAuditExport | null> {
+    const row = this.#db.prepare(`SELECT * FROM audit_exports WHERE tenant_id = ? AND export_id = ?`)
+      .get<TenantAuditExportRow>(tenantId, exportId);
+    return row ? toAuditExport(row) : null;
   }
 
   close(): void {
@@ -732,11 +990,62 @@ export class SqliteFleetStore implements FleetStore {
         at TEXT NOT NULL,
         detail TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS tenant_audit_events (
+        tenant_id TEXT NOT NULL,
+        position INTEGER NOT NULL CHECK (position > 0),
+        action TEXT NOT NULL,
+        subject_ref TEXT NOT NULL,
+        node_id TEXT,
+        actor_ref TEXT NOT NULL,
+        at TEXT NOT NULL,
+        metadata_json TEXT NOT NULL,
+        previous_hash TEXT,
+        hash TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, position),
+        UNIQUE (tenant_id, hash)
+      );
+      CREATE TABLE IF NOT EXISTS tenant_chain_heads (
+        tenant_id TEXT PRIMARY KEY,
+        position INTEGER NOT NULL CHECK (position > 0),
+        hash TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS quota_counters (
+        tenant_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        metric TEXT NOT NULL CHECK (metric IN ('tasks', 'tokens', 'costCny')),
+        used REAL NOT NULL CHECK (used >= 0),
+        limit_value REAL CHECK (limit_value > 0),
+        warning_emitted INTEGER NOT NULL CHECK (warning_emitted IN (0, 1)),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, node_id, day, metric)
+      );
+      CREATE INDEX IF NOT EXISTS quota_counters_window ON quota_counters (tenant_id, day, node_id);
+      CREATE TABLE IF NOT EXISTS audit_exports (
+        export_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        range_from INTEGER NOT NULL,
+        range_to INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, export_id)
+      );
+      CREATE TRIGGER IF NOT EXISTS tenant_audit_events_no_update
+        BEFORE UPDATE ON tenant_audit_events BEGIN SELECT RAISE(ABORT, 'tenant audit events are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS tenant_audit_events_no_delete
+        BEFORE DELETE ON tenant_audit_events BEGIN SELECT RAISE(ABORT, 'tenant audit events are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS audit_exports_no_update
+        BEFORE UPDATE ON audit_exports BEGIN SELECT RAISE(ABORT, 'audit exports are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS audit_exports_no_delete
+        BEFORE DELETE ON audit_exports BEGIN SELECT RAISE(ABORT, 'audit exports are append-only'); END;
     `);
     const migration = this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
     migration.run(11, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
     migration.run(12, 'relay_monotonic_clock', new Date(0).toISOString());
-    migration.run(RELAY_SCHEMA_VERSION, 'relay_append_only_approval_binding', new Date(0).toISOString());
+    migration.run(13, 'relay_append_only_approval_binding', new Date(0).toISOString());
+    migration.run(RELAY_SCHEMA_VERSION, 'relay_tenant_governance', new Date(0).toISOString());
   }
 
   private advanceClock(now: string): void {
@@ -836,5 +1145,116 @@ export class SqliteFleetStore implements FleetStore {
   private insertAudit(entry: RelayAuditEntry): void {
     this.#db.prepare('INSERT INTO relay_audit (tenant_id, action, task_id, actor_ref, at, detail) VALUES (?, ?, ?, ?, ?, ?)')
       .run(entry.tenantId, entry.action, entry.taskId, entry.actorRef, entry.at, entry.detail);
+  }
+
+  private appendTenantAudit(
+    tenantId: string,
+    action: TenantAuditAction,
+    subjectRef: string,
+    nodeId: string | null,
+    actorRef: string,
+    at: string,
+    metadata: FleetObject,
+  ): TenantAuditEvent {
+    const head = this.#db.prepare(`SELECT tenant_id, position, hash, updated_at FROM tenant_chain_heads WHERE tenant_id = ?`)
+      .get<TenantChainHeadRow>(tenantId);
+    const event = buildTenantAuditEvent({
+      tenantId,
+      position: (head?.position ?? 0) + 1,
+      action,
+      subjectRef,
+      nodeId,
+      actorRef,
+      at,
+      metadata,
+      previousHash: head?.hash ?? null,
+    });
+    this.#db.prepare(`
+      INSERT INTO tenant_audit_events (
+        tenant_id, position, action, subject_ref, node_id, actor_ref, at, metadata_json, previous_hash, hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      event.tenantId, event.position, event.action, event.subjectRef, event.nodeId, event.actorRef,
+      event.at, JSON.stringify(event.metadata), event.previousHash, event.hash,
+    );
+    this.#db.prepare(`
+      INSERT INTO tenant_chain_heads (tenant_id, position, hash, updated_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT (tenant_id) DO UPDATE SET position = excluded.position, hash = excluded.hash, updated_at = excluded.updated_at
+    `).run(tenantId, event.position, event.hash, at);
+    return event;
+  }
+
+  private readQuotaCounters(tenantId: string, nodeId: string, day: string): TenantQuotaCounter[] {
+    return this.#db.prepare(`
+      SELECT tenant_id, node_id, day, metric, used, limit_value, warning_emitted, updated_at
+      FROM quota_counters WHERE tenant_id = ? AND node_id = ? AND day = ?
+      ORDER BY CASE metric WHEN 'tasks' THEN 1 WHEN 'tokens' THEN 2 ELSE 3 END
+    `).all<TenantQuotaRow>(tenantId, nodeId, day).map(toQuotaCounter);
+  }
+
+  private requireQuotaCounter(tenantId: string, nodeId: string, day: string, metric: TenantQuotaMetric): TenantQuotaCounter {
+    const row = this.#db.prepare(`
+      SELECT tenant_id, node_id, day, metric, used, limit_value, warning_emitted, updated_at
+      FROM quota_counters WHERE tenant_id = ? AND node_id = ? AND day = ? AND metric = ?
+    `).get<TenantQuotaRow>(tenantId, nodeId, day, metric);
+    if (!row) throw new FleetRejectedError('invalid_contract', 'quota counter is unavailable');
+    return toQuotaCounter(row);
+  }
+
+  private incrementQuota(
+    tenantId: string,
+    nodeId: string,
+    day: string,
+    metric: TenantQuotaMetric,
+    amount: number,
+    actorRef: string,
+    now: string,
+    appendWarning = true,
+  ): TenantQuotaCounter | null {
+    const existing = this.#db.prepare(`
+      SELECT tenant_id, node_id, day, metric, used, limit_value, warning_emitted, updated_at
+      FROM quota_counters WHERE tenant_id = ? AND node_id = ? AND day = ? AND metric = ?
+    `).get<TenantQuotaRow>(tenantId, nodeId, day, metric);
+    const nextUsed = (existing?.used ?? 0) + amount;
+    if (!Number.isFinite(nextUsed) || nextUsed > Number.MAX_SAFE_INTEGER) {
+      throw new FleetRejectedError('invalid_contract', 'quota usage exceeds the supported range');
+    }
+    this.#db.prepare(`
+      INSERT INTO quota_counters (tenant_id, node_id, day, metric, used, limit_value, warning_emitted, updated_at)
+      VALUES (?, ?, ?, ?, ?, NULL, 0, ?)
+      ON CONFLICT (tenant_id, node_id, day, metric) DO UPDATE SET
+        used = quota_counters.used + excluded.used,
+        updated_at = excluded.updated_at
+    `).run(tenantId, nodeId, day, metric, amount, now);
+    const counter = this.requireQuotaCounter(tenantId, nodeId, day, metric);
+    if (counter.limit !== null && counter.used >= counter.limit * 0.8 && !counter.warningEmitted) {
+      this.#db.prepare(`UPDATE quota_counters SET warning_emitted = 1 WHERE tenant_id = ? AND node_id = ? AND day = ? AND metric = ?`)
+        .run(tenantId, nodeId, day, metric);
+      const warned = { ...counter, warningEmitted: true };
+      if (appendWarning) this.appendQuotaWarning(warned, actorRef, now);
+      return warned;
+    }
+    return null;
+  }
+
+  private appendQuotaWarning(counter: TenantQuotaCounter, actorRef: string, now: string): void {
+    this.appendTenantAudit(counter.tenantId, 'quota.warning', `${counter.nodeId}:${counter.day}:${counter.metric}`, counter.nodeId, actorRef, now, {
+      metric: counter.metric, used: counter.used, limit: counter.limit,
+    });
+  }
+
+  private exceededQuotaMetrics(tenantId: string, nodeId: string, day: string): TenantQuotaMetric[] {
+    return this.#db.prepare(`
+      SELECT metric FROM quota_counters
+      WHERE tenant_id = ? AND node_id = ? AND day = ? AND limit_value IS NOT NULL AND used >= limit_value
+      ORDER BY metric
+    `).all<{ metric: TenantQuotaMetric }>(tenantId, nodeId, day).map((row) => row.metric);
+  }
+
+  private requireAuditExport(tenantId: string, exportId: string): TenantAuditExport {
+    const row = this.#db.prepare(`SELECT * FROM audit_exports WHERE tenant_id = ? AND export_id = ?`)
+      .get<TenantAuditExportRow>(tenantId, exportId);
+    if (!row) throw new FleetRejectedError('audit_export_not_found', 'audit export was not found');
+    return toAuditExport(row);
   }
 }

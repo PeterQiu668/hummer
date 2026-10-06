@@ -16,12 +16,31 @@ import {
   type RelayAuditEntry,
   type RunEventClaims,
   type TaskClaims,
+  type TenantAuditAction,
+  type TenantAuditEvent,
+  type TenantAuditExport,
+  type TenantChainHead,
+  type TenantQuotaCounter,
+  type TenantQuotaLimits,
+  type TenantQuotaMetric,
+  type TenantQuotaUsage,
 } from './ports.js';
 import { canonicalJson } from './canonical-json.js';
+import {
+  TENANT_QUOTA_METRICS,
+  assertQuotaDay,
+  buildAuditExport,
+  buildTenantAuditEvent,
+  chainHeadFrom,
+  utcDay,
+  validateQuotaLimits,
+  validateQuotaUsage,
+} from './governance.js';
 import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 import { assertNodeTenantAuthorization } from './tenant-boundary.js';
 
 const key = (tenantId: string, id: string) => `${tenantId}\u0000${id}`;
+const quotaKey = (tenantId: string, nodeId: string, day: string, metric: TenantQuotaMetric) => `${tenantId}\u0000${nodeId}\u0000${day}\u0000${metric}`;
 const clone = <T>(value: T): T => structuredClone(value);
 
 function isSubset(granted: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
@@ -73,6 +92,9 @@ export class MemoryFleetStore implements FleetStore {
   readonly #approvalDecisions = new Map<string, ApprovalDecisionRecord>();
   readonly #approvalDecisionIds = new Set<string>();
   readonly #approvalConsumptions = new Set<string>();
+  readonly #tenantAudit = new Map<string, TenantAuditEvent[]>();
+  readonly #quotaCounters = new Map<string, TenantQuotaCounter>();
+  readonly #auditExports = new Map<string, TenantAuditExport>();
   #clockHighWaterMs = 0;
 
   async registerNode(
@@ -88,6 +110,7 @@ export class MemoryFleetStore implements FleetStore {
     assertNodeTenantAuthorization(tenantId, claims.tenantIds, authorizedTenantIds, tenantGrantRef);
     const record: FleetNodeRecord = { ...claims, tenantIds: [...claims.tenantIds], tenantId, manifest: clone(manifest), status: 'online', lastSeenAt: now, offlineAfterMs };
     this.#nodes.set(key(tenantId, claims.nodeId), record);
+    this.appendTenantAudit(tenantId, 'node.registered', claims.nodeId, claims.nodeId, 'system:relay', now, { agentVersion: claims.agentVersion });
     return clone(record);
   }
 
@@ -134,6 +157,7 @@ export class MemoryFleetStore implements FleetStore {
       }
       return { task: clone(duplicate), inserted: false };
     }
+    this.assertQuotaAvailable(tenantId, claims.targetNodeId, now);
     const record: FleetTaskRecord = {
       ...claims,
       expiresAt,
@@ -148,7 +172,12 @@ export class MemoryFleetStore implements FleetStore {
     if (this.#tasks.has(key(tenantId, record.taskId))) throw new FleetRejectedError('duplicate_delivery', 'task id already exists');
     this.#tasks.set(key(tenantId, record.taskId), record);
     this.#taskByIdempotency.set(key(tenantId, record.idempotencyKey), record.taskId);
-    if (retryOfTaskId) this.#audit.push({ tenantId, action: 'retry', taskId: record.taskId, actorRef: 'system:relay', at: now, detail: `retry-of:${retryOfTaskId}` });
+    this.appendTenantAudit(tenantId, 'task.enqueued', record.taskId, record.targetNodeId, 'system:relay', now, { workOrderId: record.workOrderId });
+    if (retryOfTaskId) {
+      this.#audit.push({ tenantId, action: 'retry', taskId: record.taskId, actorRef: 'system:relay', at: now, detail: `retry-of:${retryOfTaskId}` });
+      this.appendTenantAudit(tenantId, 'task.retried', record.taskId, record.targetNodeId, 'system:relay', now, { retryOfTaskId });
+    }
+    this.incrementQuota(tenantId, record.targetNodeId, utcDay(now), 'tasks', 1, now);
     return { task: clone(record), inserted: true };
   }
 
@@ -166,6 +195,7 @@ export class MemoryFleetStore implements FleetStore {
     task.attempt += 1;
     task.leaseOwnerNodeId = nodeId;
     task.leaseExpiresAt = new Date(Date.parse(now) + task.leaseMs).toISOString();
+    this.appendTenantAudit(tenantId, 'task.claimed', task.taskId, nodeId, `system:${nodeId}`, now, { attempt: task.attempt });
     return clone(task);
   }
 
@@ -205,6 +235,9 @@ export class MemoryFleetStore implements FleetStore {
     }
     const result = { inserted: true, task: clone(task) };
     this.#eventByIdempotency.set(key(tenantId, claims.idempotencyKey), result);
+    this.appendTenantAudit(tenantId, 'run.event', claims.eventId, claims.nodeId, `system:${claims.nodeId}`, now, {
+      workOrderId: claims.workOrderId, seq: claims.seq, type: claims.type,
+    });
     return result;
   }
 
@@ -217,6 +250,7 @@ export class MemoryFleetStore implements FleetStore {
     task.leaseOwnerNodeId = null;
     task.leaseExpiresAt = null;
     this.#audit.push({ tenantId, action: 'stop', taskId, actorRef, at: now, detail: 'task-blocked' });
+    this.appendTenantAudit(tenantId, 'task.stopped', taskId, task.targetNodeId, actorRef, now, {});
     return clone(task);
   }
 
@@ -256,6 +290,7 @@ export class MemoryFleetStore implements FleetStore {
     };
     this.#approvalRequests.set(key(tenantId, claims.requestId), record);
     this.#approvalRequestByTask.set(key(tenantId, taskId), claims.requestId);
+    this.appendTenantAudit(tenantId, 'approval.requested', claims.requestId, claims.nodeId, claims.requestedBy, now, { taskId, workOrderId: claims.workOrderId });
     return clone(record);
   }
 
@@ -280,6 +315,9 @@ export class MemoryFleetStore implements FleetStore {
     };
     this.#approvalDecisions.set(key(tenantId, claims.requestId), record);
     this.#approvalDecisionIds.add(key(tenantId, claims.decisionId));
+    this.appendTenantAudit(tenantId, 'approval.decided', claims.decisionId, request.nodeId, claims.deciderActorRef, now, {
+      requestId: claims.requestId, decision: claims.decision,
+    });
     return clone(record);
   }
 
@@ -306,6 +344,7 @@ export class MemoryFleetStore implements FleetStore {
       throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
     }
     this.#approvalConsumptions.add(consumptionKey);
+    this.appendTenantAudit(tenantId, 'approval.consumed', requestId, nodeId, `system:${nodeId}`, now, { taskId, decisionId: decision.decisionId });
     return { request: clone(request.request), decision: clone(decision.decisionRecord) };
   }
 
@@ -325,6 +364,118 @@ export class MemoryFleetStore implements FleetStore {
 
   async listAudit(tenantId: string): Promise<readonly RelayAuditEntry[]> {
     return clone(this.#audit.filter((entry) => entry.tenantId === tenantId));
+  }
+
+  async configureQuota(
+    tenantId: string,
+    nodeId: string,
+    day: string,
+    limits: TenantQuotaLimits,
+    actorRef: string,
+    now: string,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    this.advanceClock(now);
+    assertQuotaDay(day);
+    const validated = validateQuotaLimits(limits);
+    this.requireNode(tenantId, nodeId);
+    const warnings: TenantQuotaCounter[] = [];
+    for (const metric of TENANT_QUOTA_METRICS) {
+      const limit = validated[metric];
+      if (limit === undefined) continue;
+      const counter = this.getOrCreateCounter(tenantId, nodeId, day, metric, now);
+      counter.limit = limit;
+      counter.updatedAt = now;
+      if (counter.used < limit * 0.8) counter.warningEmitted = false;
+      if (counter.used >= limit * 0.8 && !counter.warningEmitted) {
+        counter.warningEmitted = true;
+        warnings.push(counter);
+      }
+    }
+    this.appendTenantAudit(tenantId, 'quota.configured', `${nodeId}:${day}`, nodeId, actorRef, now, { limits: validated });
+    for (const counter of warnings) this.appendQuotaWarning(counter, actorRef, now);
+    return this.listQuotaCounters(tenantId, nodeId, day);
+  }
+
+  async recordQuotaUsage(
+    tenantId: string,
+    nodeId: string,
+    usage: TenantQuotaUsage,
+    actorRef: string,
+    now: string,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    this.advanceClock(now);
+    const validated = validateQuotaUsage(usage);
+    this.requireNode(tenantId, nodeId);
+    const day = utcDay(now);
+    for (const metric of ['tokens', 'costCny'] as const) {
+      const amount = validated[metric];
+      if (amount === undefined) continue;
+      const current = this.#quotaCounters.get(quotaKey(tenantId, nodeId, day, metric))?.used ?? 0;
+      if (!Number.isFinite(current + amount) || current + amount > Number.MAX_SAFE_INTEGER) {
+        throw new FleetRejectedError('invalid_contract', 'quota usage exceeds the supported range');
+      }
+    }
+    const warnings: TenantQuotaCounter[] = [];
+    for (const metric of ['tokens', 'costCny'] as const) {
+      const amount = validated[metric];
+      if (amount === undefined) continue;
+      const warning = this.incrementQuota(tenantId, nodeId, day, metric, amount, now, false);
+      if (warning) warnings.push(warning);
+    }
+    this.appendTenantAudit(tenantId, 'quota.usage', `${nodeId}:${day}`, nodeId, actorRef, now, { usage: validated });
+    for (const counter of warnings) this.appendQuotaWarning(counter, actorRef, now);
+    return this.listQuotaCounters(tenantId, nodeId, day);
+  }
+
+  async listQuotaCounters(tenantId: string, nodeId: string, day: string): Promise<readonly TenantQuotaCounter[]> {
+    assertQuotaDay(day);
+    return clone([...this.#quotaCounters.values()]
+      .filter((counter) => counter.tenantId === tenantId && counter.nodeId === nodeId && counter.day === day)
+      .sort((left, right) => TENANT_QUOTA_METRICS.indexOf(left.metric) - TENANT_QUOTA_METRICS.indexOf(right.metric)));
+  }
+
+  async getTenantChainHead(tenantId: string): Promise<TenantChainHead | null> {
+    const event = this.#tenantAudit.get(tenantId)?.at(-1);
+    return event ? clone(chainHeadFrom(event)) : null;
+  }
+
+  async listTenantAudit(tenantId: string, rangeFrom?: number, rangeTo?: number): Promise<readonly TenantAuditEvent[]> {
+    const events = this.#tenantAudit.get(tenantId) ?? [];
+    const from = rangeFrom ?? 1;
+    const to = rangeTo ?? events.length;
+    if (!Number.isInteger(from) || from < 1 || !Number.isInteger(to) || to < from) {
+      throw new FleetRejectedError('invalid_contract', 'audit range is invalid');
+    }
+    return clone(events.filter((event) => event.position >= from && event.position <= to));
+  }
+
+  async createAuditExport(
+    tenantId: string,
+    rangeFrom: number | undefined,
+    rangeTo: number | undefined,
+    actorRef: string,
+    now: string,
+  ): Promise<TenantAuditExport> {
+    this.advanceClock(now);
+    const events = await this.listTenantAudit(tenantId, rangeFrom, rangeTo);
+    if ((rangeFrom !== undefined && events[0]?.position !== rangeFrom)
+      || (rangeTo !== undefined && events.at(-1)?.position !== rangeTo)) {
+      throw new FleetRejectedError('audit_export_not_found', 'audit range was not found');
+    }
+    const auditExport = buildAuditExport(tenantId, events, now);
+    const exportKey = key(tenantId, auditExport.exportId);
+    const existing = this.#auditExports.get(exportKey);
+    if (existing) return clone(existing);
+    this.#auditExports.set(exportKey, clone(auditExport));
+    this.appendTenantAudit(tenantId, 'audit.exported', auditExport.exportId, null, actorRef, now, {
+      rangeFrom: auditExport.rangeFrom, rangeTo: auditExport.rangeTo, sha256: auditExport.sha256,
+    });
+    return clone(auditExport);
+  }
+
+  async getAuditExport(tenantId: string, exportId: string): Promise<TenantAuditExport | null> {
+    const record = this.#auditExports.get(key(tenantId, exportId));
+    return record ? clone(record) : null;
   }
 
   close(): void {}
@@ -361,5 +512,99 @@ export class MemoryFleetStore implements FleetStore {
       task.leaseExpiresAt = null;
       throw new FleetRejectedError('lease_expired', 'task lease has expired');
     }
+  }
+
+  private requireNode(tenantId: string, nodeId: string): FleetNodeRecord {
+    const node = this.#nodes.get(key(tenantId, nodeId));
+    if (!node) throw new FleetRejectedError('node_unknown', 'node was not found');
+    return node;
+  }
+
+  private appendTenantAudit(
+    tenantId: string,
+    action: TenantAuditAction,
+    subjectRef: string,
+    nodeId: string | null,
+    actorRef: string,
+    at: string,
+    metadata: FleetObject,
+  ): TenantAuditEvent {
+    const events = this.#tenantAudit.get(tenantId) ?? [];
+    const event = buildTenantAuditEvent({
+      tenantId,
+      position: events.length + 1,
+      action,
+      subjectRef,
+      nodeId,
+      actorRef,
+      at,
+      metadata: clone(metadata),
+      previousHash: events.at(-1)?.hash ?? null,
+    });
+    events.push(event);
+    this.#tenantAudit.set(tenantId, events);
+    return event;
+  }
+
+  private getOrCreateCounter(
+    tenantId: string,
+    nodeId: string,
+    day: string,
+    metric: TenantQuotaMetric,
+    now: string,
+  ): TenantQuotaCounter {
+    const counterKey = quotaKey(tenantId, nodeId, day, metric);
+    let counter = this.#quotaCounters.get(counterKey);
+    if (!counter) {
+      counter = { tenantId, nodeId, day, metric, used: 0, limit: null, warningEmitted: false, updatedAt: now };
+      this.#quotaCounters.set(counterKey, counter);
+    }
+    return counter;
+  }
+
+  private incrementQuota(
+    tenantId: string,
+    nodeId: string,
+    day: string,
+    metric: TenantQuotaMetric,
+    amount: number,
+    now: string,
+    appendWarning = true,
+  ): TenantQuotaCounter | null {
+    const counter = this.getOrCreateCounter(tenantId, nodeId, day, metric, now);
+    const nextUsed = counter.used + amount;
+    if (!Number.isFinite(nextUsed) || nextUsed > Number.MAX_SAFE_INTEGER) {
+      throw new FleetRejectedError('invalid_contract', 'quota usage exceeds the supported range');
+    }
+    counter.used = nextUsed;
+    counter.updatedAt = now;
+    if (counter.limit !== null && counter.used >= counter.limit * 0.8 && !counter.warningEmitted) {
+      counter.warningEmitted = true;
+      if (appendWarning) this.appendQuotaWarning(counter, 'system:relay', now);
+      return counter;
+    }
+    return null;
+  }
+
+  private appendQuotaWarning(counter: TenantQuotaCounter, actorRef: string, now: string): void {
+    this.appendTenantAudit(counter.tenantId, 'quota.warning', `${counter.nodeId}:${counter.day}:${counter.metric}`, counter.nodeId, actorRef, now, {
+      metric: counter.metric, used: counter.used, limit: counter.limit,
+    });
+  }
+
+  private assertQuotaAvailable(tenantId: string, nodeId: string, now: string): void {
+    const day = utcDay(now);
+    const taskUsed = this.#quotaCounters.get(quotaKey(tenantId, nodeId, day, 'tasks'))?.used ?? 0;
+    if (!Number.isSafeInteger(taskUsed + 1)) {
+      throw new FleetRejectedError('invalid_contract', 'quota usage exceeds the supported range');
+    }
+    const exceeded = [...this.#quotaCounters.values()]
+      .filter((counter) => counter.tenantId === tenantId && counter.nodeId === nodeId && counter.day === day
+        && counter.limit !== null && counter.used >= counter.limit)
+      .map((counter) => counter.metric)
+      .sort();
+    if (exceeded.length === 0) return;
+    this.appendTenantAudit(tenantId, 'quota.exceeded', `${nodeId}:${day}`, nodeId, 'system:relay', now, { metrics: exceeded });
+    throw new FleetRejectedError('quota_exceeded', 'tenant node daily quota is exhausted');
   }
 }

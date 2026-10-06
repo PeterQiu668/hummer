@@ -12,6 +12,11 @@ export const BADGE_SCOPES = [
   'approval.request',
   'approval.decide',
   'approval.consume',
+  'audit.read',
+  'audit.export',
+  'quota.manage',
+  'quota.read',
+  'quota.record',
 ] as const;
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];

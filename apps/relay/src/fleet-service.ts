@@ -11,8 +11,13 @@ import {
   type FleetStore,
   type FleetTaskRecord,
   type FleetValidators,
+  type TenantAuditEvent,
+  type TenantAuditExport,
+  type TenantChainHead,
+  type TenantQuotaCounter,
   type ValidationResult,
 } from './ports.js';
+import { assertQuotaDay, validateQuotaLimits, validateQuotaUsage } from './governance.js';
 import { assertNodeTenantAuthorization, resolveAuthorizedTenantIds } from './tenant-boundary.js';
 
 export interface FleetServiceOptions {
@@ -204,7 +209,94 @@ export class FleetService implements FleetIngress {
     return this.store.enqueueTask(session.tenantId, result.value, result.meta, previous.taskId, now);
   }
 
+  async configureQuota(
+    session: AuthenticatedFleetSession,
+    nodeId: string,
+    day: string,
+    input: unknown,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('actor_mismatch', 'quota configuration requires a human/account control session');
+    }
+    if (!nodeId.trim()) throw new FleetRejectedError('node_unknown', 'node id is required');
+    assertQuotaDay(day);
+    const body = exactRecord(input, ['limits'], 'quota configuration');
+    const limits = validateQuotaLimits(body.limits);
+    return this.store.configureQuota(session.tenantId, nodeId, day, limits, session.actorRef, this.isoNow());
+  }
+
+  async recordQuotaUsage(
+    session: AuthenticatedFleetSession,
+    nodeId: string,
+    input: unknown,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    if (!session.nodeId) throw new FleetRejectedError('actor_mismatch', 'quota usage requires a node-bound session');
+    assertNode(session, nodeId, 'quota usage');
+    const usage = validateQuotaUsage(input);
+    return this.store.recordQuotaUsage(session.tenantId, nodeId, usage, session.actorRef, this.isoNow());
+  }
+
+  async listQuotaCounters(
+    session: AuthenticatedFleetSession,
+    nodeId: string,
+    day: string,
+  ): Promise<readonly TenantQuotaCounter[]> {
+    if (!nodeId.trim()) throw new FleetRejectedError('node_unknown', 'node id is required');
+    assertNode(session, nodeId, 'quota read');
+    assertQuotaDay(day);
+    return this.store.listQuotaCounters(session.tenantId, nodeId, day);
+  }
+
+  async getTenantChainHead(session: AuthenticatedFleetSession): Promise<TenantChainHead | null> {
+    return this.store.getTenantChainHead(session.tenantId);
+  }
+
+  async listTenantAudit(
+    session: AuthenticatedFleetSession,
+    rangeFrom?: number,
+    rangeTo?: number,
+  ): Promise<readonly TenantAuditEvent[]> {
+    return this.store.listTenantAudit(session.tenantId, rangeFrom, rangeTo);
+  }
+
+  async createAuditExport(session: AuthenticatedFleetSession, input: unknown): Promise<TenantAuditExport> {
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('actor_mismatch', 'audit export requires a human/account control session');
+    }
+    const body = exactRecord(input, ['rangeFrom', 'rangeTo'], 'audit export');
+    const rangeFrom = optionalPositiveInteger(body.rangeFrom, 'rangeFrom');
+    const rangeTo = optionalPositiveInteger(body.rangeTo, 'rangeTo');
+    if (rangeFrom !== undefined && rangeTo !== undefined && rangeTo < rangeFrom) {
+      throw new FleetRejectedError('invalid_contract', 'audit range is invalid');
+    }
+    return this.store.createAuditExport(session.tenantId, rangeFrom, rangeTo, session.actorRef, this.isoNow());
+  }
+
+  async getAuditExport(session: AuthenticatedFleetSession, exportId: string): Promise<TenantAuditExport | null> {
+    if (!exportId.trim()) throw new FleetRejectedError('audit_export_not_found', 'audit export was not found');
+    return this.store.getAuditExport(session.tenantId, exportId);
+  }
+
   private isoNow(): string {
     return this.#now().toISOString();
   }
+}
+
+function exactRecord(input: unknown, allowed: readonly string[], subject: string): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new FleetRejectedError('invalid_contract', `${subject} must be an object`);
+  }
+  const record = input as Record<string, unknown>;
+  if (Object.keys(record).some((key) => !allowed.includes(key))) {
+    throw new FleetRejectedError('invalid_contract', `${subject} contains an unknown field`);
+  }
+  return record;
+}
+
+function optionalPositiveInteger(value: unknown, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new FleetRejectedError('invalid_contract', `${field} must be a positive integer`);
+  }
+  return value as number;
 }

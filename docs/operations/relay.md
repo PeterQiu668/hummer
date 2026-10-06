@@ -82,7 +82,11 @@ not claimed by this slice.
 - Relay-only migration marker `12` adds the singleton `relay_clock` high-water
   table. Relay-only marker `13` adds append-only `fleet_approval_requests`,
   `fleet_approval_decisions`, and `fleet_approval_consumptions`; it does not
-  modify or share the desktop v1-v11 database.
+  modify or share the desktop database or its migration registry.
+- Relay-only marker `14` adds tenant audit chains and heads, daily tenant-node
+  quota counters, and immutable audit export manifests. Relay and desktop use
+  separate databases and migration registries; desktop v12/v13 does not collide
+  with Relay v14. See ADR-040, ADR-041, and `relay-governance.md`.
 - `fleet_task_leases` contains the integration columns
   `tenant_id/task_id/node_id/delivery_id/idempotency_key/envelope_json/state/lease_expires_at/attempt/result_json/created_at/updated_at`, with tenant-scoped unique keys for delivery and idempotency.
 - `fleet_tasks` and `fleet_run_events` are Relay-owned supporting tables. The
@@ -143,3 +147,5 @@ one stored completion.
    skew, competing claims, and 100-task duplicate-delivery tests. Include a
    same-node restamped old-attempt event probe. Until that evidence exists, do
    not describe the two-machine portion of D3 or AC-P0-04 as complete.
+4. Run the Postgres/RLS spike against a real Postgres instance and two database
+   roles. It remains pending; SQLite tenant predicates are not RLS evidence.
