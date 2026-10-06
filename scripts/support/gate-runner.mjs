@@ -15,10 +15,10 @@ export function parseGateArgs(argv, allowedModes) {
   return { dryRun, modes, unknown: [...args] };
 }
 
-export function runVitest({ file, pattern }) {
+export function runVitest({ file, pattern, cwd = resolve(repositoryRoot, 'apps', 'relay'), config = 'vitest.config.ts' }) {
   const vitest = resolve(repositoryRoot, 'node_modules', 'vitest', 'vitest.mjs');
-  const result = run(process.execPath, [vitest, 'run', file, '--config', 'vitest.config.ts', '-t', pattern, '--reporter=json'], {
-    cwd: resolve(repositoryRoot, 'apps', 'relay'),
+  const result = run(process.execPath, [vitest, 'run', file, '--config', config, '-t', pattern, '--reporter=json'], {
+    cwd,
   });
   const summary = parseLastJson(result.stdout);
   return {

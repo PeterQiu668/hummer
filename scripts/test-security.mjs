@@ -1,5 +1,5 @@
 import {
-  emitGate, finishedCheck, parseGateArgs, plannedCheck, runNodeTests, runVitest, usageFailure,
+  emitGate, finishedCheck, parseGateArgs, plannedCheck, repositoryRoot, runNodeTests, runVitest, usageFailure,
 } from './support/gate-runner.mjs';
 
 const parsed = parseGateArgs(process.argv.slice(2), ['grants', 'token-leak']);
@@ -61,10 +61,20 @@ function tokenLeak(dryRun) {
     file: 'apps/node-agent/test/relay-http-client.test.mjs',
     pattern: 'without exposing it|never leak or retry the badge|authorization failures stop',
   });
-  const check = finishedCheck('node-client-token-canary', run, evidence, 4);
+  const diagnostic = runVitest({
+    file: 'apps/desktop/src/diagnostic-pack.test.ts',
+    pattern: 'exports only hashed identity references and redacted diagnostics',
+    cwd: repositoryRoot,
+    config: 'vitest.config.ts',
+  });
+  const checks = [
+    finishedCheck('node-client-token-canary', run, evidence, 4),
+    finishedCheck('diagnostic-pack-secret-canary', diagnostic, evidence, 2),
+  ];
   emitGate({
-    gate: 'security', mode: 'token-leak', status: check.status, checks: [check],
-    assertions: run.testSummary?.passed ?? 0, negativeCases: 4,
+    gate: 'security', mode: 'token-leak',
+    status: checks.every((check) => check.status === 'passed') ? 'passed' : 'failed', checks,
+    assertions: checks.reduce((sum, check) => sum + (check.tests?.passed ?? 0), 0), negativeCases: 6,
     limitations: ['The canary covers Node client state, errors, and injected logger output; external APM/host logs are not connected in this repository.'],
   });
 }
