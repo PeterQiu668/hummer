@@ -1,7 +1,7 @@
 {
   "schema": "hummer.phase0.baseline",
   "version": 1,
-  "capturedAt": "2026-10-06T17:52:35.533Z",
+  "capturedAt": "2026-10-06T18:49:53.037Z",
   "lineage": {
     "trustedWorktree": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
     "trustedBranch": "codex/m3-development",
@@ -84,22 +84,22 @@
   },
   "gates": [
     {
-      "command": "node --version",
+      "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe --version",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:52:36.819Z",
-      "finishedAt": "2026-10-06T17:52:36.902Z",
+      "startedAt": "2026-10-06T18:49:53.869Z",
+      "finishedAt": "2026-10-06T18:49:54.039Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
-        "v24.16.0"
+        "v22.22.2"
       ],
       "spawnError": null
     },
     {
       "command": "npm.cmd --version",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:52:36.903Z",
-      "finishedAt": "2026-10-06T17:52:37.768Z",
+      "startedAt": "2026-10-06T18:49:54.039Z",
+      "finishedAt": "2026-10-06T18:49:54.573Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -108,22 +108,22 @@
       "spawnError": null
     },
     {
-      "command": "codex.cmd --version",
+      "command": "C:\\Users\\admin\\AppData\\Local\\OpenAI\\Codex\\bin\\7ac07f4ce733f89a\\codex.exe --version",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:52:37.768Z",
-      "finishedAt": "2026-10-06T17:52:38.220Z",
+      "startedAt": "2026-10-06T18:49:54.573Z",
+      "finishedAt": "2026-10-06T18:49:54.783Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
-        "codex-cli 0.160.1"
+        "codex-cli 0.153.4"
       ],
       "spawnError": null
     },
     {
       "command": "npm.cmd run config:check",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:52:38.220Z",
-      "finishedAt": "2026-10-06T17:52:39.413Z",
+      "startedAt": "2026-10-06T18:49:54.783Z",
+      "finishedAt": "2026-10-06T18:49:55.628Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -135,8 +135,8 @@
     {
       "command": "npm.cmd run typecheck",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:52:39.413Z",
-      "finishedAt": "2026-10-06T17:53:06.362Z",
+      "startedAt": "2026-10-06T18:49:55.628Z",
+      "finishedAt": "2026-10-06T18:50:34.255Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -152,8 +152,8 @@
     {
       "command": "npm.cmd run build",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:53:06.362Z",
-      "finishedAt": "2026-10-06T17:53:33.393Z",
+      "startedAt": "2026-10-06T18:50:34.255Z",
+      "finishedAt": "2026-10-06T18:50:58.474Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -171,7 +171,7 @@
         "dist/index.html                   0.44 kB │ gzip:   0.33 kB",
         "dist/assets/index-TzUswYGV.css   49.06 kB │ gzip:   9.53 kB",
         "dist/assets/index-DPjqZidd.js   557.92 kB │ gzip: 170.80 kB",
-        "✓ built in 9.77s",
+        "✓ built in 13.57s",
         "(!) Some chunks are larger than 500 kB after minification. Consider:",
         "- Using dynamic import() to code-split the application",
         "- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks",
@@ -182,8 +182,8 @@
     {
       "command": "npm.cmd test",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:53:33.393Z",
-      "finishedAt": "2026-10-06T17:54:03.769Z",
+      "startedAt": "2026-10-06T18:50:58.474Z",
+      "finishedAt": "2026-10-06T18:52:40.517Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -201,23 +201,23 @@
         " RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/m3-verify",
         " Test Files  57 passed (57)",
         "      Tests  217 passed (217)",
-        "   Start at  01:53:38",
-        "   Duration  10.44s (transform 2.23s, setup 0ms, import 10.81s, tests 8.54s, environment 8ms)",
+        "   Start at  02:51:04",
+        "   Duration  16.47s (transform 3.25s, setup 0ms, import 31.11s, tests 11.81s, environment 8ms)",
         "> hummer-enterprise-workspace@0.2.0 test:ui",
         "> vitest run --config vitest.ui.config.ts",
         " RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/m3-verify",
         " Test Files  14 passed (14)",
         "      Tests  38 passed (38)",
-        "   Start at  01:53:51",
-        "   Duration  12.40s (transform 6.44s, setup 12.83s, import 8.94s, tests 18.28s, environment 54.21s)"
+        "   Start at  02:51:23",
+        "   Duration  76.80s (transform 10.10s, setup 87.36s, import 16.69s, tests 14.60s, environment 660.80s)"
       ],
       "spawnError": null
     },
     {
-      "command": "node scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/verifiable-outcome-receipt.json",
+      "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/verifiable-outcome-receipt.json",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:54:03.769Z",
-      "finishedAt": "2026-10-06T17:54:03.907Z",
+      "startedAt": "2026-10-06T18:52:40.517Z",
+      "finishedAt": "2026-10-06T18:52:40.880Z",
       "exitCode": 0,
       "signal": null,
       "outputTail": [
@@ -226,10 +226,10 @@
       "spawnError": null
     },
     {
-      "command": "node scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/tampered-outcome-receipt.json",
+      "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/tampered-outcome-receipt.json",
       "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
-      "startedAt": "2026-10-06T17:54:03.908Z",
-      "finishedAt": "2026-10-06T17:54:04.046Z",
+      "startedAt": "2026-10-06T18:52:40.880Z",
+      "finishedAt": "2026-10-06T18:52:41.240Z",
       "exitCode": 1,
       "signal": null,
       "outputTail": [
@@ -247,16 +247,25 @@
     "fullTestPassed": true,
     "validReceiptAccepted": true,
     "tamperedReceiptRejected": true,
-    "codexVersionPinned": false
+    "codexVersionPinned": true,
+    "nodeVersionPinned": true
   },
   "blockers": [
     {
       "id": "BLK-P0-CODEX-PIN",
       "severity": "important",
-      "status": "open",
+      "status": "closed",
       "expected": "codex-cli 0.153.4",
-      "observed": "codex-cli 0.160.1",
+      "observed": "codex-cli 0.153.4",
       "policy": "Do not bypass. Runtime dispatch verification remains blocked until aligned."
+    },
+    {
+      "id": "BLK-P0-NODE-PIN",
+      "severity": "important",
+      "status": "closed",
+      "expected": "v22.22.2",
+      "observed": "v22.22.2",
+      "policy": "Use the isolated pinned binary; do not mutate the global Node.js installation."
     }
   ],
   "source": "scripts\\capture-phase0-baseline.mjs"

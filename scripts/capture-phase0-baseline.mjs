@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { delimiter, dirname, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const repositoryRoot = resolve(import.meta.dirname, '..')
@@ -19,6 +19,12 @@ const bloodlinePath = resolve(
   repositoryRoot,
   process.argv[3] ?? 'evidence/round-d0/bloodline.json',
 )
+const pinnedNodeBinary = process.env.HUMMER_NODE_BIN ?? 'node'
+const pinnedCodexBinary = process.env.HUMMER_CODEX_BIN ?? 'codex.cmd'
+const childPath =
+  pinnedNodeBinary === 'node'
+    ? process.env.PATH
+    : `${dirname(resolve(pinnedNodeBinary))}${delimiter}${process.env.PATH ?? ''}`
 
 const inheritedDirtyFiles = [
   'apps/desktop/src/config/deepseek-pricing.json',
@@ -33,16 +39,23 @@ const inheritedDirtyFiles = [
 
 function run(command, args, cwd = trustedWorktree) {
   const startedAt = new Date().toISOString()
-  const isCommandShim = process.platform === 'win32' && command.endsWith('.cmd')
-  const executable = isCommandShim ? (process.env.ComSpec ?? 'cmd.exe') : command
+  const selectedCommand =
+    command === 'node'
+      ? pinnedNodeBinary
+      : command === 'codex.cmd'
+        ? pinnedCodexBinary
+        : command
+  const isCommandShim = process.platform === 'win32' && selectedCommand.endsWith('.cmd')
+  const executable = isCommandShim ? (process.env.ComSpec ?? 'cmd.exe') : selectedCommand
   const executableArgs = isCommandShim
-    ? ['/d', '/s', '/c', [command, ...args].map(quoteCmdArg).join(' ')]
+    ? ['/d', '/s', '/c', [selectedCommand, ...args].map(quoteCmdArg).join(' ')]
     : args
   const result = spawnSync(executable, executableArgs, {
     cwd,
     encoding: 'utf8',
     shell: false,
     windowsHide: true,
+    env: { ...process.env, PATH: childPath },
   })
   const finishedAt = new Date().toISOString()
   const stdout = result.stdout ?? ''
@@ -51,7 +64,7 @@ function run(command, args, cwd = trustedWorktree) {
   const lines = combined.split(/\r?\n/).filter(Boolean)
 
   return {
-    command: [command, ...args].join(' '),
+    command: [selectedCommand, ...args].join(' '),
     cwd,
     startedAt,
     finishedAt,
@@ -161,15 +174,26 @@ const baseline = {
     codexVersionPinned: commands[2].outputTail.some((line) =>
       line.includes('0.153.4'),
     ),
+    nodeVersionPinned: commands[0].outputTail.some((line) =>
+      line.includes('v22.22.2'),
+    ),
   },
   blockers: [
     {
       id: 'BLK-P0-CODEX-PIN',
       severity: 'important',
-      status: 'open',
+      status: commands[2].outputTail.some((line) => line.includes('0.153.4')) ? 'closed' : 'open',
       expected: 'codex-cli 0.153.4',
       observed: commands[2].outputTail.at(-1) ?? null,
       policy: 'Do not bypass. Runtime dispatch verification remains blocked until aligned.',
+    },
+    {
+      id: 'BLK-P0-NODE-PIN',
+      severity: 'important',
+      status: commands[0].outputTail.some((line) => line.includes('v22.22.2')) ? 'closed' : 'open',
+      expected: 'v22.22.2',
+      observed: commands[0].outputTail.at(-1) ?? null,
+      policy: 'Use the isolated pinned binary; do not mutate the global Node.js installation.',
     },
   ],
   source: relative(repositoryRoot, import.meta.filename),
@@ -238,6 +262,7 @@ console.log(`test exit: ${commands[6].exitCode}`)
 console.log(`valid receipt exit: ${commands[7].exitCode}`)
 console.log(`tampered receipt exit: ${commands[8].exitCode}`)
 console.log(`codex pin satisfied: ${baseline.assertions.codexVersionPinned}`)
+console.log(`node pin satisfied: ${baseline.assertions.nodeVersionPinned}`)
 
 if (
   !baseline.assertions.trustedHeadMatchesExpected ||
@@ -247,6 +272,8 @@ if (
   !baseline.assertions.fullTestPassed ||
   !baseline.assertions.validReceiptAccepted ||
   !baseline.assertions.tamperedReceiptRejected
+  || !baseline.assertions.codexVersionPinned
+  || !baseline.assertions.nodeVersionPinned
 ) {
   process.exitCode = 1
 }
