@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from '@sinclair/typebox';
 
-const Identifier = Type.String({ minLength: 1, maxLength: 128 });
+const Identifier = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' });
 const ShortText = Type.String({ minLength: 1, maxLength: 512 });
 const LongText = Type.String({ minLength: 1, maxLength: 32_768 });
 const ActorRef = Type.String({
@@ -12,6 +12,13 @@ const IsoUtc = Type.String({
   maxLength: 24,
 });
 const Sha256 = Type.String({ pattern: '^[a-f0-9]{64}$' });
+const WindowsReservedSegment = '(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))';
+const SafePathSegment = `${WindowsReservedSegment}(?=[^/]*[^ .](?:/|$))[^/\\\\<>:"|?*\\x00-\\x1F\\x7F]+`;
+const NormalizedRelativePath = Type.String({
+  minLength: 1,
+  maxLength: 1024,
+  pattern: `^(?![A-Za-z]:)(?!/)(?!.*//)(?!.*(?:^|/)\\.\\.?($|/))${SafePathSegment}(?:/${SafePathSegment})*$`,
+});
 const StringList = (maxItems: number, options: Record<string, unknown> = {}) =>
   Type.Array(ShortText, { maxItems, uniqueItems: true, ...options });
 
@@ -19,8 +26,8 @@ export const SourceBoundarySchema = Type.Object(
   {
     apps: StringList(128),
     windows: StringList(128),
-    includePaths: StringList(256),
-    excludePaths: StringList(256),
+    includePaths: Type.Array(NormalizedRelativePath, { maxItems: 256, uniqueItems: true }),
+    excludePaths: Type.Array(NormalizedRelativePath, { maxItems: 256, uniqueItems: true }),
   },
   { additionalProperties: false },
 );
@@ -54,11 +61,18 @@ export const TrialEnvironmentSchema = Type.Object(
 
 export const TrialRecordSchema = Type.Object(
   {
+    tenantId: Identifier,
+    packageId: Identifier,
+    packageVersion: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
+    packageDigest: Sha256,
+    trialIds: Type.Array(Identifier, { minItems: 1, maxItems: 1_000_000, uniqueItems: true }),
     shadowRuns: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
     success: Type.Integer({ minimum: 0, maximum: 1_000_000 }),
     failure: Type.Integer({ minimum: 0, maximum: 1_000_000 }),
     lastRunAt: IsoUtc,
     environments: Type.Array(TrialEnvironmentSchema, { minItems: 1, maxItems: 256 }),
+    regressionPassed: Type.Boolean(),
+    regressionEvidenceDigest: Sha256,
   },
   { additionalProperties: false },
 );
@@ -72,7 +86,7 @@ export const DeclaredPermissionSchema = Type.Object(
       Type.Literal('execute'),
       Type.Literal('egress'),
     ]),
-    paths: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), {
+    paths: Type.Array(NormalizedRelativePath, {
       maxItems: 256,
       uniqueItems: true,
     }),
@@ -123,6 +137,7 @@ const capabilityAuthorProperties = {
   packageId: Identifier,
   packageVersion: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
   supersedesVersion: Type.Optional(Type.Integer({ minimum: 1, maximum: 999_999 })),
+  previousPackageDigest: Type.Optional(Sha256),
   title: ShortText,
   goal: LongText,
   preset: Type.Union([
@@ -171,6 +186,7 @@ export const SkillTrialSystemRecordInputSchema = Type.Object(
     trialId: Identifier,
     packageId: Identifier,
     packageVersion: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
+    packageDigest: Sha256,
     recordedBy: Type.Literal('system:skill-trial'),
     mode: Type.Union([Type.Literal('shadow'), Type.Literal('live')]),
     ok: Type.Boolean(),
@@ -188,6 +204,7 @@ const finalPackageProperties = {
   ...capabilityAuthorProperties,
   schema: Type.Literal('hummer.capability-package'),
   trialRecord: TrialRecordSchema,
+  packageDigest: Sha256,
   status: Type.Union([
     Type.Literal('draft'),
     Type.Literal('shadow'),
@@ -204,6 +221,21 @@ export const CapabilityPackageV1Schema = Type.Object(finalPackageProperties, {
   additionalProperties: false,
 });
 
+export const CapabilityShareInvitationSchema = Type.Object(
+  {
+    invitationId: Identifier,
+    sourceTenantId: Identifier,
+    targetTenantId: Identifier,
+    packageId: Identifier,
+    packageVersion: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
+    packageDigest: Sha256,
+    status: Type.Literal('accepted'),
+    expiresAt: IsoUtc,
+    evidenceDigest: Sha256,
+  },
+  { additionalProperties: false },
+);
+
 /** Read-only package handoff. It is not a mutable listing or ownership transfer. */
 export const TeamReadOnlyShareSchema = Type.Object(
   {
@@ -212,11 +244,14 @@ export const TeamReadOnlyShareSchema = Type.Object(
     shareId: Identifier,
     sourceTenantId: Identifier,
     targetTenantId: Identifier,
-    invitationRef: Type.Optional(Identifier),
+    packageId: Identifier,
+    packageVersion: Type.Integer({ minimum: 1, maximum: 1_000_000 }),
+    invitation: Type.Optional(CapabilityShareInvitationSchema),
     access: Type.Literal('read_only'),
     allowEdit: Type.Literal(false),
     allowCopyToTenant: Type.Literal(false),
     packageDigest: Sha256,
+    shareDigest: Sha256,
     package: CapabilityPackageV1Schema,
     sharedByActorRef: ActorRef,
     sharedAt: IsoUtc,
@@ -263,12 +298,16 @@ export const CapabilityInstallGateInputSchema = Type.Object(
     version: Type.Literal(1),
     gateId: Identifier,
     share: TeamReadOnlyShareSchema,
+    recordedBy: Type.Literal('system:capability-install-gate'),
+    requestDigest: Sha256,
+    shareDigest: Sha256,
     exportDescriptor: AgentSkillsExportDescriptorSchema,
     targetTenantId: Identifier,
     requestedByActorRef: ActorRef,
     staticCheck: Type.Object(
       {
-        passed: Type.Boolean(),
+        status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]),
+        evidenceDigest: Sha256,
         findings: Type.Array(InstallGateFindingSchema, { maxItems: 256 }),
       },
       { additionalProperties: false },
@@ -277,14 +316,17 @@ export const CapabilityInstallGateInputSchema = Type.Object(
       {
         approvedPermissions: Type.Array(DeclaredPermissionSchema, { maxItems: 256, uniqueItems: true }),
         deniedPermissions: Type.Array(DeclaredPermissionSchema, { maxItems: 256, uniqueItems: true }),
+        evidenceDigest: Sha256,
       },
       { additionalProperties: false },
     ),
     sourceVerification: Type.Object(
       {
-        provenanceVerified: Type.Boolean(),
-        receiptVerified: Type.Boolean(),
-        digestVerified: Type.Boolean(),
+        provenance: Type.Object({ status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]), evidenceDigest: Sha256 }, { additionalProperties: false }),
+        receipt: Type.Object({ status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]), evidenceDigest: Sha256 }, { additionalProperties: false }),
+        packageDigest: Type.Object({ status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]), evidenceDigest: Sha256 }, { additionalProperties: false }),
+        invitation: Type.Optional(Type.Object({ status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]), evidenceDigest: Sha256 }, { additionalProperties: false })),
+        regression: Type.Object({ status: Type.Union([Type.Literal('passed'), Type.Literal('failed')]), evidenceDigest: Sha256 }, { additionalProperties: false }),
       },
       { additionalProperties: false },
     ),
@@ -303,6 +345,9 @@ export const CapabilityInstallGateDecisionSchema = Type.Object(
     decision: Type.Union([Type.Literal('approved'), Type.Literal('denied')]),
     reasons: Type.Array(Identifier, { minItems: 1, maxItems: 64, uniqueItems: true }),
     packageDigest: Sha256,
+    shareDigest: Sha256,
+    requestDigest: Sha256,
+    decidedBy: Type.Literal('system:capability-install-gate'),
     evaluatedAt: IsoUtc,
   },
   { $id: 'hummer.capability-install-gate-decision.v1', additionalProperties: false },
@@ -322,6 +367,7 @@ export type SkillTrialSystemRecordInput = Static<typeof SkillTrialSystemRecordIn
 export type CapabilityPackageV1 = Static<typeof CapabilityPackageV1Schema>;
 export type TrialRecord = Static<typeof TrialRecordSchema>;
 export type TeamReadOnlyShare = Static<typeof TeamReadOnlyShareSchema>;
+export type CapabilityShareInvitation = Static<typeof CapabilityShareInvitationSchema>;
 export type CapabilityInstallGateInput = Static<typeof CapabilityInstallGateInputSchema>;
 export type CapabilityInstallGateDecision = Static<typeof CapabilityInstallGateDecisionSchema>;
 export type CapabilityContractName = keyof typeof CapabilityContractSchemas;
