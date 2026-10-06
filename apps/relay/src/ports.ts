@@ -97,6 +97,8 @@ export interface FleetValidators {
 export interface AuthenticatedFleetSession {
   tenantId: string;
   actorRef: string;
+  /** Present for node badge tokens. Transport adapters must never trust a caller-supplied node id. */
+  nodeId?: string;
 }
 
 export type NodeStatus = 'online' | 'offline';
@@ -168,6 +170,6 @@ export interface FleetIngress {
 export interface FleetTransport {
   start(ingress: FleetIngress): Promise<void>;
   publishTask(nodeId: string, task: FleetTaskRecord): Promise<void>;
-  publishControl(nodeId: string, command: 'stop', taskId: string): Promise<void>;
+  publishControl(tenantId: string, nodeId: string, command: 'stop', taskId: string): Promise<void>;
   close(): Promise<void>;
 }

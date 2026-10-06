@@ -2,10 +2,11 @@
 
 ## Current boundary
 
-This increment is the storage and application core behind the Relay. It is not a
-network server and it is not two-machine evidence. `FleetTransport` is the only
-port a later Fastify 5 + WSS/SSE adapter may implement. The core does not import
-Fastify, WebSocket, Electron, a runtime, or agent-hub code.
+This increment includes the storage/application core plus a bounded Fastify 5
+HTTP and SSE adapter. It is not two-machine evidence. `FleetTransport` remains
+the delivery port; the core does not import Fastify, WebSocket, Electron, a
+runtime, or agent-hub code. WSS remains a future adapter because the Phase 0
+control and notification flow does not justify another protocol dependency.
 
 The Relay is a thin delivery plane. HUMMER remains the source of truth for work
 orders, approvals, results, receipts, and capabilities. A transport adapter must
@@ -31,6 +32,30 @@ with a `FleetRejectedError` code. Duplicate task/event delivery returns the
 first stored result only when the canonical validated payload is identical. A
 reused key with different content is rejected as `duplicate_delivery`; it never
 silently aliases two commands.
+
+## HTTP, badge token, and stream boundary
+
+The Fastify adapter exposes only the Phase 0 operations needed to register and
+heartbeat a node, enqueue and claim a task, append a generic run event, append
+the stricter `started`/`completed`/`failed` events, stop a task, and subscribe to
+node notifications. Contract payloads still flow through
+`createSharedFleetValidators`; the adapter does not maintain another fleet
+schema. Body size is capped at the shared 64 KiB limit. Body-less claim and stop
+commands reject any unknown field.
+
+Bearer credentials are short-lived opaque badge tokens. The included static
+authenticator retains only SHA-256 token fingerprints. Each resolved badge is
+bound to one tenant, an actor, an explicit scope set, an expiry, and optionally
+one node. Node routes require the token's `nodeId` to match the route and shared
+contract body. Control routes derive tenant identity from the badge rather than
+caller input. Missing, malformed, unknown, expired, under-scoped, cross-tenant,
+and cross-node requests fail closed.
+
+`GET /v1/nodes/:nodeId/events` is an SSE stream for `task.available` and
+`task.stop`. Subscribers are keyed by `(tenantId, nodeId)`, removed on socket
+close, and forcibly ended at badge expiry. `Last-Event-ID` is not an authority:
+every reconnect must present and revalidate a badge. Durable replay and WSS are
+not claimed by this slice.
 
 ## Stores and migration alignment
 
@@ -62,16 +87,20 @@ npm.cmd run test -w @hummer/relay
 ```
 
 The suite runs the same 20 store behaviors against both memory and SQLite stores,
-plus three shared-contract adapter assertions (43 tests total). Negative cases cover unknown fields, tenant mismatch, stale nodes,
+plus three shared-contract adapter assertions and five HTTP/SSE transport tests
+(48 tests total). Negative cases cover unknown fields, tenant mismatch, stale nodes,
 wrong lease ownership, sequence gaps, completion without an artifact, stopped
-tasks, expired tasks, and retry-key reuse. A 10-task scenario double-delivers
+tasks, expired tasks, retry-key reuse, wrong/expired/under-scoped badge tokens,
+cross-node binding, and unauthorized SSE reconnect after disconnect. A 10-task scenario double-delivers
 every envelope and completion event, then proves exactly ten claims and ten
 stored completion events on one store instance.
 
 ## Remaining integration work
 
-1. Add the Fastify/WSS adapter and SSE fallback behind `FleetTransport`.
-2. Add authenticated session and short-lived badge-token middleware.
+1. Add WSS only if measured duplex traffic or deployment constraints require it;
+   SSE is the implemented Phase 0 event channel.
+2. Replace the in-process static badge registry with the deployment identity
+   issuer/revocation source; do not put plaintext tokens in config committed to Git.
 3. Run two real nodes through disconnect/reconnect, clock skew, and 100-task
    duplicate-delivery tests. Until that evidence exists, do not describe D3 or
    AC-P0-04 as complete.
