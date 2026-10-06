@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openPersistence } from './database.js';
+import { migrations } from './migrations.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -48,12 +49,30 @@ describe('desktop persistence migrations', () => {
   it('keeps v6-v9 state while adding the v10 egress ledger through an additive migration', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
 
-    expect(persistence.schemaVersion()).toBe(10);
+    expect(persistence.schemaVersion()).toBeGreaterThanOrEqual(10);
     expect(persistence.listTables()).toContain('engine_credentials');
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['tool_definitions', 'tool_invocations']));
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['work_order_intake', 'work_order_inbox']));
     expect(persistence.listTables()).toEqual(expect.arrayContaining(['execution_sandbox_checks', 'workspace_exec_jobs']));
     expect(persistence.listTables()).toContain('egress_deliveries');
+    persistence.close();
+  });
+
+  it('upgrades an existing v10 database with additive fleet node and lease tables', () => {
+    const directory = temporaryDirectory();
+    seedDatabaseThroughV10(join(directory, 'hummer.sqlite3'));
+
+    const persistence = openPersistence({ dataDirectory: directory });
+
+    expect(persistence.schemaVersion()).toBe(11);
+    expect(persistence.listTables()).toEqual(expect.arrayContaining([
+      'fleet_nodes',
+      'fleet_task_leases',
+    ]));
+    expect(persistence.appliedMigrations().at(-1)).toMatchObject({
+      version: 11,
+      name: 'phase0_fleet_nodes_and_task_leases',
+    });
     persistence.close();
   });
 
@@ -194,5 +213,29 @@ function manuallyUpdateEvent(databasePath: string, eventId: string, canonicalPay
   };
   const database = new Database(databasePath);
   database.prepare('UPDATE domain_events SET canonical_payload = ? WHERE id = ?').run(canonicalPayload, eventId);
+  database.close();
+}
+
+function seedDatabaseThroughV10(databasePath: string): void {
+  const require = createRequire(import.meta.url);
+  const Database = require('better-sqlite3') as new (path: string) => {
+    exec(sql: string): void;
+    prepare(sql: string): { run(...params: unknown[]): unknown };
+    close(): void;
+  };
+  const database = new Database(databasePath);
+  database.exec(`
+    CREATE TABLE schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    );
+  `);
+  for (const migration of migrations.filter((item) => item.version <= 10)) {
+    database.exec(migration.sql);
+    database
+      .prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
+      .run(migration.version, migration.name, '2026-10-07T00:00:00.000Z');
+  }
   database.close();
 }

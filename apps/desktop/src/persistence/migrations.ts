@@ -572,6 +572,45 @@ export const migrations: readonly Migration[] = [
         ON egress_deliveries (tenant_id, session_id, occurred_at);
     `,
   },
+  {
+    version: 11,
+    name: 'phase0_fleet_nodes_and_task_leases',
+    sql: `
+      CREATE TABLE fleet_nodes (
+        tenant_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('online', 'offline', 'draining')),
+        PRIMARY KEY (tenant_id, node_id)
+      );
+
+      CREATE INDEX fleet_nodes_availability
+        ON fleet_nodes (tenant_id, status, last_seen_at);
+
+      CREATE TABLE fleet_task_leases (
+        tenant_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        delivery_id TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        envelope_json TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('queued', 'leased', 'completed', 'failed', 'stopped')),
+        lease_expires_at TEXT,
+        attempt INTEGER NOT NULL DEFAULT 0 CHECK (attempt >= 0),
+        result_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, task_id),
+        UNIQUE (tenant_id, delivery_id),
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (tenant_id, node_id) REFERENCES fleet_nodes(tenant_id, node_id)
+      );
+
+      CREATE INDEX fleet_task_leases_queue
+        ON fleet_task_leases (tenant_id, node_id, state, lease_expires_at);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`
