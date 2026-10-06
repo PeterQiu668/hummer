@@ -1,0 +1,690 @@
+{
+  "schema": "hummer.w5-evidence",
+  "version": 1,
+  "round": "W5",
+  "generatedAt": "2026-10-06T22:58:15.567Z",
+  "commit": "b3748e11683819cba82c01b6f9a8519bf5e5eadf",
+  "branch": "codex/phase0-fleet",
+  "worktree": "phase0-fleet",
+  "node": "v22.22.2",
+  "commands": [
+    {
+      "id": "capability",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:capability",
+      "startedAt": "2026-10-06T22:55:40.366Z",
+      "finishedAt": "2026-10-06T22:55:45.618Z",
+      "exitCode": 0,
+      "json": {
+        "schema": "hummer.executable-gate-result",
+        "version": 1,
+        "gate": "capability",
+        "mode": "default",
+        "status": "passed",
+        "capturedAt": "2026-10-06T22:55:45.563Z",
+        "toolchain": {
+          "node": "v22.22.2",
+          "platform": "win32",
+          "arch": "x64"
+        },
+        "assertions": 17,
+        "negativeCases": 44,
+        "checks": [
+          {
+            "id": "capability-default",
+            "status": "passed",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run packages/capability-runtime/src/capability-runtime.test.ts --config vitest.config.ts -t CAP- --reporter=json",
+            "exitCode": 0,
+            "tests": {
+              "total": 17,
+              "passed": 17,
+              "failed": 0,
+              "pending": 0
+            },
+            "negativeCases": 44,
+            "evidence": [
+              "deterministic eight-file Agent Skills export",
+              "per-file SHA-256 and deterministic root hash",
+              "strict manifest/meta/receipt linkage and tamper rejection",
+              "declared-permission and cross-tenant share install gates",
+              "existing target refuses overwrite"
+            ],
+            "stdoutTail": "ls an exact-permission bundle once and refuses overwrite without changing source bytes\",\"status\":\"passed\",\"title\":\"installs an exact-permission bundle once and refuses overwrite without changing source bytes\",\"duration\":68.09089999999992,\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"[CAP-SHARING] cross-tenant read-only installation\"],\"fullName\":\"[CAP-SHARING] cross-tenant read-only installation requires a contract-valid read-only share and a currently valid invitation\",\"status\":\"passed\",\"title\":\"requires a contract-valid read-only share and a currently valid invitation\",\"duration\":18.20620000000008,\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"[CAP-SHARING] cross-tenant read-only installation\"],\"fullName\":\"[CAP-SHARING] cross-tenant read-only installation binds target tenant, package bytes and digest to the authenticated share\",\"status\":\"passed\",\"title\":\"binds target tenant, package bytes and digest to the authenticated share\",\"duration\":10.005500000000211,\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"[CAP-SHARING] cross-tenant read-only installation\"],\"fullName\":\"[CAP-SHARING] cross-tenant read-only installation rejects tenant/package path injection before creating an install target\",\"status\":\"passed\",\"title\":\"rejects tenant/package path injection before creating an install target\",\"duration\":8.364399999999932,\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"[CAP-SHARING] cross-tenant read-only installation\"],\"fullName\":\"[CAP-SHARING] cross-tenant read-only installation rejects a symlink or junction install root before writing any file\",\"status\":\"passed\",\"title\":\"rejects a symlink or junction install root before writing any file\",\"duration\":8.028200000000197,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1791327345006,\"endTime\":1791327345493.0283,\"status\":\"passed\",\"message\":\"\",\"name\":\"F:/Users/claude code/.claude/worktrees/phase0-fleet/packages/capability-runtime/src/capability-runtime.test.ts\"}]}",
+            "stderrTail": ""
+          }
+        ],
+        "limitations": [
+          "Local file modes are defense-in-depth; Windows ACL enforcement is outside this gate.",
+          "Per-segment lstat/realpath checks cannot eliminate a privileged local TOCTOU race without openat-style APIs.",
+          "Invitation validity is supplied by the authenticated host policy boundary, not inferred from renderer data."
+        ]
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:capability\n> node scripts/test-capability.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"capability\",\"mode\":\"default\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T22:55:45.563Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":17,\"negativeCases\":44,\"checks\":[{\"id\":\"capability-default\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run packages/capability-runtime/src/capability-runtime.test.ts --config vitest.config.ts -t CAP- --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":17,\"passed\":17,\"failed\":0,\"pending\":0},\"negativeCases\":44,\"evidence\":[\"deterministic eight-file Agent Skills export\",\"per-file SHA-256 and deterministic root hash\",\"strict manifest/meta/receipt linkage and tamper rejection\",\"declared-permission and cross-tenant share install gates\",\"existing target refuses overwrite\"],\"stdoutTail\":\"ls an exact-permission bundle once and refuses overwrite without changing source bytes\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"installs an exact-permission bundle once and refuses overwrite without changing source bytes\\\",\\\"duration\\\":68.09089999999992,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation requires a contract-valid read-only share and a currently valid invitation\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"requires a contract-valid read-only share and a currently valid invitation\\\",\\\"duration\\\":18.20620000000008,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation binds target tenant, package bytes and digest to the authenticated share\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"binds target tenant, package bytes and digest to the authenticated share\\\",\\\"duration\\\":10.005500000000211,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation rejects tenant/package path injection before creating an install target\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects tenant/package path injection before creating an install target\\\",\\\"duration\\\":8.364399999999932,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation rejects a symlink or junction install root before writing any file\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects a symlink or junction install root before writing any file\\\",\\\"duration\\\":8.028200000000197,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791327345006,\\\"endTime\\\":1791327345493.0283,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/packages/capability-runtime/src/capability-runtime.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"Local file modes are defense-in-depth; Windows ACL enforcement is outside this gate.\",\"Per-segment lstat/realpath checks cannot eliminate a privileged local TOCTOU race without openat-style APIs.\",\"Invitation validity is supplied by the authenticated host policy boundary, not inferred from renderer data.\"]}\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:capability\n> node scripts/test-capability.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"capability\",\"mode\":\"default\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T22:55:45.563Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":17,\"negativeCases\":44,\"checks\":[{\"id\":\"capability-default\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run packages/capability-runtime/src/capability-runtime.test.ts --config vitest.config.ts -t CAP- --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":17,\"passed\":17,\"failed\":0,\"pending\":0},\"negativeCases\":44,\"evidence\":[\"deterministic eight-file Agent Skills export\",\"per-file SHA-256 and deterministic root hash\",\"strict manifest/meta/receipt linkage and tamper rejection\",\"declared-permission and cross-tenant share install gates\",\"existing target refuses overwrite\"],\"stdoutTail\":\"ls an exact-permission bundle once and refuses overwrite without changing source bytes\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"installs an exact-permission bundle once and refuses overwrite without changing source bytes\\\",\\\"duration\\\":68.09089999999992,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation requires a contract-valid read-only share and a currently valid invitation\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"requires a contract-valid read-only share and a currently valid invitation\\\",\\\"duration\\\":18.20620000000008,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation binds target tenant, package bytes and digest to the authenticated share\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"binds target tenant, package bytes and digest to the authenticated share\\\",\\\"duration\\\":10.005500000000211,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation rejects tenant/package path injection before creating an install target\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects tenant/package path injection before creating an install target\\\",\\\"duration\\\":8.364399999999932,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"[CAP-SHARING] cross-tenant read-only installation\\\"],\\\"fullName\\\":\\\"[CAP-SHARING] cross-tenant read-only installation rejects a symlink or junction install root before writing any file\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects a symlink or junction install root before writing any file\\\",\\\"duration\\\":8.028200000000197,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791327345006,\\\"endTime\\\":1791327345493.0283,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/packages/capability-runtime/src/capability-runtime.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"Local file modes are defense-in-depth; Windows ACL enforcement is outside this gate.\",\"Per-segment lstat/realpath checks cannot eliminate a privileged local TOCTOU race without openat-style APIs.\",\"Invitation validity is supplied by the authenticated host policy boundary, not inferred from renderer data.\"]}",
+      "stderrTail": ""
+    },
+    {
+      "id": "contracts",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:contract",
+      "startedAt": "2026-10-06T22:55:45.618Z",
+      "finishedAt": "2026-10-06T22:55:46.549Z",
+      "exitCode": 0,
+      "json": {
+        "status": "passed",
+        "assertions": 50,
+        "negativeCases": 33,
+        "maxBytes": 65536
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":50,\"negativeCases\":33,\"maxBytes\":65536}\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":50,\"negativeCases\":33,\"maxBytes\":65536}",
+      "stderrTail": ""
+    },
+    {
+      "id": "web-relay-browser",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:web-e2e",
+      "startedAt": "2026-10-06T22:55:46.549Z",
+      "finishedAt": "2026-10-06T22:56:04.913Z",
+      "exitCode": 0,
+      "json": null,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:web-e2e\n> node scripts/e2e-web-relay.mjs\n\nWeb Relay browser-client integration gate passed.\n- Playwright Chromium viewport: 390x844 (system-chrome)\n- HTTPS Relay route mock: node list + 3 authenticated TaskEnvelope POSTs\n- Batch: explicit confirmation, per-item success/403, no 403 retry\n- Unconfigured page: read-only, no Relay request\n- Badge: absent from localStorage, console, and visible UI\n- Screenshots (ignored): dist/web-relay-e2e\nScope: browser-client integration only; this is not external Relay or two-machine evidence.\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:web-e2e\n> node scripts/e2e-web-relay.mjs\n\nWeb Relay browser-client integration gate passed.\n- Playwright Chromium viewport: 390x844 (system-chrome)\n- HTTPS Relay route mock: node list + 3 authenticated TaskEnvelope POSTs\n- Batch: explicit confirmation, per-item success/403, no 403 retry\n- Unconfigured page: read-only, no Relay request\n- Badge: absent from localStorage, console, and visible UI\n- Screenshots (ignored): dist/web-relay-e2e\nScope: browser-client integration only; this is not external Relay or two-machine evidence.",
+      "stderrTail": ""
+    },
+    {
+      "id": "tenancy",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:tenancy",
+      "startedAt": "2026-10-06T22:56:04.914Z",
+      "finishedAt": "2026-10-06T22:56:18.818Z",
+      "exitCode": 0,
+      "json": {
+        "schema": "hummer.executable-gate-result",
+        "version": 1,
+        "gate": "tenancy",
+        "capturedAt": "2026-10-06T22:56:18.762Z",
+        "toolchain": {
+          "node": "v22.22.2",
+          "platform": "win32",
+          "arch": "x64"
+        },
+        "mode": "w4-21-case-matrix",
+        "status": "passed",
+        "matrix": {
+          "expected": 21,
+          "passed": 21,
+          "failed": 0,
+          "byCategory": {
+            "read": {
+              "expected": 5,
+              "passed": 5
+            },
+            "write": {
+              "expected": 5,
+              "passed": 5
+            },
+            "surface": {
+              "expected": 4,
+              "passed": 4
+            },
+            "side": {
+              "expected": 7,
+              "passed": 7
+            }
+          }
+        },
+        "assertions": 25,
+        "negativeCases": 21,
+        "checks": [
+          {
+            "id": "TEN-W4-READ-WORKORDER",
+            "marker": "[TEN-W4-READ-WORKORDER]",
+            "category": "read",
+            "expected": "WorkOrder and result ownership cannot be read by a foreign tenant",
+            "file": "apps/api/work-orders/work-orders.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-API-WORKORDER-BARE-ID]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-READ-DOMAIN-EVENT",
+            "marker": "[TEN-W4-READ-DOMAIN-EVENT]",
+            "category": "read",
+            "expected": "session and DomainEvent projections are tenant-scoped",
+            "file": "apps/desktop/src/persistence/tenant-read-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-DESKTOP-SESSION-BARE-ID]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-READ-EVIDENCE-APPROVAL",
+            "marker": "[TEN-W4-READ-EVIDENCE-APPROVAL]",
+            "category": "read",
+            "expected": "foreign approval and evidence references are unavailable",
+            "file": "apps/desktop/src/persistence/tenant-read-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-DESKTOP-SESSION-BARE-ID]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-READ-RECEIPT-OUTCOME",
+            "marker": "[TEN-W4-READ-RECEIPT-OUTCOME]",
+            "category": "read",
+            "expected": "receipt, outcome, and workspace-job references are tenant-opaque",
+            "file": "apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0C-DESKTOP-SIDE-CHANNELS]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-WRITE-IDEMPOTENCY",
+            "marker": "[TEN-W4-WRITE-IDEMPOTENCY]",
+            "category": "write",
+            "expected": "foreign tenant cannot collide with or tamper with DomainEvent idempotency state",
+            "file": "apps/desktop/src/persistence/tenant-identifier-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0B-DESKTOP-IDENTIFIERS]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-WRITE-CREATE-TASK",
+            "marker": "[TEN-W4-WRITE-CREATE-TASK]",
+            "category": "write",
+            "expected": "task creation rejects a tenant that differs from the authenticated command tenant",
+            "file": "apps/api/work-orders/work-orders.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-WRITE-POLICY",
+            "marker": "[TEN-W4-WRITE-POLICY]",
+            "category": "write",
+            "expected": "cross-tenant policy requests fail before role permissions apply",
+            "file": "packages/contracts/src/tenancy/policy.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-ROLE-POLICY-MATRIX]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-WRITE-CONTROLLED-ARTIFACT",
+            "marker": "[TEN-W4-WRITE-CONTROLLED-ARTIFACT]",
+            "category": "write",
+            "expected": "controlled writes and egress bytes stay in the owning tenant directory",
+            "file": "apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0C-DESKTOP-SIDE-CHANNELS]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SURFACE-DESKTOP-IPC",
+            "marker": "[TEN-W4-SURFACE-DESKTOP-IPC]",
+            "category": "surface",
+            "expected": "desktop IPC rejects anonymous and cross-tenant runtime control",
+            "file": "apps/desktop/src/runtime-ipc-tenancy.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-DESKTOP-RUNTIME-IPC]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-DIAGNOSTIC-PATHS",
+            "marker": "[TEN-W4-SIDE-DIAGNOSTIC-PATHS]",
+            "category": "side",
+            "expected": "diagnostics redact tenant/path material and workspaces are partitioned",
+            "file": "apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0C-DESKTOP-SIDE-CHANNELS]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-RUNTIME-TOKEN",
+            "marker": "[TEN-W4-SIDE-RUNTIME-TOKEN]",
+            "category": "side",
+            "expected": "event publication stops after the bound token changes tenant",
+            "file": "apps/desktop/src/runtime-ipc-tenancy.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-DESKTOP-RUNTIME-IPC]",
+            "runnerGroup": "root-node",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-READ-AUDIT-EXPORT",
+            "marker": "[TEN-W4-READ-AUDIT-EXPORT]",
+            "category": "read",
+            "expected": "Memory and SQLite audit exports hide foreign references and bytes",
+            "file": "test/governance.test.ts",
+            "expectedPasses": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-W4-RELAY-GOVERNANCE]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-WRITE-GRANT-MANIFEST",
+            "marker": "[TEN-W4-WRITE-GRANT-MANIFEST]",
+            "category": "write",
+            "expected": "Memory and SQLite reject an ungranted manifest tenant without persisting it",
+            "file": "test/tenant-boundary.test.ts",
+            "expectedPasses": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-RELAY-MULTITENANT-GRANT]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SURFACE-HTTP",
+            "marker": "[TEN-W4-SURFACE-HTTP]",
+            "category": "surface",
+            "expected": "HTTP foreign and unknown references have the same result",
+            "file": "test/relay-surfaces-tenancy.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0D-RELAY-SURFACES]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SURFACE-SSE",
+            "marker": "[TEN-W4-SURFACE-SSE]",
+            "category": "surface",
+            "expected": "SSE payload and Last-Event-ID sequence stay inside the tenant-node stream",
+            "file": "test/relay-surfaces-tenancy.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0D-RELAY-SURFACES]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SURFACE-QUEUE",
+            "marker": "[TEN-W4-SURFACE-QUEUE]",
+            "category": "surface",
+            "expected": "Memory and SQLite queue/event/approval/retry/audit references stay tenant-opaque",
+            "file": "test/relay-surfaces-tenancy.test.ts",
+            "expectedPasses": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0D-RELAY-SURFACES]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-CAPABILITY-GRANT",
+            "marker": "[TEN-W4-SIDE-CAPABILITY-GRANT]",
+            "category": "side",
+            "expected": "grant ids and snapshots are tenant-partitioned and existence-opaque",
+            "file": "test/tenant-boundary.test.ts",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0-RELAY-MULTITENANT-GRANT]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-CHAIN-HEAD",
+            "marker": "[TEN-W4-SIDE-CHAIN-HEAD]",
+            "category": "side",
+            "expected": "Memory and SQLite chain heads advance independently per tenant",
+            "file": "test/governance.test.ts",
+            "expectedPasses": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-W4-RELAY-GOVERNANCE]",
+            "runnerGroup": "relay",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-OUTPUT-BYTES",
+            "marker": "[TEN-W4-SIDE-OUTPUT-BYTES]",
+            "category": "side",
+            "expected": "foreign tenant facts cannot leave the node in receipt or artifact bytes",
+            "file": "apps/node-agent/test/tenancy-boundary.test.mjs",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0F-NODE-AGENT-BOUNDARY]",
+            "runnerGroup": "node-agent",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe --test --test-name-pattern=\\[TEN-W4-SIDE-OUTPUT-BYTES\\]|\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\]|\\[TEN-W4-SIDE-RESTART-WORKSPACE\\] --test-reporter=tap <REPOSITORY_ROOT>\\apps\\node-agent\\test\\tenancy-boundary.test.mjs",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-NODE-CACHE-JOURNAL",
+            "marker": "[TEN-W4-SIDE-NODE-CACHE-JOURNAL]",
+            "category": "side",
+            "expected": "same-process claim caches, grants, and journals stay tenant-local",
+            "file": "apps/node-agent/test/tenancy-boundary.test.mjs",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0F-NODE-AGENT-BOUNDARY]",
+            "runnerGroup": "node-agent",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe --test --test-name-pattern=\\[TEN-W4-SIDE-OUTPUT-BYTES\\]|\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\]|\\[TEN-W4-SIDE-RESTART-WORKSPACE\\] --test-reporter=tap <REPOSITORY_ROOT>\\apps\\node-agent\\test\\tenancy-boundary.test.mjs",
+            "exitCode": 0
+          },
+          {
+            "id": "TEN-W4-SIDE-RESTART-WORKSPACE",
+            "marker": "[TEN-W4-SIDE-RESTART-WORKSPACE]",
+            "category": "side",
+            "expected": "restart journal refuses foreign scope without leaking records or tokens",
+            "file": "apps/node-agent/test/tenancy-boundary.test.mjs",
+            "expectedPasses": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "status": "passed",
+            "foundationMarker": "[TEN-P0F-NODE-AGENT-BOUNDARY]",
+            "runnerGroup": "node-agent",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe --test --test-name-pattern=\\[TEN-W4-SIDE-OUTPUT-BYTES\\]|\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\]|\\[TEN-W4-SIDE-RESTART-WORKSPACE\\] --test-reporter=tap <REPOSITORY_ROOT>\\apps\\node-agent\\test\\tenancy-boundary.test.mjs",
+            "exitCode": 0
+          }
+        ],
+        "groups": [
+          {
+            "id": "root-node",
+            "runner": "vitest-json",
+            "status": "passed",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-WORKORDER\\]|\\[TEN-W4-READ-DOMAIN-EVENT\\]|\\[TEN-W4-READ-EVIDENCE-APPROVAL\\]|\\[TEN-W4-READ-RECEIPT-OUTCOME\\]|\\[TEN-W4-WRITE-IDEMPOTENCY\\]|\\[TEN-W4-WRITE-CREATE-TASK\\]|\\[TEN-W4-WRITE-POLICY\\]|\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\]|\\[TEN-W4-SURFACE-DESKTOP-IPC\\]|\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\]|\\[TEN-W4-SIDE-RUNTIME-TOKEN\\] --reporter=json",
+            "exitCode": 0,
+            "reportParsed": true
+          },
+          {
+            "id": "relay",
+            "runner": "vitest-json",
+            "status": "passed",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\[TEN-W4-READ-AUDIT-EXPORT\\]|\\[TEN-W4-WRITE-GRANT-MANIFEST\\]|\\[TEN-W4-SURFACE-HTTP\\]|\\[TEN-W4-SURFACE-SSE\\]|\\[TEN-W4-SURFACE-QUEUE\\]|\\[TEN-W4-SIDE-CAPABILITY-GRANT\\]|\\[TEN-W4-SIDE-CHAIN-HEAD\\] --reporter=json",
+            "exitCode": 0,
+            "reportParsed": true
+          },
+          {
+            "id": "node-agent",
+            "runner": "node-test-tap",
+            "status": "passed",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe --test --test-name-pattern=\\[TEN-W4-SIDE-OUTPUT-BYTES\\]|\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\]|\\[TEN-W4-SIDE-RESTART-WORKSPACE\\] --test-reporter=tap <REPOSITORY_ROOT>\\apps\\node-agent\\test\\tenancy-boundary.test.mjs",
+            "exitCode": 0,
+            "reportParsed": true
+          }
+        ],
+        "limitations": [
+          "Postgres/RLS has no configured test environment and remains pending; it is not counted as passed.",
+          "The source prompt calls the matrix 21 items while its read/write/surface/side noun list contains 27 entries; this gate uses 21 non-duplicated executable attack cases and reports their category mapping explicitly.",
+          "Capability-package surfaces are covered by the separate W5 capability registry/runtime gates; recording-session storage remains future-phase, and neither is counted inside this fixed W4 21-case matrix.",
+          "The implemented subscription transport is SSE; a future WebSocket transport needs its own behavior case before it can be claimed."
+        ]
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:tenancy\n> node scripts/test-tenancy.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"tenancy\",\"capturedAt\":\"2026-10-06T22:56:18.762Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"mode\":\"w4-21-case-matrix\",\"status\":\"passed\",\"matrix\":{\"expected\":21,\"passed\":21,\"failed\":0,\"byCategory\":{\"read\":{\"expected\":5,\"passed\":5},\"write\":{\"expected\":5,\"passed\":5},\"surface\":{\"expected\":4,\"passed\":4},\"side\":{\"expected\":7,\"passed\":7}}},\"assertions\":25,\"negativeCases\":21,\"checks\":[{\"id\":\"TEN-W4-READ-WORKORDER\",\"marker\":\"[TEN-W4-READ-WORKORDER]\",\"category\":\"read\",\"expected\":\"WorkOrder and result ownership cannot be read by a foreign tenant\",\"file\":\"apps/api/work-orders/work-orders.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-API-WORKORDER-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-DOMAIN-EVENT\",\"marker\":\"[TEN-W4-READ-DOMAIN-EVENT]\",\"category\":\"read\",\"expected\":\"session and DomainEvent projections are tenant-scoped\",\"file\":\"apps/desktop/src/persistence/tenant-read-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-SESSION-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-EVIDENCE-APPROVAL\",\"marker\":\"[TEN-W4-READ-EVIDENCE-APPROVAL]\",\"category\":\"read\",\"expected\":\"foreign approval and evidence references are unavailable\",\"file\":\"apps/desktop/src/persistence/tenant-read-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-SESSION-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-RECEIPT-OUTCOME\",\"marker\":\"[TEN-W4-READ-RECEIPT-OUTCOME]\",\"category\":\"read\",\"expected\":\"receipt, outcome, and workspace-job references are tenant-opaque\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-IDEMPOTENCY\",\"marker\":\"[TEN-W4-WRITE-IDEMPOTENCY]\",\"category\":\"write\",\"expected\":\"foreign tenant cannot collide with or tamper with DomainEvent idempotency state\",\"file\":\"apps/desktop/src/persistence/tenant-identifier-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0B-DESKTOP-IDENTIFIERS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-CREATE-TASK\",\"marker\":\"[TEN-W4-WRITE-CREATE-TASK]\",\"category\":\"write\",\"expected\":\"task creation rejects a tenant that differs from the authenticated command tenant\",\"file\":\"apps/api/work-orders/work-orders.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-POLICY\",\"marker\":\"[TEN-W4-WRITE-POLICY]\",\"category\":\"write\",\"expected\":\"cross-tenant policy requests fail before role permissions apply\",\"file\":\"packages/contracts/src/tenancy/policy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-ROLE-POLICY-MATRIX]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-CONTROLLED-ARTIFACT\",\"marker\":\"[TEN-W4-WRITE-CONTROLLED-ARTIFACT]\",\"category\":\"write\",\"expected\":\"controlled writes and egress bytes stay in the owning tenant directory\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-DESKTOP-IPC\",\"marker\":\"[TEN-W4-SURFACE-DESKTOP-IPC]\",\"category\":\"surface\",\"expected\":\"desktop IPC rejects anonymous and cross-tenant runtime control\",\"file\":\"apps/desktop/src/runtime-ipc-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-RUNTIME-IPC]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-DIAGNOSTIC-PATHS\",\"marker\":\"[TEN-W4-SIDE-DIAGNOSTIC-PATHS]\",\"category\":\"side\",\"expected\":\"diagnostics redact tenant/path material and workspaces are partitioned\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-RUNTIME-TOKEN\",\"marker\":\"[TEN-W4-SIDE-RUNTIME-TOKEN]\",\"category\":\"side\",\"expected\":\"event publication stops after the bound token changes tenant\",\"file\":\"apps/desktop/src/runtime-ipc-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-RUNTIME-IPC]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-AUDIT-EXPORT\",\"marker\":\"[TEN-W4-READ-AUDIT-EXPORT]\",\"category\":\"read\",\"expected\":\"Memory and SQLite audit exports hide foreign references and bytes\",\"file\":\"test/governance.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-W4-RELAY-GOVERNANCE]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-GRANT-MANIFEST\",\"marker\":\"[TEN-W4-WRITE-GRANT-MANIFEST]\",\"category\":\"write\",\"expected\":\"Memory and SQLite reject an ungranted manifest tenant without persisting it\",\"file\":\"test/tenant-boundary.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-RELAY-MULTITENANT-GRANT]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-HTTP\",\"marker\":\"[TEN-W4-SURFACE-HTTP]\",\"category\":\"surface\",\"expected\":\"HTTP foreign and unknown references have the same result\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-SSE\",\"marker\":\"[TEN-W4-SURFACE-SSE]\",\"category\":\"surface\",\"expected\":\"SSE payload and Last-Event-ID sequence stay inside the tenant-node stream\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-QUEUE\",\"marker\":\"[TEN-W4-SURFACE-QUEUE]\",\"category\":\"surface\",\"expected\":\"Memory and SQLite queue/event/approval/retry/audit references stay tenant-opaque\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-CAPABILITY-GRANT\",\"marker\":\"[TEN-W4-SIDE-CAPABILITY-GRANT]\",\"category\":\"side\",\"expected\":\"grant ids and snapshots are tenant-partitioned and existence-opaque\",\"file\":\"test/tenant-boundary.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-RELAY-MULTITENANT-GRANT]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-CHAIN-HEAD\",\"marker\":\"[TEN-W4-SIDE-CHAIN-HEAD]\",\"category\":\"side\",\"expected\":\"Memory and SQLite chain heads advance independently per tenant\",\"file\":\"test/governance.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-W4-RELAY-GOVERNANCE]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-OUTPUT-BYTES\",\"marker\":\"[TEN-W4-SIDE-OUTPUT-BYTES]\",\"category\":\"side\",\"expected\":\"foreign tenant facts cannot leave the node in receipt or artifact bytes\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-NODE-CACHE-JOURNAL\",\"marker\":\"[TEN-W4-SIDE-NODE-CACHE-JOURNAL]\",\"category\":\"side\",\"expected\":\"same-process claim caches, grants, and journals stay tenant-local\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-RESTART-WORKSPACE\",\"marker\":\"[TEN-W4-SIDE-RESTART-WORKSPACE]\",\"category\":\"side\",\"expected\":\"restart journal refuses foreign scope without leaking records or tokens\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0}],\"groups\":[{\"id\":\"root-node\",\"runner\":\"vitest-json\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0,\"reportParsed\":true},{\"id\":\"relay\",\"runner\":\"vitest-json\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0,\"reportParsed\":true},{\"id\":\"node-agent\",\"runner\":\"node-test-tap\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0,\"reportParsed\":true}],\"limitations\":[\"Postgres/RLS has no configured test environment and remains pending; it is not counted as passed.\",\"The source prompt calls the matrix 21 items while its read/write/surface/side noun list contains 27 entries; this gate uses 21 non-duplicated executable attack cases and reports their category mapping explicitly.\",\"Capability-package surfaces are covered by the separate W5 capability registry/runtime gates; recording-session storage remains future-phase, and neither is counted inside this fixed W4 21-case matrix.\",\"The implemented subscription transport is SSE; a future WebSocket transport needs its own behavior case before it can be claimed.\"]}\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:tenancy\n> node scripts/test-tenancy.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"tenancy\",\"capturedAt\":\"2026-10-06T22:56:18.762Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"mode\":\"w4-21-case-matrix\",\"status\":\"passed\",\"matrix\":{\"expected\":21,\"passed\":21,\"failed\":0,\"byCategory\":{\"read\":{\"expected\":5,\"passed\":5},\"write\":{\"expected\":5,\"passed\":5},\"surface\":{\"expected\":4,\"passed\":4},\"side\":{\"expected\":7,\"passed\":7}}},\"assertions\":25,\"negativeCases\":21,\"checks\":[{\"id\":\"TEN-W4-READ-WORKORDER\",\"marker\":\"[TEN-W4-READ-WORKORDER]\",\"category\":\"read\",\"expected\":\"WorkOrder and result ownership cannot be read by a foreign tenant\",\"file\":\"apps/api/work-orders/work-orders.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-API-WORKORDER-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-DOMAIN-EVENT\",\"marker\":\"[TEN-W4-READ-DOMAIN-EVENT]\",\"category\":\"read\",\"expected\":\"session and DomainEvent projections are tenant-scoped\",\"file\":\"apps/desktop/src/persistence/tenant-read-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-SESSION-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-EVIDENCE-APPROVAL\",\"marker\":\"[TEN-W4-READ-EVIDENCE-APPROVAL]\",\"category\":\"read\",\"expected\":\"foreign approval and evidence references are unavailable\",\"file\":\"apps/desktop/src/persistence/tenant-read-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-SESSION-BARE-ID]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-RECEIPT-OUTCOME\",\"marker\":\"[TEN-W4-READ-RECEIPT-OUTCOME]\",\"category\":\"read\",\"expected\":\"receipt, outcome, and workspace-job references are tenant-opaque\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-IDEMPOTENCY\",\"marker\":\"[TEN-W4-WRITE-IDEMPOTENCY]\",\"category\":\"write\",\"expected\":\"foreign tenant cannot collide with or tamper with DomainEvent idempotency state\",\"file\":\"apps/desktop/src/persistence/tenant-identifier-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0B-DESKTOP-IDENTIFIERS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-CREATE-TASK\",\"marker\":\"[TEN-W4-WRITE-CREATE-TASK]\",\"category\":\"write\",\"expected\":\"task creation rejects a tenant that differs from the authenticated command tenant\",\"file\":\"apps/api/work-orders/work-orders.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-POLICY\",\"marker\":\"[TEN-W4-WRITE-POLICY]\",\"category\":\"write\",\"expected\":\"cross-tenant policy requests fail before role permissions apply\",\"file\":\"packages/contracts/src/tenancy/policy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-ROLE-POLICY-MATRIX]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-CONTROLLED-ARTIFACT\",\"marker\":\"[TEN-W4-WRITE-CONTROLLED-ARTIFACT]\",\"category\":\"write\",\"expected\":\"controlled writes and egress bytes stay in the owning tenant directory\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-DESKTOP-IPC\",\"marker\":\"[TEN-W4-SURFACE-DESKTOP-IPC]\",\"category\":\"surface\",\"expected\":\"desktop IPC rejects anonymous and cross-tenant runtime control\",\"file\":\"apps/desktop/src/runtime-ipc-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-RUNTIME-IPC]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-DIAGNOSTIC-PATHS\",\"marker\":\"[TEN-W4-SIDE-DIAGNOSTIC-PATHS]\",\"category\":\"side\",\"expected\":\"diagnostics redact tenant/path material and workspaces are partitioned\",\"file\":\"apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0C-DESKTOP-SIDE-CHANNELS]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-RUNTIME-TOKEN\",\"marker\":\"[TEN-W4-SIDE-RUNTIME-TOKEN]\",\"category\":\"side\",\"expected\":\"event publication stops after the bound token changes tenant\",\"file\":\"apps/desktop/src/runtime-ipc-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-DESKTOP-RUNTIME-IPC]\",\"runnerGroup\":\"root-node\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-READ-AUDIT-EXPORT\",\"marker\":\"[TEN-W4-READ-AUDIT-EXPORT]\",\"category\":\"read\",\"expected\":\"Memory and SQLite audit exports hide foreign references and bytes\",\"file\":\"test/governance.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-W4-RELAY-GOVERNANCE]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-WRITE-GRANT-MANIFEST\",\"marker\":\"[TEN-W4-WRITE-GRANT-MANIFEST]\",\"category\":\"write\",\"expected\":\"Memory and SQLite reject an ungranted manifest tenant without persisting it\",\"file\":\"test/tenant-boundary.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-RELAY-MULTITENANT-GRANT]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-HTTP\",\"marker\":\"[TEN-W4-SURFACE-HTTP]\",\"category\":\"surface\",\"expected\":\"HTTP foreign and unknown references have the same result\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-SSE\",\"marker\":\"[TEN-W4-SURFACE-SSE]\",\"category\":\"surface\",\"expected\":\"SSE payload and Last-Event-ID sequence stay inside the tenant-node stream\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SURFACE-QUEUE\",\"marker\":\"[TEN-W4-SURFACE-QUEUE]\",\"category\":\"surface\",\"expected\":\"Memory and SQLite queue/event/approval/retry/audit references stay tenant-opaque\",\"file\":\"test/relay-surfaces-tenancy.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0D-RELAY-SURFACES]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-CAPABILITY-GRANT\",\"marker\":\"[TEN-W4-SIDE-CAPABILITY-GRANT]\",\"category\":\"side\",\"expected\":\"grant ids and snapshots are tenant-partitioned and existence-opaque\",\"file\":\"test/tenant-boundary.test.ts\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0-RELAY-MULTITENANT-GRANT]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-CHAIN-HEAD\",\"marker\":\"[TEN-W4-SIDE-CHAIN-HEAD]\",\"category\":\"side\",\"expected\":\"Memory and SQLite chain heads advance independently per tenant\",\"file\":\"test/governance.test.ts\",\"expectedPasses\":2,\"passed\":2,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-W4-RELAY-GOVERNANCE]\",\"runnerGroup\":\"relay\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-OUTPUT-BYTES\",\"marker\":\"[TEN-W4-SIDE-OUTPUT-BYTES]\",\"category\":\"side\",\"expected\":\"foreign tenant facts cannot leave the node in receipt or artifact bytes\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-NODE-CACHE-JOURNAL\",\"marker\":\"[TEN-W4-SIDE-NODE-CACHE-JOURNAL]\",\"category\":\"side\",\"expected\":\"same-process claim caches, grants, and journals stay tenant-local\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0},{\"id\":\"TEN-W4-SIDE-RESTART-WORKSPACE\",\"marker\":\"[TEN-W4-SIDE-RESTART-WORKSPACE]\",\"category\":\"side\",\"expected\":\"restart journal refuses foreign scope without leaking records or tokens\",\"file\":\"apps/node-agent/test/tenancy-boundary.test.mjs\",\"expectedPasses\":1,\"passed\":1,\"failed\":0,\"skipped\":0,\"status\":\"passed\",\"foundationMarker\":\"[TEN-P0F-NODE-AGENT-BOUNDARY]\",\"runnerGroup\":\"node-agent\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0}],\"groups\":[{\"id\":\"root-node\",\"runner\":\"vitest-json\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/api/work-orders/work-orders.test.ts apps/desktop/src/persistence/tenant-read-isolation.test.ts apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts apps/desktop/src/persistence/tenant-identifier-isolation.test.ts packages/contracts/src/tenancy/policy.test.ts apps/desktop/src/runtime-ipc-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-WORKORDER\\\\]|\\\\[TEN-W4-READ-DOMAIN-EVENT\\\\]|\\\\[TEN-W4-READ-EVIDENCE-APPROVAL\\\\]|\\\\[TEN-W4-READ-RECEIPT-OUTCOME\\\\]|\\\\[TEN-W4-WRITE-IDEMPOTENCY\\\\]|\\\\[TEN-W4-WRITE-CREATE-TASK\\\\]|\\\\[TEN-W4-WRITE-POLICY\\\\]|\\\\[TEN-W4-WRITE-CONTROLLED-ARTIFACT\\\\]|\\\\[TEN-W4-SURFACE-DESKTOP-IPC\\\\]|\\\\[TEN-W4-SIDE-DIAGNOSTIC-PATHS\\\\]|\\\\[TEN-W4-SIDE-RUNTIME-TOKEN\\\\] --reporter=json\",\"exitCode\":0,\"reportParsed\":true},{\"id\":\"relay\",\"runner\":\"vitest-json\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/governance.test.ts test/tenant-boundary.test.ts test/relay-surfaces-tenancy.test.ts --config vitest.config.ts -t \\\\[TEN-W4-READ-AUDIT-EXPORT\\\\]|\\\\[TEN-W4-WRITE-GRANT-MANIFEST\\\\]|\\\\[TEN-W4-SURFACE-HTTP\\\\]|\\\\[TEN-W4-SURFACE-SSE\\\\]|\\\\[TEN-W4-SURFACE-QUEUE\\\\]|\\\\[TEN-W4-SIDE-CAPABILITY-GRANT\\\\]|\\\\[TEN-W4-SIDE-CHAIN-HEAD\\\\] --reporter=json\",\"exitCode\":0,\"reportParsed\":true},{\"id\":\"node-agent\",\"runner\":\"node-test-tap\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=\\\\[TEN-W4-SIDE-OUTPUT-BYTES\\\\]|\\\\[TEN-W4-SIDE-NODE-CACHE-JOURNAL\\\\]|\\\\[TEN-W4-SIDE-RESTART-WORKSPACE\\\\] --test-reporter=tap <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\tenancy-boundary.test.mjs\",\"exitCode\":0,\"reportParsed\":true}],\"limitations\":[\"Postgres/RLS has no configured test environment and remains pending; it is not counted as passed.\",\"The source prompt calls the matrix 21 items while its read/write/surface/side noun list contains 27 entries; this gate uses 21 non-duplicated executable attack cases and reports their category mapping explicitly.\",\"Capability-package surfaces are covered by the separate W5 capability registry/runtime gates; recording-session storage remains future-phase, and neither is counted inside this fixed W4 21-case matrix.\",\"The implemented subscription transport is SSE; a future WebSocket transport needs its own behavior case before it can be claimed.\"]}",
+      "stderrTail": ""
+    },
+    {
+      "id": "security",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:security",
+      "startedAt": "2026-10-06T22:56:18.820Z",
+      "finishedAt": "2026-10-06T22:56:19.295Z",
+      "exitCode": 1,
+      "json": {
+        "schema": "hummer.executable-gate-result",
+        "version": 1,
+        "gate": "security",
+        "mode": "invalid",
+        "status": "failed",
+        "capturedAt": "2026-10-06T22:56:19.236Z",
+        "toolchain": {
+          "node": "v22.22.2",
+          "platform": "win32",
+          "arch": "x64"
+        },
+        "assertions": 0,
+        "negativeCases": 0,
+        "checks": [],
+        "limitations": [],
+        "reason": "Select exactly one mode: --grants | --token-leak"
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:security\n> node scripts/test-security.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"security\",\"mode\":\"invalid\",\"status\":\"failed\",\"capturedAt\":\"2026-10-06T22:56:19.236Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":0,\"negativeCases\":0,\"checks\":[],\"limitations\":[],\"reason\":\"Select exactly one mode: --grants | --token-leak\"}\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:security\n> node scripts/test-security.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"security\",\"mode\":\"invalid\",\"status\":\"failed\",\"capturedAt\":\"2026-10-06T22:56:19.236Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":0,\"negativeCases\":0,\"checks\":[],\"limitations\":[],\"reason\":\"Select exactly one mode: --grants | --token-leak\"}",
+      "stderrTail": ""
+    },
+    {
+      "id": "fleet-idempotency",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:fleet -- --idempotency",
+      "startedAt": "2026-10-06T22:56:19.295Z",
+      "finishedAt": "2026-10-06T22:56:23.209Z",
+      "exitCode": 0,
+      "json": {
+        "schema": "hummer.executable-gate-result",
+        "version": 1,
+        "gate": "fleet",
+        "mode": "idempotency",
+        "status": "passed",
+        "capturedAt": "2026-10-06T22:56:23.152Z",
+        "toolchain": {
+          "node": "v22.22.2",
+          "platform": "win32",
+          "arch": "x64"
+        },
+        "assertions": 10,
+        "negativeCases": 4,
+        "checks": [
+          {
+            "id": "relay-idempotency",
+            "status": "passed",
+            "command": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <REPOSITORY_ROOT>\\node_modules\\vitest\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t duplicate delivery|reused task idempotency|deduplicates event delivery|100 deliveries|reused event idempotency --reporter=json",
+            "exitCode": 0,
+            "tests": {
+              "total": 58,
+              "passed": 10,
+              "failed": 0,
+              "pending": 48
+            },
+            "negativeCases": 4,
+            "evidence": [
+              "duplicate enqueue returns the original result",
+              "canonical mismatch under a reused key is rejected",
+              "duplicate event delivery does not increase event count",
+              "100 duplicate deliveries yield one task and one event sequence"
+            ],
+            "stdoutTail": " when retrying\",\"status\":\"skipped\",\"title\":\"requires a fresh idempotency key when retrying\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\",\"status\":\"skipped\",\"title\":\"queues a retry as a distinct attempt lineage\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\",\"status\":\"skipped\",\"title\":\"rejects a retry that escapes the original work-order lineage\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract rejects already expired tasks\",\"status\":\"skipped\",\"title\":\"rejects already expired tasks\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\",\"status\":\"skipped\",\"title\":\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\",\"status\":\"skipped\",\"title\":\"rejects a late event from a previous attempt after a retry is leased\",\"failureMessages\":[],\"meta\":{},\"tags\":[]},{\"ancestorTitles\":[\"sqlite FleetStore contract\"],\"fullName\":\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\",\"status\":\"skipped\",\"title\":\"delivers and completes ten tasks exactly once under duplicate ingress\",\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1791327382926,\"endTime\":1791327383068.1284,\"status\":\"passed\",\"message\":\"\",\"name\":\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\"}]}",
+            "stderrTail": ""
+          }
+        ],
+        "limitations": [
+          "This is a deterministic local Memory/SQLite service proof, not a two-machine transport proof."
+        ]
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:fleet\n> node scripts/test-fleet.mjs --idempotency\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"fleet\",\"mode\":\"idempotency\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T22:56:23.152Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":10,\"negativeCases\":4,\"checks\":[{\"id\":\"relay-idempotency\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t duplicate delivery|reused task idempotency|deduplicates event delivery|100 deliveries|reused event idempotency --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":10,\"failed\":0,\"pending\":48},\"negativeCases\":4,\"evidence\":[\"duplicate enqueue returns the original result\",\"canonical mismatch under a reused key is rejected\",\"duplicate event delivery does not increase event count\",\"100 duplicate deliveries yield one task and one event sequence\"],\"stdoutTail\":\" when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791327382926,\\\"endTime\\\":1791327383068.1284,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"This is a deterministic local Memory/SQLite service proof, not a two-machine transport proof.\"]}\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 test:fleet\n> node scripts/test-fleet.mjs --idempotency\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"fleet\",\"mode\":\"idempotency\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T22:56:23.152Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":10,\"negativeCases\":4,\"checks\":[{\"id\":\"relay-idempotency\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t duplicate delivery|reused task idempotency|deduplicates event delivery|100 deliveries|reused event idempotency --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":10,\"failed\":0,\"pending\":48},\"negativeCases\":4,\"evidence\":[\"duplicate enqueue returns the original result\",\"canonical mismatch under a reused key is rejected\",\"duplicate event delivery does not increase event count\",\"100 duplicate deliveries yield one task and one event sequence\"],\"stdoutTail\":\" when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791327382926,\\\"endTime\\\":1791327383068.1284,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"This is a deterministic local Memory/SQLite service proof, not a two-machine transport proof.\"]}",
+      "stderrTail": ""
+    },
+    {
+      "id": "full-test",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js test",
+      "startedAt": "2026-10-06T22:56:23.209Z",
+      "finishedAt": "2026-10-06T22:57:12.985Z",
+      "exitCode": 0,
+      "json": {
+        "status": "passed",
+        "assertions": 9,
+        "negativeCases": 2
+      },
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test\n> npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:gates && npm run test:evidence:seal && npm run test:unit && npm run test:ui\n\n\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n\n> hummer-enterprise-workspace@0.2.0 audit:abandoned-3d\n> node scripts/audit-abandoned-3d-lineage.mjs\n\nAbandoned 3D lineage audit passed: no live paths, imports, routes, or root dependencies remain.\n\n> hummer-enterprise-workspace@0.2.0 test:gates\n> node scripts/test-gates.mjs\n\n{\"status\":\"passed\",\"assertions\":28,\"dryRuns\":7,\"pendingModes\":0}\n\n> hummer-enterprise-workspace@0.2.0 test:evidence:seal\n> node scripts/test-evidence-seal.mjs\n\n{\"status\":\"passed\",\"assertions\":9,\"negativeCases\":2}\n\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  83 passed (83)\n      Tests  556 passed (556)\n   Start at  06:56:32\n   Duration  19.15s (transform 2.63s, setup 0ms, import 29.44s, tests 19.17s, environment 10ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  19 passed (19)\n      Tests  70 passed (70)\n   Start at  06:56:53\n   Duration  19.15s (transform 7.28s, setup 22.11s, import 17.11s, tests 23.82s, environment 121.90s)\n\n",
+      "stderr": "",
+      "stdoutTail": "\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  83 passed (83)\n      Tests  556 passed (556)\n   Start at  06:56:32\n   Duration  19.15s (transform 2.63s, setup 0ms, import 29.44s, tests 19.17s, environment 10ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  19 passed (19)\n      Tests  70 passed (70)\n   Start at  06:56:53\n   Duration  19.15s (transform 7.28s, setup 22.11s, import 17.11s, tests 23.82s, environment 121.90s)",
+      "stderrTail": ""
+    },
+    {
+      "id": "typecheck",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run typecheck",
+      "startedAt": "2026-10-06T22:57:12.985Z",
+      "finishedAt": "2026-10-06T22:57:24.032Z",
+      "exitCode": 0,
+      "json": null,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": "",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit",
+      "stderrTail": ""
+    },
+    {
+      "id": "build",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run build",
+      "startedAt": "2026-10-06T22:57:24.032Z",
+      "finishedAt": "2026-10-06T22:57:50.637Z",
+      "exitCode": 0,
+      "json": null,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2380 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                        0.44 kB │ gzip:   0.33 kB\ndist/assets/index-cXGYVF0i.css                        50.31 kB │ gzip:   9.80 kB\ndist/assets/capabilityResponseValidator-CsoqSF4i.js  187.02 kB │ gzip:  55.22 kB\ndist/assets/index-Bpx8kMrf.js                        598.22 kB │ gzip: 183.07 kB\n✓ built in 14.30s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n",
+      "stdoutTail": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2380 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                        0.44 kB │ gzip:   0.33 kB\ndist/assets/index-cXGYVF0i.css                        50.31 kB │ gzip:   9.80 kB\ndist/assets/capabilityResponseValidator-CsoqSF4i.js  187.02 kB │ gzip:  55.22 kB\ndist/assets/index-Bpx8kMrf.js                        598.22 kB │ gzip: 183.07 kB\n✓ built in 14.30s",
+      "stderrTail": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    },
+    {
+      "id": "packaged-smoke-pinned-codex",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:desktop:packaged",
+      "startedAt": "2026-10-06T22:57:50.637Z",
+      "finishedAt": "2026-10-06T22:58:15.567Z",
+      "exitCode": 0,
+      "json": null,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:desktop:packaged\n> node scripts/e2e-desktop-packaged.mjs\n\n{\n  \"executablePath\": \"F:\\\\Users\\\\claude code\\\\.claude\\\\worktrees\\\\phase0-fleet\\\\release\\\\m5e\\\\win-unpacked\\\\HUMMER.exe\",\n  \"rendererLoaded\": true,\n  \"sqliteNativeModuleLoaded\": true,\n  \"desktopRuntimeVisible\": true,\n  \"tenantId\": \"tenant_adc562de284745d5b2bd2dcd3f49a315\",\n  \"environment\": {\n    \"ready\": true,\n    \"node\": {\n      \"available\": true,\n      \"version\": \"22.22.1\",\n      \"source\": \"embedded\"\n    },\n    \"container\": {\n      \"available\": true,\n      \"runtime\": \"docker\",\n      \"preferredRuntime\": \"podman\",\n      \"productionRecommended\": false,\n      \"issue\": \"当前使用 Docker 兼容模式；企业部署推荐 Podman + WSL2。\"\n    },\n    \"workspaceExec\": {\n      \"available\": true,\n      \"checkedAt\": \"2026-10-06T22:58:01.182Z\",\n      \"runtime\": \"docker\",\n      \"passed\": 5,\n      \"total\": 5,\n      \"issue\": null,\n      \"probes\": [\n        {\n          \"name\": \"inside-write\",\n          \"succeeded\": true\n        },\n        {\n          \"name\": \"path-escape\",\n          \"succeeded\": false,\n          \"error\": \"[Errno 30] Read-only file system: '../../escaped.md'\"\n        },\n        {\n          \"name\": \"network-egress\",\n          \"succeeded\": false,\n          \"error\": \"<urlopen error [Errno -3] Temporary failure in name resolution>\"\n        },\n        {\n          \"name\": \"dns-resolution\",\n          \"succeeded\": false,\n          \"error\": \"[Errno -3] Temporary failure in name resolution\"\n        },\n        {\n          \"name\": \"raw-socket\",\n          \"succeeded\": false,\n          \"error\": \"[Errno 101] Network is unreachable\"\n        }\n      ]\n    },\n    \"codex\": {\n      \"available\": true,\n      \"compatible\": true,\n      \"expectedVersion\": \"0.153.4\",\n      \"version\": \"0.153.4\",\n      \"executable\": \"C:\\\\Users\\\\admin\\\\AppData\\\\Local\\\\OpenAI\\\\Codex\\\\bin\\\\7ac07f4ce733f89a\\\\codex.exe\"\n    }\n  }\n}\n",
+      "stderr": "",
+      "stdoutTail": "          \"name\": \"path-escape\",\n          \"succeeded\": false,\n          \"error\": \"[Errno 30] Read-only file system: '../../escaped.md'\"\n        },\n        {\n          \"name\": \"network-egress\",\n          \"succeeded\": false,\n          \"error\": \"<urlopen error [Errno -3] Temporary failure in name resolution>\"\n        },\n        {\n          \"name\": \"dns-resolution\",\n          \"succeeded\": false,\n          \"error\": \"[Errno -3] Temporary failure in name resolution\"\n        },\n        {\n          \"name\": \"raw-socket\",\n          \"succeeded\": false,\n          \"error\": \"[Errno 101] Network is unreachable\"\n        }\n      ]\n    },\n    \"codex\": {\n      \"available\": true,\n      \"compatible\": true,\n      \"expectedVersion\": \"0.153.4\",\n      \"version\": \"0.153.4\",\n      \"executable\": \"C:\\\\Users\\\\admin\\\\AppData\\\\Local\\\\OpenAI\\\\Codex\\\\bin\\\\7ac07f4ce733f89a\\\\codex.exe\"\n    }\n  }\n}",
+      "stderrTail": ""
+    }
+  ],
+  "accepted": {
+    "remoteRelayBrowser": "HTTPS-only authenticated Relay browser client, real task POSTs, explicit mobile batch confirmation, terminal 401/403 handling, and no persisted badge pass the browser integration gate",
+    "capabilityRegistry": "tenant-bound capability registry, trials, immutable catalog snapshots, read-only shares, and install gate pass Memory and SQLite gates",
+    "capabilityPackage": "self-describing deterministic eight-file Agent Skills export verifies actual bytes, hashes, receipt, permissions, paths, and no-overwrite install",
+    "capabilityUi": "capability catalog renders Relay facts and exposes install only through a startup-injected trusted installer port",
+    "packagedApp": "unsigned internal Windows installer builds and the unpacked app passes renderer, native SQLite, tenant, and isolation smoke with the supported pinned Codex CLI"
+  },
+  "broken": {
+    "twoMachine": "pending: no second physical Windows machine or external Relay was available; the browser gate is not claimed as two-machine evidence",
+    "trustedInstallerBridge": "pending: deployment-specific browser-to-target trusted installer bridge is not wired",
+    "currentCodex": "pending: host default Codex CLI 0.160.1 is not protocol-qualified; startup correctly rejects it and packaged smoke uses the supported 0.153.4 binary",
+    "signing": "pending: the NSIS installer has Authenticode status NotSigned",
+    "productionIdentity": "pending: production TLS/IdP badge provisioning and five real seed users require external coordination",
+    "postgresRls": "pending: no configured PostgreSQL/RLS test environment; not counted as passed"
+  },
+  "counts": {
+    "pass": 9,
+    "fail": 1,
+    "skipped": 0
+  },
+  "artifacts": [
+    {
+      "path": "release/m5e/HUMMER-Setup-0.6.0-internal.1.exe",
+      "bytes": 125249369,
+      "sha256": "714e18d4b171067bc10068fdb65e32ecfc3d58c4d22183a16716f8b6a2be1c9c"
+    },
+    {
+      "path": "release/m5e/HUMMER-Setup-0.6.0-internal.1.exe.blockmap",
+      "bytes": 132395,
+      "sha256": "dca50d14286ddbf009a4bdd182621b196f6c7c240bb51c1a2a8307a37cf53497"
+    }
+  ],
+  "screenshots": [
+    "dist/web-relay-e2e (ignored build output; 390x844 browser gate)"
+  ],
+  "safety": {
+    "agentHubWritten": false,
+    "realDeletionPerformed": false,
+    "deployed": false,
+    "pushed": false,
+    "installerExecuted": false,
+    "packagedUnpackedAppSmokeOnly": true
+  }
+}
