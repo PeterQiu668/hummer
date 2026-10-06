@@ -12,7 +12,7 @@ const modeConfig = {
       'declared-permission and cross-tenant share install gates',
       'existing target refuses overwrite',
     ],
-    negativeCases: 42,
+    negativeCases: 44,
   },
   permissions: {
     pattern: 'CAP-PERMISSIONS',
@@ -27,7 +27,7 @@ const modeConfig = {
   manifest: {
     pattern: 'CAP-MANIFEST',
     evidence: ['manifest/meta/receipt bind one package digest', 'tampered file/digest/root/descriptor is rejected'],
-    negativeCases: 19,
+    negativeCases: 21,
   },
   agentskills: {
     pattern: 'CAP-AGENTSKILLS',
