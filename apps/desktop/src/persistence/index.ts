@@ -27,6 +27,18 @@ export type {
   TenantRecord,
 } from './identity-store.js';
 export type { PersistableRuntimeEvent, PersistedSessionDescriptor, RuntimeEventQuery, SaveRuntimeEventOptions } from './runtime-event-store.js';
+export type {
+  AuditExportFile,
+  AuditExportManifest,
+  AuditExportRecord,
+  ChainHeadExport,
+  L3Authorization,
+  QuotaAdmissionResult,
+  QuotaCounter,
+  QuotaMetric,
+  TenantChainHead,
+  TenantLifecycleStatus,
+} from './tenant-governance-store.js';
 
 export type { BadCaseRecord, CreateProjectInput, EvaluationRecord, ProjectGrowthChain, ProjectMembershipRecord, ProjectRecord, SopRevisionRecord, WorkerAssignmentRecord } from './project-store.js';
 

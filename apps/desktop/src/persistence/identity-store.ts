@@ -3,7 +3,7 @@ import { DomainEventStore } from './domain-event-store.js';
 import { ApprovalPolicyStore } from './approval-policy-store.js';
 import type { SqliteDatabase } from './sqlite.js';
 
-export type MembershipRole = 'owner' | 'admin' | 'member';
+export type MembershipRole = 'owner' | 'admin' | 'member' | 'auditor' | 'operator';
 export interface AccountRecord { id: string; email: string | null; phone: string | null; displayName: string }
 export interface TenantRecord { id: string; name: string; slug: string }
 export interface MembershipRecord { id: string; tenantId: string; accountId: string; humanUserId: string; role: MembershipRole }
@@ -73,7 +73,9 @@ export class IdentityStore {
     contactType: 'email' | 'phone'; contactValue: string; role: Exclude<MembershipRole, 'owner'>;
   }): InvitationRecord {
     const context = this.resumeSession(sessionToken);
-    if (context.membership.role === 'member') throw new Error('Only owners and admins may invite members');
+    if (context.membership.role !== 'owner' && context.membership.role !== 'admin') {
+      throw new Error('Only owners and admins may invite members');
+    }
     const token = randomToken();
     const now = this.now();
     const invitation: InvitationRecord = {

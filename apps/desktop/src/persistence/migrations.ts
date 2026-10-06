@@ -1,9 +1,12 @@
 import type { SqliteDatabase } from './sqlite.js';
+import type { JsonValue } from './canonical-json.js';
+import { computeTenantEventHash } from './tenant-chain.js';
 
 export interface Migration {
   version: number;
   name: string;
   sql: string;
+  up?: (database: SqliteDatabase) => void;
 }
 
 export const migrations: readonly Migration[] = [
@@ -611,6 +614,162 @@ export const migrations: readonly Migration[] = [
         ON fleet_task_leases (tenant_id, node_id, state, lease_expires_at);
     `,
   },
+  {
+    version: 12,
+    name: 'w4_tenant_governance_and_dual_chain',
+    sql: `
+      ALTER TABLE memberships RENAME TO memberships_v3_legacy;
+
+      CREATE TABLE memberships (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        human_user_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member', 'auditor', 'operator')),
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, account_id),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (account_id) REFERENCES accounts(id),
+        FOREIGN KEY (human_user_id) REFERENCES human_users(id)
+      );
+
+      INSERT INTO memberships (id, tenant_id, account_id, human_user_id, role, status, created_at, updated_at)
+      SELECT id, tenant_id, account_id, human_user_id, role, status, created_at, updated_at
+      FROM memberships_v3_legacy;
+
+      DROP TABLE memberships_v3_legacy;
+
+      CREATE INDEX memberships_account ON memberships (account_id, status);
+      CREATE INDEX memberships_tenant ON memberships (tenant_id, status);
+
+      ALTER TABLE invitations RENAME TO invitations_v3_legacy;
+
+      CREATE TABLE invitations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        contact_type TEXT NOT NULL CHECK (contact_type IN ('email', 'phone')),
+        contact_value TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'member', 'auditor', 'operator')),
+        token_hash TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        invited_by_account_id TEXT NOT NULL,
+        accepted_by_account_id TEXT,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        accepted_at TEXT,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (invited_by_account_id) REFERENCES accounts(id),
+        FOREIGN KEY (accepted_by_account_id) REFERENCES accounts(id)
+      );
+
+      INSERT INTO invitations (
+        id, tenant_id, contact_type, contact_value, role, token_hash, status,
+        invited_by_account_id, accepted_by_account_id, expires_at, created_at, accepted_at
+      )
+      SELECT
+        id, tenant_id, contact_type, contact_value, role, token_hash, status,
+        invited_by_account_id, accepted_by_account_id, expires_at, created_at, accepted_at
+      FROM invitations_v3_legacy;
+
+      DROP TABLE invitations_v3_legacy;
+
+      CREATE INDEX invitations_tenant_status ON invitations (tenant_id, status);
+
+      CREATE TABLE tenant_settings (
+        tenant_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, key),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE TABLE tenant_event_chain (
+        tenant_id TEXT NOT NULL,
+        tenant_position INTEGER NOT NULL CHECK (tenant_position > 0),
+        event_id TEXT NOT NULL UNIQUE,
+        previous_hash TEXT,
+        hash TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, tenant_position),
+        FOREIGN KEY (event_id) REFERENCES domain_events(id)
+      );
+
+      CREATE INDEX tenant_event_chain_event
+        ON tenant_event_chain (tenant_id, event_id);
+
+      CREATE TABLE tenant_chain_heads (
+        tenant_id TEXT PRIMARY KEY,
+        position INTEGER NOT NULL CHECK (position > 0),
+        hash TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TRIGGER tenants_status_insert_guard
+      BEFORE INSERT ON tenants
+      WHEN NEW.status NOT IN ('active', 'suspended', 'export_required', 'destroyed')
+      BEGIN
+        SELECT RAISE(ABORT, 'invalid tenant lifecycle status');
+      END;
+
+      CREATE TRIGGER tenants_status_update_guard
+      BEFORE UPDATE OF status ON tenants
+      WHEN NEW.status NOT IN ('active', 'suspended', 'export_required', 'destroyed')
+      BEGIN
+        SELECT RAISE(ABORT, 'invalid tenant lifecycle status');
+      END;
+    `,
+    up: backfillTenantEventChains,
+  },
+  {
+    version: 13,
+    name: 'w4_audit_exports_and_quota_counters',
+    sql: `
+      CREATE TABLE audit_exports (
+        export_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        range_from INTEGER NOT NULL CHECK (range_from > 0),
+        range_to INTEGER NOT NULL CHECK (range_to >= range_from),
+        sha256 TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE INDEX audit_exports_tenant_range
+        ON audit_exports (tenant_id, range_from, range_to, created_at);
+
+      CREATE TABLE quota_counters (
+        tenant_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        window_day TEXT NOT NULL,
+        metric TEXT NOT NULL CHECK (metric IN ('tasks', 'tokens', 'cost_cny')),
+        used REAL NOT NULL DEFAULT 0 CHECK (used >= 0),
+        limit_value REAL NOT NULL CHECK (limit_value > 0),
+        warning_emitted INTEGER NOT NULL DEFAULT 0 CHECK (warning_emitted IN (0, 1)),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, node_id, window_day, metric),
+        FOREIGN KEY (tenant_id, node_id) REFERENCES fleet_nodes(tenant_id, node_id)
+      );
+
+      CREATE TABLE quota_admissions (
+        tenant_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        window_day TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_sha256 TEXT NOT NULL,
+        result_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, node_id, window_day, idempotency_key),
+        FOREIGN KEY (tenant_id, node_id) REFERENCES fleet_nodes(tenant_id, node_id)
+      );
+
+      CREATE INDEX quota_admissions_tenant_window
+        ON quota_admissions (tenant_id, node_id, window_day, created_at);
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`
@@ -623,10 +782,62 @@ export function applyMigrations(database: SqliteDatabase): void {
   const applied = new Set(database.prepare('SELECT version FROM schema_migrations').all<{ version: number }>().map((row) => row.version));
   const apply = database.transaction((migration: Migration) => {
     database.exec(migration.sql);
+    migration.up?.(database);
     database.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
       .run(migration.version, migration.name, new Date().toISOString());
   });
   for (const migration of migrations) {
     if (!applied.has(migration.version)) apply(migration);
+  }
+}
+
+interface LegacyDomainEventRow {
+  id: string;
+  tenant_id: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  aggregate_version: number;
+  event_type: string;
+  occurred_at: string;
+  actor_ref: string;
+  correlation_id: string;
+  canonical_payload: string;
+}
+
+function backfillTenantEventChains(database: SqliteDatabase): void {
+  const invalidTenant = database.prepare(`
+    SELECT id FROM tenants WHERE status NOT IN ('active', 'suspended', 'export_required', 'destroyed') LIMIT 1
+  `).get<{ id: string }>();
+  if (invalidTenant) throw new Error('Cannot migrate an invalid tenant lifecycle status');
+  const rows = database.prepare('SELECT * FROM domain_events ORDER BY position').all<LegacyDomainEventRow>();
+  const heads = new Map<string, { position: number; hash: string; updatedAt: string }>();
+  const insertChain = database.prepare(`
+    INSERT INTO tenant_event_chain (tenant_id, tenant_position, event_id, previous_hash, hash, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    const previous = heads.get(row.tenant_id);
+    const tenantPosition = (previous?.position ?? 0) + 1;
+    const previousHash = previous?.hash ?? null;
+    const hash = computeTenantEventHash({
+      id: row.id,
+      tenantId: row.tenant_id,
+      aggregateType: row.aggregate_type,
+      aggregateId: row.aggregate_id,
+      aggregateVersion: row.aggregate_version,
+      type: row.event_type,
+      occurredAt: row.occurred_at,
+      actorRef: row.actor_ref,
+      correlationId: row.correlation_id,
+      payload: JSON.parse(row.canonical_payload) as JsonValue,
+    }, tenantPosition, previousHash);
+    insertChain.run(row.tenant_id, tenantPosition, row.id, previousHash, hash, row.occurred_at);
+    heads.set(row.tenant_id, { position: tenantPosition, hash, updatedAt: row.occurred_at });
+  }
+  const insertHead = database.prepare(`
+    INSERT INTO tenant_chain_heads (tenant_id, position, hash, updated_at) VALUES (?, ?, ?, ?)
+  `);
+  for (const [tenantId, head] of heads) {
+    insertHead.run(tenantId, head.position, head.hash, head.updatedAt);
   }
 }
