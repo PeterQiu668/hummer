@@ -2,8 +2,13 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@hummer/contracts": ["packages/contracts/src/index.ts"]
+    },
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,

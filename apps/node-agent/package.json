@@ -10,5 +10,8 @@
     "test": "node --test test/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@hummer/contracts": "*"
   }
 }

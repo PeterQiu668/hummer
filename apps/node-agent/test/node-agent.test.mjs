@@ -20,7 +20,13 @@ function createHarness(overrides = {}) {
     validateTaskEnvelope: (value) => ({ ok: true, value }),
     validateApprovalDecision: (value) => ({
       ok: true,
-      value: { claimId: value.claimId, approved: true, actorKind: 'human', expiresAt: '2026-10-07T01:00:00.000Z' },
+      value: {
+        requestId: value.requestId,
+        tenantId: 'tenant_a',
+        decision: 'approved',
+        deciderActorRef: 'human:owner',
+        grantedScope: { capabilities: ['task.execute'], expiresAt: '2026-10-07T01:00:00.000Z' },
+      },
     }),
     validateRunEvent: (value) => ({ ok: true, value }),
     validateOutcomeReceipt: (value) => ({ ok: true, value }),
@@ -29,7 +35,15 @@ function createHarness(overrides = {}) {
   const executor = {
     execute: async (input) => {
       calls.executions.push(input);
-      return { events: [{ type: 'work.started' }], receipt: { id: 'receipt_1' } };
+      return {
+        events: [{
+          schema: 'hummer.run-event', version: 1, eventId: 'event_1', tenantId: 'tenant_a',
+          workOrderId: 'work_1', nodeId: 'node_a', seq: 1, occurredAt: now,
+          type: 'started', actorRef: 'employee:worker', payload: { runId: 'run_1' },
+          idempotencyKey: 'event-0001',
+        }],
+        receipt: { id: 'receipt_1' },
+      };
     },
     ...overrides.executor,
   };
@@ -103,13 +117,55 @@ test('fails closed when the approval is not an approved human decision', async (
     contractValidator: {
       validateApprovalDecision: () => ({
         ok: true,
-        value: { claimId: 'claim_1', approved: true, actorKind: 'system', expiresAt: '2026-10-07T01:00:00.000Z' },
+        value: {
+          requestId: 'claim_1', tenantId: 'tenant_a', decision: 'approved',
+          deciderActorRef: 'system:auto',
+          grantedScope: { capabilities: ['task.execute'], expiresAt: '2026-10-07T01:00:00.000Z' },
+        },
       }),
     },
   });
   await agent.pollOnce();
 
-  await assert.rejects(() => agent.confirmAndExecute('claim_1', { claimId: 'claim_1' }), { code: 'approval_not_authorized' });
+  await assert.rejects(() => agent.confirmAndExecute('claim_1', { requestId: 'claim_1' }), { code: 'approval_not_authorized' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('fails closed when approval does not grant task.execute', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateApprovalDecision: () => ({
+        ok: true,
+        value: {
+          requestId: 'claim_1', tenantId: 'tenant_a', decision: 'approved',
+          deciderActorRef: 'human:owner',
+          grantedScope: { capabilities: ['workspace.read'], expiresAt: '2026-10-07T01:00:00.000Z' },
+        },
+      }),
+    },
+  });
+  await agent.pollOnce();
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1', { requestId: 'claim_1' }), { code: 'approval_scope_denied' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('fails closed when approval tenant does not match the node tenant', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateApprovalDecision: () => ({
+        ok: true,
+        value: {
+          requestId: 'claim_1', tenantId: 'tenant_other', decision: 'approved',
+          deciderActorRef: 'human:owner',
+          grantedScope: { capabilities: ['task.execute'], expiresAt: '2026-10-07T01:00:00.000Z' },
+        },
+      }),
+    },
+  });
+  await agent.pollOnce();
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1', { requestId: 'claim_1' }), { code: 'approval_not_authorized' });
   assert.equal(calls.executions.length, 0);
 });
 
@@ -117,8 +173,8 @@ test('executes exactly once after a valid human approval and returns events plus
   const { agent, calls } = createHarness();
   await agent.pollOnce();
 
-  const first = await agent.confirmAndExecute('claim_1', { claimId: 'claim_1' });
-  const second = await agent.confirmAndExecute('claim_1', { claimId: 'claim_1' });
+  const first = await agent.confirmAndExecute('claim_1', { requestId: 'claim_1' });
+  const second = await agent.confirmAndExecute('claim_1', { requestId: 'claim_1' });
 
   assert.deepEqual(first, { state: 'completed', claimId: 'claim_1' });
   assert.deepEqual(second, { state: 'duplicate', claimId: 'claim_1' });
@@ -133,7 +189,7 @@ test('does not transmit an invalid outcome receipt', async () => {
   });
   await agent.pollOnce();
 
-  await assert.rejects(() => agent.confirmAndExecute('claim_1', { claimId: 'claim_1' }), { code: 'invalid_outcome_receipt' });
+  await assert.rejects(() => agent.confirmAndExecute('claim_1', { requestId: 'claim_1' }), { code: 'invalid_outcome_receipt' });
   assert.equal(calls.events.length, 0);
   assert.equal(calls.receipts.length, 0);
   assert.equal(calls.statuses.at(-1).state, 'failed');

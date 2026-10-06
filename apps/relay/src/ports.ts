@@ -52,7 +52,6 @@ export interface NodeClaims {
 
 export interface HeartbeatClaims {
   nodeId: string;
-  sentAt: string;
   running: number;
 }
 

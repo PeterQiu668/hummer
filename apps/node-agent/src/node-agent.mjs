@@ -3,7 +3,7 @@ import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './vali
 
 /**
  * @typedef {{ok: true, value: unknown}|{ok: false, errors: string[]}} ValidationResult
- * @typedef {{ok: true, value: {claimId: string, approved: boolean, actorKind: string, expiresAt: string}}|{ok: false, errors: string[]}} ApprovalValidationResult
+ * @typedef {{ok: true, value: {requestId: string, tenantId: string, decision: string, deciderActorRef: string, grantedScope?: {capabilities: string[], expiresAt: string}}}|{ok: false, errors: string[]}} ApprovalValidationResult
  * @typedef {{
  *   sendHeartbeat(input: unknown, context: TransportContext): Promise<void>,
  *   claimTask(context: TransportContext): Promise<unknown|null>,
@@ -131,11 +131,19 @@ export class HummerNodeAgent {
     const validation = this.#contractValidator.validateApprovalDecision(approval);
     if (!validation || validation.ok !== true) throw new NodeAgentError('invalid_approval', 'Approval decision failed the shared contract validator');
     const decision = validation.value;
-    if (decision.claimId !== claimId || decision.approved !== true || decision.actorKind !== 'human') {
-      throw new NodeAgentError('approval_not_authorized', 'Execution requires an approved decision from a human actor for this claim');
+    if (
+      decision.requestId !== claimId ||
+      decision.tenantId !== this.tenantId ||
+      decision.decision !== 'approved' ||
+      !/^(?:human|account):/.test(decision.deciderActorRef)
+    ) {
+      throw new NodeAgentError('approval_not_authorized', 'Execution requires a matching approved decision from an authenticated human or account actor');
     }
-    if (!Number.isFinite(Date.parse(decision.expiresAt)) || Date.parse(decision.expiresAt) <= this.#clock().getTime()) {
-      throw new NodeAgentError('approval_expired', 'Approval has expired');
+    if (!decision.grantedScope?.capabilities.includes('task.execute')) {
+      throw new NodeAgentError('approval_scope_denied', 'Approval scope does not grant task.execute');
+    }
+    if (!Number.isFinite(Date.parse(decision.grantedScope.expiresAt)) || Date.parse(decision.grantedScope.expiresAt) <= this.#clock().getTime()) {
+      throw new NodeAgentError('approval_expired', 'Approval scope has expired');
     }
     this.#pending.delete(claimId);
     this.#terminal.add(claimId);
