@@ -1,6 +1,6 @@
 # HUMMER Windows node agent (Phase 0 D2 skeleton)
 
-Status: local alpha skeleton. This document does **not** claim that a Relay, two-machine display, 60-second offline detection, or cross-machine execution has passed. Those gates require D1 contracts, D3 Relay integration, and real-device evidence.
+Status: local alpha skeleton with the frozen D1 contract adapter. This document does **not** claim that a network Relay, two-machine display, 60-second offline detection, or cross-machine execution has passed. Those gates still require transport integration and real-device evidence.
 
 ## Boundary
 
@@ -14,7 +14,7 @@ The implementation preserves these rules:
 
 - `NodeManifest`, claimed tasks, approval decisions, run events, and outcome receipts are all validated by the injected shared contract validator. Invalid data does not cross the transport boundary.
 - A valid claimed task is staged as `pending_confirmation`. Claiming never confirms or executes it.
-- Execution requires an unexpired capability grant with `task.execute` plus a shared-contract approval normalized as approved by a human actor for that exact claim.
+- Execution requires an unexpired capability grant with `task.execute` plus a shared-contract approval by a `human:*` or `account:*` actor for that exact claim and tenant. Its `grantedScope` must independently include an unexpired `task.execute` capability.
 - A terminal claim is never executed twice. Failures are reported and are not automatically retried.
 - The short-lived grant token is private process state. Status objects, probe output, exceptions, and documentation never include it.
 - Unknown claim fields, unknown runtime providers, unknown tools, missing scopes, expired grants, and non-human approvals fail closed.
@@ -63,7 +63,7 @@ Relay claim (unknown bytes)
   -> injected RunEvent(s) and OutcomeReceipt transport
 ```
 
-The D1 integration must provide the real `NodeManifest`, `TaskEnvelope`, `ApprovalDecision`, `RunEvent`, and `OutcomeReceipt` validators from `packages/contracts`; this package deliberately does not maintain a second field list.
+`createSharedFleetContractValidator` now binds `NodeManifest`, `TaskEnvelope`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. The existing v1 outcome-receipt verifier remains an injected authority because OutcomeReceipt is not redefined as a sixth Fleet contract.
 
 ## MCP tool facade
 
@@ -88,7 +88,7 @@ The tests include missing runtime, failed version probe, unknown provider, malfo
 
 ## Remaining integration gates
 
-- Import D1 shared validators and construct a contract-valid `NodeManifest` heartbeat.
+- Construct a real contract-valid `NodeManifest` heartbeat from runtime probes and active-lease load.
 - Bind a D3 Relay adapter and persist pending claims in HUMMER's authoritative task store.
 - Bind existing trusted `fs_read`, `doc_extract`, and sandboxed `workspace_exec` handlers without moving their policy boundary into the node.
 - Run two real nodes, prove offline within 60 seconds, and prove offline nodes receive no dispatch (`AC-P0-03`).

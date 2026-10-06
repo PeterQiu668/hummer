@@ -20,8 +20,10 @@ database or a second owner of HUMMER product facts.
 `FleetService` accepts a `FleetValidators` dependency. Every inbound node
 manifest, heartbeat, task envelope, and run event passes that dependency before
 the Relay reads routing claims or writes storage. The Relay intentionally does
-not contain a second list of shared contract fields. During integration, bind
-these ports to the TypeBox/Ajv validators exported by `@hummer/contracts`.
+not contain a second list of shared contract fields. `createSharedFleetValidators`
+binds these ports to the TypeBox/Ajv validators exported by `@hummer/contracts`.
+Heartbeat uses the same validated `NodeManifest`; the Relay projects only
+`nodeId` and `load.running` from it.
 
 Validation failures, tenant mismatches, unknown/offline nodes, expired tasks or
 leases, wrong lease owners, sequence gaps, and illegal state changes fail closed
@@ -59,8 +61,8 @@ npm.cmd run typecheck -w @hummer/relay
 npm.cmd run test -w @hummer/relay
 ```
 
-The suite runs the same 20 behaviors against both memory and SQLite stores (40
-tests total). Negative cases cover unknown fields, tenant mismatch, stale nodes,
+The suite runs the same 20 store behaviors against both memory and SQLite stores,
+plus three shared-contract adapter assertions (43 tests total). Negative cases cover unknown fields, tenant mismatch, stale nodes,
 wrong lease ownership, sequence gaps, completion without an artifact, stopped
 tasks, expired tasks, and retry-key reuse. A 10-task scenario double-delivers
 every envelope and completion event, then proves exactly ten claims and ten
@@ -68,10 +70,8 @@ stored completion events on one store instance.
 
 ## Remaining integration work
 
-1. Bind the validators to the frozen shared contract package.
-2. Add the Fastify/WSS adapter and SSE fallback behind `FleetTransport`.
-3. Add authenticated session and short-lived badge-token middleware.
-4. Integrate the reviewed desktop v11 migration with the same table semantics.
-5. Run two real nodes through disconnect/reconnect, clock skew, and 100-task
+1. Add the Fastify/WSS adapter and SSE fallback behind `FleetTransport`.
+2. Add authenticated session and short-lived badge-token middleware.
+3. Run two real nodes through disconnect/reconnect, clock skew, and 100-task
    duplicate-delivery tests. Until that evidence exists, do not describe D3 or
    AC-P0-04 as complete.
