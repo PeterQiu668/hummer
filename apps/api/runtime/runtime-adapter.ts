@@ -12,11 +12,13 @@ export interface RuntimeStartResult {
 }
 
 export interface RuntimeResumeInput {
+  tenantId: string;
   jobId: string;
   approval?: Approval;
 }
 
 export interface RuntimeCancelInput {
+  tenantId: string;
   jobId: string;
   reason: string;
 }

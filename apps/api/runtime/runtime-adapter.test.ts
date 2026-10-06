@@ -75,4 +75,16 @@ describe('MockRuntimeAdapter', () => {
     expect(cancelled.status).toBe('cancelled');
     expect(cancelled.failure).toEqual({ code: 'cancelled', safeSummary: 'operator requested cancellation' });
   });
+
+  it('requires tenant context for runtime snapshots, resume and cancel', async () => {
+    const { service, order } = await runningService();
+    const adapter = new MockRuntimeAdapter();
+    const runtime = new RuntimeService(adapter, service, { now: () => now });
+    const run = await runtime.start({ workOrder: order, runId: 'run_shared_001' });
+
+    expect(() => runtime.getSnapshot('tenant_other', run.jobId)).toThrow(/not found/i);
+    expect(() => adapter.getExecution('tenant_other', run.jobId)).toThrow(/not found/i);
+    await expect(runtime.cancel('tenant_other', run.jobId, 'cross-tenant cancel')).rejects.toThrow(/not found/i);
+    expect(runtime.getSnapshot(order.tenantId, run.jobId).status).toBe('awaiting_approval');
+  });
 });

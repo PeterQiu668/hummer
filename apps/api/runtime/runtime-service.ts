@@ -28,7 +28,7 @@ export class RuntimeService implements RuntimeAdapterPort {
     const existing = this.snapshots.get(runtimeKey(input.workOrder.tenantId, input.runId));
     if (existing) return existing;
     const started = await this.adapter.start(input);
-    const execution = this.readExecution(started.jobId);
+    const execution = this.readExecution(input.workOrder.tenantId, started.jobId);
     const snapshot = this.snapshotFromExecution(execution, input.workOrder, input.runId, started.jobId, started.traceRef ?? `trace_${input.runId}`);
     this.snapshots.set(runtimeKey(input.workOrder.tenantId, input.runId), snapshot);
     return snapshot;
@@ -46,8 +46,8 @@ export class RuntimeService implements RuntimeAdapterPort {
     const decisionContext = { tenantId, actorRef: approval.approverActorRef ?? 'human:approval_pending', actorRole: 'operator' as const, idempotencyKey: `runtime-approval-${jobId}`, expectedVersion: current.version, correlationId: current.correlationId, occurredAt: this.now() };
     await this.workOrders.decideApproval(before.workOrderId, decisionContext, approval.status === 'approved' ? 'approved' : 'rejected', approval.decisionRationale);
     const persistedApproval = this.workOrders.getApproval(tenantId, approval.id);
-    await this.adapter.resume({ jobId, approval: persistedApproval });
-    const execution = this.readExecution(jobId);
+    await this.adapter.resume({ tenantId, jobId, approval: persistedApproval });
+    const execution = this.readExecution(tenantId, jobId);
     const snapshot = this.snapshotFromExecution(execution, current, before.runId, jobId, before.traceRef);
     this.snapshots.set(runtimeKey(tenantId, before.runId), snapshot);
     return snapshot;
@@ -55,8 +55,8 @@ export class RuntimeService implements RuntimeAdapterPort {
 
   async cancel(tenantId: string, jobId: string, reason: string): Promise<RuntimeSnapshot> {
     const before = this.getSnapshot(tenantId, jobId);
-    await this.adapter.cancel({ jobId, reason });
-    const execution = this.readExecution(jobId);
+    await this.adapter.cancel({ tenantId, jobId, reason });
+    const execution = this.readExecution(tenantId, jobId);
     const snapshot = this.snapshotFromExecution(execution, this.workOrders.get(tenantId, before.workOrderId), before.runId, jobId, before.traceRef);
     this.snapshots.set(runtimeKey(tenantId, before.runId), snapshot);
     return snapshot;
@@ -92,9 +92,9 @@ export class RuntimeService implements RuntimeAdapterPort {
     return this.workOrders.createResultPackage(input.workOrderId, input.package, { tenantId: input.tenantId, actorRef: input.actorRef, actorRole: 'operator', idempotencyKey: `runtime-result-${input.workOrderId}`, expectedVersion: order.version, correlationId: input.correlationId, occurredAt: input.occurredAt });
   }
 
-  private readExecution(jobId: string): { status: RuntimeSnapshot['status']; toolTraces: readonly ToolTrace[]; evidenceRefs: readonly string[]; cost: RuntimeCost; risk: RuntimeSnapshot['risk']; resultPackage?: ResultPackage; failure?: RuntimeSnapshot['failure'] } {
-    const adapter = this.adapter as RuntimeAdapter & { getExecution?: (jobId: string) => ReturnType<NonNullable<(RuntimeAdapter & { getExecution?: (jobId: string) => unknown })['getExecution']>> };
-    const execution = adapter.getExecution?.(jobId);
+  private readExecution(tenantId: string, jobId: string): { status: RuntimeSnapshot['status']; toolTraces: readonly ToolTrace[]; evidenceRefs: readonly string[]; cost: RuntimeCost; risk: RuntimeSnapshot['risk']; resultPackage?: ResultPackage; failure?: RuntimeSnapshot['failure'] } {
+    const adapter = this.adapter as RuntimeAdapter & { getExecution?: (tenantId: string, jobId: string) => unknown };
+    const execution = adapter.getExecution?.(tenantId, jobId);
     if (!execution || typeof execution !== 'object') throw new Error('RuntimeAdapter does not expose a readable execution snapshot.');
     return execution as ReturnType<RuntimeService['readExecution']>;
   }

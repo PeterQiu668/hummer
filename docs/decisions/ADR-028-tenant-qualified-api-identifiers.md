@@ -22,8 +22,9 @@ paused until the executable cross-tenant regression gate passes.
    identifiers and idempotency keys may safely repeat across tenants.
 3. Public reads require `tenantId`. Wrong-tenant access returns the same
    `not_found` class as an unknown object and does not reveal existence.
-4. Runtime resume, cancel, and snapshot reads also require `tenantId`, and
-   runtime/approval indexes are tenant-qualified.
+4. Runtime adapter resume, cancel, snapshot, and execution reads also require
+   `tenantId`; service, approval, and adapter execution indexes are all
+   tenant-qualified.
 5. `auditor` and `operator` roles cannot make a final result acceptance or
    rejection decision. The acceptance actor must equal the authenticated actor.
 6. A behavior test with the stable ID

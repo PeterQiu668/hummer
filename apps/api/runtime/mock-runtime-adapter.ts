@@ -47,7 +47,8 @@ export class MockRuntimeAdapter implements RuntimeAdapter {
   }
 
   async start(input: RuntimeStartInput): Promise<RuntimeStartResult> {
-    const existing = this.executions.get(input.runId);
+    const key = runtimeKey(input.workOrder.tenantId, input.runId);
+    const existing = this.executions.get(key);
     if (existing) return { jobId: existing.jobId, traceRef: existing.traceRef };
     if (!this.port) throw new Error('MockRuntimeAdapter requires a RuntimeAdapterPort.');
     const traceRef = `trace_${input.runId}`;
@@ -62,7 +63,7 @@ export class MockRuntimeAdapter implements RuntimeAdapter {
       cost: { modelTokens: 320, modelCostCny: 0.32, toolCostCny: 0.1, totalCostCny: 0.42 },
       risk: { level: 'high', notes: ['Synthetic CSV write is approval-gated.', 'No external system was contacted.'] },
     };
-    this.executions.set(input.runId, execution);
+    this.executions.set(key, execution);
 
     await this.record(execution, { tool: 'synthetic_gtm_search', class: 'read', traceRef, status: 'completed' });
     await this.record(execution, { tool: 'synthetic_csv_parse', class: 'read', traceRef, status: 'completed' });
@@ -94,7 +95,7 @@ export class MockRuntimeAdapter implements RuntimeAdapter {
   }
 
   async resume(input: RuntimeResumeInput): Promise<void> {
-    const execution = this.getMutable(input.jobId);
+    const execution = this.getMutable(input.tenantId, input.jobId);
     if (!input.approval || input.approval.id !== execution.approvalId) throw new Error('A matching approval is required to resume the mock run.');
     if (input.approval.status === 'rejected') {
       execution.status = 'failed';
@@ -136,15 +137,15 @@ export class MockRuntimeAdapter implements RuntimeAdapter {
     execution.status = 'completed';
   }
 
-  async cancel(input: { jobId: string; reason: string }): Promise<void> {
-    const execution = this.getMutable(input.jobId);
+  async cancel(input: { tenantId: string; jobId: string; reason: string }): Promise<void> {
+    const execution = this.getMutable(input.tenantId, input.jobId);
     if (execution.status === 'completed' || execution.status === 'failed' || execution.status === 'cancelled') return;
     execution.status = 'cancelled';
     execution.failure = { code: 'cancelled', safeSummary: input.reason };
   }
 
-  getExecution(jobId: string): MockRuntimeExecution {
-    const execution = this.getMutable(jobId);
+  getExecution(tenantId: string, jobId: string): MockRuntimeExecution {
+    const execution = this.getMutable(tenantId, jobId);
     return { ...execution, toolTraces: [...execution.toolTraces], evidenceRefs: [...execution.evidenceRefs], risk: { ...execution.risk } };
   }
 
@@ -160,9 +161,13 @@ export class MockRuntimeAdapter implements RuntimeAdapter {
     });
   }
 
-  private getMutable(jobId: string): MutableExecution {
-    const execution = this.executions.get(jobId);
+  private getMutable(tenantId: string, jobId: string): MutableExecution {
+    const execution = this.executions.get(runtimeKey(tenantId, jobId));
     if (!execution) throw new Error(`Runtime job ${jobId} was not found.`);
     return execution;
   }
+}
+
+function runtimeKey(tenantId: string, id: string): string {
+  return `${tenantId}\u0000${id}`;
 }
