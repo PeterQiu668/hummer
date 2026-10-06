@@ -595,7 +595,7 @@ export const migrations: readonly Migration[] = [
         delivery_id TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
         envelope_json TEXT NOT NULL,
-        state TEXT NOT NULL CHECK (state IN ('queued', 'leased', 'completed', 'failed', 'stopped')),
+        state TEXT NOT NULL CHECK (state IN ('queued', 'leased', 'blocked', 'completed', 'failed')),
         lease_expires_at TEXT,
         attempt INTEGER NOT NULL DEFAULT 0 CHECK (attempt >= 0),
         result_json TEXT,

@@ -429,7 +429,7 @@ export class SqliteFleetStore implements FleetStore {
 
   private refreshNode(tenantId: string, nodeId: string, now: string): void {
     const row = this.#db.prepare('SELECT * FROM fleet_nodes WHERE tenant_id = ? AND node_id = ?').get<NodeRow>(tenantId, nodeId);
-    if (row && Date.parse(now) - Date.parse(row.last_seen_at) > row.offline_after_ms) {
+    if (row && Date.parse(now) - Date.parse(row.last_seen_at) >= row.offline_after_ms) {
       this.#db.prepare(`UPDATE fleet_nodes SET status = 'offline' WHERE tenant_id = ? AND node_id = ?`).run(tenantId, nodeId);
     }
   }

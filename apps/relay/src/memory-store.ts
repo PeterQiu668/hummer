@@ -160,7 +160,7 @@ export class MemoryFleetStore implements FleetStore {
   close(): void {}
 
   private refreshNode(node: FleetNodeRecord, now: string): void {
-    if (Date.parse(now) - Date.parse(node.lastSeenAt) > node.offlineAfterMs) node.status = 'offline';
+    if (Date.parse(now) - Date.parse(node.lastSeenAt) >= node.offlineAfterMs) node.status = 'offline';
   }
 
   private recoverExpiredLeases(tenantId: string, now: string): void {

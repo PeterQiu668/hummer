@@ -176,7 +176,7 @@ for (const [name, factory] of [
       const { service } = harness(factory);
       await service.register(SESSION, node());
       await service.enqueue(SESSION, task());
-      currentTime += 60_001;
+      currentTime += 60_000;
       await expect(service.claim(SESSION, NODE)).rejects.toMatchObject({ code: 'node_offline' });
     });
 
