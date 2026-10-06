@@ -12,6 +12,10 @@ import {
   decodeFleetContract,
   validateFleetContract,
 } from '../packages/contracts/src/fleet/index.ts';
+import {
+  DemoSessionV1StandardSchema,
+  validatePrivacyContract,
+} from '../packages/contracts/src/privacy/index.ts';
 
 const now = '2026-10-07T00:00:00Z';
 const later = '2026-10-07T01:00:00Z';
@@ -88,12 +92,29 @@ const validSamples = {
   CapabilityGrant: capabilityGrant,
 };
 
+const demoDigest = 'd'.repeat(64);
+const demoSession = {
+  schema: 'hummer.demo-session', version: 1, sessionId: 'demo-contract-1', tenantId: 'tenant_acme',
+  expertActorRef: 'human:owner', nodeId: 'node-main-win',
+  sourceBoundary: { apps: ['ResearchApp'], windows: ['Approved workspace'], excluded: ['Password dialog'] },
+  startedAt: now, pausedCount: 0,
+  segments: [{ segId: 'seg-1', sequence: 1, from: now, recordCount: 0, previousDigest: null, digest: demoDigest }],
+  captureMode: 'events-only', status: 'capturing', localOnly: true, redactionApplied: false,
+  evidenceRefs: [], chainHead: demoDigest, deletionAudit: [],
+};
+
 let assertions = 0;
 let negativeCases = 0;
 function ok(value, message) { assert.ok(value, message); assertions += 1; }
 function equal(actual, expected, message) { assert.deepEqual(actual, expected, message); assertions += 1; }
 function rejected(name, value, label, options) {
   const result = validateFleetContract(name, value, options);
+  assert.ok(result.issues?.length, `${label} must be rejected`);
+  assertions += 1;
+  negativeCases += 1;
+}
+function rejectedPrivacy(value, label) {
+  const result = validatePrivacyContract('DemoSessionV1', value);
   assert.ok(result.issues?.length, `${label} must be rejected`);
   assertions += 1;
   negativeCases += 1;
@@ -105,6 +126,11 @@ for (const [name, sample] of Object.entries(validSamples)) {
   rejected(name, { ...sample, unexpected: true }, `${name}: unknown top-level field`);
   rejected(name, { ...sample, version: 2 }, `${name}: unsupported version`);
 }
+ok(!validatePrivacyContract('DemoSessionV1', demoSession).issues, 'DemoSession valid sample must pass');
+ok(!('issues' in DemoSessionV1StandardSchema['~standard'].validate(demoSession)), 'DemoSession Standard Schema accepts valid input');
+rejectedPrivacy({ ...demoSession, localOnly: false }, 'DemoSession: localOnly false');
+rejectedPrivacy({ ...demoSession, expertActorRef: 'expert:owner' }, 'DemoSession: non-human expert');
+rejectedPrivacy({ ...demoSession, uploadAllowed: true }, 'DemoSession: unknown field');
 
 const nestedUnknown = structuredClone(taskEnvelope);
 nestedUnknown.workOrderTask.origin.autoConfirm = true;

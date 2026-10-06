@@ -770,6 +770,77 @@ export const migrations: readonly Migration[] = [
         ON quota_admissions (tenant_id, node_id, window_day, created_at);
     `,
   },
+  {
+    version: 14,
+    name: 'p2_w7_demo_session_privacy_kernel',
+    sql: `
+      CREATE TABLE demo_sessions (
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        expert_actor_ref TEXT NOT NULL CHECK (expert_actor_ref GLOB 'human:*'),
+        node_id TEXT NOT NULL,
+        source_boundary_json TEXT NOT NULL,
+        capture_mode TEXT NOT NULL CHECK (capture_mode IN ('ax-tree+keyframes', 'events-only')),
+        status TEXT NOT NULL CHECK (status IN ('capturing', 'paused', 'ended')),
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        paused_count INTEGER NOT NULL DEFAULT 0 CHECK (paused_count >= 0),
+        local_only INTEGER NOT NULL DEFAULT 1 CHECK (local_only = 1),
+        redaction_applied INTEGER NOT NULL DEFAULT 0 CHECK (redaction_applied IN (0, 1)),
+        redaction_policy_ref TEXT,
+        evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        chain_head TEXT NOT NULL,
+        deletion_audit_json TEXT NOT NULL DEFAULT '[]',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, session_id),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE UNIQUE INDEX demo_sessions_global_id
+        ON demo_sessions (session_id);
+      CREATE INDEX demo_sessions_tenant_status
+        ON demo_sessions (tenant_id, status, started_at);
+
+      CREATE TABLE demo_session_segments (
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        segment_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        deleted_at TEXT,
+        record_count INTEGER NOT NULL DEFAULT 0 CHECK (record_count >= 0),
+        previous_digest TEXT,
+        digest TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, session_id, segment_id),
+        UNIQUE (tenant_id, session_id, sequence),
+        FOREIGN KEY (tenant_id, session_id) REFERENCES demo_sessions(tenant_id, session_id)
+      );
+
+      CREATE TABLE demo_session_records (
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        segment_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        kind TEXT NOT NULL CHECK (kind IN ('ax-node', 'input-event', 'keyframe-metadata')),
+        occurred_at TEXT NOT NULL,
+        app_name TEXT NOT NULL,
+        window_name TEXT NOT NULL,
+        metadata_json TEXT NOT NULL,
+        digest TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, session_id, segment_id, sequence),
+        FOREIGN KEY (tenant_id, session_id, segment_id)
+          REFERENCES demo_session_segments(tenant_id, session_id, segment_id)
+      );
+
+      CREATE TRIGGER demo_sessions_no_delete
+        BEFORE DELETE ON demo_sessions
+        BEGIN SELECT RAISE(ABORT, 'demo session deletion requires a separately approved purge workflow'); END;
+      CREATE TRIGGER demo_session_segments_no_delete
+        BEFORE DELETE ON demo_session_segments
+        BEGIN SELECT RAISE(ABORT, 'demo session segments are retained as deletion tombstones'); END;
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

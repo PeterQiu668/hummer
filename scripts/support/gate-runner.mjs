@@ -17,7 +17,8 @@ export function parseGateArgs(argv, allowedModes) {
 
 export function runVitest({ file, pattern, cwd = resolve(repositoryRoot, 'apps', 'relay'), config = 'vitest.config.ts' }) {
   const vitest = resolve(repositoryRoot, 'node_modules', 'vitest', 'vitest.mjs');
-  const result = run(process.execPath, [vitest, 'run', file, '--config', config, '-t', pattern, '--reporter=json'], {
+  const files = Array.isArray(file) ? file : [file];
+  const result = run(process.execPath, [vitest, 'run', ...files, '--config', config, '-t', pattern, '--reporter=json'], {
     cwd,
   });
   const summary = parseLastJson(result.stdout);
