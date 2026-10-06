@@ -13,7 +13,7 @@
       "approvalId": null,
       "verdict": "accepted",
       "acceptedBy": "employee:agent-a",
-      "evidenceRef": "evidence://sha256/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidenceRef": "evidence://sha256/ed2638a6a76b5a157eb3a86c385fad32839fd867ced70b94aad2d060b00d86f9",
       "occurredAt": "2026-10-07T01:00:00.000Z"
     },
     "definition": {
@@ -29,7 +29,30 @@
       "updatedAt": "2026-10-07T01:00:00.000Z"
     },
     "costs": [],
-    "tools": [],
+    "tools": [
+      {
+        "id": "tool_wo_child_a_artifact",
+        "toolDefinitionId": "tool_definition_fleet_fixture",
+        "tenantId": "tenant_fixture",
+        "sessionId": "session_wo_child_a",
+        "capabilityId": "fleet.artifact.publish",
+        "actorRef": "employee:agent-a",
+        "status": "completed",
+        "args": {},
+        "result": {
+          "evidenceRef": "evidence://sha256/ed2638a6a76b5a157eb3a86c385fad32839fd867ced70b94aad2d060b00d86f9",
+          "sha256": "ed2638a6a76b5a157eb3a86c385fad32839fd867ced70b94aad2d060b00d86f9",
+          "sizeBytes": 36,
+          "mediaType": "text/plain; charset=utf-8"
+        },
+        "durationMs": 0,
+        "evidenceRefs": [
+          "evidence://sha256/ed2638a6a76b5a157eb3a86c385fad32839fd867ced70b94aad2d060b00d86f9"
+        ],
+        "occurredAt": "2026-10-07T01:00:00.000Z",
+        "idempotencyKey": "publish-wo_child_a"
+      }
+    ],
     "totalCostCny": 0,
     "approval": null,
     "chainIntegrity": {
@@ -59,7 +82,7 @@
   ],
   "manifest": {
     "algorithm": "SHA-256",
-    "rootHash": "0a2c42c3fe735ed11db36b7518182f3fe12c71ba3cc08d40df0ee6d163950e79",
+    "rootHash": "5cd2b29ddf54e1f0a7aae570d1fe0ce778e4d2766c10b0bd3658aac696ae5e06",
     "fieldHashes": {
       "/receipt/generatedAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
       "/receipt/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
@@ -71,7 +94,7 @@
       "/receipt/outcome/approvalId": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
       "/receipt/outcome/verdict": "d288c584af270151f7b7cd7977b94160ce1d7b501dee2d6308f2ac84ebaacc99",
       "/receipt/outcome/acceptedBy": "a6e5066316f61d5dfd9bd32129927805d02adc74ce0894e1dd8ffb412f2cb192",
-      "/receipt/outcome/evidenceRef": "959bed28d3e494b50b05470b49efc5c9f27005051e4394938c0d15eb1a0c8af8",
+      "/receipt/outcome/evidenceRef": "31d3be390fe243c2eed5731b7b8b7aec052c4310164ce0afdab703ea574a53f6",
       "/receipt/outcome/occurredAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
       "/receipt/definition/id": "98e12bf14f4bf968097798da79d53d57fa94878535e1353f4058c58957aaf6b8",
       "/receipt/definition/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
@@ -84,7 +107,22 @@
       "/receipt/definition/createdAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
       "/receipt/definition/updatedAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
       "/receipt/costs": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "/receipt/tools": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "/receipt/tools/0/id": "4d0af5933c389ba20372abb1965fc81a7aa42aecfc26a2285610fe28b3cdc821",
+      "/receipt/tools/0/toolDefinitionId": "cd94e26451fb817c7f6478e13860e198069120353f065ce2f2982e6008991b73",
+      "/receipt/tools/0/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
+      "/receipt/tools/0/sessionId": "74caaf85e7dc1aa160a030682da7f38465782a83bee2c17be190c2af560b110b",
+      "/receipt/tools/0/capabilityId": "11292544b73948ad1cdca6335527b50fe126a9299e572acc5585571763e21d77",
+      "/receipt/tools/0/actorRef": "a6e5066316f61d5dfd9bd32129927805d02adc74ce0894e1dd8ffb412f2cb192",
+      "/receipt/tools/0/status": "7093fda846e50b267da144f7b3683ee1dd8838506939f6052b7370dd01fa2ad0",
+      "/receipt/tools/0/args": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "/receipt/tools/0/result/evidenceRef": "31d3be390fe243c2eed5731b7b8b7aec052c4310164ce0afdab703ea574a53f6",
+      "/receipt/tools/0/result/sha256": "5d09ac099286e51ad3758cf2db42366e8330c06075777f1b1b6427b88c1ce4c1",
+      "/receipt/tools/0/result/sizeBytes": "76a50887d8f1c2e9301755428990ad81479ee21c25b43215cf524541e0503269",
+      "/receipt/tools/0/result/mediaType": "a59c309f5c1acfc709d278f020bc764cc93ec7a57272d18439092291b8d92e01",
+      "/receipt/tools/0/durationMs": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "/receipt/tools/0/evidenceRefs/0": "31d3be390fe243c2eed5731b7b8b7aec052c4310164ce0afdab703ea574a53f6",
+      "/receipt/tools/0/occurredAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/receipt/tools/0/idempotencyKey": "8b8a95f52ad305ebef942c20b36770a5997a329569e7caa4aef06d03f35eda3f",
       "/receipt/totalCostCny": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
       "/receipt/approval": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
       "/receipt/chainIntegrity/valid": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
