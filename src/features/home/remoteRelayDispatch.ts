@@ -6,8 +6,15 @@ import {
 } from '../execution-nodes/remoteRelayClient';
 import type { StartWorkDispatchIntentPort } from './startWorkDispatch';
 import type { BatchDispatchNode, BatchDispatchPort, BatchRuntime } from './batchDispatch';
+import {
+  configureRemoteCapabilityCatalog,
+  type CapabilityInstallerBoundary,
+} from '../capabilities/capabilityCatalogClient';
 
-export type RemoteRelayDeploymentConfig = Pick<RemoteRelayClientOptions, 'baseUrl' | 'getBadge'>;
+export type RemoteRelayDeploymentConfig = Pick<RemoteRelayClientOptions, 'baseUrl' | 'getBadge'> & {
+  /** Optional trusted host/service boundary; omitting it keeps the catalog read-only. */
+  capabilityInstaller?: CapabilityInstallerBoundary;
+};
 
 declare global {
   interface Window {
@@ -19,6 +26,7 @@ declare global {
 let deployment: {
   client: RemoteRelayClient;
   disposeExecutionNodes: () => void;
+  disposeCapabilityCatalog: () => void;
 } | null = null;
 
 /**
@@ -28,14 +36,17 @@ let deployment: {
 export function configureRemoteRelayDeployment(config: RemoteRelayDeploymentConfig): () => void {
   const client = new RemoteRelayClient(config);
   deployment?.disposeExecutionNodes();
+  deployment?.disposeCapabilityCatalog();
   const current = {
     client,
     disposeExecutionNodes: configureRemoteRelayExecutionNodes(client),
+    disposeCapabilityCatalog: configureRemoteCapabilityCatalog(client, config.capabilityInstaller),
   };
   deployment = current;
   return () => {
     if (deployment !== current) return;
     current.disposeExecutionNodes();
+    current.disposeCapabilityCatalog();
     deployment = null;
   };
 }
