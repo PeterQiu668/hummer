@@ -16,6 +16,7 @@ import { assembleOutcomeReceipt, type OutcomeReceipt } from './outcome-receipt.j
 import { ProjectStore } from './project-store.js';
 import { RuntimeEventStore } from './runtime-event-store.js';
 import { ToolRegistryStore } from './tool-registry-store.js';
+import { TenantGovernanceStore } from './tenant-governance-store.js';
 import { WorkOrderIntakeStore } from './work-order-intake-store.js';
 import { WorkspaceExecStore } from './workspace-exec-store.js';
 import { createVerifiableReceipt, type VerifiableOutcomeReceipt } from './verifiable-receipt.js';
@@ -113,6 +114,7 @@ export class DesktopPersistence {
   readonly projects: ProjectStore;
   readonly outcomes: OutcomeLedgerStore;
   readonly tools: ToolRegistryStore;
+  readonly governance: TenantGovernanceStore;
   readonly workOrderIntakes: WorkOrderIntakeStore;
   readonly workspaceExec: WorkspaceExecStore;
 
@@ -136,6 +138,7 @@ export class DesktopPersistence {
     this.projects = new ProjectStore(database, now);
     this.outcomes = new OutcomeLedgerStore(database, now);
     this.tools = new ToolRegistryStore(database);
+    this.governance = new TenantGovernanceStore(database, now);
     this.workOrderIntakes = new WorkOrderIntakeStore(database, this.evidence);
     this.workspaceExec = new WorkspaceExecStore(database);
     this.builtinTools = new BuiltinToolExecutor(this.controlledWrites, this.tools, this.egressDeliveries);

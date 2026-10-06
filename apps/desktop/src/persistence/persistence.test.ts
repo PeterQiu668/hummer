@@ -64,14 +64,21 @@ describe('desktop persistence migrations', () => {
 
     const persistence = openPersistence({ dataDirectory: directory });
 
-    expect(persistence.schemaVersion()).toBe(11);
+    expect(persistence.schemaVersion()).toBe(13);
     expect(persistence.listTables()).toEqual(expect.arrayContaining([
       'fleet_nodes',
       'fleet_task_leases',
+      'tenant_chain_heads',
+      'audit_exports',
+      'quota_counters',
     ]));
-    expect(persistence.appliedMigrations().at(-1)).toMatchObject({
+    expect(persistence.appliedMigrations().find((migration) => migration.version === 11)).toMatchObject({
       version: 11,
       name: 'phase0_fleet_nodes_and_task_leases',
+    });
+    expect(persistence.appliedMigrations().at(-1)).toMatchObject({
+      version: 13,
+      name: 'w4_audit_exports_and_quota_counters',
     });
     persistence.close();
   });
