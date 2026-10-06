@@ -7,6 +7,25 @@ afterEach(() => {
 });
 
 describe('RemoteRelayClient', () => {
+  it('rejects plaintext remote and non-HTTP Relay URLs while allowing loopback development HTTP', () => {
+    expect(() => new RemoteRelayClient({
+      baseUrl: 'http://relay.example.test',
+      getBadge: () => 'opaque-badge',
+    })).toThrow('must use HTTPS');
+    expect(() => new RemoteRelayClient({
+      baseUrl: 'file:///tmp/relay',
+      getBadge: () => 'opaque-badge',
+    })).toThrow('must use HTTPS');
+    expect(() => new RemoteRelayClient({
+      baseUrl: 'http://localhost:8787',
+      getBadge: () => 'opaque-badge',
+    })).not.toThrow();
+    expect(() => new RemoteRelayClient({
+      baseUrl: 'http://127.0.0.1:8787',
+      getBadge: () => 'opaque-badge',
+    })).not.toThrow();
+  });
+
   it('sends an in-memory badge to the authenticated read plane without persistence or logging', async () => {
     const badge = 'badge-sensitive-value';
     const setItem = vi.fn();

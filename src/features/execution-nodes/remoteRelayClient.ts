@@ -65,6 +65,11 @@ export class RemoteRelayClient {
     if (baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
       throw new Error('Remote Relay URL must not contain credentials, query, or fragment');
     }
+    const loopbackHttp = baseUrl.protocol === 'http:'
+      && (baseUrl.hostname === 'localhost' || baseUrl.hostname === '127.0.0.1' || baseUrl.hostname === '[::1]');
+    if (baseUrl.protocol !== 'https:' && !loopbackHttp) {
+      throw new Error('Remote Relay URL must use HTTPS; HTTP is allowed only for loopback development');
+    }
     this.#baseUrl = baseUrl.toString().replace(/\/$/, '');
     this.#getBadge = options.getBadge;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);

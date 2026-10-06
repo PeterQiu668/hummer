@@ -32,7 +32,8 @@ connection.
 5. The browser fetch client is constructed with an explicit Relay base URL and
    an in-memory badge provider. It does not read or write local storage and does
    not log badge material. HTTP errors expose status and safe Relay error fields,
-   never the bearer value.
+   never the bearer value. Remote URLs must use HTTPS; plaintext HTTP is accepted
+   only for `localhost`, `127.0.0.1`, or `[::1]` development endpoints.
 6. Mobile batch enqueue reuses `POST /v1/tasks/enqueue`. Each input is submitted
    exactly once and receives an indexed success or failure result. The client
    performs no automatic retries, including for 401 and 403 responses.
