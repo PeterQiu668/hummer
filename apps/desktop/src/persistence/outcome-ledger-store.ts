@@ -102,6 +102,7 @@ interface CostLedgerRow {
   input_tokens: number; cached_input_tokens: number; output_tokens: number; cost_cny: number;
   pricing_source: string; pricing_verified_at: string; computed_at: string;
 }
+interface SessionScopeRow { work_order_id: string | null }
 
 /**
  * The outcome ledger is HUMMER's billing unit: one accepted (or rejected) outcome event, tied to
@@ -155,6 +156,10 @@ export class OutcomeLedgerStore {
         .get<{ id: string }>(input.tenantId, input.idempotencyKey);
       if (existing) return this.requireEvent(input.tenantId, existing.id);
       this.requireDefinition(input.tenantId, input.outcomeDefinitionId);
+      const session = this.requireSession(input.tenantId, input.sessionId);
+      if (input.workOrderId && session.work_order_id !== input.workOrderId) throw unavailableOutcomeReference();
+      if (input.approvalId) this.requireApproval(input.tenantId, input.sessionId, input.approvalId);
+      if (input.evidenceRef) this.requireEvidence(input.tenantId, input.sessionId, input.evidenceRef);
       const id = idFor('outcome_evt');
       this.database.prepare(`
         INSERT INTO outcome_events
@@ -192,7 +197,11 @@ export class OutcomeLedgerStore {
       const existing = this.database.prepare('SELECT id FROM cost_ledger WHERE tenant_id = ? AND idempotency_key = ?')
         .get<{ id: string }>(input.tenantId, input.idempotencyKey);
       if (existing) return this.requireCost(input.tenantId, existing.id);
-      if (input.outcomeEventId) this.requireEvent(input.tenantId, input.outcomeEventId);
+      this.requireSession(input.tenantId, input.sessionId);
+      if (input.outcomeEventId) {
+        const outcome = this.requireEvent(input.tenantId, input.outcomeEventId);
+        if (outcome.sessionId !== input.sessionId) throw unavailableOutcomeReference();
+      }
       const priced = calculateOutcomeCostCny(input.model, input.usage, input.occurredAt);
       const id = idFor('cost');
       const computedAt = this.now().toISOString();
@@ -252,9 +261,32 @@ export class OutcomeLedgerStore {
     if (!row) throw new Error('Cost ledger entry is unavailable in the current tenant');
     return mapCost(row);
   }
+  private requireSession(tenantId: string, sessionId: string): SessionScopeRow {
+    const row = this.database.prepare('SELECT work_order_id FROM sessions WHERE tenant_id = ? AND id = ?')
+      .get<SessionScopeRow>(tenantId, sessionId);
+    if (!row) throw unavailableOutcomeReference();
+    return row;
+  }
+  private requireApproval(tenantId: string, sessionId: string, approvalId: string): void {
+    const row = this.database.prepare(`
+      SELECT a.id FROM approvals a
+      JOIN sessions s ON s.id = a.session_id
+      WHERE s.tenant_id = ? AND a.session_id = ? AND a.id = ?
+    `).get<{ id: string }>(tenantId, sessionId, approvalId);
+    if (!row) throw unavailableOutcomeReference();
+  }
+  private requireEvidence(tenantId: string, sessionId: string, evidenceRef: string): void {
+    const row = this.database.prepare('SELECT id FROM evidence WHERE tenant_id = ? AND session_id = ? AND ref = ?')
+      .get<{ id: string }>(tenantId, sessionId, evidenceRef);
+    if (!row) throw unavailableOutcomeReference();
+  }
   private event(tenantId: string, aggregateType: string, aggregateId: string, type: string, actorRef: string, correlationId: string, payload: JsonValue): void {
     this.events.append({ id: idFor('evt'), tenantId, aggregateType, aggregateId, type, occurredAt: this.now().toISOString(), actorRef, correlationId: `corr_${correlationId}`, payload });
   }
+}
+
+function unavailableOutcomeReference(): Error {
+  return new Error('Outcome reference is unavailable in the current tenant session');
 }
 
 function idFor(prefix: string): string { return `${prefix}_${randomUUID().replaceAll('-', '')}`; }

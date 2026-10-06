@@ -5,6 +5,7 @@ import type { ApprovalPolicyStore } from './approval-policy-store.js';
 import { DomainEventStore } from './domain-event-store.js';
 import type { EvidenceStore } from './evidence-store.js';
 import type { SqliteDatabase } from './sqlite.js';
+import { requireTenantWorkspace } from '../tenant-workspace-path.js';
 
 export interface ControlledWriteInput {
   tenantId: string;
@@ -48,7 +49,7 @@ export class ControlledWriteStore {
       throw new Error('Controlled write does not match the approved action and requester');
     }
 
-    const destination = safeDestination(input.workspaceDirectory, input.relativePath);
+    const destination = safeDestination(requireTenantWorkspace(input.workspaceDirectory, input.tenantId), input.relativePath);
     if (existsSync(destination)) throw new Error('Controlled write refuses to overwrite an existing file');
 
     const bytes = Buffer.from(input.content, 'utf8');

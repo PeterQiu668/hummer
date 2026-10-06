@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, rmSync, 
 import { basename, join } from 'node:path';
 import { requireWorkspaceFile } from '../workspace-file-guard.js';
 import type { ApprovalPolicyStore } from './approval-policy-store.js';
-import { canonicalJson, type JsonValue } from './canonical-json.js';
+import { canonicalJson, sha256Hex, type JsonValue } from './canonical-json.js';
 import { DomainEventStore } from './domain-event-store.js';
 import type { EvidenceStore } from './evidence-store.js';
 import type { SqliteDatabase } from './sqlite.js';
@@ -66,6 +66,12 @@ export class EgressDeliveryStore {
     if (approval.action !== 'external.send' || approval.requestedBy !== input.requestedBy) {
       throw new Error('External delivery does not match the approved action and requester');
     }
+    const session = this.database.prepare(`
+      SELECT work_order_id FROM sessions WHERE tenant_id = ? AND id = ?
+    `).get<{ work_order_id: string | null }>(input.tenantId, input.sessionId);
+    if (!session?.work_order_id || workOrderDirectoryName(input.sourceWorkspaceDirectory) !== session.work_order_id) {
+      throw unavailableArtifact();
+    }
 
     const source = requireWorkspaceFile({
       workspaceDirectory: input.sourceWorkspaceDirectory,
@@ -79,6 +85,11 @@ export class EgressDeliveryStore {
     if (existsSync(target)) throw new Error('External delivery refuses to overwrite an existing file');
 
     const bytes = readFileSync(source.absolutePath);
+    const digest = sha256Hex(bytes);
+    const ownedEvidence = this.database.prepare(`
+      SELECT ref FROM evidence WHERE tenant_id = ? AND session_id = ? AND sha256 = ? ORDER BY id LIMIT 1
+    `).get<{ ref: string }>(input.tenantId, input.sessionId, digest);
+    if (!ownedEvidence) throw unavailableArtifact();
     const stored = this.evidence.put(bytes, {
       tenantId: input.tenantId,
       sessionId: input.sessionId,
@@ -139,6 +150,18 @@ export class EgressDeliveryStore {
   list(tenantId: string, sessionId: string): EgressDeliveryRecord[] {
     return this.database.prepare('SELECT * FROM egress_deliveries WHERE tenant_id = ? AND session_id = ? ORDER BY occurred_at, id')
       .all<EgressRow>(tenantId, sessionId).map(mapRow);
+  }
+}
+
+function unavailableArtifact(): Error {
+  return new Error('Approved artifact is unavailable in the current tenant session');
+}
+
+function workOrderDirectoryName(directory: string): string | undefined {
+  try {
+    return basename(realpathSync(directory));
+  } catch {
+    return undefined;
   }
 }
 

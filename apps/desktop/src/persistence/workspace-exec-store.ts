@@ -45,6 +45,10 @@ export class WorkspaceExecStore {
     artifacts: WorkspaceExecArtifact[];
     occurredAt: string;
   }): void {
+    const session = this.database.prepare(`
+      SELECT id FROM sessions WHERE tenant_id = ? AND id = ? AND work_order_id = ?
+    `).get<{ id: string }>(input.tenantId, input.sessionId, input.workOrderId);
+    if (!session) throw new Error('Workspace job is unavailable in the current tenant session and work order');
     const id = `workspace_job_${randomUUID()}`;
     const status = input.exitCode === 0 ? 'completed' : 'failed';
     const transaction = this.database.transaction(() => {

@@ -182,7 +182,8 @@ function createContainerRunner(input: { runtime: 'podman' | 'docker' | 'unavaila
     if (input.runtime === 'unavailable') throw new Error('Podman/Docker runtime is unavailable');
     const volume = `hummer-order-${randomUUID()}`;
     const mount = `type=volume,source=${volume},target=/workspace`;
-    await spawnContainer(input.runtime, ['volume', 'create', volume], 30_000);
+    const created = await spawnContainer(input.runtime, ['volume', 'create', volume], 30_000);
+    if (created.exitCode !== 0) throw new Error(created.stderr || 'Unable to create the workspace execution volume');
     try {
       const snapshot = snapshotDirectory(request.workspaceDirectory);
       const staged = await spawnContainer(input.runtime, [
@@ -204,7 +205,8 @@ function createContainerRunner(input: { runtime: 'podman' | 'docker' | 'unavaila
       restoreSnapshot(request.workspaceDirectory, JSON.parse(exported.stdout) as SnapshotFile[]);
       return executed;
     } finally {
-      await spawnContainer(input.runtime, ['volume', 'rm', '--force', volume], 30_000).catch(() => undefined);
+      const removed = await spawnContainer(input.runtime, ['volume', 'rm', '--force', volume], 30_000);
+      if (removed.exitCode !== 0) throw new Error(removed.stderr || 'Unable to remove the workspace execution volume');
     }
   };
 }
