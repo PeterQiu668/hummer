@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:grants": "vitest run --config vitest.config.ts test/badge-auth.test.ts test/fastify-transport.test.ts",
-    "test:tenant-boundary": "vitest run --config vitest.config.ts test/tenant-boundary.test.ts"
+    "test:tenant-boundary": "vitest run --config vitest.config.ts test/tenant-boundary.test.ts",
+    "test:p0d-surfaces": "vitest run --config vitest.config.ts test/relay-surfaces-tenancy.test.ts"
   },
   "dependencies": {
     "@hummer/contracts": "*",
