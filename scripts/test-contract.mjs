@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
   ApprovalDecisionStandardSchema,
+  CapabilityGrantStandardSchema,
   FleetContractSchemas,
   FLEET_CONTRACT_MAX_BYTES,
   NodeManifestStandardSchema,
@@ -72,12 +73,19 @@ const approvalDecision = {
   grantedScope: { capabilities: ['workspace.exec'], paths: ['outputs/summary.md'], expiresAt: later, maxUses: 1 },
 };
 
+const capabilityGrant = {
+  schema: 'hummer.capability-grant', version: 1, grantId: 'grant-1', tenantId: 'tenant_acme',
+  workOrderId: 'wo-1', nodeId: 'node-main-win', capabilities: ['workspace.exec'],
+  paths: ['outputs/summary.md'], expiresAt: later, maxUses: 1, usedCount: 0, issuedToRunId: 'run-1',
+};
+
 const validSamples = {
   NodeManifest: nodeManifest,
   TaskEnvelope: taskEnvelope,
   RunEvent: runEvent(1, 'started'),
   ApprovalRequest: approvalRequest,
   ApprovalDecision: approvalDecision,
+  CapabilityGrant: capabilityGrant,
 };
 
 let assertions = 0;
@@ -135,6 +143,11 @@ const standardSuccess = NodeManifestStandardSchema['~standard'].validate(nodeMan
 ok(!('issues' in standardSuccess), 'Standard Schema adapter accepts a valid manifest');
 const standardFailure = ApprovalDecisionStandardSchema['~standard'].validate({ ...approvalDecision, deciderActorRef: 'system:auto' });
 ok('issues' in standardFailure, 'Standard Schema adapter preserves fail-closed approval validation');
+const standardGrant = CapabilityGrantStandardSchema['~standard'].validate(capabilityGrant);
+ok(!('issues' in standardGrant), 'Standard Schema adapter accepts a valid capability grant');
+rejected('CapabilityGrant', { ...capabilityGrant, usedCount: 2 }, 'CapabilityGrant: usedCount over maxUses');
+rejected('CapabilityGrant', { ...capabilityGrant, paths: ['../secrets.txt'] }, 'CapabilityGrant: path escape');
+rejected('CapabilityGrant', { ...capabilityGrant, capabilities: [] }, 'CapabilityGrant: empty capabilities');
 
 const encoded = new TextEncoder().encode(JSON.stringify(taskEnvelope));
 equal(decodeFleetContract(encoded, 'TaskEnvelope').value?.name, 'TaskEnvelope', 'UTF-8 JSON decodes');

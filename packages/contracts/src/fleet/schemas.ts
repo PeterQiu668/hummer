@@ -304,12 +304,32 @@ export const ApprovalDecisionSchema = Type.Union(
   { $id: 'hummer.approval-decision.v1' },
 );
 
+export const CapabilityGrantSchema = Type.Object(
+  {
+    schema: Type.Literal('hummer.capability-grant'),
+    version: Type.Literal(1),
+    grantId: Identifier,
+    tenantId: Identifier,
+    workOrderId: Identifier,
+    nodeId: Identifier,
+    capabilities: Type.Array(Identifier, { minItems: 1, maxItems: 128, uniqueItems: true }),
+    paths: Type.Array(RelativePath, { maxItems: 128, uniqueItems: true }),
+    expiresAt: IsoUtc,
+    maxUses: Type.Integer({ minimum: 1, maximum: 10_000 }),
+    usedCount: Type.Integer({ minimum: 0, maximum: 10_000 }),
+    revokedAt: Type.Optional(IsoUtc),
+    issuedToRunId: Identifier,
+  },
+  { $id: 'hummer.capability-grant.v1', additionalProperties: false },
+);
+
 export const FleetContractSchemas = {
   NodeManifest: NodeManifestSchema,
   TaskEnvelope: TaskEnvelopeSchema,
   RunEvent: RunEventSchema,
   ApprovalRequest: ApprovalRequestSchema,
   ApprovalDecision: ApprovalDecisionSchema,
+  CapabilityGrant: CapabilityGrantSchema,
 } as const satisfies Record<string, TSchema>;
 
 export type RuntimeKind = Static<typeof RuntimeKindSchema>;
@@ -321,6 +341,7 @@ export type RunEvent = Static<typeof RunEventSchema>;
 export type RiskClass = Static<typeof RiskClassSchema>;
 export type ApprovalRequest = Static<typeof ApprovalRequestSchema>;
 export type ApprovalDecision = Static<typeof ApprovalDecisionSchema>;
+export type CapabilityGrant = Static<typeof CapabilityGrantSchema>;
 export type FleetContractName = keyof typeof FleetContractSchemas;
 
 export const FleetContractNameBySchema = {
@@ -329,4 +350,5 @@ export const FleetContractNameBySchema = {
   'hummer.run-event': 'RunEvent',
   'hummer.approval-request': 'ApprovalRequest',
   'hummer.approval-decision': 'ApprovalDecision',
+  'hummer.capability-grant': 'CapabilityGrant',
 } as const satisfies Record<string, FleetContractName>;

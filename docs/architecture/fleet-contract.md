@@ -1,6 +1,6 @@
-# HUMMER Fleet Contract v0.1
+# HUMMER Fleet Contract v1.0
 
-Status: frozen for Phase 0. Semantic changes require an ADR and an explicit version bump.
+Status: frozen for Phase 1. The v1.0 freeze is additive over Phase 0 v0.1; serialized schema versions remain `1`. Semantic changes require an ADR and an explicit version bump.
 
 ## Boundary
 
@@ -19,6 +19,8 @@ All serialized fleet contracts are limited to 65,536 UTF-8 bytes. A UTF-8 BOM an
 `RunEvent` sequence numbers start at 1 and increase without gaps per WorkOrder. `artifact` payloads require a SHA-256 digest and a workspace-relative path. After `needs_approval`, the node cannot advance until a matching decision arrives. `completed` requires at least one preceding artifact.
 
 `ApprovalRequest` can originate from `system:*`, `employee:*`, or `twin:*`, never from `human:*`. Decisions are immutable human actions: only `human:*` and authenticated `account:*` actor references are accepted. A `system:*` decision is rejected and emits a security alert. Non-approved decisions cannot carry a granted scope.
+
+`CapabilityGrant` is the bounded, task-scoped authorization represented by an opaque badge token at transport time. The contract contains no token or long-term credential. A grant is bound to one tenant, work order, node, and run; its capabilities and relative paths are explicit, `usedCount` cannot exceed `maxUses`, and `revokedAt` makes it unusable even before expiry.
 
 ## Machine-checked field tables
 
@@ -129,6 +131,19 @@ All serialized fleet contracts are limited to 65,536 UTF-8 bytes. A UTF-8 BOM an
 | ApprovalDecision | schema | string | yes | hummer.approval-decision |
 | ApprovalDecision | tenantId | string | yes | - |
 | ApprovalDecision | version | integer | yes | 1 |
+| CapabilityGrant | capabilities | string[] | yes | - |
+| CapabilityGrant | expiresAt | string | yes | - |
+| CapabilityGrant | grantId | string | yes | - |
+| CapabilityGrant | issuedToRunId | string | yes | - |
+| CapabilityGrant | maxUses | integer | yes | - |
+| CapabilityGrant | nodeId | string | yes | - |
+| CapabilityGrant | paths | string[] | yes | - |
+| CapabilityGrant | revokedAt | string | no | - |
+| CapabilityGrant | schema | string | yes | hummer.capability-grant |
+| CapabilityGrant | tenantId | string | yes | - |
+| CapabilityGrant | usedCount | integer | yes | - |
+| CapabilityGrant | version | integer | yes | 1 |
+| CapabilityGrant | workOrderId | string | yes | - |
 
 ## Compatibility rule
 

@@ -2,6 +2,7 @@ export {
   ActorRefSchema,
   ApprovalDecisionSchema,
   ApprovalRequestSchema,
+  CapabilityGrantSchema,
   FleetContractNameBySchema,
   FleetContractSchemas,
   FLEET_CONTRACT_MAX_BYTES,
@@ -17,6 +18,7 @@ export {
 export type {
   ApprovalDecision,
   ApprovalRequest,
+  CapabilityGrant,
   FleetContractName,
   NodeManifest,
   RiskClass,
@@ -30,6 +32,7 @@ export type {
 export {
   ApprovalDecisionStandardSchema,
   ApprovalRequestStandardSchema,
+  CapabilityGrantStandardSchema,
   createRunEventSequenceGuard,
   createTaskEnvelopeIdempotencyGuard,
   decodeFleetContract,

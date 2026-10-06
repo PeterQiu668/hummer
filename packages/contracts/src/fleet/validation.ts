@@ -4,6 +4,7 @@ import type { Static, TSchema } from '@sinclair/typebox';
 import {
   ApprovalDecisionSchema,
   ApprovalRequestSchema,
+  CapabilityGrantSchema,
   FleetContractNameBySchema,
   FleetContractSchemas,
   FLEET_CONTRACT_MAX_BYTES,
@@ -11,6 +12,7 @@ import {
   RunEventSchema,
   TaskEnvelopeSchema,
   type ApprovalDecision,
+  type CapabilityGrant,
   type FleetContractName,
   type RunEvent,
   type TaskEnvelope,
@@ -79,6 +81,12 @@ export function validateFleetContract<Name extends FleetContractName>(
 
   const validator = validators[name];
   if (validator(value)) {
+    if (name === 'CapabilityGrant') {
+      const grant = value as CapabilityGrant;
+      if (grant.usedCount > grant.maxUses) {
+        return { issues: [{ message: '/usedCount must not exceed /maxUses', path: ['usedCount'] }] };
+      }
+    }
     return { value: value as Static<(typeof FleetContractSchemas)[Name]> };
   }
 
@@ -108,6 +116,7 @@ export const TaskEnvelopeStandardSchema = standardSchema('TaskEnvelope', TaskEnv
 export const RunEventStandardSchema = standardSchema('RunEvent', RunEventSchema);
 export const ApprovalRequestStandardSchema = standardSchema('ApprovalRequest', ApprovalRequestSchema);
 export const ApprovalDecisionStandardSchema = standardSchema('ApprovalDecision', ApprovalDecisionSchema);
+export const CapabilityGrantStandardSchema = standardSchema('CapabilityGrant', CapabilityGrantSchema);
 
 export type DecodedFleetContract = {
   [Name in FleetContractName]: {
