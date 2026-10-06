@@ -1,4 +1,4 @@
-import { currentSessionToken } from '../../identity/identityClient';
+import { currentSessionToken, requireCurrentTenantId } from '../../identity/identityClient';
 import type { SessionPlan } from '../model/session';
 import type { RuntimeEvent, RuntimeHandle } from '../runtime/adapter';
 
@@ -28,44 +28,82 @@ declare global {
 }
 
 export class MemorySessionStore implements SessionStore {
-  private readonly records = new Map<string, PersistedSessionRecord>();
+  private readonly recordsByTenant = new Map<string, Map<string, PersistedSessionRecord>>();
+  private readonly handleOwners = new Map<string, string>();
+
+  constructor(private readonly resolveTenantId: () => string = requireCurrentTenantId) {}
 
   async listSessions(): Promise<PersistedSessionRecord[]> {
-    return [...this.records.values()].map(cloneRecord);
+    return [...this.partition().values()].map(cloneRecord);
   }
 
   async saveSession(plan: SessionPlan, handle: RuntimeHandle): Promise<void> {
-    const existing = this.records.get(handle.sessionId);
-    this.records.set(handle.sessionId, { plan: clone(plan), handle: clone(handle), events: existing?.events ?? [] });
+    const tenantId = this.currentTenantId();
+    this.assertHandleTenant(handle.sessionId, tenantId);
+    const records = this.partition(tenantId);
+    const existing = records.get(handle.sessionId);
+    records.set(handle.sessionId, { plan: clone(plan), handle: clone(handle), events: existing?.events ?? [] });
+    this.handleOwners.set(handle.sessionId, tenantId);
   }
 
   async appendEvent(handle: RuntimeHandle, plan: SessionPlan, event: RuntimeEvent): Promise<RuntimeEvent> {
-    const record = this.records.get(handle.sessionId) ?? { plan: clone(plan), handle: clone(handle), events: [] };
+    const tenantId = this.currentTenantId();
+    this.assertHandleTenant(handle.sessionId, tenantId);
+    const records = this.partition(tenantId);
+    const record = records.get(handle.sessionId) ?? { plan: clone(plan), handle: clone(handle), events: [] };
     if (!record.events.some((item) => item.sequence === event.sequence)) record.events.push(clone(event));
     record.events.sort((left, right) => left.sequence - right.sequence);
-    this.records.set(handle.sessionId, record);
+    records.set(handle.sessionId, record);
+    this.handleOwners.set(handle.sessionId, tenantId);
     return clone(event);
+  }
+
+  private currentTenantId(): string {
+    const tenantId = this.resolveTenantId();
+    if (!tenantId) throw new Error('Memory session cache requires an authenticated tenant');
+    return tenantId;
+  }
+
+  private partition(tenantId = this.currentTenantId()): Map<string, PersistedSessionRecord> {
+    const existing = this.recordsByTenant.get(tenantId);
+    if (existing) return existing;
+    const created = new Map<string, PersistedSessionRecord>();
+    this.recordsByTenant.set(tenantId, created);
+    return created;
+  }
+
+  private assertHandleTenant(sessionId: string, tenantId: string): void {
+    const owner = this.handleOwners.get(sessionId);
+    if (owner && owner !== tenantId) throw new Error('Runtime handle is unavailable in the current tenant');
   }
 }
 
 export function createDefaultSessionStore(): SessionStore {
-  if (typeof window !== 'undefined' && window.hummerPersistence) return new DesktopSessionStore(window.hummerPersistence);
+  const tenantId = requireCurrentTenantId();
+  if (typeof window !== 'undefined' && window.hummerPersistence) return new DesktopSessionStore(window.hummerPersistence, tenantId);
   return new MemorySessionStore();
 }
 
 class DesktopSessionStore implements SessionStore {
-  constructor(private readonly host: DesktopPersistenceHost) {}
+  constructor(private readonly host: DesktopPersistenceHost, private readonly tenantId: string) {}
 
-  listSessions(): Promise<PersistedSessionRecord[]> {
-    return this.host.listSessions(requireSessionToken());
+  async listSessions(): Promise<PersistedSessionRecord[]> {
+    this.assertCurrentTenant();
+    return await this.host.listSessions(requireSessionToken());
   }
 
-  saveSession(plan: SessionPlan, handle: RuntimeHandle): Promise<void> {
-    return this.host.saveSession({ token: requireSessionToken(), plan, handle });
+  async saveSession(plan: SessionPlan, handle: RuntimeHandle): Promise<void> {
+    this.assertCurrentTenant();
+    await this.host.saveSession({ token: requireSessionToken(), plan, handle });
   }
 
-  appendEvent(handle: RuntimeHandle, plan: SessionPlan, event: RuntimeEvent): Promise<RuntimeEvent> {
-    return this.host.appendEvent({ token: requireSessionToken(), plan, handle, event });
+  async appendEvent(handle: RuntimeHandle, plan: SessionPlan, event: RuntimeEvent): Promise<RuntimeEvent> {
+    this.assertCurrentTenant();
+    return await this.host.appendEvent({ token: requireSessionToken(), plan, handle, event });
+  }
+
+  private assertCurrentTenant(): void {
+    if (requireCurrentTenantId() !== this.tenantId) throw new Error('Session store is unavailable after switching tenant');
   }
 }
 
