@@ -2,7 +2,7 @@ import { NodeAgentError } from './errors.mjs';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { canonicalJson, sha256Hex } from './execution-journal.mjs';
-import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
+import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
 
 /**
  * @typedef {{ok: true, value: unknown}|{ok: false, errors: string[]}} ValidationResult
@@ -131,6 +131,10 @@ export class HummerNodeAgent {
     this.#assertActiveGrant('node.heartbeat');
     const validation = this.#contractValidator.validateNodeManifest(manifest);
     if (!validation || validation.ok !== true) throw new NodeAgentError('invalid_node_manifest', 'Node manifest failed the shared contract validator');
+    const binding = readValidatedNodeManifestBinding(validation.value);
+    if (binding.nodeId !== this.nodeId || binding.tenantIds.length !== 1 || binding.tenantIds[0] !== this.tenantId) {
+      throw new NodeAgentError('node_manifest_scope_mismatch', 'Node manifest is not bound to this single-tenant agent');
+    }
     await this.#transport.sendHeartbeat(validation.value, this.#context());
   }
 
@@ -319,6 +323,12 @@ export class HummerNodeAgent {
       });
       const receiptValidation = this.#contractValidator.validateOutcomeReceipt(outcome.receipt);
       if (!receiptValidation || receiptValidation.ok !== true) throw new NodeAgentError('invalid_outcome_receipt', 'Executor returned an invalid OutcomeReceipt');
+      for (const event of validatedEvents) {
+        assertExecutionScope(readValidatedRunEventBinding(event), this.tenantId, this.nodeId, claim.binding.workOrderId);
+      }
+      const receiptBinding = readValidatedOutcomeReceiptBinding(receiptValidation.value);
+      assertExecutionScope(receiptBinding, this.tenantId, this.nodeId, claim.binding.workOrderId);
+      assertNoForeignTenantIds(receiptValidation.value, this.tenantId);
       receiptHash = digest(receiptValidation.value);
       for (const event of validatedEvents) await this.#transport.submitRunEvent(event, this.#context());
       await this.#transport.submitReceipt(receiptValidation.value, this.#context());
@@ -604,6 +614,87 @@ function recoveryResolutionResult(resolution) {
     };
   }
   return undefined;
+}
+
+/**
+ * Node-agent configuration is single-tenant. Multi-tenant manifests require a
+ * future explicit authorization model and are rejected here even if they pass
+ * the shared wire schema.
+ * @param {unknown} value
+ */
+function readValidatedNodeManifestBinding(value) {
+  if (!isRecord(value)) throw new NodeAgentError('invalid_node_manifest', 'Validated node manifest must be an object');
+  if (!Array.isArray(value.tenantIds)
+    || value.tenantIds.length === 0
+    || value.tenantIds.some((tenantId) => typeof tenantId !== 'string' || tenantId.trim() === '')) {
+    throw new NodeAgentError('invalid_node_manifest', 'Validated node manifest has an invalid tenant binding');
+  }
+  return {
+    nodeId: requireNonEmptyString(value.nodeId, 'invalid_node_manifest', 'NodeManifest nodeId'),
+    tenantIds: /** @type {string[]} */ ([...value.tenantIds]),
+  };
+}
+
+/** @param {unknown} value */
+function readValidatedRunEventBinding(value) {
+  if (!isRecord(value)) throw new NodeAgentError('invalid_run_event', 'Validated run event must be an object');
+  return {
+    tenantId: requireNonEmptyString(value.tenantId, 'invalid_run_event', 'RunEvent tenantId'),
+    nodeId: requireNonEmptyString(value.nodeId, 'invalid_run_event', 'RunEvent nodeId'),
+    workOrderId: requireNonEmptyString(value.workOrderId, 'invalid_run_event', 'RunEvent workOrderId'),
+  };
+}
+
+/**
+ * Accept either the verifiable v1 wrapper (`receipt`) or the validated receipt
+ * body itself. The injected verifier remains the schema/integrity authority;
+ * this helper enforces only the active execution binding.
+ * @param {unknown} value
+ */
+function readValidatedOutcomeReceiptBinding(value) {
+  if (!isRecord(value)) throw new NodeAgentError('invalid_outcome_receipt', 'Validated outcome receipt must be an object');
+  const body = isRecord(value.receipt) ? value.receipt : value;
+  if (!isRecord(body.outcome)) {
+    throw new NodeAgentError('invalid_outcome_receipt', 'Validated outcome receipt is missing its execution binding');
+  }
+  return {
+    tenantId: requireNonEmptyString(body.tenantId, 'invalid_outcome_receipt', 'OutcomeReceipt tenantId'),
+    workOrderId: requireNonEmptyString(body.outcome.workOrderId, 'invalid_outcome_receipt', 'OutcomeReceipt workOrderId'),
+  };
+}
+
+/**
+ * @param {{tenantId: string, nodeId?: string, workOrderId: string}} actual
+ * @param {string} tenantId
+ * @param {string} nodeId
+ * @param {string} workOrderId
+ */
+function assertExecutionScope(actual, tenantId, nodeId, workOrderId) {
+  if (actual.tenantId !== tenantId
+    || actual.workOrderId !== workOrderId
+    || (actual.nodeId !== undefined && actual.nodeId !== nodeId)) {
+    throw new NodeAgentError('execution_scope_mismatch', 'Executor output is not bound to the active task');
+  }
+}
+
+/**
+ * Valid receipts may contain many tenant-scoped facts. A structurally valid
+ * receipt that embeds any foreign tenant fact must still fail before output.
+ * @param {unknown} value
+ * @param {string} tenantId
+ */
+function assertNoForeignTenantIds(value, tenantId) {
+  if (Array.isArray(value)) {
+    for (const item of value) assertNoForeignTenantIds(item, tenantId);
+    return;
+  }
+  if (!isRecord(value)) return;
+  for (const [key, item] of Object.entries(value)) {
+    if (key === 'tenantId' && item !== tenantId) {
+      throw new NodeAgentError('execution_scope_mismatch', 'Executor output is not bound to the active task');
+    }
+    assertNoForeignTenantIds(item, tenantId);
+  }
 }
 
 /**

@@ -119,7 +119,15 @@ function createAgent(journal, overrides = {}) {
     executor: {
       execute: async () => {
         calls.executions += 1;
-        return { events: [], receipt: {} };
+        return {
+          events: [],
+          receipt: {
+            schema: 'hummer.outcome-receipt', version: 1,
+            receipt: { tenantId: 'tenant_a', outcome: { workOrderId: 'work_1' } },
+            domainEvents: [],
+            manifest: { algorithm: 'SHA-256', rootHash: 'a'.repeat(64), fieldHashes: {} },
+          },
+        };
       },
     },
     journal,

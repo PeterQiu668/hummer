@@ -66,7 +66,12 @@ function createHarness(overrides = {}) {
           type: 'started', actorRef: 'employee:worker', payload: { runId: 'run_1' },
           idempotencyKey: 'event-0001',
         }],
-        receipt: { id: 'receipt_1' },
+        receipt: {
+          schema: 'hummer.outcome-receipt', version: 1,
+          receipt: { tenantId: 'tenant_a', outcome: { workOrderId: 'work_1' } },
+          domainEvents: [],
+          manifest: { algorithm: 'SHA-256', rootHash: 'a'.repeat(64), fieldHashes: {} },
+        },
       };
     },
     ...overrides.executor,
