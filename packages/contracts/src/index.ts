@@ -12,3 +12,4 @@ export type {
 } from './work-order.ts';
 
 export * from './fleet/index.ts';
+export * from './tenancy/index.ts';
