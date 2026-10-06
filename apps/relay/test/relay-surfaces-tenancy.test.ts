@@ -158,7 +158,7 @@ describe('[TEN-P0D-RELAY-SURFACES] Relay tenant surface isolation', () => {
     ['memory', () => new MemoryFleetStore()],
     ['sqlite', () => new SqliteFleetStore(':memory:')],
   ] as const) {
-    it(`${name} keeps queue, event, approval, retry and audit references tenant-opaque`, async () => {
+    it(`[TEN-W4-SURFACE-QUEUE] ${name} keeps queue, event, approval, retry and audit references tenant-opaque`, async () => {
       const { store, service } = serviceHarness(factory());
       await service.register(session(TENANT_A), manifest(TENANT_A));
       await service.register(session(TENANT_B), manifest(TENANT_B));
@@ -195,7 +195,7 @@ describe('[TEN-P0D-RELAY-SURFACES] Relay tenant surface isolation', () => {
     });
   }
 
-  it('returns the same HTTP result for a foreign reference and an unknown local reference', async () => {
+  it('[TEN-W4-SURFACE-HTTP] returns the same HTTP result for a foreign reference and an unknown local reference', async () => {
     const { app, store } = httpHarness();
     expect((await register(app, TENANT_A, 'node-a-token')).statusCode).toBe(200);
     expect((await register(app, TENANT_B, 'node-b-token')).statusCode).toBe(200);
@@ -276,7 +276,7 @@ describe('[TEN-P0D-RELAY-SURFACES] Relay tenant surface isolation', () => {
     expect(await store.listAudit(TENANT_B)).toEqual([]);
   });
 
-  it('keeps SSE payloads and event ids inside each tenant-node stream', async () => {
+  it('[TEN-W4-SURFACE-SSE] keeps SSE payloads and event ids inside each tenant-node stream', async () => {
     const { app, events } = httpHarness();
     const address = await app.listen({ host: '127.0.0.1', port: 0 });
     const controllerA = new AbortController();

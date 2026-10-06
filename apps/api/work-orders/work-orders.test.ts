@@ -27,6 +27,15 @@ const resultInput = {
 };
 
 describe('Wave 1 WorkOrder service', () => {
+  it('[TEN-W4-WRITE-CREATE-TASK] rejects creating a task for a tenant other than the authenticated command tenant', async () => {
+    const service = new InMemoryWorkOrderService({ now: () => now });
+    await expect(service.create(
+      { ...input, tenantId: 'tenant_other', ownerActorRef: 'human:other' },
+      context(0, 'foreign-create', 'human:boss_demo', 'tenant_demo'),
+    )).rejects.toMatchObject({ code: 'not_found' });
+    expect(() => service.get('tenant_other', 'wo_00000001')).toThrowError(DomainError);
+  });
+
   it('enforces the state machine and appends a hash-chained event for each transition', async () => {
     const service = new InMemoryWorkOrderService({ now: () => now });
     const order = await service.create(input, context(0, 'create-002'));
@@ -84,7 +93,7 @@ describe('Wave 1 WorkOrder service', () => {
     await expect(service.createResultPackage(order.id, { ...resultInput, deliverables: [] }, context(6, 'result-invalid', 'employee:gtm_researcher'))).rejects.toBeInstanceOf(DomainError);
   });
 
-  it('[TEN-P0-API-WORKORDER-BARE-ID] rejects cross-tenant reads, writes, idempotency collisions and final acceptance by auditor/operator roles', async () => {
+  it('[TEN-P0-API-WORKORDER-BARE-ID] [TEN-W4-READ-WORKORDER] rejects cross-tenant reads, writes, idempotency collisions and final acceptance by auditor/operator roles', async () => {
     const service = new InMemoryWorkOrderService({ now: () => now });
     const sharedId = 'wo_shared';
     const tenantA = await service.create({ ...input, id: sharedId }, context(0, 'same-command', 'human:boss_demo', 'tenant_demo'));

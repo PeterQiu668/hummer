@@ -177,7 +177,7 @@ describe('[TEN-ROLE-POLICY-MATRIX] unified tenant role policy', () => {
     }
   });
 
-  it('denies cross-tenant requests before applying role permissions', () => {
+  it('[TEN-W4-WRITE-POLICY] denies cross-tenant requests before applying role permissions', () => {
     expect(evaluateTenantRolePolicy({
       ...common('owner', 'manage_members'),
       targetTenantId: 'tenant-b',

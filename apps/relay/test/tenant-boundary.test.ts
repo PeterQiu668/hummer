@@ -129,7 +129,7 @@ for (const [name, factory] of [
   ['sqlite', () => new SqliteFleetStore(':memory:')],
 ] as const) {
   describe(`${name} Relay tenant boundary`, () => {
-    it('rejects an ungranted extra tenant in a node manifest without persisting or disclosing it', async () => {
+    it('[TEN-W4-WRITE-GRANT-MANIFEST] rejects an ungranted extra tenant in a node manifest without persisting or disclosing it', async () => {
       const { service, store } = serviceHarness(factory());
       let rejection: unknown;
       try {
@@ -321,7 +321,7 @@ describe('Fastify Relay tenant boundary', () => {
 });
 
 describe('[TEN-P0-RELAY-MULTITENANT-GRANT] tenant-scoped CapabilityGrant registry', () => {
-  it('isolates identical grant ids and makes wrong-tenant references indistinguishable from unknown ids', () => {
+    it('[TEN-W4-SIDE-CAPABILITY-GRANT] isolates identical grant ids and makes wrong-tenant references indistinguishable from unknown ids', () => {
     const registry = new CapabilityGrantRegistry({
       now: () => new Date(NOW),
       tokenFactory: tokenSequence(),

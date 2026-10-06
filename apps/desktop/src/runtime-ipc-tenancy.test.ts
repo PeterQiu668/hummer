@@ -116,7 +116,7 @@ afterAll(() => {
 });
 
 describe('[TEN-P0-DESKTOP-RUNTIME-IPC] desktop runtime IPC tenant boundary', () => {
-  it('rejects legacy anonymous and cross-tenant Codex start/replay/control/fork calls', async () => {
+  it('[TEN-W4-SURFACE-DESKTOP-IPC] rejects legacy anonymous and cross-tenant Codex start/replay/control/fork calls', async () => {
     tenants.set('codex-owner', 'tenant-codex-owner');
     tenants.set('codex-other', 'tenant-codex-other');
     const owner = sender();
@@ -155,7 +155,7 @@ describe('[TEN-P0-DESKTOP-RUNTIME-IPC] desktop runtime IPC tenant boundary', () 
     }
   });
 
-  it('stops Codex and Claude event publication after the bound token switches tenant', async () => {
+  it('[TEN-W4-SIDE-RUNTIME-TOKEN] stops Codex and Claude event publication after the bound token switches tenant', async () => {
     tenants.set('codex-switch', 'tenant-switch-origin');
     const codexOwner = sender();
     const codexChildIndex = harness.children.length;
