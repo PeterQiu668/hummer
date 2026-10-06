@@ -99,7 +99,7 @@ Any recovered non-terminal delivery is returned as `recovery_required`, because
 a crash after the durable `executing` marker cannot prove whether the executor
 side effect occurred. No automatic retry exists. See
 `docs/decisions/ADR-024-node-execution-journal.md` for the safety boundary and
-`docs/decisions/ADR-025-operator-recovery-adjudication.md` for the manual
+`docs/decisions/ADR-027-operator-recovery-adjudication.md` for the manual
 resolution protocol.
 
 ### Operator recovery adjudication

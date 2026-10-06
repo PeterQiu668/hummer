@@ -1,4 +1,4 @@
-# ADR-025: In-doubt node attempts require immutable operator adjudication
+# ADR-027: In-doubt node attempts require immutable operator adjudication
 
 - Status: Accepted for W3
 - Date: 2026-10-07
