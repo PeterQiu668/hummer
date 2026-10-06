@@ -212,8 +212,8 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   }>) => {
     const context = persistence.identity.resumeSession(request.token);
     persistence.tools.ensureDefaults(context.tenant.id, `account:${context.account.id}`);
-    const session = persistence.runtimeEvents.listSessions().find((candidate) => (
-      candidate.tenantId === context.tenant.id && candidate.sessionId === request.input.sessionId
+    const session = persistence.runtimeEvents.listSessions(context.tenant.id).find((candidate) => (
+      candidate.sessionId === request.input.sessionId
     ));
     if (!session || session.workOrderId !== request.input.workOrderId) {
       throw new Error('The requested artifact does not belong to this tenant session and work order');
@@ -621,10 +621,10 @@ function requireCustomerEngineProfile(engineProfileId: string) {
 
 function listSessions(persistence: DesktopPersistence, token: string): Array<Record<string, JsonValue>> {
   const tenantId = persistence.identity.currentTenantId(token);
-  return persistence.runtimeEvents.listSessions().filter((descriptor) => descriptor.tenantId === tenantId).map((descriptor) => ({
+  return persistence.runtimeEvents.listSessions(tenantId).map((descriptor) => ({
     plan: descriptor.plan,
     handle: descriptor.handle,
-    events: persistence.runtimeEvents.listBySession(descriptor.sessionId) as JsonValue,
+    events: persistence.runtimeEvents.listBySession(tenantId, descriptor.sessionId) as JsonValue,
   }));
 }
 
