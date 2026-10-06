@@ -3,6 +3,9 @@
 # -text：对这些文件不做任何换行转换，检出即原始字节。
 spikes/** -text
 
+# Sealed round manifests hash evidence files byte-for-byte; preserve those bytes too.
+evidence/** -text
+
 # 生成的配置由 packages/config/scripts/generate.mjs --check 逐字节比对，生成器写 LF。
 apps/desktop/src/config/*.json text eol=lf
 src/features/engines/engine-profiles.json text eol=lf
