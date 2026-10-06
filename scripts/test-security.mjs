@@ -29,15 +29,21 @@ function grants(dryRun) {
     file: 'test/fleet-service.test.ts',
     pattern: 'rejects cross-binding, expanded scope, expiry|not authorized for the session tenant|tenant claim conflicts',
   });
+  const lifecycle = runVitest({
+    file: 'test/badge-auth.test.ts',
+    pattern: 'issues a least-privilege|does not spend|enforces maxUses|expires at|revokes immediately|rotates to|rejects|refuses rotation|restores|fails closed',
+  });
   const checks = [
     finishedCheck('transport-grant-boundaries', transport, evidence, 10),
     finishedCheck('service-grant-boundaries', service, evidence, 12),
+    finishedCheck('capability-grant-lifecycle', lifecycle, evidence, 25),
   ];
   const status = checks.every((check) => check.status === 'passed') ? 'passed' : 'failed';
   emitGate({
     gate: 'security', mode: 'grants', status, checks,
-    assertions: checks.reduce((sum, check) => sum + (check.tests?.passed ?? 0), 0), negativeCases: 22,
-    limitations: ['This proves the checked-in development badge boundary only; issuer rotation and live revocation are outside this baseline.'],
+    assertions: checks.reduce((sum, check) => sum + (check.tests?.passed ?? 0), 0),
+    negativeCases: checks.reduce((sum, check) => sum + check.negativeCases, 0),
+    limitations: ['Production IdP provisioning and transactional snapshot persistence remain integration seams.'],
   });
 }
 

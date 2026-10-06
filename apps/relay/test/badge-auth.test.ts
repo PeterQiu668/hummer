@@ -170,6 +170,16 @@ describe('CapabilityGrantRegistry', () => {
       .toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
   });
 
+  it.each(['../secret.txt', 'C:/secret.txt', '/etc/passwd', 'outputs\\secret.txt'])(
+    'rejects unsafe workspace path %s through the shared CapabilityGrant contract',
+    (path) => {
+      const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
+      expect(() => registry.issue(authority({ paths: [path] }), grant({ paths: [path] })))
+        .toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
+      expect(registry.list()).toEqual([]);
+    },
+  );
+
   it('fails closed for unknown tokens and never reflects token material in errors', async () => {
     const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
     const unknown = `hgr_${'z'.repeat(43)}`;

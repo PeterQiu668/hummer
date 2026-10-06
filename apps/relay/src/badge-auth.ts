@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { validateFleetContract, type CapabilityGrant } from '@hummer/contracts';
 
 export const BADGE_SCOPES = [
   'node.register',
@@ -71,17 +72,13 @@ export interface CapabilityGrantAuthority {
   issuedToRunId?: string;
 }
 
-export interface IssueCapabilityGrantInput {
-  grantId: string;
-  tenantId: string;
-  workOrderId: string;
-  nodeId: string;
+export type IssueCapabilityGrantInput = Omit<
+  CapabilityGrant,
+  'schema' | 'version' | 'capabilities' | 'paths' | 'usedCount' | 'revokedAt'
+> & {
   capabilities: readonly BadgeScope[];
   paths: readonly string[];
-  expiresAt: string;
-  maxUses: number;
-  issuedToRunId: string;
-}
+};
 
 export interface RotateCapabilityGrantInput extends IssueCapabilityGrantInput {}
 
@@ -184,6 +181,27 @@ function validateScopes(scopes: readonly BadgeScope[], field: string): void {
 function validatePaths(paths: readonly string[]): void {
   if (new Set(paths).size !== paths.length || paths.some((path) => !path.trim() || path.includes('\0'))) {
     throw new CapabilityGrantError('invalid_grant', 'grant paths must be unique non-empty strings');
+  }
+}
+
+function validateSharedGrant(input: IssueCapabilityGrantInput, usedCount: number, revokedAt?: string): void {
+  const result = validateFleetContract('CapabilityGrant', {
+    schema: 'hummer.capability-grant',
+    version: 1,
+    grantId: input.grantId,
+    tenantId: input.tenantId,
+    workOrderId: input.workOrderId,
+    nodeId: input.nodeId,
+    capabilities: [...input.capabilities],
+    paths: [...input.paths],
+    expiresAt: input.expiresAt,
+    maxUses: input.maxUses,
+    usedCount,
+    ...(revokedAt ? { revokedAt } : {}),
+    issuedToRunId: input.issuedToRunId,
+  });
+  if (result.issues) {
+    throw new CapabilityGrantError('invalid_grant', `capability grant violates the shared contract: ${result.issues[0]?.message ?? 'invalid'}`);
   }
 }
 
@@ -393,6 +411,7 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     }
     assertSubset(input.capabilities, authority.capabilities, 'capability grant widens authority capabilities');
     assertSubset(input.paths, authority.paths, 'capability grant widens authority paths');
+    validateSharedGrant({ ...input, expiresAt }, 0);
 
     return {
       ...input,
@@ -471,6 +490,7 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
       throw new CapabilityGrantError('invalid_grant', 'persisted capability grant state is inconsistent');
     }
     if (input.revokedAt) canonicalTimestamp(input.revokedAt, 'persisted revokedAt');
+    validateSharedGrant(input, input.usedCount, input.revokedAt);
     if (this.#byGrantId.has(input.grantId) || this.#grantIdByDigest.has(input.tokenDigest)) {
       throw new CapabilityGrantError('duplicate_grant', 'persisted capability grant is duplicated');
     }

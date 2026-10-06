@@ -24,11 +24,11 @@ for (const [script, mode] of dryRuns) {
   assertions += 4;
 }
 
-for (const mode of ['--revoke', '--process-kill']) {
+for (const mode of ['--process-kill']) {
   const result = spawnSync(process.execPath, [resolve(root, 'scripts', 'test-chaos.mjs'), mode], { encoding: 'utf8' });
   assert.equal(result.status, 2, `${mode} must remain a non-zero pending gate`);
   assert.equal(JSON.parse(result.stdout.trim()).status, 'pending');
   assertions += 2;
 }
 
-console.log(JSON.stringify({ status: 'passed', assertions, dryRuns: dryRuns.length, pendingModes: 2 }));
+console.log(JSON.stringify({ status: 'passed', assertions, dryRuns: dryRuns.length, pendingModes: 1 }));

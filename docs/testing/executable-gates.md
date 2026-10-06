@@ -6,10 +6,10 @@ These root commands are evidence adapters over the checked-in Relay and Node Age
 |---|---|---|
 | `npm run test:fleet -- --idempotency` | duplicate task/event delivery is at-most-once in Memory and SQLite stores | not a cross-machine run |
 | `npm run test:fleet -- --soak=100` | first runs the local 100-delivery prerequisite | then exits `2` (`pending`) until true two-machine evidence exists |
-| `npm run test:security -- --grants` | tenant, node, scope, expiry, and human-control boundaries fail closed | development badge registry only |
+| `npm run test:security -- --grants` | tenant, node, scope, expiry, max-use, rotation, revocation, and human-control boundaries fail closed | production IdP and transactional persistence remain seams |
 | `npm run test:security -- --token-leak` | canary token is absent from Node client state, errors, and injected logs | no external APM or host-log scan |
 | `npm run test:chaos -- --approval-timeout` | deterministic expired approval rejection | virtual Relay clock, not a killed process |
-| `npm run test:chaos -- --revoke` | no substitute assertion | exits `2` until durable revocation exists |
+| `npm run test:chaos -- --revoke` | old token fails at the next Registry and Fastify authorization checkpoint | an already-running executor still needs a node-side checkpoint hook |
 | `npm run test:chaos -- --process-kill` | no substitute assertion | exits `2` until supervised kill/restart evidence exists |
 
 Every command writes one JSON object using schema `hummer.executable-gate-result` to stdout. Exit code `0` means the selected proof passed, `1` means a test or invocation failed, and `2` means an acceptance condition is still pending. A `--dry-run` prints the selected evidence plan and executes no assertions.
