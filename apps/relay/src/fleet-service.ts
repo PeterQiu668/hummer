@@ -209,6 +209,38 @@ export class FleetService implements FleetIngress {
     return this.store.enqueueTask(session.tenantId, result.value, result.meta, previous.taskId, now);
   }
 
+  async getNode(session: AuthenticatedFleetSession, nodeId: string): Promise<FleetNodeRecord | null> {
+    if (!nodeId.trim()) return null;
+    return this.store.getNode(session.tenantId, nodeId, this.isoNow());
+  }
+
+  async listNodes(session: AuthenticatedFleetSession): Promise<readonly FleetNodeRecord[]> {
+    return this.store.listNodes(session.tenantId, this.isoNow());
+  }
+
+  async getTask(session: AuthenticatedFleetSession, taskId: string): Promise<FleetTaskRecord | null> {
+    if (!taskId.trim()) return null;
+    return this.store.getTask(session.tenantId, taskId, this.isoNow());
+  }
+
+  async listTasks(session: AuthenticatedFleetSession): Promise<readonly FleetTaskRecord[]> {
+    return this.store.listTasks(session.tenantId, this.isoNow());
+  }
+
+  async getApprovalRequest(
+    session: AuthenticatedFleetSession,
+    requestId: string,
+  ): Promise<ApprovalRequestRecord | null> {
+    if (!requestId.trim()) return null;
+    return this.store.getApprovalRequest(session.tenantId, requestId);
+  }
+
+  async listApprovalRequests(
+    session: AuthenticatedFleetSession,
+  ): Promise<readonly ApprovalRequestRecord[]> {
+    return this.store.listApprovalRequests(session.tenantId);
+  }
+
   async configureQuota(
     session: AuthenticatedFleetSession,
     nodeId: string,

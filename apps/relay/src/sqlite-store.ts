@@ -390,6 +390,16 @@ export class SqliteFleetStore implements FleetStore {
     return row ? toNode(row) : null;
   }
 
+  async listNodes(tenantId: string, now: string): Promise<readonly FleetNodeRecord[]> {
+    this.advanceClock(now);
+    const nodeIds = this.#db.prepare('SELECT node_id FROM fleet_nodes WHERE tenant_id = ?')
+      .all<{ node_id: string }>(tenantId);
+    for (const { node_id } of nodeIds) this.refreshNode(tenantId, node_id, now);
+    return this.#db.prepare('SELECT * FROM fleet_nodes WHERE tenant_id = ? ORDER BY node_id')
+      .all<NodeRow>(tenantId)
+      .map(toNode);
+  }
+
   async enqueueTask(tenantId: string, envelope: FleetObject, claims: TaskClaims, retryOfTaskId: string | null, now: string): Promise<EnqueueResult> {
     this.advanceClock(now);
     const expiresAt = canonicalUtcTimestamp(claims.expiresAt, 'task expiresAt');
@@ -572,6 +582,14 @@ export class SqliteFleetStore implements FleetStore {
     return row ? toTask(row) : null;
   }
 
+  async listTasks(tenantId: string, now: string): Promise<readonly FleetTaskRecord[]> {
+    this.advanceClock(now);
+    this.recoverExpiredLeases(tenantId, now);
+    return this.#db.prepare('SELECT * FROM fleet_tasks WHERE tenant_id = ? ORDER BY task_id')
+      .all<TaskRow>(tenantId)
+      .map(toTask);
+  }
+
   async putApprovalRequest(
     tenantId: string,
     taskId: string,
@@ -686,6 +704,12 @@ export class SqliteFleetStore implements FleetStore {
 
   async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
     return this.findApprovalRequest(tenantId, requestId);
+  }
+
+  async listApprovalRequests(tenantId: string): Promise<readonly ApprovalRequestRecord[]> {
+    return this.#db.prepare(`
+      SELECT * FROM fleet_approval_requests WHERE tenant_id = ? ORDER BY request_id
+    `).all<ApprovalRequestRow>(tenantId).map(toApprovalRequest);
   }
 
   async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
