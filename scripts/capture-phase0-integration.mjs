@@ -12,7 +12,15 @@ const checks = {
   nodeAgent: run('npm', ['run', 'check', '-w', '@hummer/node-agent']),
   relayTypecheck: run('npm', ['run', 'typecheck', '-w', '@hummer/relay']),
   relayTest: run('npm', ['test', '-w', '@hummer/relay']),
-  homeUi: run('npx', ['vitest', 'run', 'src/features/home/StartWorkPage.test.tsx', '--config', 'vitest.ui.config.ts']),
+  homeUi: run('npx', [
+    'vitest',
+    'run',
+    'src/features/home/StartWorkPage.test.tsx',
+    'src/features/home/StartWorkFlow.test.tsx',
+    'src/components/pages/WorkbenchPage.test.tsx',
+    '--config',
+    'vitest.ui.config.ts',
+  ]),
   receiptTest: run('node', ['scripts/test-fleet-receipt.mjs']),
   receiptVerify: run('npm', ['run', 'verify:fleet:receipt']),
   typecheck: run('npm', ['run', 'typecheck']),
@@ -41,7 +49,7 @@ writeEvidence('round-d2/fleet.json', {
   status: checks.nodeAgent.exitCode === 0 ? 'scaffold-verified' : 'failed',
   acceptance: [],
   limitations: [
-    'No network Relay transport is connected.',
+    'The node agent is not yet connected to the network Relay transport.',
     'No real executor or two-machine run has been performed.',
     'The host Node.js and Codex versions do not match the frozen D0 pins.',
   ],
@@ -53,11 +61,10 @@ writeEvidence('round-d3/idempotency.json', {
   version: 1,
   capturedAt,
   gitHead: head.stdout.trim(),
-  status: checks.relayTypecheck.exitCode === 0 && checks.relayTest.exitCode === 0 ? 'local-store-verified' : 'failed',
+  status: checks.relayTypecheck.exitCode === 0 && checks.relayTest.exitCode === 0 ? 'network-transport-unit-verified' : 'failed',
   acceptance: [],
   limitations: [
-    'The Relay is an in-process service and dedicated SQLite store only.',
-    'Fastify, WSS/SSE transport, bearer-token authentication, and a two-machine 100-task run remain unimplemented.',
+    'WSS, production badge issuance/revocation, durable SSE replay, TLS deployment, and a two-machine 100-task run remain unimplemented.',
   ],
   checks: [checks.relayTypecheck, checks.relayTest],
 });
@@ -67,11 +74,11 @@ writeEvidence('round-d4/ui.json', {
   version: 1,
   capturedAt,
   gitHead: head.stdout.trim(),
-  status: checks.homeUi.exitCode === 0 ? 'component-verified' : 'failed',
+  status: checks.homeUi.exitCode === 0 ? 'workbench-intent-verified' : 'failed',
   acceptance: [],
   limitations: [
-    'The StartWorkPage component is not yet routed into the production Workbench flow.',
-    'Planner, Relay dispatch, and real pending intake are not yet connected.',
+    'The Workbench emits a validated pending dispatch intent, but no production Relay adapter is injected yet.',
+    'No real runtime or two-machine execution is started by this UI slice.',
   ],
   check: checks.homeUi,
 });
@@ -105,9 +112,13 @@ writeEvidence('round-p0-integration/gates.json', {
   gitHead: head.stdout.trim(),
   status: [checks.typecheck, checks.build, checks.test].every((check) => check.exitCode === 0) ? 'passed' : 'failed',
   checks: [checks.typecheck, checks.build, checks.test],
+  toolchain: {
+    node: '22.22.2 isolated pinned binary verified in evidence/round-00/baseline.json',
+    codex: '0.153.4 isolated pinned binary verified in evidence/round-00/baseline.json',
+    globalDefaultsMutated: false,
+  },
   openBlockers: [
-    'D0 pin mismatch: host Node.js is 24.16.0 instead of 22.22.2 and Codex is 0.160.1 instead of 0.153.4.',
-    'No true two-machine run, transport authentication, offline recovery drill, or 100-task exactly-once evidence yet.',
+    'No true two-machine run, production badge issuance/revocation, offline recovery drill, or 100-task exactly-once evidence yet.',
   ],
 });
 

@@ -1,18 +1,18 @@
 {
   "schema": "hummer.phase0-evidence",
   "version": 1,
-  "capturedAt": "2026-10-06T18:19:40.224Z",
-  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
-  "status": "component-verified",
+  "capturedAt": "2026-10-06T18:56:32.962Z",
+  "gitHead": "9a14d3c35a583dc0aa2a412150b221eee153db14",
+  "status": "workbench-intent-verified",
   "acceptance": [],
   "limitations": [
-    "The StartWorkPage component is not yet routed into the production Workbench flow.",
-    "Planner, Relay dispatch, and real pending intake are not yet connected."
+    "The Workbench emits a validated pending dispatch intent, but no production Relay adapter is injected yet.",
+    "No real runtime or two-machine execution is started by this UI slice."
   ],
   "check": {
-    "command": "npx vitest run src/features/home/StartWorkPage.test.tsx --config vitest.ui.config.ts",
+    "command": "npx vitest run src/features/home/StartWorkPage.test.tsx src/features/home/StartWorkFlow.test.tsx src/components/pages/WorkbenchPage.test.tsx --config vitest.ui.config.ts",
     "exitCode": 0,
-    "stdout": "RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  02:19:55\n   Duration  2.17s (transform 114ms, setup 310ms, import 161ms, tests 254ms, environment 1.20s)",
+    "stdout": "RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  3 passed (3)\n      Tests  29 passed (29)\n   Start at  02:56:53\n   Duration  6.86s (transform 919ms, setup 1.10s, import 1.96s, tests 4.54s, environment 4.88s)",
     "stderr": ""
   }
 }

@@ -1,8 +1,8 @@
 {
   "schema": "hummer.phase0-tamper-evidence",
   "version": 1,
-  "capturedAt": "2026-10-06T18:19:40.224Z",
-  "gitHead": "6e7aec3ae533d791f596941b5e05583b565ea8fe",
+  "capturedAt": "2026-10-06T18:56:32.962Z",
+  "gitHead": "9a14d3c35a583dc0aa2a412150b221eee153db14",
   "status": "passed",
   "mutation": "one-byte child receipt tamper",
   "verifierExitCode": 1,
