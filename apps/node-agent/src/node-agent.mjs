@@ -1,4 +1,5 @@
 import { NodeAgentError } from './errors.mjs';
+import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { canonicalJson, sha256Hex } from './execution-journal.mjs';
 import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
@@ -39,9 +40,12 @@ export class HummerNodeAgent {
   /** @type {NodeTaskExecutor} */ #executor;
   /** @type {ExecutionJournal} */ #journal;
   /** @type {() => Date} */ #clock;
+  /** @type {() => string} */ #idFactory;
   /** @type {Map<string, {claimId: string, deliveryId: string, envelope: unknown, binding: ReturnType<typeof readValidatedEnvelopeBinding>, approvalRequest?: unknown}>} */ #pending = new Map();
   /** @type {Map<string, Record<string, unknown>>} */ #knownClaims = new Map();
   /** @type {Set<string>} */ #recoveryRequired = new Set();
+  /** @type {Map<string, Record<string, unknown>>} */ #recoveryResolutions = new Map();
+  /** @type {Set<string>} */ #issuedRecoveryIdentifiers = new Set();
   /** @type {Set<string>} */ #terminal = new Set();
   /** @type {Set<string>} */ #stopped = new Set();
   /** @type {NodeJS.Timeout|null} */ #heartbeatTimer = null;
@@ -56,11 +60,12 @@ export class HummerNodeAgent {
    * contractValidator: FleetContractValidator,
    * executor: NodeTaskExecutor,
    * journal: ExecutionJournal,
-   * clock?: () => Date
+   * clock?: () => Date,
+   * idFactory?: () => string
    * }} options
    */
   constructor(options) {
-    const input = assertExactRecord(options, ['nodeId', 'tenantId', 'heartbeatIntervalMs', 'grant', 'transport', 'contractValidator', 'executor', 'journal', 'clock'], 'invalid_agent_config', 'node agent options');
+    const input = assertExactRecord(options, ['nodeId', 'tenantId', 'heartbeatIntervalMs', 'grant', 'transport', 'contractValidator', 'executor', 'journal', 'clock', 'idFactory'], 'invalid_agent_config', 'node agent options');
     this.nodeId = requireNonEmptyString(input.nodeId, 'invalid_agent_config', 'nodeId');
     this.tenantId = requireNonEmptyString(input.tenantId, 'invalid_agent_config', 'tenantId');
     const heartbeatIntervalMs = input.heartbeatIntervalMs;
@@ -84,6 +89,7 @@ export class HummerNodeAgent {
     this.#executor = /** @type {NodeTaskExecutor} */ (input.executor);
     this.#journal = /** @type {ExecutionJournal} */ (input.journal);
     this.#clock = typeof input.clock === 'function' ? /** @type {() => Date} */ (input.clock) : () => new Date();
+    this.#idFactory = typeof input.idFactory === 'function' ? /** @type {() => string} */ (input.idFactory) : randomUUID;
     validatePorts(this.#transport, this.#contractValidator, this.#executor, this.#journal);
     const snapshot = initializeJournal(this.#journal, { tenantId: this.tenantId, nodeId: this.nodeId });
     for (const claim of snapshot.claims) {
@@ -92,6 +98,12 @@ export class HummerNodeAgent {
       if (claim.state === 'terminal') {
         this.#terminal.add(claimId);
         if (claim.terminalState === 'stopped') this.#stopped.add(claimId);
+      } else if (claim.state === 'recovery_abandoned' || claim.state === 'recovery_retry_authorized') {
+        this.#terminal.add(claimId);
+        this.#recoveryResolutions.set(claimId, claim);
+        for (const key of ['resolutionId', 'retryAttemptId', 'retryIdempotencyKey']) {
+          if (typeof claim[key] === 'string') this.#issuedRecoveryIdentifiers.add(claim[key]);
+        }
       } else {
         this.#recoveryRequired.add(claimId);
       }
@@ -173,6 +185,8 @@ export class HummerNodeAgent {
 
   /** @param {string} claimId @param {unknown} request */
   async requestApproval(claimId, request) {
+    const resolution = this.#resolutionResult(claimId);
+    if (resolution) return resolution;
     if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
     if (this.#recoveryRequired.has(claimId)) return { state: 'recovery_required', claimId };
@@ -232,6 +246,8 @@ export class HummerNodeAgent {
     if (arguments.length !== 1) {
       throw new NodeAgentError('local_approval_forbidden', 'Approval decisions must be consumed from the authenticated Relay');
     }
+    const resolution = this.#resolutionResult(claimId);
+    if (resolution) return resolution;
     if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
     if (this.#recoveryRequired.has(claimId)) return { state: 'recovery_required', claimId };
@@ -333,6 +349,8 @@ export class HummerNodeAgent {
    */
   stopClaim(claimId) {
     const id = requireNonEmptyString(claimId, 'invalid_claim', 'claimId');
+    const resolution = this.#resolutionResult(id);
+    if (resolution) return resolution;
     if (this.#recoveryRequired.has(id)) return { state: 'recovery_required', claimId: id };
     if (this.#terminal.has(id)) return this.#stopped.has(id) ? { state: 'stopped', claimId: id } : { state: 'duplicate', claimId: id };
     if (this.#knownClaims.has(id)) {
@@ -348,6 +366,61 @@ export class HummerNodeAgent {
     this.#stopped.add(id);
     this.#terminal.add(id);
     return { state: 'stopped', claimId: id };
+  }
+
+  /**
+   * Return only journal IDs/hashes required for an operator to adjudicate an
+   * in-doubt attempt. Raw task, approval, receipt, and grant values stay out.
+   * @param {string} claimId
+   */
+  inspectRecovery(claimId) {
+    const id = requireNonEmptyString(claimId, 'invalid_recovery_decision', 'claimId');
+    const known = this.#knownClaims.get(id);
+    if (!known) throw new NodeAgentError('recovery_not_found', 'Recovery claim was not found in the execution journal');
+    return recoveryInspection(known, this.#recoveryRequired.has(id));
+  }
+
+  /** @param {string} claimId @param {unknown} decision */
+  abandonRecovery(claimId, decision) {
+    const id = requireNonEmptyString(claimId, 'invalid_recovery_decision', 'claimId');
+    const operator = parseRecoveryDecision(decision);
+    const known = this.#requireRecoveryClaim(id);
+    const record = {
+      type: 'recovery_abandoned',
+      ...recoveryIdentity(known),
+      resolutionId: this.#newIdentifier('recovery'),
+      operatorActorRef: operator.operatorActorRef,
+      reasonCode: operator.reasonCode,
+    };
+    this.#record(record);
+    this.#finishRecovery(id);
+    return this.#resolutionResult(id);
+  }
+
+  /**
+   * Close the old attempt and mint a retry plan. This method never calls the
+   * Relay or executor. An operator must separately block the old Relay task,
+   * submit a new TaskEnvelope with the returned idempotency key, and obtain a
+   * fresh approval for that new claim.
+   * @param {string} claimId
+   * @param {unknown} decision
+   */
+  authorizeRecoveryRetry(claimId, decision) {
+    const id = requireNonEmptyString(claimId, 'invalid_recovery_decision', 'claimId');
+    const operator = parseRecoveryDecision(decision);
+    const known = this.#requireRecoveryClaim(id);
+    const record = {
+      type: 'recovery_retry_authorized',
+      ...recoveryIdentity(known),
+      resolutionId: this.#newIdentifier('recovery'),
+      operatorActorRef: operator.operatorActorRef,
+      reasonCode: operator.reasonCode,
+      retryAttemptId: this.#newIdentifier('attempt'),
+      retryIdempotencyKey: this.#newIdentifier('retry'),
+    };
+    this.#record(record);
+    this.#finishRecovery(id);
+    return this.#resolutionResult(id);
   }
 
   /** @param {string} requiredScope */
@@ -371,6 +444,47 @@ export class HummerNodeAgent {
       throw new NodeAgentError('journal_write_failed', `Execution journal append failed: ${safeErrorCode(error)}`);
     }
     if (claim && typeof claim.claimId === 'string') this.#knownClaims.set(claim.claimId, claim);
+  }
+
+  /** @param {string} claimId */
+  #requireRecoveryClaim(claimId) {
+    if (this.#recoveryResolutions.has(claimId)) {
+      throw new NodeAgentError('recovery_already_resolved', 'Recovery claim already has an immutable operator resolution');
+    }
+    if (!this.#recoveryRequired.has(claimId)) {
+      if (this.#knownClaims.has(claimId)) throw new NodeAgentError('recovery_not_required', 'Claim does not require operator recovery');
+      throw new NodeAgentError('recovery_not_found', 'Recovery claim was not found in the execution journal');
+    }
+    return this.#requireKnownClaim(claimId);
+  }
+
+  /** @param {string} claimId */
+  #finishRecovery(claimId) {
+    const known = this.#requireKnownClaim(claimId);
+    this.#recoveryRequired.delete(claimId);
+    this.#pending.delete(claimId);
+    this.#terminal.add(claimId);
+    this.#recoveryResolutions.set(claimId, known);
+  }
+
+  /** @param {string} claimId */
+  #resolutionResult(claimId) {
+    const resolution = this.#recoveryResolutions.get(claimId);
+    return resolution ? recoveryResolutionResult(resolution) : undefined;
+  }
+
+  /** @param {string} prefix */
+  #newIdentifier(prefix) {
+    const suffix = requireNonEmptyString(this.#idFactory(), 'invalid_recovery_identifier', 'generated recovery identifier');
+    if (suffix.length > 96 || !/^[A-Za-z0-9._-]+$/.test(suffix)) {
+      throw new NodeAgentError('invalid_recovery_identifier', 'Generated recovery identifier contains unsafe characters');
+    }
+    const identifier = `${prefix}-${suffix}`;
+    if (this.#issuedRecoveryIdentifiers.has(identifier)) {
+      throw new NodeAgentError('recovery_identifier_collision', 'Generated recovery identifier was already used');
+    }
+    this.#issuedRecoveryIdentifiers.add(identifier);
+    return identifier;
   }
 
   /** @param {string} claimId */
@@ -416,6 +530,80 @@ function safeClaimId(value) {
 /** @param {unknown} error */
 function safeErrorCode(error) {
   return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : 'operation_failed';
+}
+
+/** @param {unknown} value */
+function parseRecoveryDecision(value) {
+  const decision = assertExactRecord(value, ['operatorActorRef', 'reasonCode'], 'invalid_recovery_decision', 'recovery decision');
+  const operatorActorRef = requireNonEmptyString(decision.operatorActorRef, 'invalid_recovery_decision', 'operatorActorRef');
+  if (!/^(?:human|account):[A-Za-z0-9._:@/-]+$/.test(operatorActorRef)) {
+    throw new NodeAgentError('recovery_operator_forbidden', 'Recovery decisions require a human or account operator');
+  }
+  const reasonCode = requireNonEmptyString(decision.reasonCode, 'invalid_recovery_decision', 'reasonCode');
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(reasonCode)) {
+    throw new NodeAgentError('invalid_recovery_decision', 'reasonCode must be a safe machine-readable code');
+  }
+  return { operatorActorRef, reasonCode };
+}
+
+/** @param {Record<string, unknown>} known */
+function recoveryIdentity(known) {
+  return {
+    claimId: requireNonEmptyString(known.claimId, 'journal_corrupt', 'journal claimId'),
+    deliveryId: requireNonEmptyString(known.deliveryId, 'journal_corrupt', 'journal deliveryId'),
+    workOrderId: requireNonEmptyString(known.workOrderId, 'journal_corrupt', 'journal workOrderId'),
+    envelopeHash: requireJournalHash(known.envelopeHash, 'envelopeHash'),
+  };
+}
+
+/** @param {unknown} value @param {string} label */
+function requireJournalHash(value, label) {
+  const hash = requireNonEmptyString(value, 'journal_corrupt', label);
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new NodeAgentError('journal_corrupt', `${label} must be a SHA-256 digest`);
+  return hash;
+}
+
+/** @param {Record<string, unknown>} known @param {boolean} requiresDecision */
+function recoveryInspection(known, requiresDecision) {
+  const inspection = {
+    claimId: requireNonEmptyString(known.claimId, 'journal_corrupt', 'journal claimId'),
+    deliveryId: requireNonEmptyString(known.deliveryId, 'journal_corrupt', 'journal deliveryId'),
+    workOrderId: requireNonEmptyString(known.workOrderId, 'journal_corrupt', 'journal workOrderId'),
+    journalStage: requireNonEmptyString(known.state, 'journal_corrupt', 'journal state'),
+    envelopeHash: requireJournalHash(known.envelopeHash, 'envelopeHash'),
+    requiresDecision,
+  };
+  const resolution = recoveryResolutionResult(known);
+  return resolution ? { ...inspection, resolution } : inspection;
+}
+
+/** @param {Record<string, unknown>} resolution */
+function recoveryResolutionResult(resolution) {
+  if (resolution.state === 'recovery_abandoned') {
+    return {
+      state: 'abandoned',
+      claimId: String(resolution.claimId),
+      resolutionId: String(resolution.resolutionId),
+      operatorActorRef: String(resolution.operatorActorRef),
+      reasonCode: String(resolution.reasonCode),
+    };
+  }
+  if (resolution.state === 'recovery_retry_authorized') {
+    return {
+      state: 'retry_authorized',
+      claimId: String(resolution.claimId),
+      resolutionId: String(resolution.resolutionId),
+      operatorActorRef: String(resolution.operatorActorRef),
+      reasonCode: String(resolution.reasonCode),
+      retry: {
+        attemptId: String(resolution.retryAttemptId),
+        idempotencyKey: String(resolution.retryIdempotencyKey),
+        retryOfClaimId: String(resolution.claimId),
+        workOrderId: String(resolution.workOrderId),
+      },
+    };
+  }
+  return undefined;
 }
 
 /**

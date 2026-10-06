@@ -98,7 +98,56 @@ time-clean journal history. A recovered terminal delivery remains a duplicate.
 Any recovered non-terminal delivery is returned as `recovery_required`, because
 a crash after the durable `executing` marker cannot prove whether the executor
 side effect occurred. No automatic retry exists. See
-`docs/decisions/ADR-024-node-execution-journal.md` for the safety boundary.
+`docs/decisions/ADR-024-node-execution-journal.md` for the safety boundary and
+`docs/decisions/ADR-025-operator-recovery-adjudication.md` for the manual
+resolution protocol.
+
+### Operator recovery adjudication
+
+Recovery is an explicit local control-plane operation. It is not accepted from
+SSE, a task payload, a node/system actor, or an approval decision. The operator
+must authenticate as a `human:*` or `account:*` actor and choose one immutable
+outcome:
+
+1. Call `inspectRecovery(claimId)`. The result contains only the claim,
+   delivery, WorkOrder, journal stage, and TaskEnvelope hash. It never contains
+   the raw TaskEnvelope, approval, receipt, capability grant, or credential.
+2. Establish from external evidence whether the in-doubt side effect occurred.
+   Do not infer “not executed” merely because no receipt was written.
+3. If the side effect occurred, or replay would otherwise be unsafe, call
+   `abandonRecovery(claimId, { operatorActorRef, reasonCode })`. The original
+   attempt becomes permanently non-executable.
+4. Only when external evidence proves a retry is safe, call
+   `authorizeRecoveryRetry(claimId, { operatorActorRef, reasonCode })`. This
+   closes the old attempt and returns a newly generated `attemptId` and
+   `idempotencyKey` bound to `retryOfClaimId` and the original WorkOrder.
+5. Separately use an authenticated Relay human/account control route to block
+   the old Relay task and submit `POST /v1/tasks/:oldTaskId/retry` with a new
+   TaskEnvelope. Its `originRef` must preserve the returned WorkOrder lineage
+   and its `idempotencyKey` must equal the newly issued key. The node does not
+   perform this network step. The new claim starts at `pending_confirmation`
+   and requires a fresh approval before execution.
+
+Both outcomes append a canonical, SHA-256-chained, fsynced resolution record to
+the same journal. A second or conflicting resolution is rejected; journal
+history is never updated, truncated, deleted, or repaired. Merely authorizing a
+retry causes zero executor, approval-consumption, or Relay calls.
+
+Example embedding code (the CLI does not expose recovery mutation commands):
+
+```js
+const evidence = agent.inspectRecovery('delivery-17');
+// Human/account operator checks external side-effect evidence here.
+const retryPlan = agent.authorizeRecoveryRetry('delivery-17', {
+  operatorActorRef: 'human:owner',
+  reasonCode: 'verified_not_started',
+});
+// retryPlan.retry is input to the separate Relay control workflow.
+```
+
+Use short machine-readable `reasonCode` values, not customer text or secrets.
+If journal verification fails, stop: adjudication cannot bypass a corrupt or
+scope-mismatched journal.
 
 ## MCP tool facade
 

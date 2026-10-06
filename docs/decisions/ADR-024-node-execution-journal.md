@@ -41,7 +41,8 @@ atomic transaction. Calling this distributed exactly-once would be false.
    claim, including `executing`, is explicitly exposed as `recovery_required`.
    Re-delivery, approval calls, stop calls, and confirmation calls cannot invoke
    the executor for that claim. Recovery requires an operator-controlled future
-   procedure; Phase 0 defines no automatic retry or journal rewrite.
+   procedure; Phase 0 defines no automatic retry or journal rewrite. The later
+   operator protocol is defined by ADR-025 and preserves this fail-closed rule.
 7. Relay tables, desktop migrations, and the five frozen Fleet wire contracts
    are unchanged.
 

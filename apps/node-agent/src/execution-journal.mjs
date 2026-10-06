@@ -214,6 +214,24 @@ function validateRecord(record) {
     assertExactKeys(record, ['type', 'claimId', 'deliveryId', 'workOrderId', 'envelopeHash', 'requestId', 'approvalRequestHash', 'approvalDecisionHash']);
     return identifiers(record, type, ['envelopeHash', 'requestId', 'approvalRequestHash', 'approvalDecisionHash']);
   }
+  if (type === 'recovery_abandoned') {
+    assertExactKeys(record, [
+      'type', 'claimId', 'deliveryId', 'workOrderId', 'envelopeHash',
+      'resolutionId', 'operatorActorRef', 'reasonCode',
+    ]);
+    return recoveryResolution(record, type);
+  }
+  if (type === 'recovery_retry_authorized') {
+    assertExactKeys(record, [
+      'type', 'claimId', 'deliveryId', 'workOrderId', 'envelopeHash',
+      'resolutionId', 'operatorActorRef', 'reasonCode', 'retryAttemptId',
+      'retryIdempotencyKey',
+    ]);
+    const output = recoveryResolution(record, type);
+    output.retryAttemptId = requiredString(record.retryAttemptId, 'retryAttemptId');
+    output.retryIdempotencyKey = requiredIdempotencyKey(record.retryIdempotencyKey);
+    return output;
+  }
   if (type === 'terminal') {
     assertAllowedKeys(record, ['type', 'claimId', 'deliveryId', 'workOrderId', 'terminalState', 'receiptHash', 'reasonCode']);
     const terminalState = requiredString(record.terminalState, 'terminalState');
@@ -262,6 +280,7 @@ function verifyEntries(entries) {
         'version', 'sequence', 'occurredAt', 'tenantId', 'nodeId', 'previousHash', 'hash',
         'type', 'claimId', 'deliveryId', 'workOrderId', 'envelopeHash', 'requestId',
         'approvalRequestHash', 'approvalDecisionHash', 'terminalState', 'receiptHash', 'reasonCode',
+        'resolutionId', 'operatorActorRef', 'retryAttemptId', 'retryIdempotencyKey',
       ]);
       if (entry.version !== JOURNAL_VERSION || entry.sequence !== index + 1) throw new Error('version or sequence mismatch');
       if (typeof entry.occurredAt !== 'string' || !Number.isFinite(Date.parse(entry.occurredAt))) throw new Error('invalid timestamp');
@@ -302,7 +321,9 @@ function applyTransition(claims, record) {
   }
   if (!current) throw new Error('claim is missing');
   assertClaimIdentity(current, record);
-  if (current.state === 'terminal') throw new Error('terminal claim cannot transition');
+  if (current.state === 'terminal' || current.state === 'recovery_abandoned' || current.state === 'recovery_retry_authorized') {
+    throw new Error('resolved claim cannot transition');
+  }
   const expected = {
     approval_request_recorded: 'claim_accepted',
     approval_decision_consumed: 'approval_request_recorded',
@@ -313,8 +334,48 @@ function applyTransition(claims, record) {
     claims.set(claimId, { ...current, ...record, state: 'terminal' });
     return;
   }
+  if (record.type === 'recovery_abandoned' || record.type === 'recovery_retry_authorized') {
+    claims.set(claimId, { ...current, ...record, state: record.type });
+    return;
+  }
   if (!expected || current.state !== expected) throw new Error('invalid claim transition');
   claims.set(claimId, { ...current, ...record, state: record.type });
+}
+
+/** @param {Record<string, unknown>} record @param {string} type */
+function recoveryResolution(record, type) {
+  const output = identifiers(record, type, ['envelopeHash']);
+  output.resolutionId = requiredString(record.resolutionId, 'resolutionId');
+  output.operatorActorRef = requiredOperatorActor(record.operatorActorRef);
+  output.reasonCode = requiredReasonCode(record.reasonCode);
+  return output;
+}
+
+/** @param {unknown} value */
+function requiredOperatorActor(value) {
+  const actor = requiredString(value, 'operatorActorRef');
+  if (!/^(?:human|account):[A-Za-z0-9._:@/-]+$/.test(actor)) {
+    throw new NodeAgentError('invalid_journal_record', 'operatorActorRef must identify a human or account operator');
+  }
+  return actor;
+}
+
+/** @param {unknown} value */
+function requiredReasonCode(value) {
+  const reason = requiredString(value, 'reasonCode');
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(reason)) {
+    throw new NodeAgentError('invalid_journal_record', 'reasonCode must be a safe machine-readable code');
+  }
+  return reason;
+}
+
+/** @param {unknown} value */
+function requiredIdempotencyKey(value) {
+  const key = requiredString(value, 'retryIdempotencyKey');
+  if (key.length < 8 || key.length > 128) {
+    throw new NodeAgentError('invalid_journal_record', 'retryIdempotencyKey must be 8 to 128 characters');
+  }
+  return key;
 }
 
 /** @param {Record<string, unknown>} current @param {Record<string, unknown>} next */
