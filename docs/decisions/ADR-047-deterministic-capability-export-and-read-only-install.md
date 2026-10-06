@@ -14,9 +14,11 @@ trusting renderer-supplied claims.
 
 The Agent Skills export contains exactly eight standard files. A file cannot
 embed its own final digest, and a receipt cannot embed a root hash that includes
-itself. File digests and the bundle root are therefore returned as the export
-descriptor around the eight-file payload rather than introduced as a hidden
-ninth file.
+itself. File digests and the bundle root are therefore derived from the
+eight-file payload rather than introduced as a hidden ninth file or accepted as
+an external caller claim. `meta.json` embeds the complete
+`CapabilityPackageV1`, so the directory is self-describing across hosts without
+a HUMMER sidecar.
 
 ## Decision
 
@@ -67,6 +69,14 @@ eight-name set. It validates the package and receipt, regenerates every expected
 file, recalculates each digest and the bundle root, compares the descriptor, and
 reruns prohibited-content scanning. Checking only a supplied manifest or a
 caller-provided `passed` boolean is insufficient.
+
+`loadCapabilityExportDirectory(sourceDirectory)` accepts only a directory. It
+enumerates and reads the exact eight regular files, parses the complete package
+from `meta.json`, validates that package, then derives all file digests, the
+root hash, and the descriptor from actual bytes before full regeneration. The
+former API shape that supplied package/descriptor/root claims is rejected
+explicitly. `installCapabilityExportDirectory` composes this loader with the
+same trusted install gate for direct cross-host directory installation.
 
 ### Trusted gate input creation and verification
 

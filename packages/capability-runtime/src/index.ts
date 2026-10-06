@@ -101,6 +101,10 @@ export interface InstallCapabilityInput {
   readonly evaluatedAt: string;
 }
 
+export interface InstallCapabilityDirectoryInput extends Omit<InstallCapabilityInput, 'bundle'> {
+  readonly sourceDirectory: string;
+}
+
 export interface InstalledCapability {
   readonly targetDirectory: string;
   readonly readOnly: true;
@@ -322,7 +326,8 @@ function validateSourceReceipt(
   return envelope as CapabilityReceiptEnvelope;
 }
 
-export interface LoadCapabilityExportDirectoryInput {
+/** @deprecated External bundle claims are deliberately rejected by the loader. */
+export interface LegacyLoadCapabilityExportDirectoryInput {
   readonly sourceDirectory: string;
   readonly package: CapabilityPackageV1;
   readonly descriptor: CapabilityExportBundle['descriptor'];
@@ -438,16 +443,7 @@ function renderCapabilityExport(input: unknown, receiptInput: unknown): Capabili
     'meta.json': prettyJson({
       schema: 'hummer.capability-agent-skills-meta',
       version: 1,
-      packageId: pkg.packageId,
-      packageVersion: pkg.packageVersion,
-      packageDigest,
-      status: pkg.status,
-      preset: pkg.preset,
-      provenance: pkg.provenance,
-      sourceBoundary: pkg.sourceBoundary,
-      trialRecord: pkg.trialRecord,
-      failureNotes: pkg.failureNotes,
-      correctionCount: pkg.behaviorTrack.corrections.length,
+      package: pkg,
     }),
     'receipt.json': prettyJson(receipt),
   };
@@ -514,9 +510,12 @@ export async function writeCapabilityExport(
 }
 
 export async function loadCapabilityExportDirectory(
-  input: LoadCapabilityExportDirectoryInput,
+  sourceDirectory: string | LegacyLoadCapabilityExportDirectoryInput,
 ): Promise<CapabilityExportBundle> {
-  const source = resolve(input.sourceDirectory);
+  if (typeof sourceDirectory !== 'string') {
+    throw new Error('CAPABILITY_EXPORT_EXTERNAL_CLAIMS_REJECTED');
+  }
+  const source = resolve(sourceDirectory);
   const entries = await readdir(source, { withFileTypes: true });
   const names = entries.map((entry) => entry.name).sort();
   const expectedNames = [...AGENT_SKILLS_FILES].sort();
@@ -541,13 +540,34 @@ export async function loadCapabilityExportDirectory(
     }
     files[name] = text;
   }
+  let meta: unknown;
+  try {
+    meta = JSON.parse(files['meta.json']);
+  } catch {
+    throw new Error('CAPABILITY_EXPORT_META_INVALID:json');
+  }
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta) ||
+      (meta as Record<string, unknown>).schema !== 'hummer.capability-agent-skills-meta' ||
+      (meta as Record<string, unknown>).version !== 1 ||
+      !('package' in (meta as Record<string, unknown>))) {
+    throw new Error('CAPABILITY_EXPORT_META_INVALID:schema');
+  }
+  const packageValidation = validateCapabilityContract(
+    'CapabilityPackageV1',
+    (meta as { package: unknown }).package,
+  );
+  if (packageValidation.issues) {
+    throw new Error(`CAPABILITY_EXPORT_META_INVALID:${packageValidation.issues[0]?.message}`);
+  }
+  const pkg = packageValidation.value;
+  const actual = describeActualFiles(files);
   const candidate: CapabilityExportBundle = {
-    package: input.package,
-    packageDigest: input.package.packageDigest,
+    package: pkg,
+    packageDigest: pkg.packageDigest,
     files,
-    fileDigests: input.descriptor.fileDigests,
-    rootHash: input.rootHash,
-    descriptor: input.descriptor,
+    fileDigests: actual.fileDigests,
+    rootHash: actual.rootHash,
+    descriptor: actual.descriptor,
   };
   const verification = verifyCapabilityExport(candidate);
   if (!verification.ok) throw new Error(`CAPABILITY_EXPORT_INVALID:${verification.issues.join(',')}`);
@@ -790,4 +810,13 @@ export async function installCapabilityExport(input: InstallCapabilityInput): Pr
     rootHash: input.bundle.rootHash,
     decision: evaluation.decision,
   });
+}
+
+/** Loads a self-describing eight-file directory, verifies its actual bytes, then installs it. */
+export async function installCapabilityExportDirectory(
+  input: InstallCapabilityDirectoryInput,
+): Promise<InstalledCapability> {
+  const { sourceDirectory, ...installInput } = input;
+  const bundle = await loadCapabilityExportDirectory(sourceDirectory);
+  return installCapabilityExport({ ...installInput, bundle });
 }

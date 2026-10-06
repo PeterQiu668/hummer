@@ -10,6 +10,7 @@ import {
   createCapabilityExport,
   evaluateCapabilityInstallRequest,
   installCapabilityExport,
+  installCapabilityExportDirectory,
   loadCapabilityExportDirectory,
   verifyCapabilityExport,
   verifyInstallGateInput,
@@ -314,11 +315,14 @@ describe('[CAP-MANIFEST] bundle and manifest verification', () => {
   it('links the manifest, meta and receipt and passes the repository receipt verifier', async () => {
     const bundle = exportFixture();
     const manifest = JSON.parse(bundle.files['manifest.json']) as Record<string, unknown>;
-    const meta = JSON.parse(bundle.files['meta.json']) as Record<string, unknown>;
+    const meta = JSON.parse(bundle.files['meta.json']) as { package: CapabilityPackageV1; rootHash?: unknown };
     const receipt = JSON.parse(bundle.files['receipt.json']) as { receipt: { capability: Record<string, unknown> } };
 
     expect(manifest.packageDigest).toBe(bundle.packageDigest);
-    expect(meta.packageDigest).toBe(bundle.packageDigest);
+    expect(manifest.rootHash).toBeUndefined();
+    expect(meta.package).toEqual(bundle.package);
+    expect(meta.package.packageDigest).toBe(bundle.packageDigest);
+    expect(meta.rootHash).toBeUndefined();
     expect(receipt.receipt.capability.packageDigest).toBe(bundle.packageDigest);
     expect(manifest.installEntry).toBe('manifest.json');
     expect(manifest.artifacts).toEqual(AGENT_SKILLS_FILES);
@@ -370,32 +374,40 @@ describe('[CAP-MANIFEST] bundle and manifest verification', () => {
     const bundle = exportFixture();
     const root = await mkdtemp(join(tmpdir(), 'hummer-capability-export-'));
     const source = await writeCapabilityExport(bundle, join(root, 'bundle'));
-    const loaded = await loadCapabilityExportDirectory({
-      sourceDirectory: source,
-      package: bundle.package,
-      descriptor: bundle.descriptor,
-      rootHash: bundle.rootHash,
-    });
+    const loaded = await loadCapabilityExportDirectory(source);
     expect(loaded).toEqual(bundle);
 
     await chmod(join(source, 'work.md'), 0o644);
     await writeFile(join(source, 'work.md'), `${bundle.files['work.md']}\nTampered\n`, 'utf8');
-    await expect(loadCapabilityExportDirectory({
-      sourceDirectory: source,
-      package: bundle.package,
-      descriptor: bundle.descriptor,
-      rootHash: bundle.rootHash,
-    })).rejects.toThrow('CAPABILITY_EXPORT_INVALID');
+    await expect(loadCapabilityExportDirectory(source)).rejects.toThrow('CAPABILITY_EXPORT_INVALID');
 
     const extraRoot = await mkdtemp(join(tmpdir(), 'hummer-capability-export-extra-'));
     const extraSource = await writeCapabilityExport(bundle, join(extraRoot, 'bundle'));
     await writeFile(join(extraSource, 'install.ps1'), 'Write-Host bypass', 'utf8');
+    await expect(loadCapabilityExportDirectory(extraSource)).rejects.toThrow('CAPABILITY_EXPORT_FILE_SET_INVALID');
+  });
+
+  it('loads without external claims and rejects meta package tampering or legacy root injection', async () => {
+    const bundle = exportFixture();
+    const root = await mkdtemp(join(tmpdir(), 'hummer-capability-self-describing-'));
+    const source = await writeCapabilityExport(bundle, join(root, 'bundle'));
+
+    await expect(loadCapabilityExportDirectory(source)).resolves.toEqual(bundle);
     await expect(loadCapabilityExportDirectory({
-      sourceDirectory: extraSource,
+      sourceDirectory: source,
       package: bundle.package,
       descriptor: bundle.descriptor,
-      rootHash: bundle.rootHash,
-    })).rejects.toThrow('CAPABILITY_EXPORT_FILE_SET_INVALID');
+      rootHash: 'f'.repeat(64),
+    })).rejects.toThrow('CAPABILITY_EXPORT_EXTERNAL_CLAIMS_REJECTED');
+
+    const tamperRoot = await mkdtemp(join(tmpdir(), 'hummer-capability-meta-tamper-'));
+    const tamperSource = await writeCapabilityExport(bundle, join(tamperRoot, 'bundle'));
+    const metaPath = join(tamperSource, 'meta.json');
+    const meta = JSON.parse(await readFile(metaPath, 'utf8')) as { package: CapabilityPackageV1 };
+    meta.package.title = 'Tampered package title';
+    await chmod(metaPath, 0o644);
+    await writeFile(metaPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
+    await expect(loadCapabilityExportDirectory(tamperSource)).rejects.toThrow('CAPABILITY_EXPORT_META_INVALID');
   });
 
   it('rejects shared packages without five unique successful shadow trials and regression evidence', () => {
@@ -585,15 +597,11 @@ describe('[CAP-PERMISSIONS] install permission boundary', () => {
     const created = exportFixture();
     const exportRoot = await mkdtemp(join(tmpdir(), 'hummer-capability-install-source-'));
     const sourceDirectory = await writeCapabilityExport(created, join(exportRoot, 'bundle'));
-    const bundle = await loadCapabilityExportDirectory({
-      sourceDirectory,
-      package: created.package,
-      descriptor: created.descriptor,
-      rootHash: created.rootHash,
-    });
+    const bundle = await loadCapabilityExportDirectory(sourceDirectory);
     const before = structuredClone(bundle);
     const input = await installInput(bundle);
-    const installed = await installCapabilityExport(input);
+    const { bundle: _bundle, ...directoryInput } = input;
+    const installed = await installCapabilityExportDirectory({ ...directoryInput, sourceDirectory });
     const skillBefore = await readFile(join(installed.targetDirectory, 'SKILL.md'), 'utf8');
 
     expect(installed.readOnly).toBe(true);
@@ -603,7 +611,9 @@ describe('[CAP-PERMISSIONS] install permission boundary', () => {
     expect(installed.decision.requestDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(installed.decision.decidedBy).toBe('system:capability-install-gate');
     expect(bundle).toEqual(before);
-    await expect(installCapabilityExport(input)).rejects.toThrow('CAPABILITY_INSTALL_TARGET_EXISTS');
+    await expect(installCapabilityExportDirectory({ ...directoryInput, sourceDirectory })).rejects.toThrow(
+      'CAPABILITY_INSTALL_TARGET_EXISTS',
+    );
     expect(await readFile(join(installed.targetDirectory, 'SKILL.md'), 'utf8')).toBe(skillBefore);
     expect(bundle).toEqual(before);
   });
