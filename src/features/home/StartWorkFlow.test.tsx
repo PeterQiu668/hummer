@@ -36,13 +36,25 @@ async function requestPlan() {
 }
 
 describe('StartWorkFlow relay seam', () => {
+  it('is explicitly read-only and cannot confirm when no Relay dispatch port is configured', async () => {
+    render(<StartWorkFlow
+      planner={{ draft: vi.fn().mockResolvedValue(draftPlanFromPrompt('整理客户资料并生成摘要')) }}
+      nodePort={{ list: vi.fn().mockResolvedValue([onlineNode]) }}
+      decisionActorRef="human:boss"
+    />);
+    await requestPlan();
+
+    expect(screen.getByRole('status')).toHaveTextContent('Relay 未配置，当前只读，不能发送任务');
+    expect(screen.getByRole('button', { name: '确认计划' })).toBeDisabled();
+  });
+
   it('keeps the generated plan pending and produces no dispatch intent before confirmation', async () => {
     const { record } = setup();
     await requestPlan();
 
     expect(screen.getByText('等待你的确认')).toBeInTheDocument();
     expect(record).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText('待派发意图')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('派发回执')).not.toBeInTheDocument();
   });
 
   it('records exactly one Relay-shaped pending dispatch intent after explicit human confirmation', async () => {
@@ -65,8 +77,8 @@ describe('StartWorkFlow relay seam', () => {
     }));
     const intent = record.mock.calls[0][0];
     expect(validateFleetContract('TaskEnvelope', intent.envelope).issues).toBeUndefined();
-    expect(screen.getByText('计划已确认，尚未派发')).toBeInTheDocument();
-    expect(screen.getByLabelText('待派发意图')).toHaveTextContent('start-work:');
+    expect(screen.getByText('计划已确认，等待派发回执')).toBeInTheDocument();
+    expect(screen.getByLabelText('派发回执')).toHaveTextContent('start-work:');
   });
 
   it('records no dispatch intent after rejection', async () => {
@@ -86,11 +98,11 @@ describe('StartWorkFlow relay seam', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Relay 暂不可用');
     expect(screen.getByText('等待你的确认')).toBeInTheDocument();
-    expect(screen.queryByLabelText('待派发意图')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('派发回执')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '确认计划' }));
     await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
-    expect(screen.getByLabelText('待派发意图')).toHaveTextContent('start-work:');
+    expect(screen.getByLabelText('派发回执')).toHaveTextContent('start-work:');
   });
 
   it('fails closed for an unknown risk and records no dispatch intent', async () => {

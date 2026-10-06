@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureRemoteRelayExecutionNodes, desktopExecutionNodePort } from './executionNodeClient';
 
 let dispose: (() => void) | undefined;
 afterEach(() => {
   dispose?.();
   dispose = undefined;
+  vi.unstubAllGlobals();
 });
 
 describe('executionNodeClient browser Relay branch', () => {
@@ -39,5 +40,20 @@ describe('executionNodeClient browser Relay branch', () => {
       lastSeenAt: '2026-10-07T00:00:00.000Z',
     }]);
     await expect(port?.killAll()).rejects.toThrow('read-only');
+  });
+
+  it('keeps Electron IPC precedence when a remote browser client was configured', async () => {
+    const remoteList = vi.fn().mockResolvedValue([]);
+    const desktopList = vi.fn().mockResolvedValue([]);
+    dispose = configureRemoteRelayExecutionNodes({ listNodes: remoteList });
+    vi.stubGlobal('localStorage', { getItem: () => 'desktop-session-token' });
+    vi.stubGlobal('window', {
+      hummerExecutionNodes: { list: desktopList, killAll: vi.fn().mockResolvedValue({ killed: 0 }) },
+    });
+
+    await desktopExecutionNodePort()?.list();
+
+    expect(desktopList).toHaveBeenCalledWith('desktop-session-token');
+    expect(remoteList).not.toHaveBeenCalled();
   });
 });

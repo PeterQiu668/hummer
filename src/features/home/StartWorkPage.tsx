@@ -38,6 +38,7 @@ export interface StartWorkPageProps {
   now?: () => string;
   onPlanRequest?: (target: string) => void;
   onDecision?: (plan: StartWorkPlan, decision: StartWorkDecision) => void;
+  dispatchAvailable?: boolean;
 }
 
 /**
@@ -50,6 +51,7 @@ export default function StartWorkPage({
   now = () => new Date().toISOString(),
   onPlanRequest,
   onDecision,
+  dispatchAvailable = true,
 }: StartWorkPageProps) {
   const [localDecision, setLocalDecision] = useState<{
     sourcePlan: StartWorkPlan;
@@ -69,7 +71,7 @@ export default function StartWorkPage({
   const actorIsHuman = decisionActorRef.startsWith('human:') && decisionActorRef.length > 'human:'.length;
   const dispatchValidation = currentPlan ? validateDispatchableStartWorkPlan(currentPlan) : { ok: false, errors: [] };
   const canReject = Boolean(currentPlan && validation.ok && actorIsHuman);
-  const canConfirm = Boolean(canReject && dispatchValidation.ok);
+  const canConfirm = Boolean(canReject && dispatchValidation.ok && dispatchAvailable);
 
   const decide = (decision: StartWorkDecision) => {
     if (!currentPlan) {
@@ -157,7 +159,7 @@ export default function StartWorkPage({
           <h2 className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{currentPlan.target}</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             <span className={`hum-chip ${terminal ? 'is-muted' : 'is-warning'}`}>
-              {terminal ? (currentPlan.status === 'confirmed' ? '已确认 · 尚未派发' : '已拒绝 · 未派发') : '等待你的确认'}
+              {terminal ? (currentPlan.status === 'confirmed' ? '已确认 · 等待回执' : '已拒绝 · 未派发') : '等待你的确认'}
             </span>
             <span className="hum-chip"><CircleDollarSign size={13} aria-hidden="true" />{formatCost(estimatedCost)}</span>
           </div>
@@ -213,6 +215,12 @@ export default function StartWorkPage({
           </div>
         ) : null}
 
+        {!terminal && !dispatchAvailable ? (
+          <p className="hum-card border-[var(--border)] bg-[var(--bg-canvas)] p-4 text-sm hum-muted" role="status">
+            Relay 未配置，当前只读，不能发送任务。
+          </p>
+        ) : null}
+
         {terminal ? (
           <div className="hum-card p-4" role="status">
             <div className="flex items-start gap-3">
@@ -220,8 +228,8 @@ export default function StartWorkPage({
                 ? <CheckCircle2 className="mt-0.5 text-[var(--success)]" size={18} aria-hidden="true" />
                 : <CircleX className="mt-0.5 text-[var(--error)]" size={18} aria-hidden="true" />}
               <div>
-                <p className="font-medium">{currentPlan.status === 'confirmed' ? '计划已确认，尚未派发' : '计划已拒绝，未派发'}</p>
-                <p className="mt-1 text-xs hum-muted">决策人：{currentPlan.decidedBy} · 此页面没有执行能力</p>
+                <p className="font-medium">{currentPlan.status === 'confirmed' ? '计划已确认，等待派发回执' : '计划已拒绝，未派发'}</p>
+                <p className="mt-1 text-xs hum-muted">决策人：{currentPlan.decidedBy} · 任务只能通过受控派发入口发送</p>
               </div>
             </div>
           </div>
