@@ -1,0 +1,325 @@
+{
+  "round": "P1-W2W3-foundation",
+  "generatedAt": "2026-10-06T20:30:01.521Z",
+  "commit": "39a952ac784d52a1be20901c743710329384e1c0",
+  "worktree": "phase0-fleet",
+  "node": "v22.22.2",
+  "commands": [
+    {
+      "id": "typecheck",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run typecheck",
+      "startedAt": "2026-10-06T20:28:24.107Z",
+      "finishedAt": "2026-10-06T20:28:34.616Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "id": "build",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run build",
+      "startedAt": "2026-10-06T20:28:34.616Z",
+      "finishedAt": "2026-10-06T20:28:50.621Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 1997 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.44 kB │ gzip:   0.33 kB\ndist/assets/index-DxdCqEpU.css   49.68 kB │ gzip:   9.70 kB\ndist/assets/index-GlogOwxv.js   573.70 kB │ gzip: 175.22 kB\n✓ built in 6.48s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "id": "test",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js test",
+      "startedAt": "2026-10-06T20:28:50.621Z",
+      "finishedAt": "2026-10-06T20:29:28.331Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test\n> npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:gates && npm run test:evidence:seal && npm run test:unit && npm run test:ui\n\n\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n\n> hummer-enterprise-workspace@0.2.0 audit:abandoned-3d\n> node scripts/audit-abandoned-3d-lineage.mjs\n\nAbandoned 3D lineage audit passed: no live paths, imports, routes, or root dependencies remain.\n\n> hummer-enterprise-workspace@0.2.0 test:gates\n> node scripts/test-gates.mjs\n\n{\"status\":\"passed\",\"assertions\":30,\"dryRuns\":7,\"pendingModes\":1}\n\n> hummer-enterprise-workspace@0.2.0 test:evidence:seal\n> node scripts/test-evidence-seal.mjs\n\n{\"status\":\"passed\",\"assertions\":9,\"negativeCases\":2}\n\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  63 passed (63)\n      Tests  323 passed (323)\n   Start at  04:28:59\n   Duration  11.02s (transform 2.36s, setup 0ms, import 13.50s, tests 8.97s, environment 8ms)\n\n\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  16 passed (16)\n      Tests  53 passed (53)\n   Start at  04:29:12\n   Duration  15.46s (transform 8.17s, setup 21.96s, import 13.23s, tests 19.87s, environment 77.19s)\n\n",
+      "stderr": ""
+    },
+    {
+      "id": "contract",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test:contract",
+      "startedAt": "2026-10-06T20:29:28.331Z",
+      "finishedAt": "2026-10-06T20:29:29.555Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":50,\"negativeCases\":33,\"maxBytes\":65536}\n",
+      "stderr": ""
+    },
+    {
+      "id": "relay",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test -w @hummer/relay",
+      "startedAt": "2026-10-06T20:29:29.555Z",
+      "finishedAt": "2026-10-06T20:29:33.888Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  5 passed (5)\n      Tests  97 passed (97)\n   Start at  04:29:31\n   Duration  2.15s (transform 846ms, setup 0ms, import 5.88s, tests 917ms, environment 0ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "id": "node-agent",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe F:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run test -w @hummer/node-agent",
+      "startedAt": "2026-10-06T20:29:33.888Z",
+      "finishedAt": "2026-10-06T20:29:35.140Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "\n> @hummer/node-agent@0.1.0-alpha.0 test\n> node --test test/*.test.mjs\n\n✔ binds TaskEnvelope validation to the frozen shared contract (1.9371ms)\n✔ rejects a system-authored approval decision through the shared contract (1.6074ms)\n✔ binds ApprovalRequest validation to the frozen shared contract (1.0837ms)\n✔ keeps the existing outcome receipt validator as the only receipt authority (0.6433ms)\n✔ exposes only the three HUMMER local tool names (2.2018ms)\n✔ rejects an unknown MCP tool fail-closed (1.9088ms)\n✔ rejects workspace execution without explicit confirmation (0.4025ms)\n✔ rejects a known tool when the grant scope is absent (0.367ms)\n✔ delegates authorized calls without implementing host IO in the facade (0.351ms)\n✔ stages a valid claim as pending and never executes before human confirmation (8.1462ms)\n✔ rejects an invalid NodeManifest before a heartbeat leaves the node (1.0363ms)\n✔ rejects a malformed claim before contract validation or execution (0.4383ms)\n✔ rejects a task envelope that the shared contract validator does not accept (0.3049ms)\n✔ fails closed when the Relay returns a decision that is not an approved human decision (3.3199ms)\n✔ fails closed when approval does not grant task.execute (1.1782ms)\n✔ fails closed when approval tenant does not match the node tenant (4.3045ms)\n✔ rejects caller-supplied decisions without contacting the executor (1.6054ms)\n✔ rejects a Relay bundle whose persisted run binding differs from the pending request (1.0658ms)\n✔ executes exactly once after a valid human approval and returns events plus receipt (1.5467ms)\n✔ a relay stop makes a pending claim permanently non-executable (0.8031ms)\n✔ rejects a shared-contract TaskEnvelope bound to another tenant (0.4379ms)\n✔ rejects a shared-contract TaskEnvelope targeted at another node (0.3579ms)\n✔ rejects an expired shared-contract TaskEnvelope (0.3423ms)\n✔ does not transmit an invalid outcome receipt (3.9486ms)\n✔ rejects an expired local grant and does not leak its token in the error (0.5761ms)\n✔ a completed file-journal delivery stays terminal after agent reconstruction (20.7789ms)\n✔ an executing record recovered after a crash requires operator recovery and never retries (1.2616ms)\n✔ file journal tampering fails startup instead of repairing or truncating history (12.9223ms)\n✔ a journal cannot be reused across tenant or node scope (0.6102ms)\n✔ an executing journal append failure prevents the executor side effect (1.0387ms)\n✔ operator inspection is redacted and the recovered attempt remains fail-closed (9.9814ms)\n✔ abandon appends a chained immutable operator decision and survives restart (30.0334ms)\n✔ authorize retry mints a new attempt and idempotency lineage without execution (23.3191ms)\n✔ recovery rejects machine actors, unsafe reason text, unknown claims, and terminal claims (22.2793ms)\n✔ tampering with an appended recovery decision fails startup and is never repaired (21.2008ms)\n✔ a generated recovery identifier can never be reused across decisions (2.0027ms)\n✔ a failed durable resolution append leaves the claim recovery-required (0.8977ms)\n✔ rejects plaintext non-loopback Relay endpoints before a badge can be sent (1.2131ms)\n✔ uses the injected base URL and opaque badge for Relay operations without exposing it (41.9939ms)\n✔ 401 and 403 failures are terminal and never leak or retry the badge (1.493ms)\n✔ SSE authorization failures stop after one attempt with no reconnect (1.319ms)\n✔ SSE reconnect uses capped exponential backoff and stops after the configured bound (2.5715ms)\n✔ connectAgent claims task.available but never confirms or executes, and applies task.stop (9.6618ms)\n✔ keeps Windows PATH precedence instead of preferring a later executable (1.7346ms)\n✔ reports a missing runtime with an explicit missing status and null path/version (1.2577ms)\n✔ rejects an unknown provider instead of probing an arbitrary command (0.5761ms)\n✔ requires an explicit executable for cli-other (0.2762ms)\n✔ probes all four runtime classes without hiding a failed version check (0.6938ms)\nℹ tests 48\nℹ suites 0\nℹ pass 48\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 667.4722\n",
+      "stderr": ""
+    },
+    {
+      "id": "fleet-idempotency",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-fleet.mjs --idempotency",
+      "startedAt": "2026-10-06T20:29:35.140Z",
+      "finishedAt": "2026-10-06T20:29:39.106Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"fleet\",\"mode\":\"idempotency\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:29:39.087Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":10,\"negativeCases\":4,\"checks\":[{\"id\":\"relay-idempotency\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t duplicate delivery|reused task idempotency|deduplicates event delivery|100 deliveries|reused event idempotency --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":10,\"failed\":0,\"pending\":48},\"negativeCases\":4,\"evidence\":[\"duplicate enqueue returns the original result\",\"canonical mismatch under a reused key is rejected\",\"duplicate event delivery does not increase event count\",\"100 duplicate deliveries yield one task and one event sequence\"],\"stdoutTail\":\"y when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318578890,\\\"endTime\\\":1791318579014.791,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"This is a deterministic local Memory/SQLite service proof, not a two-machine transport proof.\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "security-grants",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-security.mjs --grants",
+      "startedAt": "2026-10-06T20:29:39.106Z",
+      "finishedAt": "2026-10-06T20:29:47.209Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"security\",\"mode\":\"grants\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:29:47.189Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":33,\"negativeCases\":47,\"checks\":[{\"id\":\"transport-grant-boundaries\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fastify-transport.test.ts --config vitest.config.ts -t rejects missing, wrong, expired and under-scoped|rejects unknown approval fields|fails closed on cross-tenant --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":9,\"passed\":3,\"failed\":0,\"pending\":6},\"negativeCases\":10,\"evidence\":[\"missing, invalid, expired and under-scoped badges are rejected\",\"cross-tenant and node-binding mismatches fail closed\",\"system-authored and scope-expanded approvals are rejected\"],\"stdoutTail\":\" decisions before persistence\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects unknown approval fields and system-authored decisions before persistence\\\",\\\"duration\\\":20.830400000000054,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport fails closed on cross-tenant access and node binding mismatches\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"fails closed on cross-tenant access and node binding mismatches\\\",\\\"duration\\\":5.464700000000221,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport rejects unknown contract and command fields before state changes\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects unknown contract and command fields before state changes\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport requires fresh authorization after an SSE disconnect and never widens node scope\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires fresh authorization after an SSE disconnect and never widens node scope\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport enforces capability-grant scope, revocation, and maxUses at the Fastify boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"enforces capability-grant scope, revocation, and maxUses at the Fastify boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport makes grant revocation effective on the next Fastify authorization checkpoint\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"makes grant revocation effective on the next Fastify authorization checkpoint\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318581973,\\\"endTime\\\":1791318582049.4646,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fastify-transport.test.ts\\\"}]}\",\"stderrTail\":\"\"},{\"id\":\"service-grant-boundaries\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t rejects cross-binding, expanded scope, expiry|not authorized for the session tenant|tenant claim conflicts --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":6,\"failed\":0,\"pending\":52},\"negativeCases\":12,\"evidence\":[\"missing, invalid, expired and under-scoped badges are rejected\",\"cross-tenant and node-binding mismatches fail closed\",\"system-authored and scope-expanded approvals are rejected\"],\"stdoutTail\":\" when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318584867,\\\"endTime\\\":1791318584906.0913,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"},{\"id\":\"capability-grant-lifecycle\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/badge-auth.test.ts --config vitest.config.ts -t issues a least-privilege|does not spend|enforces maxUses|expires at|revokes immediately|rotates to|rejects|refuses rotation|restores|fails closed --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":24,\"passed\":24,\"failed\":0,\"pending\":0},\"negativeCases\":25,\"evidence\":[\"missing, invalid, expired and under-scoped badges are rejected\",\"cross-tenant and node-binding mismatches fail closed\",\"system-authored and scope-expanded approvals are rejected\"],\"stdoutTail\":\"secret.txt through the shared CapabilityGrant contract\\\",\\\"duration\\\":0.09030000000007021,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry fails closed for unknown tokens and never reflects token material in errors\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"fails closed for unknown tokens and never reflects token material in errors\\\",\\\"duration\\\":0.3512000000000626,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry rejects duplicate grant ids and duplicate opaque tokens without changing the first grant\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"rejects duplicate grant ids and duplicate opaque tokens without changing the first grant\\\",\\\"duration\\\":1.0714000000000397,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry refuses rotation that exceeds the source remaining uses and leaves the source active\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"refuses rotation that exceeds the source remaining uses and leaves the source active\\\",\\\"duration\\\":0.4350000000001728,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry restores usedCount and revocation from a digest-only persistence snapshot\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"restores usedCount and revocation from a digest-only persistence snapshot\\\",\\\"duration\\\":0.9875999999999294,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry fails closed on unknown or inconsistent persisted grant state\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"fails closed on unknown or inconsistent persisted grant state\\\",\\\"duration\\\":0.5750000000000455,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318587111,\\\"endTime\\\":1791318587131.575,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/badge-auth.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"Production IdP provisioning and transactional snapshot persistence remain integration seams.\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "security-token-leak",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-security.mjs --token-leak",
+      "startedAt": "2026-10-06T20:29:47.209Z",
+      "finishedAt": "2026-10-06T20:29:49.573Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"security\",\"mode\":\"token-leak\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:29:49.553Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":4,\"negativeCases\":6,\"checks\":[{\"id\":\"node-client-token-canary\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test --test-name-pattern=without exposing it|never leak or retry the badge|authorization failures stop <REPOSITORY_ROOT>\\\\apps\\\\node-agent\\\\test\\\\relay-http-client.test.mjs\",\"exitCode\":0,\"tests\":{\"total\":3,\"passed\":3,\"failed\":0,\"pending\":null},\"negativeCases\":4,\"evidence\":[\"opaque badge is absent from serialized client state and structured logs\",\"401/403 errors are terminal, single-attempt, and omit badge material\",\"SSE authorization failures do not reconnect with the rejected badge\"],\"stdoutTail\":\"TAP version 13\\n# Subtest: uses the injected base URL and opaque badge for Relay operations without exposing it\\nok 1 - uses the injected base URL and opaque badge for Relay operations without exposing it\\n  ---\\n  duration_ms: 32.7194\\n  type: 'test'\\n  ...\\n# Subtest: 401 and 403 failures are terminal and never leak or retry the badge\\nok 2 - 401 and 403 failures are terminal and never leak or retry the badge\\n  ---\\n  duration_ms: 1.4456\\n  type: 'test'\\n  ...\\n# Subtest: SSE authorization failures stop after one attempt with no reconnect\\nok 3 - SSE authorization failures stop after one attempt with no reconnect\\n  ---\\n  duration_ms: 1.6973\\n  type: 'test'\\n  ...\\n1..3\\n# tests 3\\n# suites 0\\n# pass 3\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n# todo 0\\n# duration_ms 158.2241\",\"stderrTail\":\"\"},{\"id\":\"diagnostic-pack-secret-canary\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run apps/desktop/src/diagnostic-pack.test.ts --config vitest.config.ts -t exports only hashed identity references and redacted diagnostics --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":8,\"passed\":1,\"failed\":0,\"pending\":7},\"negativeCases\":2,\"evidence\":[\"opaque badge is absent from serialized client state and structured logs\",\"401/403 errors are terminal, single-attempt, and omit badge material\",\"SSE authorization failures do not reconnect with the rejected badge\"],\"stdoutTail\":\"},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack rejects forbidden or non-relative diagnostic file credentials/runtime.json\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects forbidden or non-relative diagnostic file credentials/runtime.json\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack rejects forbidden or non-relative diagnostic file recordings/session-1.jsonl\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects forbidden or non-relative diagnostic file recordings/session-1.jsonl\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack rejects forbidden or non-relative diagnostic file raw-capture/frame.png\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects forbidden or non-relative diagnostic file raw-capture/frame.png\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack rejects forbidden or non-relative diagnostic file ../outside/log.jsonl\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects forbidden or non-relative diagnostic file ../outside/log.jsonl\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack rejects forbidden or non-relative diagnostic file C:/Users/admin/log.jsonl\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects forbidden or non-relative diagnostic file C:/Users/admin/log.jsonl\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"redacted diagnostic pack\\\"],\\\"fullName\\\":\\\"redacted diagnostic pack writes UTF-8 once and refuses to overwrite an existing pack\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"writes UTF-8 once and refuses to overwrite an existing pack\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318589493,\\\"endTime\\\":1791318589496.1409,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/desktop/src/diagnostic-pack.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"The canary covers Node client state, errors, and injected logger output; external APM/host logs are not connected in this repository.\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "chaos-approval-timeout",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-chaos.mjs --approval-timeout",
+      "startedAt": "2026-10-06T20:29:49.574Z",
+      "finishedAt": "2026-10-06T20:29:52.576Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"chaos\",\"mode\":\"approval-timeout\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:29:52.556Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":2,\"negativeCases\":2,\"checks\":[{\"id\":\"approval-expiry\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t rejects cross-binding, expanded scope, expiry --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":2,\"failed\":0,\"pending\":56},\"negativeCases\":2,\"evidence\":[\"expired approval decision is rejected for both Memory and SQLite stores\"],\"stdoutTail\":\" when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318592439,\\\"endTime\\\":1791318592472.5989,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"Uses an injected deterministic Relay clock; no process was killed and no wall-clock wait was hidden.\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "chaos-revoke",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-chaos.mjs --revoke",
+      "startedAt": "2026-10-06T20:29:52.576Z",
+      "finishedAt": "2026-10-06T20:29:58.038Z",
+      "exitCode": 0,
+      "disposition": "passed",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"chaos\",\"mode\":\"revoke\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:29:58.013Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":2,\"negativeCases\":2,\"checks\":[{\"id\":\"registry-revocation\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/badge-auth.test.ts --config vitest.config.ts -t revokes immediately --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":24,\"passed\":1,\"failed\":0,\"pending\":23},\"negativeCases\":1,\"evidence\":[\"Relay grant authorization rejects the old token immediately after revocation\",\"the next authenticated Fastify request fails without reflecting bearer material\"],\"stdoutTail\":\"rantRegistry rejects unsafe workspace path outputs\\\\\\\\secret.txt through the shared CapabilityGrant contract\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects unsafe workspace path outputs\\\\\\\\secret.txt through the shared CapabilityGrant contract\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry fails closed for unknown tokens and never reflects token material in errors\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"fails closed for unknown tokens and never reflects token material in errors\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry rejects duplicate grant ids and duplicate opaque tokens without changing the first grant\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects duplicate grant ids and duplicate opaque tokens without changing the first grant\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry refuses rotation that exceeds the source remaining uses and leaves the source active\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"refuses rotation that exceeds the source remaining uses and leaves the source active\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry restores usedCount and revocation from a digest-only persistence snapshot\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"restores usedCount and revocation from a digest-only persistence snapshot\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"CapabilityGrantRegistry\\\"],\\\"fullName\\\":\\\"CapabilityGrantRegistry fails closed on unknown or inconsistent persisted grant state\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"fails closed on unknown or inconsistent persisted grant state\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318594876,\\\"endTime\\\":1791318594886.4905,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/badge-auth.test.ts\\\"}]}\",\"stderrTail\":\"\"},{\"id\":\"transport-revocation-checkpoint\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fastify-transport.test.ts --config vitest.config.ts -t grant revocation effective --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":9,\"passed\":1,\"failed\":0,\"pending\":8},\"negativeCases\":1,\"evidence\":[\"Relay grant authorization rejects the old token immediately after revocation\",\"the next authenticated Fastify request fails without reflecting bearer material\"],\"stdoutTail\":\"val fields and system-authored decisions before persistence\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects unknown approval fields and system-authored decisions before persistence\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport fails closed on cross-tenant access and node binding mismatches\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"fails closed on cross-tenant access and node binding mismatches\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport rejects unknown contract and command fields before state changes\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects unknown contract and command fields before state changes\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport requires fresh authorization after an SSE disconnect and never widens node scope\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires fresh authorization after an SSE disconnect and never widens node scope\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport enforces capability-grant scope, revocation, and maxUses at the Fastify boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"enforces capability-grant scope, revocation, and maxUses at the Fastify boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"Fastify fleet relay transport\\\"],\\\"fullName\\\":\\\"Fastify fleet relay transport makes grant revocation effective on the next Fastify authorization checkpoint\\\",\\\"status\\\":\\\"passed\\\",\\\"title\\\":\\\"makes grant revocation effective on the next Fastify authorization checkpoint\\\",\\\"duration\\\":50.63300000000004,\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318597896,\\\"endTime\\\":1791318597946.633,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fastify-transport.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"This proves revocation at the next Relay authorization checkpoint; an already-running node executor still needs an in-flight checkpoint hook.\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "fleet-real-two-machine-soak",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-fleet.mjs --soak=100",
+      "startedAt": "2026-10-06T20:29:58.038Z",
+      "finishedAt": "2026-10-06T20:30:01.199Z",
+      "exitCode": 2,
+      "disposition": "pending",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"fleet\",\"mode\":\"soak=100\",\"status\":\"pending\",\"capturedAt\":\"2026-10-06T20:30:01.154Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":2,\"negativeCases\":0,\"checks\":[{\"id\":\"local-soak-baseline\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe <REPOSITORY_ROOT>\\\\node_modules\\\\vitest\\\\vitest.mjs run test/fleet-service.test.ts --config vitest.config.ts -t 100 deliveries --reporter=json\",\"exitCode\":0,\"tests\":{\"total\":58,\"passed\":2,\"failed\":0,\"pending\":56},\"negativeCases\":0,\"evidence\":[\"100 duplicate deliveries are exercised against both local Memory and SQLite stores\"],\"stdoutTail\":\" when retrying\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"requires a fresh idempotency key when retrying\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract queues a retry as a distinct attempt lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"queues a retry as a distinct attempt lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a retry that escapes the original work-order lineage\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a retry that escapes the original work-order lineage\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects already expired tasks\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects already expired tasks\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"normalizes offset task expiry and refuses a claim at the exact millisecond boundary\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract rejects a late event from a previous attempt after a retry is leased\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"rejects a late event from a previous attempt after a retry is leased\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]},{\\\"ancestorTitles\\\":[\\\"sqlite FleetStore contract\\\"],\\\"fullName\\\":\\\"sqlite FleetStore contract delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"status\\\":\\\"skipped\\\",\\\"title\\\":\\\"delivers and completes ten tasks exactly once under duplicate ingress\\\",\\\"failureMessages\\\":[],\\\"meta\\\":{},\\\"tags\\\":[]}],\\\"startTime\\\":1791318600966,\\\"endTime\\\":1791318601077.7483,\\\"status\\\":\\\"passed\\\",\\\"message\\\":\\\"\\\",\\\"name\\\":\\\"F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay/test/fleet-service.test.ts\\\"}]}\",\"stderrTail\":\"\"}],\"limitations\":[\"Local single-process duplicate delivery passed, but it does not satisfy the required true two-machine soak.\",\"No remote endpoint, second enrolled node, or cross-process receipt was supplied to this gate.\"],\"reason\":\"True two-machine evidence is not implemented; refusing to report a pass.\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "chaos-process-kill",
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe <WORKTREE>\\scripts\\test-chaos.mjs --process-kill",
+      "startedAt": "2026-10-06T20:30:01.199Z",
+      "finishedAt": "2026-10-06T20:30:01.317Z",
+      "exitCode": 2,
+      "disposition": "pending",
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"chaos\",\"mode\":\"process-kill\",\"status\":\"pending\",\"capturedAt\":\"2026-10-06T20:30:01.297Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":0,\"negativeCases\":0,\"checks\":[{\"id\":\"process-kill\",\"status\":\"planned\",\"command\":\"<requires supervised Relay/Node child processes and crash evidence>\",\"evidence\":[]}],\"limitations\":[\"No supervised multi-process kill/restart harness exists in the delegated baseline.\",\"No substitute unit assertion is reported as a chaos pass.\"],\"reason\":\"No supervised multi-process kill/restart harness exists in the delegated baseline.\"}\n",
+      "stderr": ""
+    }
+  ],
+  "accepted": {
+    "contractV1": "CapabilityGrant is in the shared TypeBox/Ajv/Standard Schema source",
+    "grants": "least privilege, expiry, maxUses, rotation and next-checkpoint revocation",
+    "recovery": "manual abandon or retry authorization with immutable journal lineage",
+    "diagnostics": "allowlisted redacted diagnostic core and token-leak canary",
+    "evidenceSealing": "immutable chained manifest command and negative tests"
+  },
+  "broken": {
+    "trueTwoMachineSoak": "pending: no enrolled second physical device or remote endpoint was supplied",
+    "supervisedProcessKill": "pending: supervised multi-process kill/restart harness is not implemented",
+    "inFlightNodeRevocation": "Relay revocation is immediate at the next authorization checkpoint; a long-running executor checkpoint hook remains"
+  },
+  "counts": {
+    "pass": 11,
+    "fail": 0,
+    "skipped": 0,
+    "pending": 2
+  },
+  "artifacts": [
+    {
+      "path": "apps/desktop/src/diagnostic-pack.test.ts",
+      "sha256": "d2ac61164820d75bde085a3d749d6e8a6e152d9aae526944ac5659b20d05089c",
+      "bytes": 2692
+    },
+    {
+      "path": "apps/desktop/src/diagnostic-pack.ts",
+      "sha256": "9dd118fcabcbf08177f055c16c59c6206774cf492ef80f36b3162d39e6597712",
+      "bytes": 5612
+    },
+    {
+      "path": "apps/node-agent/src/execution-journal.mjs",
+      "sha256": "fe0ed8f1138b7103bbbb765f45ddb5e4b9a26788f23fc178556bef9f7ba6b07c",
+      "bytes": 20612
+    },
+    {
+      "path": "apps/node-agent/src/node-agent.mjs",
+      "sha256": "ee3ff33622808435fe27af3579aa8e9ee83a0dd671e749b3706da001ded4b9d9",
+      "bytes": 38336
+    },
+    {
+      "path": "apps/node-agent/test/recovery.test.mjs",
+      "sha256": "b31c5e2d60878792cc4b7372c6a41731aa9fa4f1471cf3aa31d3b816a5c354aa",
+      "bytes": 12683
+    },
+    {
+      "path": "apps/relay/package.json",
+      "sha256": "213ac5bc1b245f4835fd08fe01fabe2322804871de25845b1b4bc07e83b9c53a",
+      "bytes": 635
+    },
+    {
+      "path": "apps/relay/src/badge-auth.ts",
+      "sha256": "ce6ac3c8f52f5ef2ee8479dad307f29045e9e5fec86f6c3f66876e8113f01973",
+      "bytes": 20617
+    },
+    {
+      "path": "apps/relay/src/fastify-transport.ts",
+      "sha256": "d6b60360261f80e6fee33c31f4174b1e848bdc09099b06de60981d40e4f2e7b6",
+      "bytes": 12735
+    },
+    {
+      "path": "apps/relay/test/badge-auth.test.ts",
+      "sha256": "883a752e59e7c167d5a3b0c1b6dc83ff2d7392098e2fbb878da196bf38032b3e",
+      "bytes": 13097
+    },
+    {
+      "path": "apps/relay/test/fastify-transport.test.ts",
+      "sha256": "258f4f4a3bb9273782bddc03592c902b7b74173f2a14bc5cba1dadcb2da69a1e",
+      "bytes": 18735
+    },
+    {
+      "path": "docs/architecture/fleet-contract.md",
+      "sha256": "005bae114ea5a7481fdb200d52698923b1a3aa70d3dd63837925c3ae21a25e8b",
+      "bytes": 9851
+    },
+    {
+      "path": "docs/decisions/ADR-024-node-execution-journal.md",
+      "sha256": "bff19fd3cdb285d2b3226a8e46955d29ce0415770b16a9be8bc87ede52db4aaf",
+      "bytes": 3969
+    },
+    {
+      "path": "docs/decisions/ADR-025-capability-grant-contract.md",
+      "sha256": "08fc936f64de122bfb55ed1b403d2756557e8f77553628ba61a1aec0938164f2",
+      "bytes": 1764
+    },
+    {
+      "path": "docs/decisions/ADR-026-capability-grant-lifecycle.md",
+      "sha256": "cb9ec1a24adaf03d1ccb13ba01754c0ff843f4ec0fc5222823acd489619fafe7",
+      "bytes": 4766
+    },
+    {
+      "path": "docs/decisions/ADR-027-operator-recovery-adjudication.md",
+      "sha256": "3d61174e8c55a8ff83be80babd15475c1b2e8ed2f5f0cfa60a025c4ed9a04f9c",
+      "bytes": 3226
+    },
+    {
+      "path": "docs/operations/capability-grants.md",
+      "sha256": "8f4721f8c6dac1831327eff2a1a948aad3da16b4b6f779b4becefcd9b97b993b",
+      "bytes": 4031
+    },
+    {
+      "path": "docs/operations/diagnostic-pack.md",
+      "sha256": "4b12cc84df2a8aa69dd9272cd0892b71b7d7e5c2c1a946f002364ed68a70c29f",
+      "bytes": 906
+    },
+    {
+      "path": "docs/operations/evidence-sealing.md",
+      "sha256": "64b31f09b3f4e7724b91010e3e5f19c57b68b5ebdb93ef170efb0c77008bbaa2",
+      "bytes": 765
+    },
+    {
+      "path": "docs/operations/node-agent.md",
+      "sha256": "4af08f9875b31344cc479400b75fe6a3b09b3b872e87c4f3f7b511a63587be36",
+      "bytes": 11169
+    },
+    {
+      "path": "docs/testing/executable-gates.md",
+      "sha256": "3d5e6287159163cbbf9ddaa3eabc84ecbf82f380e942b5f09cafd541b36c0282",
+      "bytes": 2040
+    },
+    {
+      "path": "package.json",
+      "sha256": "b4b6f7452e20a5b88ab682487d08aa18bf0f4a0d2223de0169e4b17446558567",
+      "bytes": 5397
+    },
+    {
+      "path": "packages/contracts/src/fleet/index.ts",
+      "sha256": "8c97b1a40d3f6abe90a700f4ae5f17c0cf2c00d18d3771d334aa7547d9c28879",
+      "bytes": 1092
+    },
+    {
+      "path": "packages/contracts/src/fleet/schemas.ts",
+      "sha256": "7dd8bc162f9c7ce1ad7c93ddb80b94b50bdb9eb502647ab3db27faaf7a3dc043",
+      "bytes": 11628
+    },
+    {
+      "path": "packages/contracts/src/fleet/validation.ts",
+      "sha256": "d1eebdd7879af682146e93a7285db8173f0de7e96234ef6523698f2997c43546",
+      "bytes": 9827
+    },
+    {
+      "path": "scripts/capture-p1-foundation.mjs",
+      "sha256": "99ac6e27877a2c1916baa1699fcca809503722e725642985046b8f67a9127559",
+      "bytes": 5912
+    },
+    {
+      "path": "scripts/evidence-seal.mjs",
+      "sha256": "4b1bd453cff93e2f6c5b71c40defb0d49c51d15601d274b355dffca68bd20ba8",
+      "bytes": 4157
+    },
+    {
+      "path": "scripts/support/gate-runner.mjs",
+      "sha256": "62faa079a92cef70c1a4f59aeff7e840a1812f2c93c793b332abcf9e42c92ec6",
+      "bytes": 4294
+    },
+    {
+      "path": "scripts/test-chaos.mjs",
+      "sha256": "a6625889f4a491a9c230d1796ed92c1f7f03ac7dd7a944ccbc0a2280f5220d8e",
+      "bytes": 3522
+    },
+    {
+      "path": "scripts/test-contract.mjs",
+      "sha256": "4b24be3ff9813cdf655724bfd3186cb88763f2b779ae8cf31346b55b8e097724",
+      "bytes": 13380
+    },
+    {
+      "path": "scripts/test-evidence-seal.mjs",
+      "sha256": "fc48c00cb073313adf71e9cc78da58c4ae4a4c1afb4c78a72a500379ceefa420",
+      "bytes": 2586
+    },
+    {
+      "path": "scripts/test-fleet.mjs",
+      "sha256": "d03e7c172df9c196e900dfb59599c64c6090948815e6c79a3e56bb91d0d9e89f",
+      "bytes": 3024
+    },
+    {
+      "path": "scripts/test-gates.mjs",
+      "sha256": "1f9773d8aff311c7a8b5ef78b9fc6b40995cdbb97337c202b388775db652b2c7",
+      "bytes": 1448
+    },
+    {
+      "path": "scripts/test-security.mjs",
+      "sha256": "6fdcccba009f5cc38558785c918b7d496e37646e218a0f2b8d7b2570487b19e9",
+      "bytes": 4105
+    }
+  ],
+  "screenshots": []
+}

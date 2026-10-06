@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-w2w3-foundation",
+  "generatedAt": "2026-10-06T20:30:11.220Z",
+  "gitCommit": "39a952ac784d52a1be20901c743710329384e1c0",
+  "prevManifestRootHash": null,
+  "files": [
+    {
+      "path": "evidence/round-p1-w2w3-foundation/gates.json",
+      "sha256": "e26fa79d9acf2fa772c4f7d603b905aa2bf20f755bc41bcaabe4ac7d4d6b9eb0",
+      "bytes": 52883
+    }
+  ],
+  "rootHash": "bf45d1d43f5724c2fc620b055d62ee50e1f58d4a0efaef3fd7f7daecfe7856e0"
+}
