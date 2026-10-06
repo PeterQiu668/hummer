@@ -4,7 +4,7 @@ import { MockRuntimeAdapter } from './mock-runtime-adapter.ts';
 import { RuntimeService } from './runtime-service.ts';
 
 const now = '2026-08-24T00:00:00.000Z';
-const context = (expectedVersion: number, idempotencyKey: string, actorRef = 'employee:gtm_researcher') => ({ actorRef, expectedVersion, idempotencyKey, correlationId: 'cor_runtime_demo', occurredAt: now });
+const context = (expectedVersion: number, idempotencyKey: string, actorRef = 'employee:gtm_researcher') => ({ tenantId: 'tenant_demo', actorRef, actorRole: 'owner' as const, expectedVersion, idempotencyKey, correlationId: 'cor_runtime_demo', occurredAt: now });
 
 async function runningService() {
   const service = new InMemoryWorkOrderService({ now: () => now });
@@ -31,7 +31,7 @@ describe('MockRuntimeAdapter', () => {
     expect(run.evidenceRefs).toEqual(['evi_00000001']);
     expect(run.resultPackage).toBeUndefined();
 
-    const resumed = await runtime.resume(run.jobId, { approval: { status: 'approved', action: 'synthetic_csv_write' } });
+    const resumed = await runtime.resume(order.tenantId, run.jobId, { approval: { status: 'approved', action: 'synthetic_csv_write' } });
     expect(resumed.status).toBe('completed');
     expect(resumed.resultPackage?.status).toBe('delivered');
     expect(resumed.resultPackage?.evidenceRefs).toEqual(['evi_00000001']);
@@ -59,7 +59,7 @@ describe('MockRuntimeAdapter', () => {
     const { service, order } = await runningService();
     const runtime = new RuntimeService(new MockRuntimeAdapter(), service, { now: () => now });
     const run = await runtime.start({ workOrder: order, runId: 'run_demo_003' });
-    const rejected = await runtime.resume(run.jobId, { approval: { status: 'rejected', action: 'synthetic_csv_write' } });
+    const rejected = await runtime.resume(order.tenantId, run.jobId, { approval: { status: 'rejected', action: 'synthetic_csv_write' } });
 
     expect(rejected.status).toBe('failed');
     expect(rejected.failure).toEqual({ code: 'approval_rejected', safeSummary: 'Synthetic write was blocked after human approval rejection.' });
@@ -71,7 +71,7 @@ describe('MockRuntimeAdapter', () => {
     const { service, order } = await runningService();
     const runtime = new RuntimeService(new MockRuntimeAdapter(), service, { now: () => now });
     const run = await runtime.start({ workOrder: order, runId: 'run_demo_004' });
-    const cancelled = await runtime.cancel(run.jobId, 'operator requested cancellation');
+    const cancelled = await runtime.cancel(order.tenantId, run.jobId, 'operator requested cancellation');
     expect(cancelled.status).toBe('cancelled');
     expect(cancelled.failure).toEqual({ code: 'cancelled', safeSummary: 'operator requested cancellation' });
   });
