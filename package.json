@@ -21,6 +21,7 @@
     "test:contract": "node scripts/test-contract.mjs",
     "test:fleet": "node scripts/test-fleet.mjs",
     "test:security": "node scripts/test-security.mjs",
+    "test:tenancy": "node scripts/test-tenancy.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",
     "test:process-kill": "node --test scripts/test-process-kill.mjs",
     "test:gates": "node scripts/test-gates.mjs",
