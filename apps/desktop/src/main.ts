@@ -40,7 +40,9 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 app.whenReady().then(async () => {
-  persistenceHost = registerPersistenceHost({ stopAll: async () => (await stopAllCodexRuns()) + stopAllClaudeRuns() });
+  persistenceHost = registerPersistenceHost({
+    stopAll: async (tenantId) => (await stopAllCodexRuns(tenantId)) + stopAllClaudeRuns(tenantId),
+  });
   workspaceExecService = new WorkspaceExecService({
     workspaceRoot: resolve(process.env.HUMMER_EXEC_WORKSPACE_ROOT ?? join(app.getPath('userData'), 'workspace')),
   });
@@ -60,13 +62,14 @@ app.whenReady().then(async () => {
     target === 'container' ? 'https://podman-desktop.io/docs/installation/windows-install' : 'https://www.npmjs.com/package/@openai/codex',
   ));
   registerCodexHost({
+    resolveTenantId: persistenceHost.resolveTenantId,
     resolveCredential: persistenceHost.resolveEngineCredential,
     recordMcpConnectorStatus: persistenceHost.recordMcpConnectorStatus,
     authorizeMcpTool: persistenceHost.authorizeMcpTool,
     createWorkspaceExecLease: (context) => workspaceExecBroker!.createLease(context),
     revokeWorkspaceExecLease: (token) => workspaceExecBroker?.revoke(token),
   });
-  registerClaudeHost();
+  registerClaudeHost({ resolveTenantId: persistenceHost.resolveTenantId });
   await createWindow();
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
