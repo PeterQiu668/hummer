@@ -175,7 +175,7 @@ describe('[TEN-W4-GOVERNANCE] additive migrations and tenant dual chain', () => 
 });
 
 describe('[TEN-W4-GOVERNANCE] tenant audit export, quota, and lifecycle', () => {
-  it('creates a tenant-explicit audit manifest with file hashes and rejects foreign event/export references', () => {
+  it('[TEN-W4-EXPORT-DESKTOP] creates a tenant-explicit audit manifest with file hashes and rejects foreign event/export references', () => {
     const directory = temporaryDirectory();
     const persistence = openPersistence({ dataDirectory: directory });
     const companyA = createCompany(persistence, '审计甲', 'audit-a@example.test');

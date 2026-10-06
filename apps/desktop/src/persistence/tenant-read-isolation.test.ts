@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe('[TEN-P0-DESKTOP-SESSION-BARE-ID] tenant-scoped persistence reads', () => {
-  it('returns not found or empty for every cross-tenant session projection', () => {
+  it('[TEN-W4-READ-DOMAIN-EVENT] returns not found or empty for every cross-tenant session projection', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
     const companyA = persistence.identity.createCompany({
       companyName: '租户甲', displayName: '甲负责人', email: 'tenant-a-read@example.test',
@@ -83,7 +83,7 @@ describe('[TEN-P0-DESKTOP-SESSION-BARE-ID] tenant-scoped persistence reads', () 
     persistence.close();
   });
 
-  it('rejects cross-tenant session, approval, and evidence references without altering the owner tenant', () => {
+  it('[TEN-W4-READ-EVIDENCE-APPROVAL] rejects cross-tenant session, approval, and evidence references without altering the owner tenant', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
     const companyA = persistence.identity.createCompany({
       companyName: '写隔离甲', displayName: '甲负责人', email: 'tenant-a-write@example.test',

@@ -56,7 +56,7 @@ for (const [name, factory] of [
   ['sqlite', () => new SqliteFleetStore(':memory:')],
 ] as const) {
   describe(`[TEN-W4-RELAY-GOVERNANCE] ${name} tenant governance`, () => {
-    it('maintains independent verifiable tenant audit chains and chain heads', async () => {
+    it('[TEN-W4-SIDE-CHAIN-HEAD] maintains independent verifiable tenant audit chains and chain heads', async () => {
       const store = factory();
       openStores.push(store);
       await register(store, TENANT_A);
@@ -75,7 +75,7 @@ for (const [name, factory] of [
       expect(JSON.stringify(auditB)).not.toContain(TENANT_A);
     });
 
-    it('warns once at 80 percent and rejects only new enqueue after a quota reaches 100 percent', async () => {
+    it('[TEN-W4-QUOTA-ADMISSION] warns once at 80 percent and rejects only new enqueue after a quota reaches 100 percent', async () => {
       const store = factory();
       openStores.push(store);
       await register(store, TENANT_A);
@@ -103,7 +103,7 @@ for (const [name, factory] of [
       expect((await store.listTenantAudit(TENANT_A)).filter((entry) => entry.action === 'quota.warning' && entry.metadata.metric === 'costCny')).toHaveLength(1);
     });
 
-    it('persists tenant-qualified audit export metadata and hides foreign export references', async () => {
+    it('[TEN-W4-READ-AUDIT-EXPORT] [TEN-W4-EXPORT-MANIFEST] persists tenant-qualified audit export metadata and hides foreign export references', async () => {
       const store = factory();
       openStores.push(store);
       await register(store, TENANT_A);
@@ -132,7 +132,7 @@ for (const [name, factory] of [
       expect((await store.listTenantAudit(TENANT_B)).map((entry) => entry.action)).toEqual(['node.registered']);
     });
 
-    it('blocks new tasks when token or cost usage has exhausted the node day window', async () => {
+    it('[TEN-W4-QUOTA-TOKEN-COST] blocks new tasks when token or cost usage has exhausted the node day window', async () => {
       const store = factory();
       openStores.push(store);
       await register(store, TENANT_A);
@@ -146,7 +146,7 @@ for (const [name, factory] of [
       });
     });
 
-    it('treats foreign and unknown quota node references identically', async () => {
+    it('[TEN-W4-QUOTA-FOREIGN-NODE] treats foreign and unknown quota node references identically', async () => {
       const store = factory();
       openStores.push(store);
       await register(store, TENANT_A);
@@ -240,7 +240,7 @@ describe('[TEN-W4-RELAY-GOVERNANCE] authorized governance HTTP surfaces', () => 
     scopes, expiresAt: '2026-10-07T01:00:00.000Z',
   });
 
-  it('requires explicit scopes and derives tenant from the badge for quota, chain, and exports', async () => {
+  it('[TEN-W4-EXPORT-HTTP-TENANT] requires explicit scopes and derives tenant from the badge for quota, chain, and exports', async () => {
     const store = new MemoryFleetStore();
     openStores.push(store);
     await register(store, TENANT_A);

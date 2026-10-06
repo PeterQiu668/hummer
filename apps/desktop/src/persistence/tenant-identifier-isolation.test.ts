@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe('[TEN-P0B-DESKTOP-IDENTIFIERS] tenant-scoped persistence identifiers', () => {
-  it('keeps domain-event idempotency tenant-scoped and tenant integrity independent of foreign tampering', () => {
+  it('[TEN-W4-WRITE-IDEMPOTENCY] keeps domain-event idempotency tenant-scoped and tenant integrity independent of foreign tampering', () => {
     const directory = temporaryDirectory();
     const persistence = openPersistence({ dataDirectory: directory });
     const companyA = createCompany(persistence, '事件甲', 'event-a@example.test');

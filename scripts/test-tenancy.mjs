@@ -1,240 +1,253 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { repositoryRoot, usageFailure } from './support/gate-runner.mjs';
+import { repositoryRoot } from './support/gate-runner.mjs';
 
+const MODES = new Set(['--chain-heads', '--quota', '--export']);
 const args = process.argv.slice(2);
-if (args.length > 0) {
-  usageFailure('tenancy', 'no arguments; runs the complete confirmed P0 regression set', args);
+
+if (args.length > 1 || (args.length === 1 && !MODES.has(args[0]))) {
+  emit({
+    mode: 'invalid',
+    status: 'failed',
+    reason: args.length === 0 ? 'invalid invocation' : `Unknown arguments: ${args.join(', ')}`,
+    limitations: [],
+  }, 2);
+} else if (Number(process.versions.node.split('.')[0]) !== 22) {
+  emit({
+    mode: modeName(args[0]),
+    status: 'failed',
+    reason: `Node 22 is required; received ${process.version}`,
+    limitations: commonLimitations(),
+  }, 1);
 } else {
-  runP0RegressionGate();
-}
-
-function runP0RegressionGate() {
-  const definitions = {
-    rootNode: [
-      marker('TEN-P0-API-WORKORDER-BARE-ID', 'apps/api/work-orders/work-orders.test.ts'),
-      marker('TEN-P0-DESKTOP-SESSION-BARE-ID', 'apps/desktop/src/persistence/tenant-read-isolation.test.ts'),
-      marker('TEN-P0B-DESKTOP-IDENTIFIERS', 'apps/desktop/src/persistence/tenant-identifier-isolation.test.ts'),
-      marker('TEN-P0C-DESKTOP-SIDE-CHANNELS', 'apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts'),
-      marker('TEN-P0-DESKTOP-RUNTIME-IPC', 'apps/desktop/src/runtime-ipc-tenancy.test.ts'),
-      marker('TEN-P0G-IDENTITY-BOUNDARY', 'apps/desktop/src/persistence/identity-tenant-boundary.test.ts'),
-    ],
-    rootUi: [
-      marker('TEN-P0E-RENDERER-CACHE', 'src/features/identity/rendererTenantBoundary.test.tsx'),
-    ],
-    relay: [
-      marker('TEN-P0D-RELAY-SURFACES', 'test/relay-surfaces-tenancy.test.ts'),
-      marker('TEN-P0-RELAY-MULTITENANT-GRANT', 'test/tenant-boundary.test.ts'),
-    ],
-    node: [
-      marker('TEN-P0F-NODE-AGENT-BOUNDARY', 'apps/node-agent/test/tenancy-boundary.test.mjs'),
-    ],
-  };
-
-  const node22 = Number(process.versions.node.split('.')[0]) === 22;
-  const groups = [
-    mergeVitestGroups('root', [
-      runVitestGroup({
-        id: 'root-node',
-        cwd: repositoryRoot,
-        config: 'vitest.config.ts',
-        definitions: definitions.rootNode,
-      }),
-      runVitestGroup({
-        id: 'root-ui',
-        cwd: repositoryRoot,
-        config: 'vitest.ui.config.ts',
-        definitions: definitions.rootUi,
-      }),
-    ]),
-    runVitestGroup({
-      id: 'relay',
-      cwd: resolve(repositoryRoot, 'apps', 'relay'),
-      config: 'vitest.config.ts',
-      definitions: definitions.relay,
-    }),
-    runNodeGroup({
-      id: 'node-agent',
-      definitions: definitions.node,
-    }),
-  ];
-
-  if (!node22) {
-    for (const group of groups) {
-      group.status = 'failed';
-      group.toolchain.compatible = false;
-      group.toolchain.reason = `Node 22 is required; gate ran under ${process.version}.`;
-    }
-  }
-
-  const checks = groups.flatMap((group) => group.markers.map((entry) => ({
-    ...entry,
+  const mode = modeName(args[0]);
+  const definitions = definitionsFor(mode);
+  const groups = runGroups(definitions);
+  const checks = groups.flatMap((group) => group.checks.map((check) => ({
+    ...check,
     runnerGroup: group.id,
     command: group.command,
     exitCode: group.exitCode,
   })));
-  const failed = checks.filter((check) => check.status !== 'passed');
-  const status = node22 && groups.every((group) => group.status === 'passed') && failed.length === 0
+  const passed = checks.filter((check) => check.status === 'passed').length;
+  const status = passed === definitions.length && groups.every((group) => group.status === 'passed')
     ? 'passed'
     : 'failed';
-
-  emitTenancyGate({
-    gate: 'tenancy',
-    mode: 'confirmed-p0-regression',
+  emit({
+    mode,
     status,
+    matrix: matrixSummary(definitions, checks),
+    assertions: checks.reduce((total, check) => total + check.passed, 0),
+    negativeCases: passed,
     checks,
-    assertions: groups.reduce((total, group) => total + group.passed, 0),
-    negativeCases: groups.reduce((total, group) => total + group.negativeCases, 0),
-    limitations: [
-      'This is the executable regression set for the ten confirmed P0 tenant-boundary markers only.',
-      'Passing this gate does not prove the complete 21-item W4 tenancy matrix or any surface without one of these behavior-test markers.',
-      'A negative case is one selected behavior test that passed; it is not an estimate of assertions inside that test.',
-      'Vitest tests outside the selected marker suites are excluded, including runner-reported skips caused only by the marker filter.',
-    ],
-    reason: status === 'passed'
-      ? undefined
-      : failureReason({ node22, groups, failed }),
-    groups,
-  });
+    groups: groups.map(({ checks: _checks, ...group }) => group),
+    limitations: limitationsFor(mode),
+    ...(status === 'passed' ? {} : { reason: failureReason(groups, checks) }),
+  }, status === 'passed' ? 0 : 1);
 }
 
-function marker(id, file) {
-  return { id, marker: `[${id}]`, file };
+function modeName(arg) {
+  if (arg === '--chain-heads') return 'chain-heads';
+  if (arg === '--quota') return 'quota';
+  if (arg === '--export') return 'export';
+  return 'w4-21-case-matrix';
 }
 
-function runVitestGroup({ id, cwd, config, definitions }) {
-  const vitest = resolve(repositoryRoot, 'node_modules', 'vitest', 'vitest.mjs');
-  const pattern = definitions.map((definition) => escapeRegex(definition.marker)).join('|');
-  const result = run(process.execPath, [
-    vitest,
-    'run',
-    ...definitions.map((definition) => definition.file),
-    '--config',
-    config,
-    '-t',
-    pattern,
-    '--reporter=json',
-  ], cwd);
-  const report = parseJsonReport(result.stdout);
-  const assertions = report?.testResults?.flatMap((testResult) => testResult.assertionResults ?? []) ?? [];
-  const markers = definitions.map((definition) => summarizeVitestMarker(definition, assertions));
-  return finishGroup({
-    id,
-    runner: 'vitest-json',
-    result,
-    markers,
-    reportParsed: report !== null,
-  });
+function definitionsFor(mode) {
+  if (mode === 'chain-heads') return [
+    relay('TEN-W4-SIDE-CHAIN-HEAD', 'chain-heads', 'Memory and SQLite tenant chain heads advance independently', 'test/governance.test.ts', 2),
+  ];
+  if (mode === 'quota') return [
+    relay('TEN-W4-QUOTA-ADMISSION', 'quota', '80 percent warning, 100 percent task admission rejection, and in-chain rejection', 'test/governance.test.ts', 2),
+    relay('TEN-W4-QUOTA-TOKEN-COST', 'quota', 'token and cost exhaustion reject new task admission', 'test/governance.test.ts', 2),
+    relay('TEN-W4-QUOTA-FOREIGN-NODE', 'quota', 'foreign and unknown node quota references are indistinguishable', 'test/governance.test.ts', 2),
+  ];
+  if (mode === 'export') return [
+    relay('TEN-W4-EXPORT-MANIFEST', 'export', 'Memory and SQLite manifests verify and hide foreign export references', 'test/governance.test.ts', 2),
+    relay('TEN-W4-EXPORT-HTTP-TENANT', 'export', 'authenticated HTTP tenant overrides caller-supplied tenant and hides foreign export ids', 'test/governance.test.ts'),
+    root('TEN-W4-EXPORT-DESKTOP', 'export', 'desktop export manifest is tenant-explicit and rejects foreign bytes', 'apps/desktop/src/persistence/tenant-governance-store.test.ts'),
+  ];
+
+  return [
+    root('TEN-W4-READ-WORKORDER', 'read', 'WorkOrder and result ownership cannot be read by a foreign tenant', 'apps/api/work-orders/work-orders.test.ts', 1, 'TEN-P0-API-WORKORDER-BARE-ID'),
+    root('TEN-W4-READ-DOMAIN-EVENT', 'read', 'session and DomainEvent projections are tenant-scoped', 'apps/desktop/src/persistence/tenant-read-isolation.test.ts', 1, 'TEN-P0-DESKTOP-SESSION-BARE-ID'),
+    root('TEN-W4-READ-EVIDENCE-APPROVAL', 'read', 'foreign approval and evidence references are unavailable', 'apps/desktop/src/persistence/tenant-read-isolation.test.ts', 1, 'TEN-P0-DESKTOP-SESSION-BARE-ID'),
+    root('TEN-W4-READ-RECEIPT-OUTCOME', 'read', 'receipt, outcome, and workspace-job references are tenant-opaque', 'apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts', 1, 'TEN-P0C-DESKTOP-SIDE-CHANNELS'),
+    relay('TEN-W4-READ-AUDIT-EXPORT', 'read', 'Memory and SQLite audit exports hide foreign references and bytes', 'test/governance.test.ts', 2, 'TEN-W4-RELAY-GOVERNANCE'),
+
+    root('TEN-W4-WRITE-IDEMPOTENCY', 'write', 'foreign tenant cannot collide with or tamper with DomainEvent idempotency state', 'apps/desktop/src/persistence/tenant-identifier-isolation.test.ts', 1, 'TEN-P0B-DESKTOP-IDENTIFIERS'),
+    root('TEN-W4-WRITE-CREATE-TASK', 'write', 'task creation rejects a tenant that differs from the authenticated command tenant', 'apps/api/work-orders/work-orders.test.ts'),
+    root('TEN-W4-WRITE-POLICY', 'write', 'cross-tenant policy requests fail before role permissions apply', 'packages/contracts/src/tenancy/policy.test.ts', 1, 'TEN-ROLE-POLICY-MATRIX'),
+    relay('TEN-W4-WRITE-GRANT-MANIFEST', 'write', 'Memory and SQLite reject an ungranted manifest tenant without persisting it', 'test/tenant-boundary.test.ts', 2, 'TEN-P0-RELAY-MULTITENANT-GRANT'),
+    root('TEN-W4-WRITE-CONTROLLED-ARTIFACT', 'write', 'controlled writes and egress bytes stay in the owning tenant directory', 'apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts', 1, 'TEN-P0C-DESKTOP-SIDE-CHANNELS'),
+
+    root('TEN-W4-SURFACE-DESKTOP-IPC', 'surface', 'desktop IPC rejects anonymous and cross-tenant runtime control', 'apps/desktop/src/runtime-ipc-tenancy.test.ts', 1, 'TEN-P0-DESKTOP-RUNTIME-IPC'),
+    relay('TEN-W4-SURFACE-HTTP', 'surface', 'HTTP foreign and unknown references have the same result', 'test/relay-surfaces-tenancy.test.ts', 1, 'TEN-P0D-RELAY-SURFACES'),
+    relay('TEN-W4-SURFACE-SSE', 'surface', 'SSE payload and Last-Event-ID sequence stay inside the tenant-node stream', 'test/relay-surfaces-tenancy.test.ts', 1, 'TEN-P0D-RELAY-SURFACES'),
+    relay('TEN-W4-SURFACE-QUEUE', 'surface', 'Memory and SQLite queue/event/approval/retry/audit references stay tenant-opaque', 'test/relay-surfaces-tenancy.test.ts', 2, 'TEN-P0D-RELAY-SURFACES'),
+
+    nodeTest('TEN-W4-SIDE-OUTPUT-BYTES', 'side', 'foreign tenant facts cannot leave the node in receipt or artifact bytes', 'apps/node-agent/test/tenancy-boundary.test.mjs', 1, 'TEN-P0F-NODE-AGENT-BOUNDARY'),
+    root('TEN-W4-SIDE-DIAGNOSTIC-PATHS', 'side', 'diagnostics redact tenant/path material and workspaces are partitioned', 'apps/desktop/src/persistence/tenant-side-channel-isolation.test.ts', 1, 'TEN-P0C-DESKTOP-SIDE-CHANNELS'),
+    root('TEN-W4-SIDE-RUNTIME-TOKEN', 'side', 'event publication stops after the bound token changes tenant', 'apps/desktop/src/runtime-ipc-tenancy.test.ts', 1, 'TEN-P0-DESKTOP-RUNTIME-IPC'),
+    nodeTest('TEN-W4-SIDE-NODE-CACHE-JOURNAL', 'side', 'same-process claim caches, grants, and journals stay tenant-local', 'apps/node-agent/test/tenancy-boundary.test.mjs', 1, 'TEN-P0F-NODE-AGENT-BOUNDARY'),
+    nodeTest('TEN-W4-SIDE-RESTART-WORKSPACE', 'side', 'restart journal refuses foreign scope without leaking records or tokens', 'apps/node-agent/test/tenancy-boundary.test.mjs', 1, 'TEN-P0F-NODE-AGENT-BOUNDARY'),
+    relay('TEN-W4-SIDE-CAPABILITY-GRANT', 'side', 'grant ids and snapshots are tenant-partitioned and existence-opaque', 'test/tenant-boundary.test.ts', 1, 'TEN-P0-RELAY-MULTITENANT-GRANT'),
+    relay('TEN-W4-SIDE-CHAIN-HEAD', 'side', 'Memory and SQLite chain heads advance independently per tenant', 'test/governance.test.ts', 2, 'TEN-W4-RELAY-GOVERNANCE'),
+  ];
 }
 
-function runNodeGroup({ id, definitions }) {
-  const pattern = definitions.map((definition) => escapeRegex(definition.marker)).join('|');
-  const result = run(process.execPath, [
-    '--test',
-    `--test-name-pattern=${pattern}`,
-    '--test-reporter=tap',
-    ...definitions.map((definition) => resolve(repositoryRoot, definition.file)),
-  ], repositoryRoot);
-  const markers = definitions.map((definition) => summarizeTapMarker(definition, result.stdout));
-  return finishGroup({
-    id,
-    runner: 'node-test-tap',
-    result,
-    markers,
-    reportParsed: /^TAP version 13$/m.test(result.stdout),
-  });
+function root(id, category, expected, file, expectedPasses = 1, foundationMarker) {
+  return definition(id, category, expected, file, 'root-node', 'vitest', repositoryRoot, 'vitest.config.ts', expectedPasses, foundationMarker);
 }
 
-function mergeVitestGroups(id, parts) {
-  const passed = parts.reduce((total, part) => total + part.passed, 0);
-  const failed = parts.reduce((total, part) => total + part.failed, 0);
-  const skipped = parts.reduce((total, part) => total + part.skipped, 0);
+function relay(id, category, expected, file, expectedPasses = 1, foundationMarker) {
+  return definition(id, category, expected, file, 'relay', 'vitest', resolve(repositoryRoot, 'apps', 'relay'), 'vitest.config.ts', expectedPasses, foundationMarker);
+}
+
+function nodeTest(id, category, expected, file, expectedPasses = 1, foundationMarker) {
+  return definition(id, category, expected, file, 'node-agent', 'node', repositoryRoot, undefined, expectedPasses, foundationMarker);
+}
+
+function definition(id, category, expected, file, group, runner, cwd, config, expectedPasses, foundationMarker) {
   return {
     id,
-    status: parts.every((part) => part.status === 'passed') ? 'passed' : 'failed',
-    passed,
-    failed,
-    skipped,
-    negativeCases: passed,
-    toolchain: {
-      node: process.version,
-      runner: 'vitest-json (node and jsdom configs)',
-      compatible: Number(process.versions.node.split('.')[0]) === 22,
-    },
-    command: parts.map((part) => part.command),
-    exitCode: parts.every((part) => part.exitCode === 0) ? 0 : 1,
-    reportParsed: parts.every((part) => part.reportParsed),
-    markers: parts.flatMap((part) => part.markers),
-    runs: parts.map((part) => ({
-      id: part.id,
-      command: part.command,
-      exitCode: part.exitCode,
-      reportParsed: part.reportParsed,
-    })),
+    marker: `[${id}]`,
+    category,
+    expected,
+    file,
+    group,
+    runner,
+    cwd,
+    config,
+    expectedPasses,
+    ...(foundationMarker ? { foundationMarker: `[${foundationMarker}]` } : {}),
   };
 }
 
-function finishGroup({ id, runner, result, markers, reportParsed }) {
-  const passed = markers.reduce((total, entry) => total + entry.passed, 0);
-  const failed = markers.reduce((total, entry) => total + entry.failed, 0);
-  const skipped = markers.reduce((total, entry) => total + entry.skipped, 0);
-  const markerFailure = markers.some((entry) => entry.status !== 'passed');
+function runGroups(definitions) {
+  const buckets = new Map();
+  for (const entry of definitions) {
+    if (!buckets.has(entry.group)) buckets.set(entry.group, []);
+    buckets.get(entry.group).push(entry);
+  }
+  return [...buckets.entries()].map(([id, entries]) => entries[0].runner === 'node'
+    ? runNodeGroup(id, entries)
+    : runVitestGroup(id, entries));
+}
+
+function runVitestGroup(id, definitions) {
+  const vitest = resolve(repositoryRoot, 'node_modules', 'vitest', 'vitest.mjs');
+  const pattern = definitions.map((entry) => escapeRegex(entry.marker)).join('|');
+  const files = [...new Set(definitions.map((entry) => entry.file))];
+  const result = run(process.execPath, [vitest, 'run', ...files, '--config', definitions[0].config, '-t', pattern, '--reporter=json'], definitions[0].cwd);
+  const report = parseJsonReport(result.stdout);
+  const assertions = report?.testResults?.flatMap((testResult) => testResult.assertionResults ?? []) ?? [];
+  const checks = definitions.map((entry) => summarizeVitest(entry, assertions));
+  return finishGroup(id, 'vitest-json', result, report !== null, checks);
+}
+
+function runNodeGroup(id, definitions) {
+  const pattern = definitions.map((entry) => escapeRegex(entry.marker)).join('|');
+  const files = [...new Set(definitions.map((entry) => resolve(repositoryRoot, entry.file)))];
+  const result = run(process.execPath, ['--test', `--test-name-pattern=${pattern}`, '--test-reporter=tap', ...files], repositoryRoot);
+  const checks = definitions.map((entry) => summarizeTap(entry, result.stdout));
+  return finishGroup(id, 'node-test-tap', result, /^TAP version 13$/m.test(result.stdout), checks);
+}
+
+function finishGroup(id, runner, result, reportParsed, checks) {
+  const status = result.exitCode === 0 && reportParsed && checks.every((check) => check.status === 'passed')
+    ? 'passed'
+    : 'failed';
   return {
     id,
-    status: result.exitCode === 0 && reportParsed && !markerFailure ? 'passed' : 'failed',
-    passed,
-    failed,
-    skipped,
-    negativeCases: passed,
-    toolchain: {
-      node: process.version,
-      runner,
-      compatible: Number(process.versions.node.split('.')[0]) === 22,
-    },
+    runner,
+    status,
     command: redact(result.command),
     exitCode: result.exitCode,
     reportParsed,
-    markers,
-    ...(result.exitCode === 0 && reportParsed ? {} : {
-      stdoutTail: tail(result.stdout),
-      stderrTail: tail(result.stderr),
+    checks,
+    ...(status === 'passed' ? {} : { stdoutTail: tail(result.stdout), stderrTail: tail(result.stderr) }),
+  };
+}
+
+function summarizeVitest(definition, assertions) {
+  const selected = assertions.filter((assertion) => String(assertion.fullName ?? '').includes(definition.marker));
+  return summarize(definition, {
+    passed: selected.filter((assertion) => assertion.status === 'passed').length,
+    failed: selected.filter((assertion) => assertion.status === 'failed').length,
+    skipped: selected.filter((assertion) => !['passed', 'failed'].includes(assertion.status)).length,
+  });
+}
+
+function summarizeTap(definition, stdout) {
+  const selected = String(stdout).split(/\r?\n/)
+    .filter((line) => /^(?:ok|not ok) \d+ - /.test(line) && line.includes(definition.marker));
+  return summarize(definition, {
+    passed: selected.filter((line) => line.startsWith('ok ') && !/# (?:SKIP|TODO)\b/i.test(line)).length,
+    failed: selected.filter((line) => line.startsWith('not ok ')).length,
+    skipped: selected.filter((line) => /# (?:SKIP|TODO)\b/i.test(line)).length,
+  });
+}
+
+function summarize(definition, counts) {
+  const status = counts.passed === definition.expectedPasses && counts.failed === 0 && counts.skipped === 0
+    ? 'passed'
+    : 'failed';
+  return {
+    id: definition.id,
+    marker: definition.marker,
+    category: definition.category,
+    expected: definition.expected,
+    file: definition.file,
+    expectedPasses: definition.expectedPasses,
+    ...counts,
+    status,
+    ...(definition.foundationMarker ? { foundationMarker: definition.foundationMarker } : {}),
+    ...(status === 'passed' ? {} : {
+      reason: `expected exactly ${definition.expectedPasses} passed, 0 failed, 0 skipped; received ${counts.passed}/${counts.failed}/${counts.skipped}`,
     }),
   };
 }
 
-function summarizeVitestMarker(definition, assertions) {
-  const selected = assertions.filter((assertion) => String(assertion.fullName ?? '').includes(definition.marker));
-  const passed = selected.filter((assertion) => assertion.status === 'passed').length;
-  const failed = selected.filter((assertion) => assertion.status === 'failed').length;
-  const skipped = selected.filter((assertion) => !['passed', 'failed'].includes(assertion.status)).length;
-  return summarizeMarker(definition, { passed, failed, skipped });
-}
-
-function summarizeTapMarker(definition, stdout) {
-  const lines = String(stdout).split(/\r?\n/);
-  const selected = lines.filter((line) => /^(?:ok|not ok) \d+ - /.test(line) && line.includes(definition.marker));
-  const passed = selected.filter((line) => line.startsWith('ok ') && !/# (?:SKIP|TODO)\b/i.test(line)).length;
-  const failed = selected.filter((line) => line.startsWith('not ok ')).length;
-  const skipped = selected.filter((line) => /# (?:SKIP|TODO)\b/i.test(line)).length;
-  return summarizeMarker(definition, { passed, failed, skipped });
-}
-
-function summarizeMarker(definition, { passed, failed, skipped }) {
-  const status = passed > 0 && failed === 0 && skipped === 0 ? 'passed' : 'failed';
-  const reasons = [];
-  if (passed === 0) reasons.push('marker missing or selected zero passing tests');
-  if (failed > 0) reasons.push(`${failed} selected test(s) failed`);
-  if (skipped > 0) reasons.push(`${skipped} selected test(s) skipped or todo`);
+function matrixSummary(definitions, checks) {
+  const categories = [...new Set(definitions.map((entry) => entry.category))];
   return {
-    id: definition.id,
-    file: definition.file,
-    status,
-    passed,
-    failed,
-    skipped,
-    negativeCases: passed,
-    ...(reasons.length > 0 ? { reason: reasons.join('; ') } : {}),
+    expected: definitions.length,
+    passed: checks.filter((check) => check.status === 'passed').length,
+    failed: checks.filter((check) => check.status !== 'passed').length,
+    byCategory: Object.fromEntries(categories.map((category) => {
+      const selected = checks.filter((check) => check.category === category);
+      return [category, { expected: selected.length, passed: selected.filter((check) => check.status === 'passed').length }];
+    })),
   };
+}
+
+function limitationsFor(mode) {
+  const limitations = commonLimitations();
+  if (mode === 'w4-21-case-matrix') {
+    limitations.push(
+      'The source prompt calls the matrix 21 items while its read/write/surface/side noun list contains 27 entries; this gate uses 21 non-duplicated executable attack cases and reports their category mapping explicitly.',
+      'Capability-package and recording-session storage are future-phase surfaces and are not claimed by this 21-case W4 gate.',
+      'The implemented subscription transport is SSE; a future WebSocket transport needs its own behavior case before it can be claimed.',
+    );
+  }
+  if (mode === 'export') {
+    limitations.push('The export gate verifies tenant-qualified manifests, hashes, and byte/reference isolation; it does not claim external archive delivery.');
+  }
+  return limitations;
+}
+
+function commonLimitations() {
+  return ['Postgres/RLS has no configured test environment and remains pending; it is not counted as passed.'];
+}
+
+function failureReason(groups, checks) {
+  const failedGroups = groups.filter((group) => group.status !== 'passed').map((group) => group.id);
+  const failedChecks = checks.filter((check) => check.status !== 'passed').map((check) => check.id);
+  return [
+    failedGroups.length ? `runner groups: ${failedGroups.join(', ')}` : '',
+    failedChecks.length ? `behavior checks: ${failedChecks.join(', ')}` : '',
+  ].filter(Boolean).join('; ');
 }
 
 function run(command, args, cwd) {
@@ -259,40 +272,23 @@ function parseJsonReport(stdout) {
       const report = JSON.parse(line);
       if (Array.isArray(report.testResults)) return report;
     } catch {
-      // Keep looking: a runner warning may precede or follow the JSON report.
+      // Runner warnings may appear before or after the JSON report.
     }
   }
   return null;
 }
 
-function failureReason({ node22, groups, failed }) {
-  const reasons = [];
-  if (!node22) reasons.push(`Node 22 required, received ${process.version}`);
-  for (const group of groups.filter((entry) => entry.status !== 'passed')) {
-    reasons.push(`${group.id} runner exit=${group.exitCode}, reportParsed=${group.reportParsed}`);
-  }
-  if (failed.length > 0) reasons.push(`marker failures: ${failed.map((entry) => entry.id).join(', ')}`);
-  return reasons.join('; ');
-}
-
-function emitTenancyGate({ gate, mode, status, checks, assertions, negativeCases, limitations, reason, groups }) {
+function emit(payload, exitCode) {
   const result = {
     schema: 'hummer.executable-gate-result',
     version: 1,
-    gate,
-    mode,
-    status,
+    gate: 'tenancy',
     capturedAt: new Date().toISOString(),
     toolchain: { node: process.version, platform: process.platform, arch: process.arch },
-    assertions,
-    negativeCases,
-    checks,
-    groups,
-    limitations,
-    ...(reason ? { reason } : {}),
+    ...payload,
   };
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exitCode = status === 'passed' ? 0 : 1;
+  process.exitCode = exitCode;
 }
 
 function escapeRegex(value) {

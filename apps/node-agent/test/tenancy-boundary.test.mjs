@@ -203,7 +203,7 @@ test('[TEN-P0F-NODE-AGENT-BOUNDARY] rejects a misbound receipt before events or 
   assert.equal(new Set(failures).size, 1);
 });
 
-test('[TEN-P0F-NODE-AGENT-BOUNDARY] rejects a receipt with an embedded foreign tenant fact before any output', async () => {
+test('[TEN-P0F-NODE-AGENT-BOUNDARY] [TEN-W4-SIDE-OUTPUT-BYTES] rejects a receipt with an embedded foreign tenant fact before any output', async () => {
   const harness = createHarness({
     executor: {
       execute: async () => {
@@ -221,7 +221,7 @@ test('[TEN-P0F-NODE-AGENT-BOUNDARY] rejects a receipt with an embedded foreign t
   assert.equal(harness.calls.receipts.length, 0);
 });
 
-test('[TEN-P0F-NODE-AGENT-BOUNDARY] same-process tenant agents isolate claim caches, grants and journals', async () => {
+test('[TEN-P0F-NODE-AGENT-BOUNDARY] [TEN-W4-SIDE-NODE-CACHE-JOURNAL] same-process tenant agents isolate claim caches, grants and journals', async () => {
   const tenantA = createHarness({ tenantId: TENANT_A });
   const tenantB = createHarness({ tenantId: TENANT_B });
 
@@ -246,7 +246,7 @@ test('[TEN-P0F-NODE-AGENT-BOUNDARY] same-process tenant agents isolate claim cac
   }), { code: 'grant_scope_mismatch' });
 });
 
-test('[TEN-P0F-NODE-AGENT-BOUNDARY] file restart refuses cross-scope recovery without leaking tenant records or tokens', async () => {
+test('[TEN-P0F-NODE-AGENT-BOUNDARY] [TEN-W4-SIDE-RESTART-WORKSPACE] file restart refuses cross-scope recovery without leaking tenant records or tokens', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'hummer-p0f-'));
   const path = join(directory, 'tenant-a', 'execution.jsonl');
   const first = createHarness({

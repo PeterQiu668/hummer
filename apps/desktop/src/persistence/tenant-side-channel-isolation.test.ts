@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe('[TEN-P0C-DESKTOP-SIDE-CHANNELS] tenant receipt, export, and workspace boundaries', () => {
-  it('rejects foreign session, approval, evidence, outcome, and workspace-job references as unavailable', () => {
+  it('[TEN-W4-READ-RECEIPT-OUTCOME] rejects foreign session, approval, evidence, outcome, and workspace-job references as unavailable', () => {
     const persistence = openPersistence({ dataDirectory: temporaryDirectory() });
     const companyA = createCompany(persistence, '侧信道甲', 'side-a@example.test');
     const companyB = createCompany(persistence, '侧信道乙', 'side-b@example.test');
@@ -103,7 +103,7 @@ describe('[TEN-P0C-DESKTOP-SIDE-CHANNELS] tenant receipt, export, and workspace 
     persistence.close();
   });
 
-  it('binds controlled writes to tenant directories and egress bytes to owned session evidence', () => {
+  it('[TEN-W4-WRITE-CONTROLLED-ARTIFACT] binds controlled writes to tenant directories and egress bytes to owned session evidence', () => {
     const root = temporaryDirectory();
     const workspace = join(root, 'shared-workspace');
     const destination = join(root, 'destination');
@@ -151,7 +151,7 @@ describe('[TEN-P0C-DESKTOP-SIDE-CHANNELS] tenant receipt, export, and workspace 
     persistence.close();
   });
 
-  it('redacts tenant, node, and absolute path material from diagnostics and isolates work-order directories', async () => {
+  it('[TEN-W4-SIDE-DIAGNOSTIC-PATHS] redacts tenant, node, and absolute path material from diagnostics and isolates work-order directories', async () => {
     const tenantRef = 'tenant-private-customer';
     const nodeRef = 'node-private-laptop';
     const diagnostic = createDiagnosticPack({
