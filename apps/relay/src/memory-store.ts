@@ -19,6 +19,7 @@ import {
 } from './ports.js';
 import { canonicalJson } from './canonical-json.js';
 import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
+import { assertNodeTenantAuthorization } from './tenant-boundary.js';
 
 const key = (tenantId: string, id: string) => `${tenantId}\u0000${id}`;
 const clone = <T>(value: T): T => structuredClone(value);
@@ -74,8 +75,17 @@ export class MemoryFleetStore implements FleetStore {
   readonly #approvalConsumptions = new Set<string>();
   #clockHighWaterMs = 0;
 
-  async registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord> {
+  async registerNode(
+    tenantId: string,
+    manifest: FleetObject,
+    claims: NodeClaims,
+    authorizedTenantIds: readonly string[],
+    tenantGrantRef: string | undefined,
+    now: string,
+    offlineAfterMs: number,
+  ): Promise<FleetNodeRecord> {
     this.advanceClock(now);
+    assertNodeTenantAuthorization(tenantId, claims.tenantIds, authorizedTenantIds, tenantGrantRef);
     const record: FleetNodeRecord = { ...claims, tenantIds: [...claims.tenantIds], tenantId, manifest: clone(manifest), status: 'online', lastSeenAt: now, offlineAfterMs };
     this.#nodes.set(key(tenantId, claims.nodeId), record);
     return clone(record);

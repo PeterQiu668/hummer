@@ -316,14 +316,14 @@ describe('Fastify fleet relay transport', () => {
     });
     expect(denied.statusCode).toBe(403);
     expect(denied.json()).toEqual({ error: { code: 'scope_denied', message: 'badge does not grant node.heartbeat' } });
-    expect(registry.get('grant-bootstrap')).toMatchObject({ usedCount: 0, status: 'active' });
+    expect(registry.get('tenant-a', 'grant-bootstrap')).toMatchObject({ usedCount: 0, status: 'active' });
 
     const accepted = await entry.app.inject({
       method: 'POST', url: '/v1/nodes/register', headers: authorization(token), payload: manifest(),
     });
     expect(accepted.statusCode).toBe(200);
     expect(JSON.stringify(accepted.json())).not.toContain(token);
-    expect(registry.get('grant-bootstrap')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+    expect(registry.get('tenant-a', 'grant-bootstrap')).toMatchObject({ usedCount: 1, status: 'exhausted' });
 
     const replay = await entry.app.inject({
       method: 'POST', url: '/v1/nodes/register', headers: authorization(token), payload: manifest(),
@@ -344,7 +344,7 @@ describe('Fastify fleet relay transport', () => {
       workOrderId: 'work-bootstrap', issuedToRunId: 'run-bootstrap',
       capabilities: ['node.register'], paths: [], expiresAt: '2026-10-07T00:30:00.000Z', maxUses: 2,
     });
-    registry.revoke('grant-revoked');
+    registry.revoke('tenant-a', 'grant-revoked');
     const store = new MemoryFleetStore();
     const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
     const entry = createFleetRelayServer(service, { authenticator: registry, now: () => new Date(NOW) });

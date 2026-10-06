@@ -28,6 +28,8 @@ export interface BadgeTokenClaims {
   issuedToRunId?: string;
   maxUses?: number;
   usedCount?: number;
+  /** Explicit registration grant. Omitted means the badge's primary tenant only. */
+  authorizedTenantIds?: readonly string[];
 }
 
 export type BadgeAuthorizationFailureReason =
@@ -132,6 +134,8 @@ type StoredCapabilityGrant = PersistedCapabilityGrant;
 export interface CapabilityGrantRegistryOptions {
   now?: () => Date;
   tokenFactory?: () => string;
+  /** Required when restoring records; every record must belong to this tenant. */
+  initialTenantId?: string;
   initialRecords?: readonly PersistedCapabilityGrant[];
 }
 
@@ -147,6 +151,10 @@ function fingerprint(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
+function tenantGrantKey(tenantId: string, grantId: string): string {
+  return `${tenantId}\0${grantId}`;
+}
+
 function canonicalTimestamp(value: string, field: string): string {
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) throw new CapabilityGrantError('invalid_grant', `${field} must be an ISO timestamp`);
@@ -154,7 +162,11 @@ function canonicalTimestamp(value: string, field: string): string {
 }
 
 function cloneClaims(claims: BadgeTokenClaims): BadgeTokenClaims {
-  return { ...claims, scopes: [...claims.scopes] };
+  return {
+    ...claims,
+    scopes: [...claims.scopes],
+    ...(claims.authorizedTenantIds ? { authorizedTenantIds: [...claims.authorizedTenantIds] } : {}),
+  };
 }
 
 function cloneGrant(grant: CapabilityGrantRecord): CapabilityGrantRecord {
@@ -221,6 +233,14 @@ function validateStaticBadge(input: StaticBadgeToken): void {
     throw new Error('badge contains an unsupported or empty scope set');
   }
   if (input.nodeId !== undefined && !input.nodeId.trim()) throw new Error('badge nodeId cannot be empty');
+  if (input.authorizedTenantIds !== undefined
+    && (input.authorizedTenantIds.length === 0
+      || input.authorizedTenantIds.some((tenantId) => !tenantId.trim())
+      || new Set(input.authorizedTenantIds).size !== input.authorizedTenantIds.length
+      || !input.authorizedTenantIds.includes(input.tenantId)
+      || (input.authorizedTenantIds.length > 1 && !input.grantRef?.trim()))) {
+    throw new Error('badge authorized tenant set is invalid');
+  }
 }
 
 /**
@@ -255,15 +275,19 @@ export function createStaticBadgeTokenAuthenticator(tokens: readonly StaticBadge
  * random opaque token. All mutation methods return redaction-safe records.
  */
 export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
-  readonly #byGrantId = new Map<string, StoredCapabilityGrant>();
-  readonly #grantIdByDigest = new Map<string, string>();
+  readonly #byTenantGrant = new Map<string, StoredCapabilityGrant>();
+  readonly #grantKeyByDigest = new Map<string, string>();
   readonly #now: () => Date;
   readonly #tokenFactory: () => string;
 
   constructor(options: CapabilityGrantRegistryOptions = {}) {
     this.#now = options.now ?? (() => new Date());
     this.#tokenFactory = options.tokenFactory ?? (() => `hgr_${randomBytes(32).toString('base64url')}`);
-    for (const record of options.initialRecords ?? []) this.restore(record);
+    const initialRecords = options.initialRecords ?? [];
+    if (initialRecords.length > 0 && (!options.initialTenantId || !idPattern.test(options.initialTenantId))) {
+      throw new CapabilityGrantError('invalid_grant', 'persisted capability grant tenant is required');
+    }
+    for (const record of initialRecords) this.restore(options.initialTenantId!, record);
   }
 
   issue(authority: CapabilityGrantAuthority, input: IssueCapabilityGrantInput): IssuedCapabilityGrant {
@@ -272,9 +296,9 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     return this.insertPrepared(prepared, this.#tokenFactory());
   }
 
-  rotate(grantId: string, input: RotateCapabilityGrantInput): IssuedCapabilityGrant {
+  rotate(tenantId: string, grantId: string, input: RotateCapabilityGrantInput): IssuedCapabilityGrant {
     const now = this.#now().toISOString();
-    const current = this.#byGrantId.get(grantId);
+    const current = this.#byTenantGrant.get(tenantGrantKey(tenantId, grantId));
     if (!current) throw new CapabilityGrantError('grant_not_found', 'capability grant was not found');
     this.assertActive(current, now);
     const remainingUses = current.maxUses - current.usedCount;
@@ -297,9 +321,9 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     return replacement;
   }
 
-  revoke(grantId: string): CapabilityGrantRecord {
+  revoke(tenantId: string, grantId: string): CapabilityGrantRecord {
     const now = this.#now().toISOString();
-    const grant = this.#byGrantId.get(grantId);
+    const grant = this.#byTenantGrant.get(tenantGrantKey(tenantId, grantId));
     if (!grant) throw new CapabilityGrantError('grant_not_found', 'capability grant was not found');
     if (grant.status === 'rotated' || grant.status === 'revoked') return publicGrant(grant, now);
     if (Date.parse(grant.expiresAt) <= Date.parse(now)) {
@@ -311,31 +335,35 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     return publicGrant(grant, now);
   }
 
-  get(grantId: string): CapabilityGrantRecord | null {
-    const grant = this.#byGrantId.get(grantId);
+  get(tenantId: string, grantId: string): CapabilityGrantRecord | null {
+    const grant = this.#byTenantGrant.get(tenantGrantKey(tenantId, grantId));
     return grant ? publicGrant(grant, this.#now().toISOString()) : null;
   }
 
-  list(): readonly CapabilityGrantRecord[] {
+  list(tenantId: string): readonly CapabilityGrantRecord[] {
     const now = this.#now().toISOString();
-    return [...this.#byGrantId.values()].map((grant) => publicGrant(grant, now));
+    return [...this.#byTenantGrant.values()]
+      .filter((grant) => grant.tenantId === tenantId)
+      .map((grant) => publicGrant(grant, now));
   }
 
   /**
    * Durable-state boundary. Persist this snapshot, never an IssuedCapabilityGrant.
    * SHA-256 digests are safe here because issued bearer tokens carry 256 bits of entropy.
    */
-  snapshot(): readonly PersistedCapabilityGrant[] {
-    return [...this.#byGrantId.values()].map((grant) => ({
-      ...publicGrant(grant, this.#now().toISOString()),
-      tokenDigest: grant.tokenDigest,
-    }));
+  snapshot(tenantId: string): readonly PersistedCapabilityGrant[] {
+    return [...this.#byTenantGrant.values()]
+      .filter((grant) => grant.tenantId === tenantId)
+      .map((grant) => ({
+        ...publicGrant(grant, this.#now().toISOString()),
+        tokenDigest: grant.tokenDigest,
+      }));
   }
 
   async authorize(input: BadgeAuthorizationInput): Promise<BadgeAuthorizationResult> {
-    const grantId = this.#grantIdByDigest.get(fingerprint(input.token));
-    if (!grantId) return { ok: false, reason: 'unknown' };
-    const grant = this.#byGrantId.get(grantId);
+    const grantKey = this.#grantKeyByDigest.get(fingerprint(input.token));
+    if (!grantKey) return { ok: false, reason: 'unknown' };
+    const grant = this.#byTenantGrant.get(grantKey);
     if (!grant) return { ok: false, reason: 'unknown' };
     const now = canonicalTimestamp(input.now, 'authorization time');
     if (grant.status === 'revoked' || grant.status === 'rotated') return { ok: false, reason: 'revoked' };
@@ -357,6 +385,7 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
         tokenId: grant.tokenRef,
         grantRef: grant.tokenRef,
         tenantId: grant.tenantId,
+        authorizedTenantIds: [grant.tenantId],
         actorRef: `system:${grant.nodeId}`,
         nodeId: grant.nodeId,
         scopes: [...grant.capabilities],
@@ -380,7 +409,7 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
       || !idPattern.test(input.issuedToRunId) || !idPattern.test(authority.authorityRef)) {
       throw new CapabilityGrantError('invalid_grant', 'grant identifiers contain unsupported characters');
     }
-    if (this.#byGrantId.has(input.grantId)) {
+    if (this.#byTenantGrant.has(tenantGrantKey(input.tenantId, input.grantId))) {
       throw new CapabilityGrantError('duplicate_grant', 'capability grant id already exists');
     }
     validateScopes(input.capabilities, 'grant');
@@ -435,12 +464,13 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
       throw new CapabilityGrantError('invalid_grant', 'token factory must return at least 32 non-whitespace characters');
     }
     const tokenDigest = fingerprint(token);
-    if (this.#grantIdByDigest.has(tokenDigest)) {
+    if (this.#grantKeyByDigest.has(tokenDigest)) {
       throw new CapabilityGrantError('duplicate_grant', 'token factory returned a duplicate opaque token');
     }
     const stored: StoredCapabilityGrant = { ...prepared, tokenDigest };
-    this.#byGrantId.set(stored.grantId, stored);
-    this.#grantIdByDigest.set(tokenDigest, stored.grantId);
+    const grantKey = tenantGrantKey(stored.tenantId, stored.grantId);
+    this.#byTenantGrant.set(grantKey, stored);
+    this.#grantKeyByDigest.set(tokenDigest, grantKey);
     const issued = { grant: publicGrant(stored, this.#now().toISOString()) } as IssuedCapabilityGrant;
     Object.defineProperty(issued, 'token', {
       value: token,
@@ -465,12 +495,13 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     }
   }
 
-  private restore(input: PersistedCapabilityGrant): void {
+  private restore(initialTenantId: string, input: PersistedCapabilityGrant): void {
     const keys = Object.keys(input as unknown as Record<string, unknown>);
     if (keys.some((key) => !persistedGrantFields.has(key))) {
       throw new CapabilityGrantError('invalid_grant', 'persisted capability grant contains unknown fields');
     }
     if (!idPattern.test(input.grantId) || !idPattern.test(input.tenantId)
+      || input.tenantId !== initialTenantId
       || !idPattern.test(input.workOrderId) || !idPattern.test(input.nodeId)
       || !idPattern.test(input.issuedToRunId) || !idPattern.test(input.issuedByAuthorityRef)
       || input.tokenRef !== `grant:${input.grantId}`
@@ -491,7 +522,8 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
     }
     if (input.revokedAt) canonicalTimestamp(input.revokedAt, 'persisted revokedAt');
     validateSharedGrant(input, input.usedCount, input.revokedAt);
-    if (this.#byGrantId.has(input.grantId) || this.#grantIdByDigest.has(input.tokenDigest)) {
+    const grantKey = tenantGrantKey(input.tenantId, input.grantId);
+    if (this.#byTenantGrant.has(grantKey) || this.#grantKeyByDigest.has(input.tokenDigest)) {
       throw new CapabilityGrantError('duplicate_grant', 'persisted capability grant is duplicated');
     }
     const stored: StoredCapabilityGrant = {
@@ -499,7 +531,7 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
       capabilities: [...input.capabilities],
       paths: [...input.paths],
     };
-    this.#byGrantId.set(stored.grantId, stored);
-    this.#grantIdByDigest.set(stored.tokenDigest, stored.grantId);
+    this.#byTenantGrant.set(grantKey, stored);
+    this.#grantKeyByDigest.set(stored.tokenDigest, grantKey);
   }
 }

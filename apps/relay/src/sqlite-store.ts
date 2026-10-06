@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { canonicalJson } from './canonical-json.js';
 import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
+import { assertNodeTenantAuthorization } from './tenant-boundary.js';
 import {
   FleetRejectedError,
   type ApprovalBundle,
@@ -231,8 +232,17 @@ export class SqliteFleetStore implements FleetStore {
     this.migrate();
   }
 
-  async registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord> {
+  async registerNode(
+    tenantId: string,
+    manifest: FleetObject,
+    claims: NodeClaims,
+    authorizedTenantIds: readonly string[],
+    tenantGrantRef: string | undefined,
+    now: string,
+    offlineAfterMs: number,
+  ): Promise<FleetNodeRecord> {
     this.advanceClock(now);
+    assertNodeTenantAuthorization(tenantId, claims.tenantIds, authorizedTenantIds, tenantGrantRef);
     this.#db.prepare(`
       INSERT INTO fleet_nodes (tenant_id, node_id, tenant_ids_json, agent_version, manifest_json, last_seen_at, status, offline_after_ms)
       VALUES (?, ?, ?, ?, ?, ?, 'online', ?)
