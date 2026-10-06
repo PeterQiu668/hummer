@@ -22,6 +22,7 @@
     "test:fleet": "node scripts/test-fleet.mjs",
     "test:security": "node scripts/test-security.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",
+    "test:process-kill": "node --test scripts/test-process-kill.mjs",
     "test:gates": "node scripts/test-gates.mjs",
     "test:evidence:seal": "node scripts/test-evidence-seal.mjs",
     "evidence:seal": "node scripts/evidence-seal.mjs",

@@ -1,5 +1,5 @@
 import {
-  emitGate, finishedCheck, parseGateArgs, plannedCheck, runVitest, usageFailure,
+  emitGate, finishedCheck, parseGateArgs, plannedCheck, runNodeTests, runVitest, usageFailure,
 } from './support/gate-runner.mjs';
 
 const parsed = parseGateArgs(process.argv.slice(2), ['approval-timeout', 'revoke', 'process-kill']);
@@ -9,6 +9,8 @@ if (parsed.unknown.length || parsed.modes.length !== 1) {
   approvalTimeout(parsed.dryRun);
 } else if (parsed.modes[0] === 'revoke') {
   revoke(parsed.dryRun);
+} else if (parsed.modes[0] === 'process-kill') {
+  processKill(parsed.dryRun);
 } else {
   pendingMode(parsed.modes[0], parsed.dryRun);
 }
@@ -53,14 +55,17 @@ function revoke(dryRun) {
   });
 }
 
-function pendingMode(mode, dryRun) {
-  const reasons = {
-    'process-kill': 'No supervised multi-process kill/restart harness exists in the delegated baseline.',
-  };
-  const check = plannedCheck(mode, mode === 'revoke' ? '<requires durable token revocation API and audit proof>' : '<requires supervised Relay/Node child processes and crash evidence>', []);
+function processKill(dryRun) {
+  const evidence = ['a real child process reaches executing, is forcibly killed, and a fresh process recovers the durable journal'];
+  if (dryRun) {
+    emitGate({ gate: 'chaos', mode: 'process-kill', status: 'planned', checks: [plannedCheck('node-process-kill-recovery', 'node --test scripts/test-process-kill.mjs', evidence)], limitations: ['Dry run: no process was started or killed.'] });
+    return;
+  }
+  const run = runNodeTests({ file: 'scripts/test-process-kill.mjs' });
+  const check = finishedCheck('node-process-kill-recovery', run, evidence, 3);
   emitGate({
-    gate: 'chaos', mode, status: dryRun ? 'planned' : 'pending', checks: [check],
-    limitations: [reasons[mode], 'No substitute unit assertion is reported as a chaos pass.'],
-    reason: dryRun ? 'Dry run only: pending prerequisite is declared without execution.' : reasons[mode],
+    gate: 'chaos', mode: 'process-kill', status: check.status, checks: [check],
+    assertions: run.testSummary?.passed ?? 0, negativeCases: 3,
+    limitations: ['This is a supervised local Node Agent crash/restart proof; Relay failover and true cross-machine recovery remain separate gates.'],
   });
 }
