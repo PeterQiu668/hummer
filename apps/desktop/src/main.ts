@@ -63,13 +63,17 @@ app.whenReady().then(async () => {
   ));
   registerCodexHost({
     resolveTenantId: persistenceHost.resolveTenantId,
+    authorizeApproval: persistenceHost.authorizeRuntimeApproval,
     resolveCredential: persistenceHost.resolveEngineCredential,
     recordMcpConnectorStatus: persistenceHost.recordMcpConnectorStatus,
     authorizeMcpTool: persistenceHost.authorizeMcpTool,
     createWorkspaceExecLease: (context) => workspaceExecBroker!.createLease(context),
     revokeWorkspaceExecLease: (token) => workspaceExecBroker?.revoke(token),
   });
-  registerClaudeHost({ resolveTenantId: persistenceHost.resolveTenantId });
+  registerClaudeHost({
+    resolveTenantId: persistenceHost.resolveTenantId,
+    authorizeApproval: persistenceHost.authorizeRuntimeApproval,
+  });
   await createWindow();
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();

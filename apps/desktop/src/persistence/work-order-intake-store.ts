@@ -105,6 +105,15 @@ export class WorkOrderIntakeStore {
     return rows.map(mapRow);
   }
 
+  participantActorIds(tenantId: string, workOrderId: string): string[] {
+    return this.database.prepare(`
+      SELECT DISTINCT confirmed_by FROM work_order_intake
+      WHERE tenant_id = ? AND work_order_id = ? AND status = 'confirmed' AND confirmed_by IS NOT NULL
+      ORDER BY confirmed_by
+    `).all<{ confirmed_by: string }>(tenantId, workOrderId)
+      .flatMap((row) => row.confirmed_by.startsWith('account:') ? [row.confirmed_by.slice('account:'.length)] : []);
+  }
+
   confirm(tenantId: string, id: string, actorRef: string, occurredAt: string): WorkOrderIntakeRecord {
     const current = this.require(tenantId, id);
     if (current.status === 'confirmed') return current;

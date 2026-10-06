@@ -67,7 +67,7 @@ interface RunState {
   stderr: string;
   requestSequence: number;
   pending: Map<string, PendingRequest>;
-  approvalRequests: Map<string, string | number>;
+  approvalRequests: Map<string, { requestId: string | number; approvalScope: 'write' | 'other' }>;
   activeMcpTools: Map<string, { serverName: string; toolName: string }>;
   approvalWatchdog: ApprovalContinuationWatchdog;
   threadId?: string;
@@ -100,6 +100,9 @@ function reasoningEffortArgs(environment: NodeJS.ProcessEnv): string[] {
 
 export interface CodexHostOptions {
   resolveTenantId?: (token: string) => string;
+  authorizeApproval?: (token: string, context: {
+    riskLevel: 'high'; initiatedByActorId: string; approvalScope: 'write' | 'other';
+  }) => void;
   resolveCredential?: (token: string, engineProfileId: string, envKey: string) => string | undefined;
   recordMcpConnectorStatus?: (token: string, record: RuntimeConnectorRecord) => void;
   authorizeMcpTool?: (token: string, request: { serverName: string; toolName: string }) => boolean;
@@ -117,7 +120,16 @@ export function registerCodexHost(options: CodexHostOptions = {}): void {
   ipcMain.handle(REPLAY, (_event, token: string, processId: string) => [...requireRun(processId, token).events]);
   ipcMain.handle(STOP, async (_event, token: string, processId: string) => stopRun(requireRun(processId, token)));
   ipcMain.handle(RESPOND_APPROVAL, async (_event, token: string, processId: string, approvalId: string, approved: boolean) => {
-    respondToApproval(requireRun(processId, token), approvalId, approved);
+    const state = requireRun(processId, token);
+    const pending = state.approvalRequests.get(approvalId);
+    if (!pending) throw new Error(`Unknown Codex approval ${approvalId}`);
+    if (!hostOptions.authorizeApproval) throw new Error('Codex approval role authorizer is not configured');
+    hostOptions.authorizeApproval(token, {
+      riskLevel: 'high',
+      initiatedByActorId: '',
+      approvalScope: pending.approvalScope,
+    });
+    respondToApproval(state, approvalId, approved);
   });
   ipcMain.handle(STEER, async (_event, token: string, processId: string, text: string) => steerRun(requireRun(processId, token), text));
   ipcMain.handle(FORK, (event, token: string, processId: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => forkCodex(event, requireRun(processId, token), token, checkpoint, sop));
@@ -419,7 +431,10 @@ function handleNativeMessage(state: RunState, message: unknown): void {
   }
   const approval = scopeAppServerApproval(message, state.threadId ?? state.processId);
   if (approval) {
-    state.approvalRequests.set(approval.approvalId, approval.requestId);
+    state.approvalRequests.set(approval.approvalId, {
+      requestId: approval.requestId,
+      approvalScope: approval.approvalScope,
+    });
     message = approval.message;
   }
   if (method === 'turn/started') {
@@ -484,11 +499,11 @@ function writeJson(state: RunState, message: unknown): void {
 }
 
 function respondToApproval(state: RunState, approvalId: string, approved: boolean): void {
-  const requestId = state.approvalRequests.get(approvalId);
-  if (requestId === undefined) throw new Error(`Unknown Codex approval ${approvalId}`);
+  const pending = state.approvalRequests.get(approvalId);
+  if (!pending) throw new Error(`Unknown Codex approval ${approvalId}`);
   state.approvalRequests.delete(approvalId);
   state.approvalWatchdog.arm(approvalId);
-  writeJson(state, { id: requestId, result: approvalResult(approved) });
+  writeJson(state, { id: pending.requestId, result: approvalResult(approved) });
 }
 
 async function steerRun(state: RunState, text: string): Promise<void> {

@@ -15,6 +15,7 @@ export function mcpElicitationResult(approved: boolean):
 export interface ScopedApprovalRequest {
   approvalId: string;
   requestId: string | number;
+  approvalScope: 'write' | 'other';
   message: Record<string, unknown>;
 }
 
@@ -29,6 +30,7 @@ export function scopeAppServerApproval(message: unknown, scope: string): ScopedA
   return {
     approvalId,
     requestId: message.id,
+    approvalScope: method === 'item/fileChange/requestApproval' ? 'write' : 'other',
     message: {
       ...message,
       params: { ...params, approvalId },

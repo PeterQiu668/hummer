@@ -27,6 +27,12 @@ import { isStructuredTaskFile, parseStructuredTaskFile } from './structured-task
 import { requireWorkspaceDirectory, requireWorkspaceFile } from './workspace-file-guard.js';
 import type { WorkspaceExecLeaseContext } from './workspace-exec-broker.js';
 import type { WorkspaceExecHealth, WorkspaceExecRequest, WorkspaceExecResult } from './workspace-exec-service.js';
+import {
+  evaluateDesktopRolePolicy,
+  requireDesktopRoleAction,
+  type DesktopRoleActionContext,
+} from './desktop-role-policy.js';
+import type { IdentityContext, MembershipRole } from './persistence/identity-store.js';
 
 interface SessionRecordRequest {
   token: string;
@@ -37,13 +43,14 @@ interface AppendEventRequest extends SessionRecordRequest { event: Record<string
 interface Authenticated<T> { token: string; input: T }
 interface InvitationRequest {
   token: string;
-  input: { contactType: 'email' | 'phone'; contactValue: string; role: 'admin' | 'member' };
+  input: { contactType: 'email' | 'phone'; contactValue: string; role: Exclude<MembershipRole, 'owner'> };
 }
 interface AcceptInvitationRequest { token: string; displayName: string; email?: string; phone?: string }
 
 export interface PersistenceHostRegistration {
   databasePath: string;
   resolveTenantId(token: string): string;
+  authorizeRuntimeApproval(token: string, context: DesktopRoleActionContext['approve_high_risk']): void;
   resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
   recordMcpConnectorStatus(token: string, record: RuntimeConnectorRecord): void;
   authorizeMcpTool(token: string, request: { serverName: string; toolName: string }): boolean;
@@ -249,6 +256,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   });
   ipcMain.handle('hummer:intake:submit-form', (_event, request: Authenticated<WorkOrderIntakePayload>) => {
     const context = persistence.identity.resumeSession(request.token);
+    requireDesktopRoleAction(context, 'create_task', {});
     const receivedAt = new Date().toISOString();
     const payload = normalizeIntakePayload(request.input);
     return persistence.workOrderIntakes.intake({
@@ -259,6 +267,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   });
   ipcMain.handle('hummer:intake:confirm', (_event, request: Authenticated<{ id: string }>) => {
     const context = persistence.identity.resumeSession(request.token);
+    requireDesktopRoleAction(context, 'create_task', {});
     return persistence.workOrderIntakes.confirm(context.tenant.id, request.input.id, `account:${context.account.id}`, new Date().toISOString());
   });
   ipcMain.handle('hummer:intake:inbox', (_event, token: string) => {
@@ -288,7 +297,11 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   ipcMain.handle('hummer:identity:list-tenants', (_event, token: string) => persistence.identity.listTenants(token));
   ipcMain.handle('hummer:identity:switch-tenant', (_event, request: { token: string; tenantId: string }) => persistence.identity.switchTenant(request.token, request.tenantId));
   ipcMain.handle('hummer:identity:list-members', (_event, token: string) => persistence.identity.listMembers(token));
-  ipcMain.handle('hummer:identity:create-invitation', (_event, request: InvitationRequest) => persistence.identity.createInvitation(request.token, request.input));
+  ipcMain.handle('hummer:identity:create-invitation', (_event, request: InvitationRequest) => {
+    const context = persistence.identity.resumeSession(request.token);
+    requireDesktopRoleAction(context, 'manage_members', {});
+    return persistence.identity.createInvitation(request.token, request.input);
+  });
 
   ipcMain.handle('hummer:persistence:list-sessions', (_event, token: string) => listSessions(persistence, token));
   ipcMain.handle('hummer:persistence:save-session', (_event, request: SessionRecordRequest) => saveSession(persistence, request));
@@ -382,6 +395,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     };
   });  ipcMain.handle('hummer:approval-policy:authorize', (_event, request: Authenticated<Omit<AuthorizeApprovalInput, 'tenantId' | 'approverActorRef'>>) => {
     const context = persistence.identity.resumeSession(request.token);
+    requireDesktopRoleAction(context, 'approve_high_risk', approvalRoleContext(request.input.action, request.input.requestedBy));
     return persistence.approvalPolicies.authorize({
       ...request.input,
       tenantId: context.tenant.id,
@@ -392,6 +406,11 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     const context = persistence.identity.resumeSession(request.token);
     const evidence = persistence.approvalPolicies.getEvidence(context.tenant.id, request.input.sessionId, request.input.approvalId);
     if (!evidence) throw new Error('Approval evidence is unavailable in the current tenant');
+    requireDesktopRoleAction(
+      context,
+      'read_receipt_audit',
+      receiptAuditContext(persistence, context.tenant.id, request.input.sessionId),
+    );
     const approver = evidence.approverActorRef ? persistence.identity.resolveActor(request.token, evidence.approverActorRef) : undefined;
     const decisionActor = evidence.decisionActorRef ? persistence.identity.resolveActor(request.token, evidence.decisionActorRef) : undefined;
     return { ...evidence, approverDisplayName: approver?.displayName ?? null, decisionActorDisplayName: decisionActor?.displayName ?? null };
@@ -431,6 +450,11 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   });
   ipcMain.handle('hummer:outcomes:record', (_event, request: Authenticated<Omit<RecordOutcomeInput, 'tenantId' | 'acceptedBy'>>) => {
     const context = persistence.identity.resumeSession(request.token);
+    const participants = sessionParticipantActorIds(persistence, context.tenant.id, request.input.sessionId);
+    requireDesktopRoleAction(context, 'accept_result', {
+      initiatedByActorId: participants[0] ?? '',
+      participantActorIds: participants,
+    });
     return persistence.outcomes.recordOutcome({
       ...request.input,
       tenantId: context.tenant.id,
@@ -446,16 +470,23 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     });
   });
   ipcMain.handle('hummer:outcomes:receipt', (_event, request: Authenticated<{ outcomeEventId: string }>) => {
-    const tenantId = persistence.identity.currentTenantId(request.token);
-    return persistence.buildOutcomeReceipt(tenantId, request.input.outcomeEventId);
+    const context = persistence.identity.resumeSession(request.token);
+    const outcome = requireOutcomeForRoleCheck(persistence, context.tenant.id, request.input.outcomeEventId);
+    requireDesktopRoleAction(context, 'read_receipt_audit', receiptAuditContext(persistence, context.tenant.id, outcome.sessionId));
+    return persistence.buildOutcomeReceipt(context.tenant.id, request.input.outcomeEventId);
   });
   ipcMain.handle('hummer:outcomes:session-cost', (_event, request: Authenticated<{ sessionId: string }>) => {
     const tenantId = persistence.identity.currentTenantId(request.token);
     return persistence.outcomes.sessionCostSummary(tenantId, request.input.sessionId);
   });
   ipcMain.handle('hummer:outcomes:list', (_event, token: string) => {
-    const tenantId = persistence.identity.currentTenantId(token);
-    return persistence.outcomes.listEvents(tenantId).map((outcome) => {
+    const context = persistence.identity.resumeSession(token);
+    const tenantId = context.tenant.id;
+    return persistence.outcomes.listEvents(tenantId).filter((outcome) => roleAllowsReceiptAudit(
+      persistence,
+      context,
+      outcome.sessionId,
+    )).map((outcome) => {
       const definition = persistence.outcomes.getDefinition(tenantId, outcome.outcomeDefinitionId);
       if (!definition) throw new Error('Outcome definition is unavailable in the current tenant');
       const costs = persistence.outcomes.listCosts(tenantId, outcome.id);
@@ -463,13 +494,19 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     });
   });
   ipcMain.handle('hummer:outcomes:export-receipt', (_event, request: Authenticated<{ outcomeEventId: string }>) => {
-    const tenantId = persistence.identity.currentTenantId(request.token);
-    return JSON.stringify(persistence.buildVerifiableOutcomeReceipt(tenantId, request.input.outcomeEventId), null, 2);
+    const context = persistence.identity.resumeSession(request.token);
+    const outcome = requireOutcomeForRoleCheck(persistence, context.tenant.id, request.input.outcomeEventId);
+    requireDesktopRoleAction(context, 'read_receipt_audit', receiptAuditContext(persistence, context.tenant.id, outcome.sessionId));
+    return JSON.stringify(persistence.buildVerifiableOutcomeReceipt(context.tenant.id, request.input.outcomeEventId), null, 2);
   });
 
   return {
     databasePath: persistence.databasePath,
     resolveTenantId: (token) => persistence.identity.currentTenantId(token),
+    authorizeRuntimeApproval: (token, approvalContext) => {
+      const context = persistence.identity.resumeSession(token);
+      requireDesktopRoleAction(context, 'approve_high_risk', approvalContext);
+    },
     resolveEngineCredential: (token, engineProfileId, envKey) => {
       const tenantId = persistence.identity.currentTenantId(token);
       return credentialVault.resolve(tenantId, engineProfileId, envKey) ?? process.env[envKey];
@@ -636,8 +673,13 @@ function requireCustomerEngineProfile(engineProfileId: string) {
 }
 
 function listSessions(persistence: DesktopPersistence, token: string): Array<Record<string, JsonValue>> {
-  const tenantId = persistence.identity.currentTenantId(token);
-  return persistence.runtimeEvents.listSessions(tenantId).map((descriptor) => ({
+  const context = persistence.identity.resumeSession(token);
+  const tenantId = context.tenant.id;
+  return persistence.runtimeEvents.listSessions(tenantId).filter((descriptor) => roleAllowsReceiptAudit(
+    persistence,
+    context,
+    descriptor.sessionId,
+  )).map((descriptor) => ({
     plan: descriptor.plan,
     handle: descriptor.handle,
     events: persistence.runtimeEvents.listBySession(tenantId, descriptor.sessionId) as JsonValue,
@@ -682,4 +724,65 @@ function requiredString(value: Record<string, unknown>, key: string): string {
   const result = value[key];
   if (typeof result !== 'string' || !result) throw new TypeError(`Persistence request requires ${key}`);
   return result;
+}
+
+function approvalRoleContext(action: string, requestedBy: string): DesktopRoleActionContext['approve_high_risk'] {
+  return {
+    riskLevel: 'high',
+    initiatedByActorId: accountIdFromActorRef(requestedBy) ?? '',
+    approvalScope: action.startsWith('external.') || action.startsWith('network.')
+      ? 'egress'
+      : action.includes('write')
+        ? 'write'
+        : 'other',
+  };
+}
+
+function receiptAuditContext(
+  persistence: DesktopPersistence,
+  tenantId: string,
+  sessionId: string,
+): DesktopRoleActionContext['read_receipt_audit'] {
+  return {
+    participantActorIds: sessionParticipantActorIds(persistence, tenantId, sessionId),
+    nodeRelated: persistence.executionNodes.list(tenantId).some((node) => node.currentSessionId === sessionId),
+  };
+}
+
+function sessionParticipantActorIds(
+  persistence: DesktopPersistence,
+  tenantId: string,
+  sessionId: string,
+): string[] {
+  const session = persistence.runtimeEvents.listSessions(tenantId).find((candidate) => candidate.sessionId === sessionId);
+  return session?.workOrderId
+    ? persistence.workOrderIntakes.participantActorIds(tenantId, session.workOrderId)
+    : [];
+}
+
+function roleAllowsReceiptAudit(
+  persistence: DesktopPersistence,
+  identity: IdentityContext,
+  sessionId: string,
+): boolean {
+  return evaluateDesktopRolePolicy({
+    role: identity.membership.role,
+    actorId: identity.account.id,
+    actorTenantId: identity.tenant.id,
+    targetTenantId: identity.tenant.id,
+    action: 'read_receipt_audit',
+    context: receiptAuditContext(persistence, identity.tenant.id, sessionId),
+  }).allowed;
+}
+
+function requireOutcomeForRoleCheck(persistence: DesktopPersistence, tenantId: string, outcomeEventId: string) {
+  const outcome = persistence.outcomes.getEvent(tenantId, outcomeEventId);
+  if (!outcome) throw new Error('Outcome event is unavailable in the current tenant');
+  return outcome;
+}
+
+function accountIdFromActorRef(actorRef: string): string | undefined {
+  return actorRef.startsWith('account:') && actorRef.length > 'account:'.length
+    ? actorRef.slice('account:'.length)
+    : undefined;
 }
