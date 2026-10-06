@@ -87,7 +87,7 @@ describe('controlled write channel', () => {
 
     expect(readFileSync(join(fixture.workspace, 'approved.md'), 'utf8')).toBe('approved content');
     expect(result.evidenceRef).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);
-    expect(fixture.persistence.evidence.verify(result.evidenceRef)).toEqual({
+    expect(fixture.persistence.evidence.verify(fixture.tenantId, result.evidenceRef)).toEqual({
       valid: true,
       sha256: result.sha256,
       sizeBytes: Buffer.byteLength('approved content'),

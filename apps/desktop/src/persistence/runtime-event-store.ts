@@ -71,26 +71,30 @@ export class RuntimeEventStore {
     const saveTransaction = this.database.transaction(() => {
       if (workOrderId) {
         const title = isJsonObject(descriptor.plan) && typeof descriptor.plan.prompt === 'string' ? descriptor.plan.prompt : null;
-        this.database.prepare(`
+        const workOrderWrite = this.database.prepare(`
           INSERT INTO work_orders (id, tenant_id, status, title, payload_json, created_at, updated_at)
           VALUES (?, ?, 'running', ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET status = 'running', payload_json = excluded.payload_json, updated_at = excluded.updated_at
+          WHERE work_orders.tenant_id = excluded.tenant_id
         `).run(workOrderId, descriptor.tenantId, title, canonicalJson(descriptor.plan), descriptor.startedAt, descriptor.startedAt);
+        if (workOrderWrite.changes !== 1) throw tenantScopeError();
       }
-      this.database.prepare(`
+      const sessionWrite = this.database.prepare(`
         INSERT INTO sessions (id, tenant_id, work_order_id, runtime_id, status, started_at, ended_at, last_sequence, payload_json)
         VALUES (?, ?, ?, ?, 'running', ?, NULL, 0, ?)
         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
+        WHERE sessions.tenant_id = excluded.tenant_id
       `).run(descriptor.sessionId, descriptor.tenantId, workOrderId, descriptor.runtimeId, descriptor.startedAt, payload);
+      if (sessionWrite.changes !== 1) throw tenantScopeError();
     });
     saveTransaction();
   }
 
-  listSessions(): PersistedSessionDescriptor[] {
+  listSessions(tenantId: string): PersistedSessionDescriptor[] {
     return this.database.prepare(`
       SELECT id, tenant_id, work_order_id, runtime_id, started_at, payload_json
-      FROM sessions ORDER BY started_at DESC, id DESC
-    `).all<SessionDescriptorRow>().flatMap((row) => {
+      FROM sessions WHERE tenant_id = ? ORDER BY started_at DESC, id DESC
+    `).all<SessionDescriptorRow>(tenantId).flatMap((row) => {
       const payload = JSON.parse(row.payload_json) as unknown;
       if (!isJsonObject(payload) || !('plan' in payload) || !('handle' in payload)) return [];
       return [{
@@ -127,11 +131,16 @@ export class RuntimeEventStore {
   save(event: PersistableRuntimeEvent, options: SaveRuntimeEventOptions): void {
     validateRuntimeEvent(event, options);
     const eventJson = canonicalJson(event);
-    const eventId = `evt_runtime_${sha256Hex(`${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
-    const stepId = `step_${sha256Hex(`${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
+    const eventId = `evt_runtime_${sha256Hex(`${options.tenantId}:${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
+    const stepId = `step_${sha256Hex(`${options.tenantId}:${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
     const saveTransaction = this.database.transaction(() => {
-      const existing = this.database.prepare('SELECT event_json FROM steps WHERE session_id = ? AND sequence = ?')
-        .get<StepRow>(event.sessionId, event.sequence);
+      this.assertSessionTenant(event.sessionId, options.tenantId);
+      const existing = this.database.prepare(`
+        SELECT st.event_json
+        FROM steps st
+        JOIN sessions s ON s.id = st.session_id
+        WHERE s.tenant_id = ? AND st.session_id = ? AND st.sequence = ?
+      `).get<StepRow>(options.tenantId, event.sessionId, event.sequence);
       if (existing) {
         if (existing.event_json !== eventJson) {
           throw new Error(`Conflicting runtime event for ${event.sessionId} sequence ${event.sequence}`);
@@ -158,24 +167,29 @@ export class RuntimeEventStore {
         stepId, event.sessionId, event.sequence, event.type, event.actorRef, event.occurredAt,
         event.durationMs ?? null, event.costCny ?? null, eventJson,
       );
-      this.projectApproval(event);
+      this.projectApproval(event, options.tenantId);
       this.projectResult(event, options, eventJson);
     });
     saveTransaction();
   }
 
-  listBySession(sessionId: string, query: RuntimeEventQuery = {}): PersistableRuntimeEvent[] {
+  listBySession(tenantId: string, sessionId: string, query: RuntimeEventQuery = {}): PersistableRuntimeEvent[] {
     const afterSequence = query.afterSequence ?? 0;
     const limit = Math.max(1, Math.min(query.limit ?? 10_000, 10_000));
     return this.database.prepare(`
-      SELECT event_json FROM steps WHERE session_id = ? AND sequence > ? ORDER BY sequence LIMIT ?
-    `).all<StepRow>(sessionId, afterSequence, limit).map((row) => JSON.parse(row.event_json) as PersistableRuntimeEvent);
+      SELECT st.event_json
+      FROM steps st
+      JOIN sessions s ON s.id = st.session_id
+      WHERE s.tenant_id = ? AND st.session_id = ? AND st.sequence > ?
+      ORDER BY st.sequence LIMIT ?
+    `).all<StepRow>(tenantId, sessionId, afterSequence, limit)
+      .map((row) => JSON.parse(row.event_json) as PersistableRuntimeEvent);
   }
 
   private upsertSession(event: PersistableRuntimeEvent, options: SaveRuntimeEventOptions, eventJson: string): void {
     const status = sessionStatus(event);
     const endedAt = status === 'delivered' || status === 'blocked' || status === 'cancelled' ? event.occurredAt : null;
-    this.database.prepare(`
+    const write = this.database.prepare(`
       INSERT INTO sessions (
         id, tenant_id, work_order_id, runtime_id, status, started_at, ended_at, last_sequence, payload_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -183,54 +197,69 @@ export class RuntimeEventStore {
         status = excluded.status,
         ended_at = COALESCE(excluded.ended_at, sessions.ended_at),
         last_sequence = excluded.last_sequence
-      WHERE excluded.last_sequence > sessions.last_sequence
+      WHERE sessions.tenant_id = excluded.tenant_id
+        AND excluded.last_sequence > sessions.last_sequence
     `).run(
       event.sessionId, options.tenantId, options.workOrderId ?? null, options.runtimeId, status,
       event.occurredAt, endedAt, event.sequence, eventJson,
     );
+    if (write.changes !== 1) throw tenantScopeError();
   }
 
-  private projectApproval(event: PersistableRuntimeEvent): void {
+  private projectApproval(event: PersistableRuntimeEvent, tenantId: string): void {
     const approvalId = stringField(event, 'approvalId');
     if (!approvalId) return;
     if (event.type === 'approval_required') {
-      this.database.prepare(`
+      const inserted = this.database.prepare(`
         INSERT INTO approvals (id, session_id, sequence, status, requested_at, resolved_at, payload_json)
         VALUES (?, ?, ?, 'pending', ?, NULL, ?)
         ON CONFLICT(id) DO NOTHING
       `).run(approvalId, event.sessionId, event.sequence, event.occurredAt, canonicalJson(event));
+      if (inserted.changes === 0 && !this.approvalExistsInTenant(tenantId, approvalId)) throw tenantScopeError();
       return;
     }
     if (event.type === 'approval_resolved') {
       const approved = event.approved === true;
-      const existingApproval = this.database.prepare('SELECT payload_json FROM approvals WHERE id = ? AND session_id = ?')
-        .get<ApprovalPayloadRow>(approvalId, event.sessionId);
+      const existingApproval = this.database.prepare(`
+        SELECT a.payload_json
+        FROM approvals a
+        JOIN sessions s ON s.id = a.session_id
+        WHERE s.tenant_id = ? AND a.id = ? AND a.session_id = ?
+      `).get<ApprovalPayloadRow>(tenantId, approvalId, event.sessionId);
       const changed = this.database.prepare(`
-        UPDATE approvals SET status = ?, resolved_at = ?, payload_json = ? WHERE id = ? AND session_id = ?
+        UPDATE approvals
+        SET status = ?, resolved_at = ?, payload_json = ?
+        WHERE id = ? AND session_id = ?
+          AND EXISTS (
+            SELECT 1 FROM sessions s
+            WHERE s.id = approvals.session_id AND s.tenant_id = ?
+          )
       `).run(
         approved ? 'approved' : 'declined',
         event.occurredAt,
         mergeApprovalPayload(existingApproval?.payload_json, event),
         approvalId,
         event.sessionId,
+        tenantId,
       );
       if (changed.changes === 0) {
-        const inherited = this.database.prepare('SELECT id FROM approvals WHERE id = ?').get<{ id: string }>(approvalId);
-        if (inherited) return;
-        this.database.prepare(`
+        if (this.approvalExistsInTenant(tenantId, approvalId)) return;
+        const inserted = this.database.prepare(`
           INSERT INTO approvals (id, session_id, sequence, status, requested_at, resolved_at, payload_json)
           VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO NOTHING
         `).run(
           approvalId, event.sessionId, event.sequence, approved ? 'approved' : 'declined',
           event.occurredAt, event.occurredAt, canonicalJson(event),
         );
+        if (inserted.changes !== 1) throw tenantScopeError();
       }
     }
   }
 
   private projectResult(event: PersistableRuntimeEvent, options: SaveRuntimeEventOptions, eventJson: string): void {
     if (event.type !== 'result') return;
-    const id = `res_${sha256Hex(`${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
+    const id = `res_${sha256Hex(`${options.tenantId}:${event.sessionId}:${event.sequence}`).slice(0, 32)}`;
     this.database.prepare(`
       INSERT INTO result_packages (id, tenant_id, session_id, work_order_id, status, payload_json, created_at)
       VALUES (?, ?, ?, ?, 'delivered', ?, ?)
@@ -240,6 +269,25 @@ export class RuntimeEventStore {
       UPDATE work_orders SET status = 'delivered', updated_at = ? WHERE id = ? AND tenant_id = ?
     `).run(event.occurredAt, options.workOrderId, options.tenantId);
   }
+
+  private assertSessionTenant(sessionId: string, tenantId: string): void {
+    const existing = this.database.prepare('SELECT tenant_id FROM sessions WHERE id = ?')
+      .get<{ tenant_id: string }>(sessionId);
+    if (existing && existing.tenant_id !== tenantId) throw tenantScopeError();
+  }
+
+  private approvalExistsInTenant(tenantId: string, approvalId: string): boolean {
+    return Boolean(this.database.prepare(`
+      SELECT a.id
+      FROM approvals a
+      JOIN sessions s ON s.id = a.session_id
+      WHERE s.tenant_id = ? AND a.id = ?
+    `).get<{ id: string }>(tenantId, approvalId));
+  }
+}
+
+function tenantScopeError(): Error {
+  return new Error('Resource is unavailable in the current tenant');
 }
 
 function mergeApprovalPayload(existing: string | undefined, resolution: PersistableRuntimeEvent): string {

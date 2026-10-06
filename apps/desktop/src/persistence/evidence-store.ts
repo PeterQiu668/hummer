@@ -58,6 +58,7 @@ export class EvidenceStore {
 
   put(content: Uint8Array, metadata: EvidenceMetadata): StoredEvidence {
     validateMetadata(metadata);
+    if (metadata.sessionId) this.assertSessionTenant(metadata.tenantId, metadata.sessionId);
     const bytes = Buffer.from(content);
     const sha256 = sha256Hex(bytes);
     const ref = `evidence://sha256/${sha256}`;
@@ -65,7 +66,7 @@ export class EvidenceStore {
     const blobPath = join(this.dataDirectory, relativePath);
     this.writeBlob(blobPath, bytes, sha256);
 
-    const id = `evi_${sha256Hex(`${metadata.sessionId ?? 'global'}:${sha256}`).slice(0, 32)}`;
+    const id = `evi_${sha256Hex(`${metadata.tenantId}:${metadata.sessionId ?? 'global'}:${sha256}`).slice(0, 32)}`;
     const metadataJson = canonicalJson(metadata.metadata ?? {});
     this.database.prepare(`
       INSERT INTO evidence (
@@ -76,30 +77,37 @@ export class EvidenceStore {
       id, ref, metadata.tenantId, metadata.sessionId ?? null, sha256, bytes.length,
       metadata.mediaType, metadata.name ?? null, relativePath, metadata.createdAt, metadataJson,
     );
-    const row = this.database.prepare('SELECT * FROM evidence WHERE id = ?').get<EvidenceRow>(id);
-    if (!row) throw new Error(`Evidence metadata was not recorded for ${ref}`);
+    const row = this.database.prepare('SELECT * FROM evidence WHERE tenant_id = ? AND id = ?')
+      .get<EvidenceRow>(metadata.tenantId, id)
+      ?? (metadata.sessionId
+        ? this.database.prepare(`
+          SELECT * FROM evidence WHERE tenant_id = ? AND session_id = ? AND ref = ? LIMIT 1
+        `).get<EvidenceRow>(metadata.tenantId, metadata.sessionId, ref)
+        : undefined);
+    if (!row) throw new Error('Evidence metadata was not recorded in the current tenant');
     return this.mapRow(row);
   }
 
-  read(ref: string): Buffer {
-    const row = this.findRow(ref);
+  read(tenantId: string, ref: string): Buffer {
+    const row = this.findRow(tenantId, ref);
     const integrity = this.verifyRow(row);
     if (!integrity.valid) throw new Error(`Evidence integrity check failed for ${ref}: ${integrity.reason}`);
     return readFileSync(join(this.dataDirectory, row.blob_path));
   }
 
-  verify(ref: string): EvidenceIntegrity {
-    return this.verifyRow(this.findRow(ref));
+  verify(tenantId: string, ref: string): EvidenceIntegrity {
+    return this.verifyRow(this.findRow(tenantId, ref));
   }
 
-  listBySession(sessionId: string): StoredEvidence[] {
-    return this.database.prepare('SELECT * FROM evidence WHERE session_id = ? ORDER BY created_at, id')
-      .all<EvidenceRow>(sessionId).map((row) => this.mapRow(row));
+  listBySession(tenantId: string, sessionId: string): StoredEvidence[] {
+    return this.database.prepare('SELECT * FROM evidence WHERE tenant_id = ? AND session_id = ? ORDER BY created_at, id')
+      .all<EvidenceRow>(tenantId, sessionId).map((row) => this.mapRow(row));
   }
 
-  private findRow(ref: string): EvidenceRow {
-    const row = this.database.prepare('SELECT * FROM evidence WHERE ref = ? ORDER BY id LIMIT 1').get<EvidenceRow>(ref);
-    if (!row) throw new Error(`Unknown evidence reference: ${ref}`);
+  private findRow(tenantId: string, ref: string): EvidenceRow {
+    const row = this.database.prepare('SELECT * FROM evidence WHERE tenant_id = ? AND ref = ? ORDER BY id LIMIT 1')
+      .get<EvidenceRow>(tenantId, ref);
+    if (!row) throw new Error('Unknown evidence reference in the current tenant');
     return row;
   }
 
@@ -111,6 +119,12 @@ export class EvidenceStore {
     if (actualDigest !== row.sha256) return { valid: false, sha256: row.sha256, reason: 'digest_mismatch' };
     if (bytes.length !== row.size_bytes) return { valid: false, sha256: row.sha256, reason: 'size_mismatch' };
     return { valid: true, sha256: row.sha256, sizeBytes: row.size_bytes };
+  }
+
+  private assertSessionTenant(tenantId: string, sessionId: string): void {
+    const row = this.database.prepare('SELECT tenant_id FROM sessions WHERE id = ?')
+      .get<{ tenant_id: string }>(sessionId);
+    if (row && row.tenant_id !== tenantId) throw new Error('Resource is unavailable in the current tenant');
   }
 
   private writeBlob(path: string, bytes: Buffer, expectedDigest: string): void {

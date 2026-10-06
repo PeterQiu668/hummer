@@ -14,6 +14,10 @@ describe('runtime artifact evidence', () => {
     const data = temporaryDirectory();
     writeFileSync(join(root, 'summary.md'), 'real artifact', 'utf8');
     const persistence = openPersistence({ dataDirectory: data });
+    persistence.runtimeEvents.saveSession({
+      sessionId: 'ses_1', tenantId: 'tenant_demo', runtimeId: 'test',
+      startedAt: '2026-08-28T03:00:00.000Z', plan: {}, handle: {},
+    });
 
     const event = enrichRuntimeEventEvidence(persistence, {
       sessionId: 'ses_1', sequence: 2, occurredAt: '2026-08-28T03:00:00.000Z', actorRef: 'employee:codex',
@@ -23,7 +27,7 @@ describe('runtime artifact evidence', () => {
 
     expect(event.evidenceRefs).toHaveLength(1);
     expect(event.evidenceRefs[0]).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);
-    expect(persistence.evidence.read(event.evidenceRefs[0])).toEqual(Buffer.from('real artifact'));
+    expect(persistence.evidence.read('tenant_demo', event.evidenceRefs[0])).toEqual(Buffer.from('real artifact'));
     persistence.close();
   });
 
@@ -32,6 +36,10 @@ describe('runtime artifact evidence', () => {
     const data = temporaryDirectory();
     writeFileSync(join(root, 'orders.xlsx'), 'fixture bytes', 'utf8');
     const persistence = openPersistence({ dataDirectory: data });
+    persistence.runtimeEvents.saveSession({
+      sessionId: 'ses_doc_1', tenantId: 'tenant_demo', runtimeId: 'test',
+      startedAt: '2026-09-12T03:00:00.000Z', plan: {}, handle: {},
+    });
 
     const event = enrichRuntimeEventEvidence(persistence, {
       sessionId: 'ses_doc_1', sequence: 3, occurredAt: '2026-09-12T03:00:00.000Z', actorRef: 'employee:codex',
@@ -40,7 +48,7 @@ describe('runtime artifact evidence', () => {
     }, root, 'tenant_demo');
 
     expect(event.evidenceRefs).toEqual(expect.arrayContaining([expect.stringMatching(/^evidence:\/\/sha256\/[a-f0-9]{64}$/)]));
-    expect(persistence.evidence.read(event.evidenceRefs.find((ref) => ref.startsWith('evidence://'))!)).toEqual(Buffer.from('fixture bytes'));
+    expect(persistence.evidence.read('tenant_demo', event.evidenceRefs.find((ref) => ref.startsWith('evidence://'))!)).toEqual(Buffer.from('fixture bytes'));
     persistence.close();
   });
 
@@ -51,6 +59,10 @@ describe('runtime artifact evidence', () => {
     writeFileSync(join(outside, 'outside.xlsx'), 'must stay outside', 'utf8');
     symlinkSync(outside, join(root, 'linked'), 'junction');
     const persistence = openPersistence({ dataDirectory: data });
+    persistence.runtimeEvents.saveSession({
+      sessionId: 'ses_doc_link', tenantId: 'tenant_demo', runtimeId: 'test',
+      startedAt: '2026-09-12T03:00:00.000Z', plan: {}, handle: {},
+    });
 
     const event = enrichRuntimeEventEvidence(persistence, {
       sessionId: 'ses_doc_link', sequence: 3, occurredAt: '2026-09-12T03:00:00.000Z', actorRef: 'employee:untrusted-runtime',
@@ -59,7 +71,7 @@ describe('runtime artifact evidence', () => {
     }, root, 'tenant_demo');
 
     expect(event.evidenceRefs).toEqual(['codex://items/mcp_doc_link']);
-    expect(persistence.listEvidence('ses_doc_link')).toEqual([]);
+    expect(persistence.listEvidence('tenant_demo', 'ses_doc_link')).toEqual([]);
     persistence.close();
   });
 });

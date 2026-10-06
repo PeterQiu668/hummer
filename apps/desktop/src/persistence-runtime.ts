@@ -49,7 +49,7 @@ export function enrichRuntimeEventEvidence(
     }
   }
   if (event.type === 'result') {
-    evidenceRefs.push(...persistence.listEvidence(event.sessionId).map((item) => item.ref));
+    evidenceRefs.push(...persistence.listEvidence(tenantId, event.sessionId).map((item) => item.ref));
   }
   return { ...event, evidenceRefs: [...new Set(evidenceRefs)] };
 }

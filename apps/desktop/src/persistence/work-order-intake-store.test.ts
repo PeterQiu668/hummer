@@ -32,7 +32,7 @@ describe('work order intake fact source', () => {
     expect(pending.payloadEvidenceRef).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);
     expect(first.workOrderIntakes.list(companyA.tenant.id)).toHaveLength(1);
     expect(first.workOrderIntakes.list(companyB.tenant.id)).toHaveLength(0);
-    expect(first.runtimeEvents.listSessions().filter((session) => session.tenantId === companyA.tenant.id)).toHaveLength(0);
+    expect(first.runtimeEvents.listSessions(companyA.tenant.id)).toHaveLength(0);
     expect(first.tools.listInvocations(companyA.tenant.id, 'any')).toHaveLength(0);
     expect(first.listDomainEvents(companyA.session.token).map((event) => event.type)).toContain('work_order_intake.received');
     expect(first.verifyDomainEventIntegrity()).toMatchObject({ valid: true });
@@ -40,7 +40,7 @@ describe('work order intake fact source', () => {
 
     const reopened = openPersistence({ dataDirectory: directory });
     expect(reopened.workOrderIntakes.list(companyA.tenant.id)).toEqual([pending]);
-    expect(reopened.runtimeEvents.listSessions().filter((session) => session.tenantId === companyA.tenant.id)).toHaveLength(0);
+    expect(reopened.runtimeEvents.listSessions(companyA.tenant.id)).toHaveLength(0);
     reopened.close();
   });
 
