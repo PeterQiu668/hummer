@@ -44,7 +44,8 @@ const streamKey = (tenantId: string, nodeId: string) => `${tenantId}\u0000${node
 
 export class FleetSseBroker {
   readonly #subscribers = new Map<string, Set<StreamSubscriber>>();
-  #sequence = 0;
+  /** Stream-local IDs prevent another tenant or node's activity from creating observable gaps. */
+  readonly #sequences = new Map<string, number>();
 
   subscribe(tenantId: string, nodeId: string, response: ServerResponse, expiresAt: string): void {
     const expiry = Date.parse(expiresAt);
@@ -63,10 +64,13 @@ export class FleetSseBroker {
   }
 
   publish(tenantId: string, nodeId: string, event: 'task.available' | 'task.stop', data: unknown): void {
-    const subscribers = this.#subscribers.get(streamKey(tenantId, nodeId));
+    const key = streamKey(tenantId, nodeId);
+    const subscribers = this.#subscribers.get(key);
     if (!subscribers) return;
     const now = Date.now();
-    const id = String(++this.#sequence);
+    const sequence = (this.#sequences.get(key) ?? 0) + 1;
+    this.#sequences.set(key, sequence);
+    const id = String(sequence);
     const frame = `id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const subscriber of [...subscribers]) {
       if (subscriber.expiresAt <= now || subscriber.response.destroyed || subscriber.response.writableEnded) {
@@ -85,6 +89,7 @@ export class FleetSseBroker {
       }
     }
     this.#subscribers.clear();
+    this.#sequences.clear();
   }
 
   private remove(key: string, subscriber: StreamSubscriber): void {
@@ -92,7 +97,10 @@ export class FleetSseBroker {
     const subscribers = this.#subscribers.get(key);
     if (!subscribers) return;
     subscribers.delete(subscriber);
-    if (subscribers.size === 0) this.#subscribers.delete(key);
+    if (subscribers.size === 0) {
+      this.#subscribers.delete(key);
+      this.#sequences.delete(key);
+    }
   }
 }
 
@@ -279,6 +287,7 @@ export function createFleetRelayServer(
   app.get('/v1/nodes/:nodeId/events', async (request, reply: FastifyReply) => {
     const nodeId = pathParam(request, 'nodeId');
     const { claims } = await authorize(request, 'stream.connect', nodeId);
+    // Last-Event-ID is intentionally not a replay cursor or authority input.
     reply.hijack();
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
