@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createStaticBadgeTokenAuthenticator, type BadgeScope } from '../src/badge-auth.js';
+import {
+  CapabilityGrantRegistry,
+  createStaticBadgeTokenAuthenticator,
+  type BadgeScope,
+} from '../src/badge-auth.js';
 import { createSharedFleetValidators } from '../src/contract-adapter.js';
 import { FleetService } from '../src/fleet-service.js';
 import { createFleetRelayServer, type FleetSseBroker } from '../src/fastify-transport.js';
@@ -286,5 +290,73 @@ describe('Fastify fleet relay transport', () => {
     });
     expect(unauthenticatedReconnect.status).toBe(401);
     expect(() => entry.events.publish(TENANT, NODE, 'task.stop', { taskId: 'delivery-1' })).not.toThrow();
+  });
+
+  it('enforces capability-grant scope, revocation, and maxUses at the Fastify boundary', async () => {
+    const token = `hgr_${'g'.repeat(43)}`;
+    const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => token });
+    registry.issue({
+      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-bootstrap', issuedToRunId: 'run-bootstrap',
+      capabilities: ['node.register', 'node.heartbeat'], paths: [],
+      expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 2,
+    }, {
+      grantId: 'grant-bootstrap', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-bootstrap', issuedToRunId: 'run-bootstrap',
+      capabilities: ['node.register'], paths: [],
+      expiresAt: '2026-10-07T00:30:00.000Z', maxUses: 1,
+    });
+    const store = new MemoryFleetStore();
+    const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
+    const entry = createFleetRelayServer(service, { authenticator: registry, now: () => new Date(NOW) });
+    openApps.push(entry);
+
+    const denied = await entry.app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/heartbeat`, headers: authorization(token), payload: manifest(),
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json()).toEqual({ error: { code: 'scope_denied', message: 'badge does not grant node.heartbeat' } });
+    expect(registry.get('grant-bootstrap')).toMatchObject({ usedCount: 0, status: 'active' });
+
+    const accepted = await entry.app.inject({
+      method: 'POST', url: '/v1/nodes/register', headers: authorization(token), payload: manifest(),
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(JSON.stringify(accepted.json())).not.toContain(token);
+    expect(registry.get('grant-bootstrap')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+
+    const replay = await entry.app.inject({
+      method: 'POST', url: '/v1/nodes/register', headers: authorization(token), payload: manifest(),
+    });
+    expect(replay.statusCode).toBe(401);
+    expect(JSON.stringify(replay.json())).not.toContain(token);
+  });
+
+  it('makes grant revocation effective on the next Fastify authorization checkpoint', async () => {
+    const token = `hgr_${'r'.repeat(43)}`;
+    const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => token });
+    registry.issue({
+      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-bootstrap', issuedToRunId: 'run-bootstrap',
+      capabilities: ['node.register'], paths: [], expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 2,
+    }, {
+      grantId: 'grant-revoked', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-bootstrap', issuedToRunId: 'run-bootstrap',
+      capabilities: ['node.register'], paths: [], expiresAt: '2026-10-07T00:30:00.000Z', maxUses: 2,
+    });
+    registry.revoke('grant-revoked');
+    const store = new MemoryFleetStore();
+    const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
+    const entry = createFleetRelayServer(service, { authenticator: registry, now: () => new Date(NOW) });
+    openApps.push(entry);
+
+    const response = await entry.app.inject({
+      method: 'POST', url: '/v1/nodes/register', headers: authorization(token), payload: manifest(),
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: { code: 'invalid_token', message: 'Bearer badge token is invalid or expired' },
+    });
+    expect(JSON.stringify(response.json())).not.toContain(token);
   });
 });
