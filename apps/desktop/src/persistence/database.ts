@@ -173,6 +173,10 @@ export class DesktopPersistence {
     return this.domainEvents.verifyIntegrity();
   }
 
+  verifyTenantDomainEventIntegrity(tenantId: string): IntegrityResult {
+    return this.domainEvents.verifyTenantIntegrity(tenantId);
+  }
+
   /**
    * Assembles a verifiable receipt for one outcome event: the outcome, its acceptance criteria,
    * every cost entry billed against it, the governing approval (if any), and a hash-chain
@@ -190,7 +194,7 @@ export class DesktopPersistence {
     const tools = this.tools.listInvocations(tenantId, outcome.sessionId);
     return assembleOutcomeReceipt({
       tenantId, outcome, definition, costs, tools, approval,
-      chainIntegrity: this.verifyDomainEventIntegrity(),
+      chainIntegrity: this.verifyTenantDomainEventIntegrity(tenantId),
       generatedAt: new Date().toISOString(),
       environment,
     });

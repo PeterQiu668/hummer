@@ -47,7 +47,8 @@ export class DomainEventStore {
   append(input: DomainEventInput): StoredDomainEvent {
     assertDomainEvent(input);
     const appendTransaction = this.database.transaction(() => {
-      const existing = this.database.prepare('SELECT * FROM domain_events WHERE id = ?').get<DomainEventRow>(input.id);
+      const existing = this.database.prepare('SELECT * FROM domain_events WHERE tenant_id = ? AND id = ?')
+        .get<DomainEventRow>(input.tenantId, input.id);
       if (existing) {
         const stored = mapRow(existing);
         if (canonicalJson(eventHashMaterial(stored)) !== canonicalJson(eventHashMaterial({ ...input, aggregateVersion: stored.aggregateVersion, canonicalPayload: canonicalJson(input.payload), previousHash: stored.previousHash }))) {
@@ -55,6 +56,9 @@ export class DomainEventStore {
         }
         return stored;
       }
+      const foreignId = this.database.prepare('SELECT 1 AS found FROM domain_events WHERE id = ?')
+        .get<{ found: number }>(input.id);
+      if (foreignId) throw new Error('Domain event is unavailable in the current tenant');
 
       const previous = this.database.prepare('SELECT hash FROM domain_events ORDER BY position DESC LIMIT 1').get<{ hash: string }>();
       const aggregate = this.database.prepare(`
@@ -118,6 +122,29 @@ export class DomainEventStore {
         return { valid: false, checked, eventId: row.id, reason: 'hash_mismatch' };
       }
       expectedPreviousHash = row.hash;
+    }
+    return { valid: true, checked };
+  }
+
+  verifyTenantIntegrity(tenantId: string): IntegrityResult {
+    const rows = this.database.prepare('SELECT * FROM domain_events WHERE tenant_id = ? ORDER BY position')
+      .all<DomainEventRow>(tenantId);
+    let checked = 0;
+    for (const row of rows) {
+      checked += 1;
+      let payload: JsonValue;
+      try {
+        payload = JSON.parse(row.canonical_payload) as JsonValue;
+        if (canonicalJson(payload) !== row.canonical_payload) {
+          return { valid: false, checked, eventId: row.id, reason: 'payload_not_canonical' };
+        }
+      } catch {
+        return { valid: false, checked, eventId: row.id, reason: 'payload_not_canonical' };
+      }
+      const stored = mapRow(row, payload);
+      if (computeEventHash(stored) !== row.hash) {
+        return { valid: false, checked, eventId: row.id, reason: 'hash_mismatch' };
+      }
     }
     return { valid: true, checked };
   }

@@ -122,7 +122,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   });
   persistence.runtimeEvents.interruptStaleRealSessions(new Date().toISOString());
   const runtimeId = process.env.HUMMER_RUNTIME_SHELL === 'claude' ? 'claude-code' : 'codex-cli';
-  const nodeIds = new Set<string>();
+  const nodeTenants = new Map<string, string>();
 
   ipcMain.handle('hummer:engine-profiles:list', (_event, token: string | null) => {
     const configured = new Set<string>();
@@ -321,8 +321,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     return persisted;
   });
   ipcMain.handle('hummer:persistence:verify-integrity', (_event, token: string) => {
-    persistence.identity.currentTenantId(token);
-    return persistence.verifyDomainEventIntegrity();
+    return persistence.verifyTenantDomainEventIntegrity(persistence.identity.currentTenantId(token));
   });
   ipcMain.handle('hummer:organization:list-employees', (_event, token: string) => {
     return persistence.organization.listDigitalEmployees(persistence.identity.currentTenantId(token));
@@ -411,7 +410,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       permissionScope: 'read-only runtime; controlled-write approval-required',
       lastSeenAt: new Date().toISOString(),
     });
-    nodeIds.add(nodeId);
+    nodeTenants.set(nodeId, tenantId);
     return persistence.executionNodes.list(tenantId);
   });
   ipcMain.handle('hummer:execution-nodes:kill-all', async (_event, token: string) => {
@@ -525,7 +524,9 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     close: () => {
       inboxWatcher.close();
       CHANNELS.forEach((channel) => ipcMain.removeHandler(channel));
-      nodeIds.forEach((nodeId) => persistence.executionNodes.markOffline(nodeId, new Date().toISOString()));
+      nodeTenants.forEach((tenantId, nodeId) => {
+        persistence.executionNodes.markOffline(tenantId, nodeId, new Date().toISOString());
+      });
       persistence.close();
     },
   };
