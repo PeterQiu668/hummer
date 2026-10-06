@@ -168,7 +168,9 @@ export function createFleetRelayServer(
     if (error instanceof FleetRejectedError) {
       return reply.status(fleetStatus(error)).send({ error: { code: error.code, message: error.message } });
     }
-    const statusCode = 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
+    const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number'
+      ? error.statusCode
+      : 500;
     if (statusCode >= 400 && statusCode < 500) {
       return reply.status(statusCode).send({ error: { code: 'invalid_request', message: 'request was rejected' } });
     }

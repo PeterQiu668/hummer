@@ -81,8 +81,8 @@ function node(tenantIds = [TENANT]) {
   return { schema: 'test.node', nodeId: NODE, tenantIds, agentVersion: '0.1.0' };
 }
 
-function heartbeat() {
-  return { schema: 'test.heartbeat', nodeId: NODE, sentAt: new Date(currentTime).toISOString(), running: 0 };
+function heartbeat(running = 0) {
+  return { schema: 'test.heartbeat', nodeId: NODE, sentAt: new Date(currentTime).toISOString(), running };
 }
 
 function task(index = 1, overrides: Partial<Record<string, unknown>> = {}) {
@@ -172,12 +172,28 @@ for (const [name, factory] of [
       await expect(service.enqueue(SESSION, task(99, { idempotencyKey: 'delivery-1' }))).rejects.toMatchObject({ code: 'duplicate_delivery' });
     });
 
-    it('marks a stale node offline and refuses its claim', async () => {
+    it('keeps a node online before 60 seconds and marks it offline at exactly 60 seconds', async () => {
       const { service } = harness(factory);
       await service.register(SESSION, node());
-      await service.enqueue(SESSION, task());
-      currentTime += 60_000;
+      await service.enqueue(SESSION, task(1, { leaseMs: 120_000 }));
+      await service.enqueue(SESSION, task(2, { leaseMs: 120_000 }));
+      currentTime += 59_999;
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-1' });
+      currentTime += 1;
       await expect(service.claim(SESSION, NODE)).rejects.toMatchObject({ code: 'node_offline' });
+    });
+
+    it('rejects a heartbeat whose running count differs from active leases without renewing the node', async () => {
+      const { service, store } = harness(factory);
+      await service.register(SESSION, node());
+      await expect(service.heartbeat(SESSION, heartbeat(1))).rejects.toMatchObject({ code: 'heartbeat_load_mismatch' });
+      await service.enqueue(SESSION, task(1, { leaseMs: 120_000 }));
+      await service.claim(SESSION, NODE);
+
+      await expect(service.heartbeat(SESSION, heartbeat(0))).rejects.toMatchObject({ code: 'heartbeat_load_mismatch' });
+      await expect(service.heartbeat(SESSION, heartbeat(1))).resolves.toMatchObject({ status: 'online' });
+      currentTime += 60_000;
+      expect(await store.getNode(TENANT, NODE, new Date(currentTime).toISOString())).toMatchObject({ status: 'offline' });
     });
 
     it('recovers an expired lease without duplicating the task', async () => {
@@ -187,6 +203,46 @@ for (const [name, factory] of [
       expect(await service.claim(SESSION, NODE)).toMatchObject({ attempt: 1 });
       currentTime += 1_001;
       await service.heartbeat(SESSION, heartbeat());
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-1', attempt: 2 });
+    });
+
+    it('recovers a lease at the exact expiry boundary and permits only one concurrent re-claim', async () => {
+      const { service } = harness(factory);
+      await service.register(SESSION, node());
+      await service.enqueue(SESSION, task(1, { leaseMs: 1_000 }));
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ attempt: 1 });
+
+      currentTime += 1_000;
+      await service.heartbeat(SESSION, heartbeat(0));
+      const claims = await Promise.all([
+        service.claim(SESSION, NODE),
+        service.claim(SESSION, NODE),
+      ]);
+      expect(claims.filter((claimed) => claimed !== null)).toHaveLength(1);
+      expect(claims.filter((claimed) => claimed === null)).toHaveLength(1);
+      expect(claims.find((claimed) => claimed !== null)).toMatchObject({ taskId: 'task-1', attempt: 2, status: 'leased' });
+    });
+
+    it('rejects relay clock rollback and preserves the last accepted heartbeat time', async () => {
+      const { service, store } = harness(factory);
+      await service.register(SESSION, node());
+      currentTime += 10_000;
+      const acceptedAt = new Date(currentTime).toISOString();
+      await service.heartbeat(SESSION, heartbeat(0));
+
+      currentTime -= 1;
+      await expect(service.heartbeat(SESSION, heartbeat(0))).rejects.toMatchObject({ code: 'clock_regression' });
+      expect(await store.getNode(TENANT, NODE, acceptedAt)).toMatchObject({ lastSeenAt: acceptedAt, status: 'online' });
+    });
+
+    it('treats a forward clock jump as authoritative for lease expiry', async () => {
+      const { service } = harness(factory);
+      await service.register(SESSION, node());
+      await service.enqueue(SESSION, task(1, { leaseMs: 1_000 }));
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ attempt: 1 });
+
+      currentTime += 1_000;
+      await service.heartbeat(SESSION, heartbeat(0));
       expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-1', attempt: 2 });
     });
 
@@ -237,6 +293,31 @@ for (const [name, factory] of [
       expect(await store.listEvents(TENANT, 'work-1')).toHaveLength(1);
     });
 
+    it('executes and completes once after 100 deliveries with the same idempotency keys', async () => {
+      const { service, store } = harness(factory);
+      await service.register(SESSION, node());
+
+      const enqueues = await Promise.all(Array.from({ length: 100 }, () => service.enqueue(SESSION, task())));
+      expect(enqueues.filter((result) => result.inserted)).toHaveLength(1);
+      expect(enqueues.every((result) => result.task.taskId === 'task-1')).toBe(true);
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-1', attempt: 1 });
+      expect(await service.claim(SESSION, NODE)).toBeNull();
+
+      const starts = await Promise.all(Array.from({ length: 100 }, () => service.ack(SESSION, event(1, 1, 'started'))));
+      const artifacts = await Promise.all(Array.from({ length: 100 }, () => service.event(SESSION, event(1, 2, 'artifact'))));
+      const completions = await Promise.all(Array.from({ length: 100 }, () => service.complete(SESSION, event(1, 3, 'completed'))));
+
+      expect(starts.filter((result) => result.inserted)).toHaveLength(1);
+      expect(artifacts.filter((result) => result.inserted)).toHaveLength(1);
+      expect(completions.filter((result) => result.inserted)).toHaveLength(1);
+      expect(completions.every((result) => result.task.status === 'completed')).toBe(true);
+      expect(await store.listEvents(TENANT, 'work-1')).toEqual([
+        expect.objectContaining({ type: 'started', seq: 1 }),
+        expect.objectContaining({ type: 'artifact', seq: 2 }),
+        expect.objectContaining({ type: 'completed', seq: 3 }),
+      ]);
+    });
+
     it('rejects a reused event idempotency key when the canonical event differs', async () => {
       const { service } = harness(factory);
       await service.register(SESSION, node());
@@ -285,6 +366,37 @@ for (const [name, factory] of [
     it('rejects already expired tasks', async () => {
       const { service } = harness(factory);
       await expect(service.enqueue(SESSION, task(1, { expiresAt: new Date(currentTime).toISOString() }))).rejects.toMatchObject({ code: 'task_expired' });
+    });
+
+    it('normalizes offset task expiry and refuses a claim at the exact millisecond boundary', async () => {
+      const { service } = harness(factory);
+      await service.register(SESSION, node());
+      const expiresAt = new Date(currentTime + 3_600_500).toISOString().replace('Z', '+01:00');
+      const queued = await service.enqueue(SESSION, task(1, { expiresAt }));
+      expect(queued.task.expiresAt).toBe(new Date(currentTime + 500).toISOString());
+
+      currentTime += 500;
+      await service.heartbeat(SESSION, heartbeat(0));
+      expect(await service.claim(SESSION, NODE)).toBeNull();
+    });
+
+    it('rejects a late event from a previous attempt after a retry is leased', async () => {
+      const { service, store } = harness(factory);
+      await service.register(SESSION, node());
+      await service.enqueue(SESSION, task());
+      await service.claim(SESSION, NODE);
+      const previousAttemptAt = new Date(currentTime).toISOString();
+      await service.stop(SESSION, 'task-1');
+
+      currentTime += 100;
+      await service.retry(SESSION, 'task-1', task(2, { workOrderId: 'work-1', originRef: 'origin-1' }));
+      expect(await service.claim(SESSION, NODE)).toMatchObject({ taskId: 'task-2', attempt: 1, status: 'leased' });
+      await expect(service.event(SESSION, event(1, 1, 'started', {
+        eventId: 'event-late-old-attempt',
+        idempotencyKey: 'event-late-old-attempt',
+        occurredAt: previousAttemptAt,
+      }))).rejects.toMatchObject({ code: 'invalid_transition' });
+      expect(await store.listEvents(TENANT, 'work-1')).toHaveLength(0);
     });
 
     it('delivers and completes ten tasks exactly once under duplicate ingress', async () => {
