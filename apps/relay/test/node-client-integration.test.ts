@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify';
 // @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
 import { HummerNodeAgent } from '../../node-agent/src/node-agent.mjs';
 // @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
+import { MemoryExecutionJournal } from '../../node-agent/src/execution-journal.mjs';
+// @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
 import { createSharedFleetContractValidator } from '../../node-agent/src/contract-validator.mjs';
 // @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
 import { RelayClientError, RelayHttpClient } from '../../node-agent/src/relay-http-client.mjs';
@@ -137,6 +139,7 @@ function createAgent(client: RelayHttpClient, executions: unknown[], index: numb
         return { events: runEvents(index), receipt: { id: `receipt-${index}` } };
       },
     },
+    journal: new MemoryExecutionJournal(),
     clock: () => new Date(NOW),
   });
 }

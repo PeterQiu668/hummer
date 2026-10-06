@@ -15,7 +15,8 @@ The implementation preserves these rules:
 - `NodeManifest`, claimed tasks, approval decisions, run events, and outcome receipts are all validated by the injected shared contract validator. Invalid data does not cross the transport boundary.
 - A valid claimed task is staged as `pending_confirmation`. Claiming never confirms or executes it.
 - Execution requires an unexpired capability grant with `task.execute` plus a Relay-persisted shared-contract approval by a `human:*` or `account:*` actor for that exact claim and tenant. Its `grantedScope` must independently include an unexpired `task.execute` capability.
-- A terminal claim is never executed twice. Failures are reported and are not automatically retried.
+- A terminal claim is never executed twice. Claims are recorded in an injected execution journal; failures are reported and are not automatically retried.
+- Restart recovery is durable at-most-once, not distributed exactly-once. A recovered non-terminal claim is `recovery_required` and is never automatically retried.
 - The short-lived grant token is private process state. Status objects, probe output, exceptions, and documentation never include it.
 - Unknown claim fields, unknown runtime providers, unknown tools, missing scopes, expired grants, and non-human approvals fail closed.
 
@@ -58,14 +59,18 @@ The heartbeat timer does not trigger task execution and does not perform an auto
 Relay claim (unknown bytes)
   -> exact local delivery wrapper validation
   -> injected TaskEnvelope contract validation
+  -> durable claim/delivery/WorkOrder/envelope-hash journal record
   -> pending_confirmation status
   -> node badge appends the bound ApprovalRequest to Relay
+  -> durable approval-request ID/hash journal record
   -> human/account control badge appends immutable ApprovalDecision to Relay
   -> node badge atomically reads/consumes the bound decision from Relay
   -> ApprovalRequest and ApprovalDecision contract validation
   -> grant expiry/scope check
-  -> injected executor exactly once
+  -> durable decision-consumed + executing journal records
+  -> injected executor at most once per intact journal
   -> injected RunEvent(s) and OutcomeReceipt transport
+  -> durable receipt-hash + terminal journal record
 ```
 
 `createSharedFleetContractValidator` now binds `NodeManifest`, `TaskEnvelope`, `ApprovalRequest`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. The existing v1 outcome-receipt verifier remains an injected authority because OutcomeReceipt is not redefined as a sixth Fleet contract.
@@ -76,6 +81,24 @@ route, revalidates both frozen contracts, and checks that the returned request
 is exactly the one staged for the pending claim. Passing a local decision is a
 hard error. SSE may wake polling or stop a claim, but it never carries approval
 authority or triggers execution.
+
+## Execution journal and restart recovery
+
+`HummerNodeAgent` requires an `ExecutionJournal`. `FileExecutionJournal` is the
+local durable implementation and `MemoryExecutionJournal` is available for
+tests. A file journal is scoped to exactly one tenant and node. It uses
+canonical append-only JSONL with a SHA-256 hash chain and flushes every append
+before returning. It stores only IDs, hashes, state, and safe reason codes; it
+does not store the capability token, raw contracts, credentials, or receipt
+body.
+
+Startup verifies every line and refuses tampering, truncation, invalid state
+transitions, and tenant/node reuse. It does not delete, truncate, repair, or
+time-clean journal history. A recovered terminal delivery remains a duplicate.
+Any recovered non-terminal delivery is returned as `recovery_required`, because
+a crash after the durable `executing` marker cannot prove whether the executor
+side effect occurred. No automatic retry exists. See
+`docs/decisions/ADR-024-node-execution-journal.md` for the safety boundary.
 
 ## MCP tool facade
 

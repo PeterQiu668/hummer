@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
+import { canonicalJson, FileExecutionJournal, MemoryExecutionJournal, sha256Hex } from '../src/execution-journal.mjs';
 import { HummerNodeAgent } from '../src/node-agent.mjs';
 
 const now = '2026-10-07T00:00:00.000Z';
@@ -81,6 +85,7 @@ function createHarness(overrides = {}) {
     transport,
     contractValidator,
     executor,
+    journal: overrides.journal ?? new MemoryExecutionJournal({ clock: () => new Date(now) }),
     clock: () => new Date(now),
   });
   return { agent, calls };
@@ -329,3 +334,100 @@ test('rejects an expired local grant and does not leak its token in the error', 
   });
   assert.equal(calls.executions.length, 0);
 });
+
+test('a completed file-journal delivery stays terminal after agent reconstruction', async () => {
+  const journalPath = temporaryJournalPath();
+  const first = createHarness({ journal: new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) }) });
+  await stageApproval(first.agent);
+  assert.deepEqual(await first.agent.confirmAndExecute('claim_1'), { state: 'completed', claimId: 'claim_1' });
+
+  const second = createHarness({ journal: new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) }) });
+  assert.deepEqual(await second.agent.pollOnce(), { state: 'duplicate', claimId: 'claim_1' });
+  assert.equal(second.calls.executions.length, 0);
+
+  const journalText = readFileSync(journalPath, 'utf8');
+  assert.doesNotMatch(journalText, /test-grant-value|safe preview|"envelope":/);
+  assert.match(journalText, /"receiptHash":"[a-f0-9]{64}"/);
+});
+
+test('an executing record recovered after a crash requires operator recovery and never retries', async () => {
+  const journal = new MemoryExecutionJournal({ clock: () => new Date(now) });
+  seedExecutingClaim(journal);
+
+  const { agent, calls } = createHarness({ journal });
+
+  assert.deepEqual(await agent.pollOnce(), { state: 'recovery_required', claimId: 'claim_1' });
+  assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'recovery_required', claimId: 'claim_1' });
+  assert.equal(calls.executions.length, 0);
+  assert.equal(calls.approvalConsumptions.length, 0);
+});
+
+test('file journal tampering fails startup instead of repairing or truncating history', () => {
+  const journalPath = temporaryJournalPath();
+  const journal = new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) });
+  journal.initialize({ tenantId: 'tenant_a', nodeId: 'node_a' });
+  journal.append(claimRecord());
+  const original = readFileSync(journalPath, 'utf8');
+  writeFileSync(journalPath, original.replace('claim_1', 'claim_X'), 'utf8');
+
+  assert.throws(
+    () => createHarness({ journal: new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) }) }),
+    { code: 'journal_corrupt' },
+  );
+  assert.equal(readFileSync(journalPath, 'utf8'), original.replace('claim_1', 'claim_X'));
+});
+
+test('a journal cannot be reused across tenant or node scope', () => {
+  const journal = new MemoryExecutionJournal({ clock: () => new Date(now) });
+  journal.initialize({ tenantId: 'tenant_a', nodeId: 'node_a' });
+
+  assert.throws(() => journal.initialize({ tenantId: 'tenant_b', nodeId: 'node_a' }), { code: 'journal_scope_mismatch' });
+  assert.throws(() => journal.initialize({ tenantId: 'tenant_a', nodeId: 'node_b' }), { code: 'journal_scope_mismatch' });
+});
+
+test('an executing journal append failure prevents the executor side effect', async () => {
+  const backing = new MemoryExecutionJournal({ clock: () => new Date(now) });
+  const journal = {
+    initialize: (scope) => backing.initialize(scope),
+    append: (record) => {
+      if (record.type === 'executing') throw Object.assign(new Error('simulated disk failure'), { code: 'EIO' });
+      return backing.append(record);
+    },
+  };
+  const { agent, calls } = createHarness({ journal });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'), { code: 'journal_write_failed' });
+  assert.equal(calls.executions.length, 0);
+  assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'recovery_required', claimId: 'claim_1' });
+});
+
+function temporaryJournalPath() {
+  return join(mkdtempSync(join(tmpdir(), 'hummer-node-journal-')), 'execution.jsonl');
+}
+
+function claimRecord() {
+  return {
+    type: 'claim_accepted', claimId: 'claim_1', deliveryId: 'delivery_1', workOrderId: 'work_1',
+    envelopeHash: sha256Hex(canonicalJson({
+      id: 'task_1', tenantId: 'tenant_a', targetNodeId: 'node_a',
+      expiresAt: '2026-10-07T01:00:00.000Z', originRef: 'work_1',
+    })),
+  };
+}
+
+function seedExecutingClaim(journal) {
+  journal.initialize({ tenantId: 'tenant_a', nodeId: 'node_a' });
+  journal.append(claimRecord());
+  journal.append({
+    ...claimRecord(), type: 'approval_request_recorded', requestId: 'request_1', approvalRequestHash: 'b'.repeat(64),
+  });
+  journal.append({
+    ...claimRecord(), type: 'approval_decision_consumed', requestId: 'request_1',
+    approvalRequestHash: 'b'.repeat(64), approvalDecisionHash: 'c'.repeat(64),
+  });
+  journal.append({
+    ...claimRecord(), type: 'executing', requestId: 'request_1',
+    approvalRequestHash: 'b'.repeat(64), approvalDecisionHash: 'c'.repeat(64),
+  });
+}
