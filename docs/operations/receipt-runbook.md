@@ -18,7 +18,7 @@ The envelope and every object owned by the fleet extension reject unknown fields
 - `chainHead`: tenant, node, position, hash, and time. This records the supplied head; Phase 0 does not claim a signed or externally anchored timestamp.
 - `manifest`: SHA-256 leaf hashes and a root hash over all four structures above. This makes the parent aggregation cover every child and artifact reference without changing the original version 1 manifest.
 
-Allowed runtime labels are `codex`, `claude-code`, `deepseek`, and `cli-other`. Paths use portable `/` separators, must be relative to the parent receipt directory, and must resolve inside that directory. Absolute paths, `..`, Windows drive prefixes, backslashes, missing files, and symlink escapes fail closed.
+Allowed runtime labels match the frozen fleet contract: `codex`, `claude`, `deepseek`, `cli-other`, and `gui-exec`. Paths use portable `/` separators, must be relative to the parent receipt directory, and must resolve inside that directory. Absolute paths, `..`, Windows drive prefixes, backslashes, missing files, and symlink escapes fail closed.
 
 For each child, the verifier checks:
 

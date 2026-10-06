@@ -19,11 +19,14 @@ const repositoryRoot = resolve(scriptDirectory, '..');
 const verifierPath = join(scriptDirectory, 'verify-fleet-receipt.mjs');
 const fixtureDirectory = join(repositoryRoot, 'spikes', 'p0-fleet-receipt');
 const writeFixtures = process.argv.includes('--write-fixtures');
+const refreshFixtures = process.argv.includes('--refresh-fixtures');
 
-if (writeFixtures) {
+if (writeFixtures || refreshFixtures) {
   if (existsSync(fixtureDirectory)) {
-    console.error(JSON.stringify({ written: false, path: fixtureDirectory, reason: 'fixture directory already exists' }));
-    process.exit(1);
+    if (writeFixtures) {
+      console.error(JSON.stringify({ written: false, path: fixtureDirectory, reason: 'fixture directory already exists' }));
+      process.exit(1);
+    }
   }
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'hummer-fleet-fixture-'));
   const fixture = createScenario(join(temporaryDirectory, 'fixture'));
@@ -224,7 +227,7 @@ function createScenario(root) {
       receiptFile: childPaths[1],
       nodeId: 'node-b',
       agentId: 'agent-b',
-      runtime: 'claude-code',
+      runtime: 'claude',
       agentVersion: 'fixture-1.0.0',
       completedAt: '2026-10-07T01:02:00.000Z',
       artifactId: 'artifact-summary',
@@ -236,7 +239,7 @@ function createScenario(root) {
     parentWorkOrderId: 'wo_parent',
     nodes: [
       { nodeId: 'node-a', runtime: 'codex', agentVersion: 'fixture-1.0.0', artifactIds: ['artifact-report'] },
-      { nodeId: 'node-b', runtime: 'claude-code', agentVersion: 'fixture-1.0.0', artifactIds: ['artifact-summary'] },
+      { nodeId: 'node-b', runtime: 'claude', agentVersion: 'fixture-1.0.0', artifactIds: ['artifact-summary'] },
     ],
     childReceipts,
     chainHead: {

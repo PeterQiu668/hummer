@@ -118,7 +118,7 @@
       },
       {
         "nodeId": "node-b",
-        "runtime": "claude-code",
+        "runtime": "claude",
         "agentVersion": "fixture-1.0.0",
         "artifactIds": [
           "artifact-summary"
@@ -151,7 +151,7 @@
         "receiptRootHash": "04ee5f229e69344bc298fcdd48b4d602da27f33fa2fcb96d8e62e1df648943bc",
         "nodeId": "node-b",
         "agentId": "agent-b",
-        "runtime": "claude-code",
+        "runtime": "claude",
         "agentVersion": "fixture-1.0.0",
         "completedAt": "2026-10-07T01:02:00.000Z",
         "artifactRefs": [
@@ -172,7 +172,7 @@
     },
     "manifest": {
       "algorithm": "SHA-256",
-      "rootHash": "4a3e814938385cc79cd95ec1d16249ca9da97b0ae9d64b871bb38d8f03e1a362",
+      "rootHash": "a1c50c0916b97ac3c98fd8433cce892186095bb6d238cb6b455a496e3ea6ed6c",
       "fieldHashes": {
         "/parentWorkOrderId": "31619991c7a13a98138745b1a77cecbf1a50b27783bddd75e10b50c55115cdc3",
         "/nodes/0/nodeId": "875f4b24a78704fc21b20497b72575b76193810f11da9505b6e6ad333020b071",
@@ -180,7 +180,7 @@
         "/nodes/0/agentVersion": "9adfae37d20c47b3e7427cf326b7b193c224b00f873603a1a6e0b1bd4c5384a0",
         "/nodes/0/artifactIds/0": "db0807b4a7cfaa61ac708f09a0035343b49b1b33d43df37f9b3a065742c2a78e",
         "/nodes/1/nodeId": "66db3b3d46e58ac89fe6f65e58468c2201af8ce3440df3164bb0bc9f02cb7523",
-        "/nodes/1/runtime": "d84da32b9aa10a02997143b5382fdeee9452575e1ab57bfc4b81380ff08d7bfe",
+        "/nodes/1/runtime": "389432cbf83f3d1b64029a75864ec96f8fd06451b4c99d7b28385d395d480bfa",
         "/nodes/1/agentVersion": "9adfae37d20c47b3e7427cf326b7b193c224b00f873603a1a6e0b1bd4c5384a0",
         "/nodes/1/artifactIds/0": "997fe079d84e8eb869457246a138e9fc1917a54a1021b2c059cf79598bb52d89",
         "/childReceipts/0/workOrderId": "99b4e3f5de0bf31ed62d9b857fa824f9659e7fc215731f8458ed5b859ab09c61",
@@ -201,7 +201,7 @@
         "/childReceipts/1/receiptRootHash": "20a0584aede8aed750b52700d3f2c0c967e86d0d52bf06a31201cf2a130cd41a",
         "/childReceipts/1/nodeId": "66db3b3d46e58ac89fe6f65e58468c2201af8ce3440df3164bb0bc9f02cb7523",
         "/childReceipts/1/agentId": "e937769f076fe55412f533cf0f035f06aed6b47f712f038bc4939d45d7df1f9a",
-        "/childReceipts/1/runtime": "d84da32b9aa10a02997143b5382fdeee9452575e1ab57bfc4b81380ff08d7bfe",
+        "/childReceipts/1/runtime": "389432cbf83f3d1b64029a75864ec96f8fd06451b4c99d7b28385d395d480bfa",
         "/childReceipts/1/agentVersion": "9adfae37d20c47b3e7427cf326b7b193c224b00f873603a1a6e0b1bd4c5384a0",
         "/childReceipts/1/completedAt": "b25ca9e9590fef8800c2c6263f96bdaf77bac2cb30de2d8d10548e97b765fc34",
         "/childReceipts/1/artifactRefs/0/artifactId": "997fe079d84e8eb869457246a138e9fc1917a54a1021b2c059cf79598bb52d89",

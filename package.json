@@ -19,6 +19,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "npm run audit:dead-controls && npm run test:unit && npm run test:ui",
     "test:contract": "node scripts/test-contract.mjs",
+    "verify:fleet:receipt": "node scripts/verify-fleet-receipt.mjs spikes/p0-fleet-receipt/fleet-receipt.json",
     "audit:dead-controls": "node scripts/audit-dead-controls.mjs",
     "pretest:unit": "npm run config:check",
     "test:unit": "vitest run --config vitest.config.ts",

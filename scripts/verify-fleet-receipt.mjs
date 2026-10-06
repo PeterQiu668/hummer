@@ -335,7 +335,7 @@ function isIdentifier(value, prefix = '') {
 }
 
 function isRuntime(value) {
-  return ['codex', 'claude-code', 'deepseek', 'cli-other'].includes(value);
+  return ['codex', 'claude', 'deepseek', 'cli-other', 'gui-exec'].includes(value);
 }
 
 function isSha256(value) {
