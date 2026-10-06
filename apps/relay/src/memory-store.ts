@@ -24,7 +24,20 @@ import {
   type TenantQuotaLimits,
   type TenantQuotaMetric,
   type TenantQuotaUsage,
+  type CapabilityCatalogItem,
+  type CapabilityRegistryRecord,
+  type CapabilityShareCreateInput,
+  type CapabilityTrialRecordInput,
+  type CapabilityVersionCreateInput,
 } from './ports.js';
+import type { CapabilityInstallGateDecision, CapabilityInstallGateInput, CapabilityShareInvitation, SkillTrialSystemRecordInput, TeamReadOnlyShare } from '@hummer/contracts';
+import {
+  assertCapabilityHistory,
+  capabilityRecordFromShare,
+  buildCapabilityShare,
+  createTrialAggregate,
+  rebindCapabilityInstallDecision,
+} from './capability-registry.js';
 import { canonicalJson } from './canonical-json.js';
 import {
   TENANT_QUOTA_METRICS,
@@ -40,6 +53,7 @@ import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 import { assertNodeTenantAuthorization } from './tenant-boundary.js';
 
 const key = (tenantId: string, id: string) => `${tenantId}\u0000${id}`;
+const capabilityVersionKey = (tenantId: string, packageId: string, version: number) => `${tenantId}\u0000${packageId}\u0000${version}`;
 const quotaKey = (tenantId: string, nodeId: string, day: string, metric: TenantQuotaMetric) => `${tenantId}\u0000${nodeId}\u0000${day}\u0000${metric}`;
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -95,6 +109,10 @@ export class MemoryFleetStore implements FleetStore {
   readonly #tenantAudit = new Map<string, TenantAuditEvent[]>();
   readonly #quotaCounters = new Map<string, TenantQuotaCounter>();
   readonly #auditExports = new Map<string, TenantAuditExport>();
+  readonly #capabilityPackages = new Map<string, CapabilityRegistryRecord>();
+  readonly #capabilityTrials = new Map<string, SkillTrialSystemRecordInput>();
+  readonly #capabilityShares = new Map<string, TeamReadOnlyShare>();
+  readonly #capabilityInstallDecisions = new Map<string, CapabilityInstallGateDecision>();
   #clockHighWaterMs = 0;
 
   async registerNode(
@@ -503,6 +521,150 @@ export class MemoryFleetStore implements FleetStore {
   async getAuditExport(tenantId: string, exportId: string): Promise<TenantAuditExport | null> {
     const record = this.#auditExports.get(key(tenantId, exportId));
     return record ? clone(record) : null;
+  }
+
+  async createCapabilityVersion(
+    tenantId: string,
+    input: CapabilityVersionCreateInput,
+    actorRef: string,
+    now: string,
+  ): Promise<CapabilityRegistryRecord> {
+    this.advanceClock(now);
+    if (input.author.tenantId !== tenantId || input.author.status !== 'draft') {
+      throw new FleetRejectedError('tenant_mismatch', 'capability author tenant does not match the authenticated session');
+    }
+    const task = this.#tasks.get(key(tenantId, input.sourceTaskId));
+    if (!task || task.status !== 'completed') throw new FleetRejectedError('capability_not_found', 'completed source task was not found');
+    const events = this.#events.get(key(tenantId, task.workOrderId)) ?? [];
+    const artifact = events.find((entry) => entry.claims.eventId === input.artifactEventId && entry.claims.type === 'artifact');
+    const completed = events.find((entry) => entry.claims.eventId === input.completedEventId && entry.claims.type === 'completed');
+    const eventIds = new Set(events.map((entry) => entry.claims.eventId));
+    if (!artifact || !completed || input.author.evidenceRefs.some((reference) => !eventIds.has(reference))
+      || !eventIds.has(input.author.receiptRef)) {
+      throw new FleetRejectedError('capability_not_found', 'completed task evidence was not found');
+    }
+    const history = [...this.#capabilityPackages.values()].filter((record) =>
+      record.tenantId === tenantId && record.packageId === input.author.packageId);
+    const packageDigest = assertCapabilityHistory(history, input.author);
+    const record: CapabilityRegistryRecord = {
+      tenantId,
+      packageId: input.author.packageId,
+      packageVersion: input.author.packageVersion,
+      packageDigest,
+      author: clone(input.author),
+      trialRecord: null,
+      status: 'draft',
+      sourceTaskId: input.sourceTaskId,
+      artifactEventId: input.artifactEventId,
+      completedEventId: input.completedEventId,
+      createdAt: now,
+    };
+    const recordKey = capabilityVersionKey(tenantId, record.packageId, record.packageVersion);
+    if (this.#capabilityPackages.has(recordKey)) throw new FleetRejectedError('capability_conflict', 'capability version already exists');
+    this.#capabilityPackages.set(recordKey, clone(record));
+    this.appendTenantAudit(tenantId, 'capability.version_created', `${record.packageId}:${record.packageVersion}`, null, actorRef, now, {
+      packageDigest, sourceTaskId: input.sourceTaskId,
+    });
+    return clone(record);
+  }
+
+  async recordCapabilityTrial(
+    tenantId: string,
+    input: CapabilityTrialRecordInput,
+    nodeId: string,
+    now: string,
+  ): Promise<CapabilityRegistryRecord> {
+    this.advanceClock(now);
+    const trial = input.trial;
+    if (trial.tenantId !== tenantId || trial.environment.nodeId !== nodeId) {
+      throw new FleetRejectedError('capability_trust_denied', 'trial identity does not match the trusted node session');
+    }
+    this.requireNode(tenantId, nodeId);
+    const recordKey = capabilityVersionKey(tenantId, trial.packageId, trial.packageVersion);
+    const record = this.#capabilityPackages.get(recordKey);
+    if (!record || record.packageDigest !== trial.packageDigest) {
+      throw new FleetRejectedError('capability_not_found', 'capability version was not found');
+    }
+    if (record.status === 'shared') throw new FleetRejectedError('capability_conflict', 'shared capability trial snapshot is immutable');
+    const trialKey = key(tenantId, trial.trialId);
+    if (this.#capabilityTrials.has(trialKey)) throw new FleetRejectedError('capability_conflict', 'SkillTrial trialId already exists');
+    const trials = [...this.#capabilityTrials.values()].filter((item) => item.tenantId === tenantId
+      && item.packageId === trial.packageId && item.packageVersion === trial.packageVersion);
+    const aggregate = createTrialAggregate([...trials, trial], input.regression);
+    this.#capabilityTrials.set(trialKey, clone(trial));
+    record.trialRecord = aggregate;
+    record.status = aggregate.shadowRuns >= 5 && aggregate.failure === 0 && aggregate.regressionPassed ? 'verified' : 'shadow';
+    this.appendTenantAudit(tenantId, 'capability.trial_recorded', trial.trialId, nodeId, 'system:skill-trial', now, {
+      packageId: trial.packageId, packageVersion: trial.packageVersion, packageDigest: trial.packageDigest, ok: trial.ok,
+    });
+    return clone(record);
+  }
+
+  async createCapabilityShare(
+    sourceTenantId: string,
+    input: CapabilityShareCreateInput,
+    invitation: CapabilityShareInvitation | undefined,
+    actorRef: string,
+    now: string,
+  ): Promise<TeamReadOnlyShare> {
+    this.advanceClock(now);
+    const record = this.#capabilityPackages.get(capabilityVersionKey(sourceTenantId, input.packageId, input.packageVersion));
+    if (!record) throw new FleetRejectedError('capability_not_found', 'capability version was not found');
+    if (record.status !== 'verified' && record.status !== 'shared') {
+      throw new FleetRejectedError('capability_trust_denied', 'capability has not passed trusted trials');
+    }
+    const shareKey = key(input.targetTenantId, input.shareId);
+    if (this.#capabilityShares.has(shareKey)) throw new FleetRejectedError('capability_conflict', 'capability share already exists');
+    const share = buildCapabilityShare({ shareId: input.shareId, record, targetTenantId: input.targetTenantId, invitation, actorRef, now });
+    this.#capabilityShares.set(shareKey, clone(share));
+    record.status = 'shared';
+    this.appendTenantAudit(sourceTenantId, 'capability.shared', input.shareId, null, actorRef, now, {
+      targetTenantId: input.targetTenantId, packageId: input.packageId, packageVersion: input.packageVersion, packageDigest: record.packageDigest,
+    });
+    return clone(share);
+  }
+
+  async listCapabilities(tenantId: string): Promise<readonly CapabilityCatalogItem[]> {
+    const owned = [...this.#capabilityPackages.values()].filter((record) => record.tenantId === tenantId)
+      .map((record): CapabilityCatalogItem => ({ access: 'owner', record: clone(record), share: null }));
+    const shared = [...this.#capabilityShares.values()].filter((share) => share.targetTenantId === tenantId)
+      .map((share): CapabilityCatalogItem => {
+        const record = this.#capabilityPackages.get(capabilityVersionKey(share.sourceTenantId, share.packageId, share.packageVersion));
+        if (!record) throw new FleetRejectedError('capability_not_found', 'shared capability source was not found');
+        return { access: 'read_only', record: capabilityRecordFromShare(clone(record), clone(share)), share: clone(share) };
+      });
+    return [...owned, ...shared].sort((left, right) => `${left.record.packageId}:${left.record.packageVersion}`.localeCompare(`${right.record.packageId}:${right.record.packageVersion}`));
+  }
+
+  async getCapability(tenantId: string, packageId: string, packageVersion?: number): Promise<CapabilityCatalogItem | null> {
+    const candidates = (await this.listCapabilities(tenantId)).filter((item) => item.record.packageId === packageId
+      && (packageVersion === undefined || item.record.packageVersion === packageVersion));
+    return candidates.sort((left, right) => right.record.packageVersion - left.record.packageVersion)[0] ?? null;
+  }
+
+  async getCapabilityShare(targetTenantId: string, shareId: string): Promise<TeamReadOnlyShare | null> {
+    const share = this.#capabilityShares.get(key(targetTenantId, shareId));
+    return share ? clone(share) : null;
+  }
+
+  async recordCapabilityInstallDecision(
+    targetTenantId: string,
+    input: CapabilityInstallGateInput,
+    actorRef: string,
+    now: string,
+  ): Promise<CapabilityInstallGateDecision> {
+    this.advanceClock(now);
+    const shareId = input.share.shareId;
+    const share = this.#capabilityShares.get(key(targetTenantId, shareId));
+    if (!share) throw new FleetRejectedError('capability_not_found', 'capability share was not found');
+    const gateKey = key(targetTenantId, input.gateId);
+    if (this.#capabilityInstallDecisions.has(gateKey)) throw new FleetRejectedError('capability_conflict', 'install gate id already exists');
+    const decision = rebindCapabilityInstallDecision({ share, targetTenantId, input, now });
+    this.#capabilityInstallDecisions.set(gateKey, clone(decision));
+    this.appendTenantAudit(targetTenantId, 'capability.install_evaluated', input.gateId, null, actorRef, now, {
+      shareId, packageDigest: share.packageDigest, decision: decision.decision, requestDigest: decision.requestDigest,
+    });
+    return clone(decision);
   }
 
   close(): void {}
