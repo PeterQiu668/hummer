@@ -17,10 +17,11 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "pretypecheck": "npm run config:generate",
     "typecheck": "tsc -b --noEmit",
-    "test": "npm run audit:dead-controls && npm run test:unit && npm run test:ui",
+    "test": "npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:unit && npm run test:ui",
     "test:contract": "node scripts/test-contract.mjs",
     "verify:fleet:receipt": "node scripts/verify-fleet-receipt.mjs spikes/p0-fleet-receipt/fleet-receipt.json",
     "audit:dead-controls": "node scripts/audit-dead-controls.mjs",
+    "audit:abandoned-3d": "node scripts/audit-abandoned-3d-lineage.mjs",
     "pretest:unit": "npm run config:check",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:ui": "vitest run --config vitest.ui.config.ts",
@@ -62,15 +63,12 @@
     "verify:m5g:evidence": "node scripts/verify-m5g-evidence.mjs"
   },
   "dependencies": {
-    "@react-three/drei": "^9.122.0",
-    "@react-three/fiber": "^8.17.10",
     "framer-motion": "^11.18.2",
     "gsap": "^3.12.5",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "reactflow": "^11.11.4",
-    "three": "^0.171.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
@@ -82,7 +80,6 @@
     "@testing-library/user-event": "^14.6.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "@types/three": "^0.171.0",
     "@vitejs/plugin-react": "^4.3.4",
     "ajv": "^8.20.0",
     "autoprefixer": "^10.4.20",
