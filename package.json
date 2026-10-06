@@ -19,6 +19,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "npm run audit:dead-controls && npm run audit:abandoned-3d && npm run test:gates && npm run test:evidence:seal && npm run test:unit && npm run test:ui",
     "test:contract": "node scripts/test-contract.mjs",
+    "test:perf": "node scripts/test-perf.mjs",
     "test:capability": "node scripts/test-capability.mjs",
     "test:fleet": "node scripts/test-fleet.mjs",
     "test:security": "node scripts/test-security.mjs",
