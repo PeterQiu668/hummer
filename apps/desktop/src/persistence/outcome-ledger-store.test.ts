@@ -36,16 +36,18 @@ describe('OutcomeLedgerStore', () => {
 
     const definition = persistence.outcomes.defineOutcome({
       tenantId: owner.tenant.id, actionPattern: 'external.send.email', title: '外发邮件审核通过',
-      acceptanceCriteria: '内容经责任人审阅，且未违反客户白名单', riskLevel: 'high',
+      acceptanceCriteria: '内容经责任人审阅，且未违反客户白名单 sk-super-secret-value', riskLevel: 'high',
       actorRef: `account:${owner.account.id}`, idempotencyKey: 'outcome-def-001',
     });
     expect(definition.id).toMatch(/^outcome_def_/);
 
-    // The evidence ref intentionally embeds a secret-shaped value to prove the receipt assembler
-    // actually redacts it, rather than the assertion below passing only because no secret was present.
+    const outcomeEvidence = persistence.evidence.put(Buffer.from('accepted outcome'), {
+      tenantId: owner.tenant.id, sessionId, mediaType: 'text/plain',
+      createdAt: '2026-09-02T09:57:30.000Z',
+    });
     const outcome = persistence.outcomes.recordOutcome({
       tenantId: owner.tenant.id, outcomeDefinitionId: definition.id, workOrderId: 'wo_outreach_001', sessionId, approvalId,
-      verdict: 'accepted', acceptedBy: `account:${owner.account.id}`, evidenceRef: 'evi_outreach_001_sk-super-secret-value',
+      verdict: 'accepted', acceptedBy: `account:${owner.account.id}`, evidenceRef: outcomeEvidence.ref,
       occurredAt: '2026-09-02T09:58:00.000Z', idempotencyKey: 'outcome-evt-001',
     });
     expect(outcome.verdict).toBe('accepted');
@@ -125,6 +127,7 @@ describe('OutcomeLedgerStore', () => {
   it('fails closed instead of billing a cost for a model with no verified price', () => {
     const persistence = openPersistence({ dataDirectory: tmpDir() });
     const owner = persistence.identity.createCompany({ companyName: '甲公司', displayName: '甲', email: 'a2@example.test' });
+    saveSession(persistence, owner.tenant.id, 'ses_x');
     expect(() => persistence.outcomes.recordCost({
       tenantId: owner.tenant.id, sessionId: 'ses_x', engineProfileId: 'zhipu-enhanced', model: 'glm-5.2',
       usage: { inputTokens: 100, cachedInputTokens: 0, outputTokens: 50 }, occurredAt: '2026-09-02T09:00:00.000Z',
@@ -137,6 +140,8 @@ describe('OutcomeLedgerStore', () => {
     const persistence = openPersistence({ dataDirectory: tmpDir() });
     const first = persistence.identity.createCompany({ companyName: '甲公司', displayName: '甲', email: 'a3@example.test' });
     const second = persistence.identity.createCompany({ companyName: '乙公司', displayName: '乙', email: 'b3@example.test' });
+    saveSession(persistence, first.tenant.id, 'ses_tenant_a');
+    saveSession(persistence, second.tenant.id, 'ses_tenant_b');
     const definition = persistence.outcomes.defineOutcome({
       tenantId: first.tenant.id, actionPattern: 'external.send.email', title: '甲的审核通过', acceptanceCriteria: '仅甲可见',
       riskLevel: 'high', actorRef: `account:${first.account.id}`, idempotencyKey: 'tenant-def-001',
@@ -159,6 +164,7 @@ describe('OutcomeLedgerStore', () => {
   it('records a rejected outcome without any cost and still produces a receipt with a null approval when none was linked', () => {
     const persistence = openPersistence({ dataDirectory: tmpDir() });
     const owner = persistence.identity.createCompany({ companyName: '甲公司', displayName: '甲', email: 'a4@example.test' });
+    saveSession(persistence, owner.tenant.id, 'ses_rejected');
     const definition = persistence.outcomes.defineOutcome({
       tenantId: owner.tenant.id, actionPattern: 'crm.write.accounts', title: 'CRM 写回通过', acceptanceCriteria: '字段抽查通过',
       riskLevel: 'high', actorRef: `account:${owner.account.id}`, idempotencyKey: 'rej-def-001',
@@ -178,6 +184,7 @@ describe('OutcomeLedgerStore', () => {
     const persistence = openPersistence({ dataDirectory: tmpDir() });
     const owner = persistence.identity.createCompany({ companyName: '甲公司', displayName: '甲', email: 'planning@example.test' });
     const sessionId = 'ses_planning_receipt';
+    saveSession(persistence, owner.tenant.id, sessionId);
     const definition = persistence.outcomes.defineOutcome({
       tenantId: owner.tenant.id, actionPattern: 'file.write.report', title: '报告验收', acceptanceCriteria: '内容完整',
       riskLevel: 'high', actorRef: `account:${owner.account.id}`, idempotencyKey: 'planning-def-001',
@@ -198,3 +205,10 @@ describe('OutcomeLedgerStore', () => {
     persistence.close();
   });
 });
+
+function saveSession(persistence: ReturnType<typeof openPersistence>, tenantId: string, sessionId: string, workOrderId?: string): void {
+  persistence.runtimeEvents.saveSession({
+    sessionId, tenantId, runtimeId: 'test', workOrderId,
+    startedAt: '2026-09-02T08:00:00.000Z', plan: {}, handle: {},
+  });
+}

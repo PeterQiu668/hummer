@@ -63,6 +63,8 @@ function redactText(raw: string, explicitSecrets: readonly string[]): string {
     const separator = match.includes('=') ? '=' : ':';
     return `${match.split(/[=:]/, 1)[0]}${separator}[REDACTED:VALUE]`;
   });
+  value = value.replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\s,;"']+/g, '[REDACTED:PATH]');
+  value = value.replace(/(^|\s)\/(?:Users|home|tmp|var|private|etc)(?:\/[^\s,;"']*)?/g, '$1[REDACTED:PATH]');
   return value;
 }
 
@@ -71,20 +73,23 @@ function requireText(value: string, field: string, maxLength: number): string {
   return value;
 }
 
-function sanitizeFile(file: DiagnosticFileInput): DiagnosticFileInput {
-  const normalized = file.path.replaceAll('\\', '/');
-  if (!normalized || normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized) || normalized.split('/').includes('..')) {
+function sanitizeFile(file: DiagnosticFileInput, secrets: readonly string[]): DiagnosticFileInput {
+  const requested = file.path.replaceAll('\\', '/');
+  if (!requested || requested.startsWith('/') || /^[A-Za-z]:\//.test(requested) || requested.split('/').includes('..')) {
     throw new Error('diagnostic file paths must be workspace-relative');
   }
-  if (FORBIDDEN_PATH_SEGMENTS.test(normalized)) throw new Error(`diagnostic file category is forbidden: ${normalized}`);
+  if (FORBIDDEN_PATH_SEGMENTS.test(requested)) throw new Error(`diagnostic file category is forbidden: ${requested}`);
   if (!Number.isInteger(file.bytes) || file.bytes < 0) throw new Error('diagnostic file bytes must be a non-negative integer');
   if (!HASH_PATTERN.test(file.sha256)) throw new Error('diagnostic file sha256 is invalid');
+  const normalized = redactText(requested, secrets);
   return { ...file, path: normalized };
 }
 
 export function createDiagnosticPack(input: DiagnosticPackInput): DiagnosticPack {
   if (!ISO_UTC_PATTERN.test(input.generatedAt)) throw new Error('diagnostic generatedAt must be UTC ISO-8601');
-  const secrets = (input.explicitSecrets ?? []).filter((secret) => secret.length > 0);
+  const explicitSecrets = (input.explicitSecrets ?? []).filter((secret) => secret.length > 0);
+  const secrets = [...explicitSecrets, input.tenantRef, input.nodeRef]
+    .filter((secret): secret is string => typeof secret === 'string' && secret.length > 0);
   return {
     schema: 'hummer.diagnostic-pack',
     version: 1,
@@ -106,8 +111,8 @@ export function createDiagnosticPack(input: DiagnosticPackInput): DiagnosticPack
       code: requireText(event.code, 'event code', 128),
       message: redactText(event.message.slice(0, 4096), secrets),
     })),
-    files: input.files.slice(0, 256).map(sanitizeFile),
-    redaction: { policy: 'allowlist-v1', explicitSecretCount: secrets.length },
+    files: input.files.slice(0, 256).map((file) => sanitizeFile(file, secrets)),
+    redaction: { policy: 'allowlist-v1', explicitSecretCount: explicitSecrets.length },
   };
 }
 

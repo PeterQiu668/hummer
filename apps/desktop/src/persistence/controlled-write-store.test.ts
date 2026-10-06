@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { platform } from 'node:process';
 import { openPersistence } from './database.js';
+import { requireTenantWorkspace } from '../tenant-workspace-path.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -14,7 +15,7 @@ afterEach(() => {
 describe('controlled write channel', () => {
   it('refuses a file write without an approved HUMMER policy decision', () => {
     const fixture = createFixture('missing');
-    const outputPath = join(fixture.workspace, 'blocked.md');
+    const outputPath = join(requireTenantWorkspace(fixture.workspace, fixture.tenantId), 'blocked.md');
 
     expect(() => fixture.persistence.controlledWrites.write({
       tenantId: fixture.tenantId,
@@ -48,7 +49,7 @@ describe('controlled write channel', () => {
       occurredAt: '2026-09-11T04:00:02.000Z',
     })).toThrow(/approved approval/i);
 
-    expect(existsSync(join(fixture.workspace, 'rejected.md'))).toBe(false);
+    expect(existsSync(join(requireTenantWorkspace(fixture.workspace, fixture.tenantId), 'rejected.md'))).toBe(false);
     expect(fixture.persistence.listDomainEvents(fixture.token)).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'approval.rejected', aggregateId: 'approval_rejected' }),
     ]));
@@ -85,7 +86,7 @@ describe('controlled write channel', () => {
       occurredAt: '2026-09-11T04:00:03.000Z',
     });
 
-    expect(readFileSync(join(fixture.workspace, 'approved.md'), 'utf8')).toBe('approved content');
+    expect(readFileSync(join(requireTenantWorkspace(fixture.workspace, fixture.tenantId), 'approved.md'), 'utf8')).toBe('approved content');
     expect(result.evidenceRef).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);
     expect(fixture.persistence.evidence.verify(fixture.tenantId, result.evidenceRef)).toEqual({
       valid: true,
@@ -104,9 +105,9 @@ describe('controlled write channel', () => {
     const fixture = createFixture('symlink');
     recordApproval(fixture.persistence, fixture.tenantId, fixture.approverActorRef, 'session_symlink', 'approval_symlink', true);
     const external = join(fixture.root, 'external');
-    mkdirSync(fixture.workspace, { recursive: true });
+    const tenantWorkspace = requireTenantWorkspace(fixture.workspace, fixture.tenantId);
     mkdirSync(external);
-    symlinkSync(external, join(fixture.workspace, 'linked'), platform === 'win32' ? 'junction' : 'dir');
+    symlinkSync(external, join(tenantWorkspace, 'linked'), platform === 'win32' ? 'junction' : 'dir');
 
     expect(() => fixture.persistence.controlledWrites.write({
       tenantId: fixture.tenantId,

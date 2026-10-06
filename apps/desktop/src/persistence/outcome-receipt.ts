@@ -41,6 +41,7 @@ export interface AssembleOutcomeReceiptInput {
  * including a raw provider key anywhere in the assembled JSON can never leave this function.
  */
 export function assembleOutcomeReceipt(input: AssembleOutcomeReceiptInput): OutcomeReceipt {
+  assertReceiptScope(input);
   const totalCostCny = input.costs.reduce((sum, entry) => sum + entry.costCny, 0);
   const body = {
     generatedAt: input.generatedAt,
@@ -55,4 +56,18 @@ export function assembleOutcomeReceipt(input: AssembleOutcomeReceiptInput): Outc
   };
   const receiptJson = redactRuntimeSecrets(canonicalJson(body), input.environment);
   return { ...body, receiptJson };
+}
+
+function assertReceiptScope(input: AssembleOutcomeReceiptInput): void {
+  const scoped = input.outcome.tenantId === input.tenantId
+    && input.definition.tenantId === input.tenantId
+    && input.outcome.outcomeDefinitionId === input.definition.id
+    && input.costs.every((cost) => (
+      cost.tenantId === input.tenantId
+      && cost.sessionId === input.outcome.sessionId
+      && (cost.outcomeEventId === null || cost.outcomeEventId === input.outcome.id)
+    ))
+    && input.tools.every((tool) => tool.tenantId === input.tenantId && tool.sessionId === input.outcome.sessionId)
+    && (input.approval === null || input.approval.sessionId === input.outcome.sessionId);
+  if (!scoped) throw new Error('Outcome receipt data is unavailable in the current tenant session');
 }

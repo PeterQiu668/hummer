@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openPersistence } from './database.js';
+import { requireTenantWorkspace } from '../tenant-workspace-path.js';
 
 const roots: string[] = [];
 
@@ -26,7 +27,7 @@ describe('builtin tool executor', () => {
       idempotencyKey: 'draft-approved',
     });
 
-    expect(existsSync(join(fixture.workspace, 'drafts/customer-update.md'))).toBe(true);
+    expect(existsSync(join(requireTenantWorkspace(fixture.workspace, fixture.tenantId), 'drafts/customer-update.md'))).toBe(true);
     expect(result.evidenceRef).toMatch(/^evidence:\/\/sha256\/[a-f0-9]{64}$/);
     expect(fixture.persistence.tools.listInvocations(fixture.tenantId, fixture.sessionId)).toEqual([
       expect.objectContaining({ capabilityId: 'external.send.draft', status: 'completed', evidenceRefs: [result.evidenceRef] }),
@@ -51,7 +52,7 @@ describe('builtin tool executor', () => {
       idempotencyKey: 'draft-rejected',
     })).toThrow(/approved approval/i);
 
-    expect(existsSync(join(fixture.workspace, 'drafts/rejected.md'))).toBe(false);
+    expect(existsSync(join(requireTenantWorkspace(fixture.workspace, fixture.tenantId), 'drafts/rejected.md'))).toBe(false);
     expect(fixture.persistence.tools.listInvocations(fixture.tenantId, fixture.sessionId)).toEqual([
       expect.objectContaining({ capabilityId: 'external.send.draft', status: 'declined', evidenceRefs: [] }),
     ]);
@@ -62,11 +63,15 @@ describe('builtin tool executor', () => {
   it('exports an approved sandbox artifact to a user-selected directory and records delivery proof', () => {
     const fixture = createFixture('egress-approved', 'external.send');
     recordDecision(fixture, true, 'external.send');
-    const orderWorkspace = join(fixture.workspace, 'order-42');
+    const orderWorkspace = join(fixture.workspace, fixture.workOrderId);
     const destinationDirectory = join(fixture.root, 'customer-delivery');
     mkdirSync(orderWorkspace, { recursive: true });
     mkdirSync(destinationDirectory, { recursive: true });
     writeFileSync(join(orderWorkspace, 'proposal.md'), 'approved customer proposal', 'utf8');
+    fixture.persistence.evidence.put(Buffer.from('approved customer proposal'), {
+      tenantId: fixture.tenantId, sessionId: fixture.sessionId, mediaType: 'text/markdown',
+      name: 'proposal.md', createdAt: '2026-09-14T08:00:01.500Z',
+    });
 
     const result = fixture.persistence.builtinTools.exportApprovedArtifact({
       tenantId: fixture.tenantId,
@@ -93,7 +98,7 @@ describe('builtin tool executor', () => {
   it('leaves no destination trace when external delivery was rejected', () => {
     const fixture = createFixture('egress-rejected', 'external.send');
     recordDecision(fixture, false, 'external.send');
-    const orderWorkspace = join(fixture.workspace, 'order-43');
+    const orderWorkspace = join(fixture.workspace, fixture.workOrderId);
     const destinationDirectory = join(fixture.root, 'customer-delivery');
     mkdirSync(orderWorkspace, { recursive: true });
     mkdirSync(destinationDirectory, { recursive: true });
@@ -129,11 +134,12 @@ function createFixture(label: string, action = 'external.send.draft') {
   const approver = `account:${identity.account.id}`;
   const sessionId = `session_${label}`;
   const approvalId = `approval_${label}`;
+  const workOrderId = `work_${label}`;
   persistence.approvalPolicies.ensureDefaults(tenantId, approver);
   persistence.tools.ensureDefaults(tenantId, approver);
-  persistence.runtimeEvents.saveSession({ sessionId, tenantId, runtimeId: 'builtin', startedAt: '2026-09-11T05:00:00.000Z', plan: {}, handle: { sessionId, runtimeId: 'builtin' } });
+  persistence.runtimeEvents.saveSession({ sessionId, tenantId, runtimeId: 'builtin', workOrderId, startedAt: '2026-09-11T05:00:00.000Z', plan: {}, handle: { sessionId, runtimeId: 'builtin' } });
   persistence.runtimeEvents.save({ sessionId, sequence: 1, occurredAt: '2026-09-11T05:00:00.000Z', actorRef: 'employee:writer', type: 'approval_required', approvalId, tool: action, evidenceRefs: [] }, { tenantId, runtimeId: 'builtin', correlationId: `corr_${sessionId}` });
-  return { persistence, tenantId, approver, sessionId, approvalId, workspace: join(root, 'workspace'), root };
+  return { persistence, tenantId, approver, sessionId, approvalId, workOrderId, workspace: join(root, 'workspace'), root };
 }
 
 function recordDecision(fixture: ReturnType<typeof createFixture>, approved: boolean, action = 'external.send.draft'): void {
