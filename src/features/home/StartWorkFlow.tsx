@@ -63,8 +63,16 @@ export default function StartWorkFlow({
         confirmedBy: decidedPlan.decidedBy ?? decisionActorRef,
         confirmedAt: decidedPlan.decidedAt ?? now(),
       });
+      setError(null);
       setIntent(nextIntent);
       void Promise.resolve(dispatchIntentPort?.record(nextIntent)).catch((cause) => {
+        setIntent(null);
+        setPlan({
+          ...decidedPlan,
+          status: 'pending',
+          decidedBy: null,
+          decidedAt: null,
+        });
         setError(cause instanceof Error ? cause.message : '派发适配器未能记录意图');
       });
     } catch (cause) {

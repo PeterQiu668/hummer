@@ -78,6 +78,21 @@ describe('StartWorkFlow relay seam', () => {
     expect(record).not.toHaveBeenCalled();
   });
 
+  it('returns to pending and allows retry when the dispatch intent port rejects', async () => {
+    const { record } = setup();
+    record.mockRejectedValueOnce(new Error('Relay 暂不可用'));
+    await requestPlan();
+    fireEvent.click(screen.getByRole('button', { name: '确认计划' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Relay 暂不可用');
+    expect(screen.getByText('等待你的确认')).toBeInTheDocument();
+    expect(screen.queryByLabelText('待派发意图')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '确认计划' }));
+    await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText('待派发意图')).toHaveTextContent('start-work:');
+  });
+
   it('fails closed for an unknown risk and records no dispatch intent', async () => {
     const source = draftPlanFromPrompt('执行未知动作');
     source.understanding = ['读取已授权资料', '执行 unknown capability'];
