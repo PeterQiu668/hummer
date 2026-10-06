@@ -31,6 +31,7 @@ export class HummerNodeAgent {
   /** @type {() => Date} */ #clock;
   /** @type {Map<string, {claimId: string, deliveryId: string, envelope: unknown}>} */ #pending = new Map();
   /** @type {Set<string>} */ #terminal = new Set();
+  /** @type {Set<string>} */ #stopped = new Set();
   /** @type {NodeJS.Timeout|null} */ #heartbeatTimer = null;
 
   /**
@@ -117,6 +118,17 @@ export class HummerNodeAgent {
       this.#terminal.add(claim.claimId);
       return { state: 'rejected', claimId: claim.claimId, reasonCode: 'invalid_task_envelope' };
     }
+    const envelope = readValidatedEnvelopeBinding(validation.value);
+    if (envelope.tenantId !== this.tenantId || envelope.targetNodeId !== this.nodeId) {
+      await this.#transport.reportClaimStatus({ claimId: claim.claimId, state: 'rejected', reasonCode: 'task_scope_mismatch' }, this.#context());
+      this.#terminal.add(claim.claimId);
+      return { state: 'rejected', claimId: claim.claimId, reasonCode: 'task_scope_mismatch' };
+    }
+    if (Date.parse(envelope.expiresAt) <= this.#clock().getTime()) {
+      await this.#transport.reportClaimStatus({ claimId: claim.claimId, state: 'rejected', reasonCode: 'task_expired' }, this.#context());
+      this.#terminal.add(claim.claimId);
+      return { state: 'rejected', claimId: claim.claimId, reasonCode: 'task_expired' };
+    }
     this.#pending.set(claim.claimId, { ...claim, envelope: validation.value });
     await this.#transport.reportClaimStatus({ claimId: claim.claimId, state: 'pending_confirmation' }, this.#context());
     return { state: 'pending_confirmation', claimId: claim.claimId };
@@ -124,6 +136,7 @@ export class HummerNodeAgent {
 
   /** @param {string} claimId @param {unknown} approval */
   async confirmAndExecute(claimId, approval) {
+    if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
     const claim = this.#pending.get(claimId);
     if (!claim) throw new NodeAgentError('claim_not_pending', 'Claim is not waiting for confirmation');
@@ -169,6 +182,19 @@ export class HummerNodeAgent {
     }
   }
 
+  /**
+   * Apply a Relay stop notification to a claim that has not started executing.
+   * Stop is terminal and cannot be reversed by a later ApprovalDecision.
+   * @param {string} claimId
+   */
+  stopClaim(claimId) {
+    const id = requireNonEmptyString(claimId, 'invalid_claim', 'claimId');
+    this.#pending.delete(id);
+    this.#stopped.add(id);
+    this.#terminal.add(id);
+    return { state: 'stopped', claimId: id };
+  }
+
   /** @param {string} requiredScope */
   #assertActiveGrant(requiredScope) {
     if (Date.parse(this.grantExpiresAt) <= this.#clock().getTime()) throw new NodeAgentError('grant_expired', 'Capability grant has expired');
@@ -201,6 +227,24 @@ function safeClaimId(value) {
 /** @param {unknown} error */
 function safeErrorCode(error) {
   return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : 'operation_failed';
+}
+
+/**
+ * TaskEnvelope was already accepted by the injected shared validator. This
+ * helper reads only the three routing/expiry bindings the node must enforce;
+ * it is not a second contract schema.
+ * @param {unknown} value
+ */
+function readValidatedEnvelopeBinding(value) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new NodeAgentError('invalid_task_envelope', 'Validated task envelope must be an object');
+  }
+  const envelope = /** @type {Record<string, unknown>} */ (value);
+  return {
+    tenantId: requireNonEmptyString(envelope.tenantId, 'invalid_task_envelope', 'TaskEnvelope tenantId'),
+    targetNodeId: requireNonEmptyString(envelope.targetNodeId, 'invalid_task_envelope', 'TaskEnvelope targetNodeId'),
+    expiresAt: requireIsoDate(envelope.expiresAt, 'invalid_task_envelope', 'TaskEnvelope expiresAt'),
+  };
 }
 
 /** @param {FleetTransport} transport @param {FleetContractValidator} validator @param {NodeTaskExecutor} executor */
