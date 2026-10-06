@@ -5,7 +5,12 @@ import { delimiter, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const outputDirectory = resolve(repository, 'evidence', 'round-w5');
+const roundDirectoryName = option('round') ?? 'round-w5';
+if (!/^round-w5(?:\.[1-9][0-9]*)?$/.test(roundDirectoryName)) {
+  fail('W5 evidence round must be round-w5 or a positive revision such as round-w5.1.');
+}
+const roundLabel = roundDirectoryName.slice('round-'.length).toUpperCase();
+const outputDirectory = resolve(repository, 'evidence', roundDirectoryName);
 const gatesPath = resolve(outputDirectory, 'gates.json');
 const reportPath = resolve(outputDirectory, 'report.md');
 const installerPath = resolve(repository, 'release', 'm5e', 'HUMMER-Setup-0.6.0-internal.1.exe');
@@ -24,7 +29,8 @@ const specifications = [
   { id: 'contracts', args: ['run', 'test:contract'] },
   { id: 'web-relay-browser', args: ['run', 'test:web-e2e'] },
   { id: 'tenancy', args: ['run', 'test:tenancy'] },
-  { id: 'security', args: ['run', 'test:security'] },
+  { id: 'security-grants', args: ['run', 'test:security', '--', '--grants'] },
+  { id: 'security-token-leak', args: ['run', 'test:security', '--', '--token-leak'] },
   { id: 'fleet-idempotency', args: ['run', 'test:fleet', '--', '--idempotency'] },
   { id: 'full-test', args: ['test'] },
   { id: 'typecheck', args: ['run', 'typecheck'] },
@@ -42,7 +48,7 @@ const counts = {
 const evidence = {
   schema: 'hummer.w5-evidence',
   version: 1,
-  round: 'W5',
+  round: roundLabel,
   generatedAt: new Date().toISOString(),
   commit: sourceCommit,
   branch: git(['branch', '--show-current']).trim(),
@@ -137,9 +143,9 @@ function report(evidence) {
     return `   - \`${command.cmd}\` -> exit ${command.exitCode} (tail: ${escapeMarkdown(summary)})`;
   }).join('\n');
   const artifacts = evidence.artifacts.map((item) => `   - \`${item.path}\`: ${item.bytes} bytes, SHA-256 \`${item.sha256}\``).join('\n');
-  return `# W5 internal beta foundation evidence report
+  return `# ${roundLabel} internal beta foundation evidence report
 
-ROUND W5 | ${evidence.generatedAt.slice(0, 10)} | branch ${evidence.branch} | source commit ${evidence.commit} | worktree phase0-fleet
+ROUND ${roundLabel} | ${evidence.generatedAt.slice(0, 10)} | branch ${evidence.branch} | source commit ${evidence.commit} | worktree phase0-fleet
 
 1. 本轮目标
    - 打通远程 Relay 浏览器入口、手机批量派活、能力资产注册/分享/安装门禁、真实能力目录 UI，并形成可安装的 Windows 内测包。
@@ -152,9 +158,9 @@ ROUND W5 | ${evidence.generatedAt.slice(0, 10)} | branch ${evidence.branch} | so
 ${commandLines}
 4. 产物
 ${artifacts}
-   - \`evidence/round-w5/gates.json\`
-   - \`evidence/round-w5/report.md\`
-   - \`evidence/round-w5/manifest.json\`（封存后提供逐文件 SHA-256 与 rootHash）
+   - \`evidence/${roundDirectoryName}/gates.json\`
+   - \`evidence/${roundDirectoryName}/report.md\`
+   - \`evidence/${roundDirectoryName}/manifest.json\`（封存后提供逐文件 SHA-256 与 rootHash）
 5. 未完成 / 失败 / 降级项
    - 真实双机与外部 Relay：pending；本轮浏览器门禁使用 HTTPS route mock，不能冒充双机证据。
    - 受信安装桥：pending；UI 只接受启动时注入的 installer port，但实际部署桥尚未接线。
@@ -185,6 +191,14 @@ function findNpmCli() {
     }
   }
   throw new Error('npm-cli.js was not found; set HUMMER_NPM_CLI');
+}
+
+function option(name) {
+  const prefix = `--${name}=`;
+  const inline = process.argv.slice(2).find((value) => value.startsWith(prefix));
+  if (inline) return inline.slice(prefix.length);
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
 function git(args) {
