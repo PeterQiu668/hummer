@@ -44,6 +44,9 @@ let hostOptions: ClaudeHostOptions = {};
 
 export interface ClaudeHostOptions {
   resolveTenantId?: (token: string) => string;
+  authorizeApproval?: (token: string, context: {
+    riskLevel: 'high'; initiatedByActorId: string; approvalScope: 'other';
+  }) => void;
 }
 
 export function registerClaudeHost(options: ClaudeHostOptions = {}): void {
@@ -55,6 +58,8 @@ export function registerClaudeHost(options: ClaudeHostOptions = {}): void {
   ipcMain.handle(STOP, async (_event, token: string, processId: string) => stopRun(requireRun(processId, token)));
   ipcMain.handle(RESPOND_APPROVAL, async (_event, token: string, processId: string) => {
     requireRun(processId, token);
+    if (!hostOptions.authorizeApproval) throw new Error('Claude Code approval role authorizer is not configured');
+    hostOptions.authorizeApproval(token, { riskLevel: 'high', initiatedByActorId: '', approvalScope: 'other' });
     throw new Error('Claude Code approval E2E is not connected: the installed CLI requires an external permission-prompt MCP tool. No approval was sent.');
   });
   ipcMain.handle(STEER, async (_event, token: string, processId: string, text: string) => steerRun(requireRun(processId, token), text));
