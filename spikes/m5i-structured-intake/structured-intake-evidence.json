@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-10-06T14:53:12.915Z",
+  "accepted": {
+    "id": "intake_16ccdccaa72364412dd56ff62a3b106a",
+    "externalRef": "folder:inbox\\20261006-desktop-37dld71-orders.hummer-task.json:5f22054288c904f7ea158c6fc1c3f6b37421b5481c6c7bca4ecce96aec568ee4",
+    "payload": {
+      "assignee": "销售运营分身",
+      "attachmentNames": [],
+      "dueAt": "2026-10-10T10:00:00.000Z",
+      "executable": true,
+      "expectedDeliverable": "订单汇总表与逾期清单",
+      "origin": {
+        "device": "desktop-37dld71",
+        "system": "agent-hub",
+        "taskId": "task-20261006-001"
+      },
+      "prompt": "整理九月华东订单。目标：汇总订单并标出逾期项。期望交付：订单汇总表与逾期清单。附件：无。",
+      "sourceSha256": "5f22054288c904f7ea158c6fc1c3f6b37421b5481c6c7bca4ecce96aec568ee4",
+      "structuredTask": true,
+      "suggestedCapabilities": [],
+      "target": "汇总订单并标出逾期项",
+      "title": "整理九月华东订单"
+    },
+    "payloadEvidenceRef": "evidence://sha256/5f22054288c904f7ea158c6fc1c3f6b37421b5481c6c7bca4ecce96aec568ee4"
+  },
+  "broken": {
+    "id": "intake_928f7d041d7ba7a6984cab1eed065d96",
+    "preReadError": "结构化任务文件无效：不是有效的 JSON",
+    "confirmAttempt": "rejected: Error invoking remote method 'hummer:intake:confirm': Error: This file type has no implemented capability and cannot be confirmed for execution"
+  },
+  "sessionsBeforeConfirmation": 0,
+  "integrity": {
+    "valid": true,
+    "checked": 4
+  },
+  "screenshotPath": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify\\spikes\\m5i-structured-intake\\structured-intake.png"
+}

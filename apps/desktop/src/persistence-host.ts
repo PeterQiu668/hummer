@@ -23,6 +23,7 @@ import type { RuntimeConnectorRecord } from './mcp-connector-registry.js';
 import { probeLocalMcp } from './mcp-connection-probe.js';
 import { WorkOrderInboxWatcher } from './work-order-inbox-watcher.js';
 import { preReadInboxFile } from './inbox-pre-reader.js';
+import { isStructuredTaskFile, parseStructuredTaskFile } from './structured-task-file.js';
 import { requireWorkspaceDirectory, requireWorkspaceFile } from './workspace-file-guard.js';
 import type { WorkspaceExecLeaseContext } from './workspace-exec-broker.js';
 import type { WorkspaceExecHealth, WorkspaceExecRequest, WorkspaceExecResult } from './workspace-exec-service.js';
@@ -534,6 +535,10 @@ async function ingestInboxFile(persistence: DesktopPersistence, tenantId: string
   const file = requireWorkspaceFile({ workspaceDirectory, requestedPath, capability: 'work_order_intake', maxBytes: 25 * 1024 * 1024 });
   const bytes = readFileSync(file.absolutePath);
   const digest = createHash('sha256').update(bytes).digest('hex');
+  if (isStructuredTaskFile(requestedPath)) {
+    ingestStructuredTaskFile(persistence, tenantId, requestedPath, bytes, digest);
+    return;
+  }
   const preRead = await preReadInboxFile(workspaceDirectory, requestedPath);
   const prompt = preRead.executable && preRead.capabilityId
     ? `使用 ${preRead.capabilityId} 读取 ${requestedPath}，根据本地预读摘要提取订单目标与交付要求，生成一份可验收的订单处理结果。\n本地预读摘要：${preRead.summary}`
@@ -562,6 +567,23 @@ async function ingestInboxFile(persistence: DesktopPersistence, tenantId: string
     evidenceRefs: preRead.executable ? [intake.payloadEvidenceRef] : [],
     occurredAt: intake.receivedAt,
     idempotencyKey: `inbox-pre-read:${intake.id}`,
+  });
+}
+
+// ADR-014：结构化派活文件。解析成功 → 与表单同形的 payload；失败 → 照样落一张 pending 工单，
+// 标为不可执行并写明原因，让人看见，而不是静默丢弃。两种情况都不启动运行时。
+function ingestStructuredTaskFile(persistence: DesktopPersistence, tenantId: string, requestedPath: string, bytes: Uint8Array, digest: string): void {
+  const parsed = parseStructuredTaskFile(bytes);
+  const payload: WorkOrderIntakePayload = parsed.ok ? parsed.payload : {
+    title: `无法解析的结构化任务：${requestedPath}`, target: '修正任务文件后重新投递', expectedDeliverable: '无',
+    assignee: '自动推荐', dueAt: null, attachmentNames: [requestedPath], prompt: `结构化任务文件 ${requestedPath} 无效，未执行。`,
+    executable: false, suggestedCapabilities: [], structuredTask: true, sourceSha256: digest,
+    preReadError: `结构化任务文件无效：${parsed.error}`,
+  };
+  persistence.workOrderIntakes.intake({
+    tenantId, source: 'folder', externalRef: `folder:${requestedPath}:${digest}`, actorRef: 'system:inbox-watcher',
+    receivedAt: new Date().toISOString(), payloadBytes: bytes, payloadMediaType: 'application/json', payloadName: requestedPath,
+    payload: parsed.ok ? { ...payload, sourceSha256: digest } : payload,
   });
 }
 

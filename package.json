@@ -47,6 +47,7 @@
     "test:desktop:tool-registry": "node scripts/e2e-desktop-tool-registry.mjs",
     "test:desktop:doc-extract": "node scripts/e2e-desktop-doc-extract.mjs",
     "test:desktop:intake": "node scripts/e2e-desktop-intake.mjs",
+    "test:desktop:structured-intake": "node scripts/e2e-desktop-structured-intake.mjs",
     "test:desktop:external-draft": "node scripts/e2e-desktop-external-draft.mjs",
     "test:desktop:egress": "node scripts/e2e-desktop-egress.mjs",
     "test:desktop:workspace-exec": "node scripts/e2e-desktop-workspace-exec.mjs",
