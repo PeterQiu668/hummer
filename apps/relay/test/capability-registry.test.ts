@@ -6,6 +6,8 @@ import type { FastifyInstance } from 'fastify';
 import {
   computeCapabilityPackageDigest,
   computeCapabilityInstallRequestDigest,
+  computeTeamReadOnlyShareDigest,
+  validateCapabilityContract,
   type CapabilityPackageAuthorInput,
   type CapabilityInstallGateInput,
   type SkillTrialSystemRecordInput,
@@ -201,9 +203,17 @@ for (const [name, factory] of [
       expect(decision).toMatchObject({ decision: 'approved', targetTenantId: TENANT_B, packageDigest: created.packageDigest });
       const denied = await store.recordCapabilityInstallDecision(TENANT_B, gateInput(share, 'gate-denied', NOW, true), 'system:capability-install-gate', NOW);
       expect(denied).toMatchObject({ decision: 'denied' });
-      const forged = gateInput(share, 'gate-forged');
+      const forged = gateInput(structuredClone(share), 'gate-forged');
       forged.share.packageDigest = '0'.repeat(64);
       await expect(store.recordCapabilityInstallDecision(TENANT_B, forged, 'system:capability-install-gate', NOW))
+        .rejects.toMatchObject({ code: 'capability_trust_denied' });
+      const alternateShare = structuredClone(share);
+      alternateShare.targetTenantId = TENANT_A;
+      delete alternateShare.invitation;
+      alternateShare.shareDigest = computeTeamReadOnlyShareDigest(alternateShare);
+      const alternateGate = gateInput(alternateShare, 'gate-valid-but-foreign');
+      expect(validateCapabilityContract('CapabilityInstallGateInput', alternateGate).issues).toBeUndefined();
+      await expect(store.recordCapabilityInstallDecision(TENANT_B, alternateGate, 'system:capability-install-gate', NOW))
         .rejects.toMatchObject({ code: 'capability_trust_denied' });
       await expect(store.recordCapabilityInstallDecision('tenant-unknown', gateInput(share, 'gate-2'), 'system:capability-install-gate', NOW))
         .rejects.toMatchObject({ code: 'capability_not_found' });
