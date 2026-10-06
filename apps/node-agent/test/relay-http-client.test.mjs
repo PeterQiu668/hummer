@@ -5,6 +5,21 @@ import { RelayClientError, RelayHttpClient } from '../src/relay-http-client.mjs'
 
 const context = { nodeId: 'node-a', tenantId: 'tenant-a', grantToken: 'local-grant-not-used-for-http' };
 
+test('rejects plaintext non-loopback Relay endpoints before a badge can be sent', () => {
+  assert.throws(
+    () => new RelayHttpClient({ baseUrl: 'http://relay.example', badgeToken: 'safe-test-badge' }),
+    /Plain HTTP Relay endpoints are allowed only on loopback/,
+  );
+  assert.throws(
+    () => new RelayHttpClient({
+      baseUrl: 'https://relay.example',
+      badgeToken: 'safe-test-badge',
+      reconnect: { maxAttempts: Number.POSITIVE_INFINITY },
+    }),
+    /positive finite integer/,
+  );
+});
+
 function jsonResponse(body, status = 200) {
   return new Response(body === undefined ? undefined : JSON.stringify(body), {
     status,
@@ -60,7 +75,7 @@ test('401 and 403 failures are terminal and never leak or retry the badge', asyn
     const badgeToken = `badge-${status}-secret`;
     let attempts = 0;
     const client = new RelayHttpClient({
-      baseUrl: 'http://relay.invalid', badgeToken,
+      baseUrl: 'https://relay.invalid', badgeToken,
       fetch: async () => {
         attempts += 1;
         return jsonResponse({ error: { code: 'denied', message: 'request denied' } }, status);
@@ -83,7 +98,7 @@ test('SSE authorization failures stop after one attempt with no reconnect', asyn
     let attempts = 0;
     const delays = [];
     const client = new RelayHttpClient({
-      baseUrl: 'http://relay.invalid', badgeToken: `stream-badge-${status}`,
+      baseUrl: 'https://relay.invalid', badgeToken: `stream-badge-${status}`,
       fetch: async () => {
         attempts += 1;
         return jsonResponse({ error: { code: 'invalid_token', message: 'denied' } }, status);
@@ -103,7 +118,7 @@ test('SSE reconnect uses capped exponential backoff and stops after the configur
   const delays = [];
   let attempts = 0;
   const client = new RelayHttpClient({
-    baseUrl: 'http://relay.invalid', badgeToken: 'safe-test-badge',
+    baseUrl: 'https://relay.invalid', badgeToken: 'safe-test-badge',
     fetch: async () => {
       attempts += 1;
       return new Response(new ReadableStream({
@@ -136,7 +151,7 @@ test('connectAgent claims task.available but never confirms or executes, and app
     confirmAndExecute: async () => { executions.push('executed'); },
   };
   const client = new RelayHttpClient({
-    baseUrl: 'http://relay.invalid', badgeToken: 'safe-test-badge',
+    baseUrl: 'https://relay.invalid', badgeToken: 'safe-test-badge',
     fetch: async () => new Response(new ReadableStream({
       start(value) {
         controller = value;

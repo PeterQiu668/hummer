@@ -43,14 +43,17 @@ export class RelayHttpClient {
     if (!['http:', 'https:'].includes(baseUrl.protocol) || baseUrl.username || baseUrl.password) {
       throw new TypeError('Relay baseUrl must be an HTTP(S) URL without credentials');
     }
+    if (baseUrl.protocol === 'http:' && !isLoopbackHost(baseUrl.hostname)) {
+      throw new TypeError('Plain HTTP Relay endpoints are allowed only on loopback');
+    }
     if (typeof options.badgeToken !== 'string' || !options.badgeToken.trim()) throw new TypeError('Opaque Relay badge token is required');
     const initialDelayMs = options.reconnect?.initialDelayMs ?? 250;
     const maxDelayMs = options.reconnect?.maxDelayMs ?? 15_000;
-    const maxAttempts = options.reconnect?.maxAttempts ?? Number.POSITIVE_INFINITY;
+    const maxAttempts = options.reconnect?.maxAttempts ?? 8;
     if (!Number.isFinite(initialDelayMs) || initialDelayMs < 0) throw new TypeError('initialDelayMs must be non-negative');
     if (!Number.isFinite(maxDelayMs) || maxDelayMs < initialDelayMs) throw new TypeError('maxDelayMs must be at least initialDelayMs');
-    if (!(maxAttempts === Number.POSITIVE_INFINITY || (Number.isInteger(maxAttempts) && maxAttempts >= 1))) {
-      throw new TypeError('maxAttempts must be a positive integer or Infinity');
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+      throw new TypeError('maxAttempts must be a positive finite integer');
     }
     this.#baseUrl = baseUrl;
     this.#badgeToken = options.badgeToken;
@@ -259,6 +262,12 @@ export class RelayHttpClient {
       ...(json ? { 'content-type': 'application/json' } : {}),
     };
   }
+}
+
+/** @param {string} hostname */
+function isLoopbackHost(hostname) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
 }
 
 /** @param {URL} url */
