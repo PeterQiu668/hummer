@@ -6,6 +6,7 @@
     { "path": "./apps/api" },
     { "path": "./apps/desktop" },
     { "path": "./packages/contracts" },
-    { "path": "./packages/capability-runtime" }
+    { "path": "./packages/capability-runtime" },
+    { "path": "./packages/skill-replay" }
   ]
 }
