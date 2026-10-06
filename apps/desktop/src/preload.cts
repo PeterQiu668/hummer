@@ -30,40 +30,40 @@ ipcRenderer.on(EVENT, (_event, envelope: Envelope) => deliver(envelope));
 
 ipcRenderer.on(CLAUDE_EVENT, (_event, envelope: Envelope) => deliverClaude(envelope));
 contextBridge.exposeInMainWorld('hummerCodexCliHost', {
-  start: (request: unknown) => ipcRenderer.invoke('hummer:codex:start', request),
-  subscribe: (run: Run, callback: (message: unknown) => void) => {
+  start: (request: unknown, token: string) => ipcRenderer.invoke('hummer:codex:start', token, request),
+  subscribe: (run: Run, token: string, callback: (message: unknown) => void) => {
     const subscription: Subscription = { callback, seen: new Set() };
     const group = subscriptions.get(run.processId) ?? new Set<Subscription>();
     group.add(subscription);
     subscriptions.set(run.processId, group);
-    void ipcRenderer.invoke('hummer:codex:replay', run.processId).then((events: Envelope[]) => events.forEach(deliver));
+    void ipcRenderer.invoke('hummer:codex:replay', token, run.processId).then((events: Envelope[]) => events.forEach(deliver));
     return () => {
       group.delete(subscription);
       if (!group.size) subscriptions.delete(run.processId);
     };
   },
-  respondToApproval: (run: Run, id: string, approved: boolean) => ipcRenderer.invoke('hummer:codex:respond-approval', run.processId, id, approved),
-  sendHumanMessage: (run: Run, text: string) => ipcRenderer.invoke('hummer:codex:steer', run.processId, text),
-  stop: (run: Run) => ipcRenderer.invoke('hummer:codex:stop', run.processId),
-  fork: (run: Run, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => ipcRenderer.invoke('hummer:codex:fork', run.processId, checkpoint, sop),
+  respondToApproval: (run: Run, token: string, id: string, approved: boolean) => ipcRenderer.invoke('hummer:codex:respond-approval', token, run.processId, id, approved),
+  sendHumanMessage: (run: Run, token: string, text: string) => ipcRenderer.invoke('hummer:codex:steer', token, run.processId, text),
+  stop: (run: Run, token: string) => ipcRenderer.invoke('hummer:codex:stop', token, run.processId),
+  fork: (run: Run, token: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => ipcRenderer.invoke('hummer:codex:fork', token, run.processId, checkpoint, sop),
 });
 
 contextBridge.exposeInMainWorld('hummerClaudeCliHost', {
-  start: (request: unknown) => ipcRenderer.invoke('hummer:claude:start', request),
-  subscribe: (run: Run, callback: (message: unknown) => void) => {
+  start: (request: unknown, token: string) => ipcRenderer.invoke('hummer:claude:start', token, request),
+  subscribe: (run: Run, token: string, callback: (message: unknown) => void) => {
     const subscription: Subscription = { callback, seen: new Set() };
     const group = claudeSubscriptions.get(run.processId) ?? new Set<Subscription>();
     group.add(subscription);
     claudeSubscriptions.set(run.processId, group);
-    void ipcRenderer.invoke('hummer:claude:replay', run.processId).then((events: Envelope[]) => events.forEach(deliverClaude));
+    void ipcRenderer.invoke('hummer:claude:replay', token, run.processId).then((events: Envelope[]) => events.forEach(deliverClaude));
     return () => {
       group.delete(subscription);
       if (!group.size) claudeSubscriptions.delete(run.processId);
     };
   },
-  respondToApproval: (run: Run, id: string, approved: boolean) => ipcRenderer.invoke('hummer:claude:respond-approval', run.processId, id, approved),
-  sendHumanMessage: (run: Run, text: string) => ipcRenderer.invoke('hummer:claude:steer', run.processId, text),
-  stop: (run: Run) => ipcRenderer.invoke('hummer:claude:stop', run.processId),
+  respondToApproval: (run: Run, token: string, id: string, approved: boolean) => ipcRenderer.invoke('hummer:claude:respond-approval', token, run.processId, id, approved),
+  sendHumanMessage: (run: Run, token: string, text: string) => ipcRenderer.invoke('hummer:claude:steer', token, run.processId, text),
+  stop: (run: Run, token: string) => ipcRenderer.invoke('hummer:claude:stop', token, run.processId),
 });
 
 contextBridge.exposeInMainWorld('hummerEngineProfiles', {

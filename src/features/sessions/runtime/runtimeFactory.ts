@@ -36,6 +36,7 @@ export function createDefaultRuntimeAdapter(): RuntimeAdapter {
       enabled: true,
       host: window.hummerClaudeCliHost,
       cwd: window.hummerDesktop?.cwd ?? import.meta.env.VITE_HUMMER_CLAUDE_CWD,
+      getAuthToken: currentSessionToken,
     });
     return new FailoverRuntimeAdapter(claude, new MockRuntimeAdapter());
   }

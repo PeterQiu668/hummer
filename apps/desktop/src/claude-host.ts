@@ -28,6 +28,8 @@ interface EventEnvelope {
 
 interface RunState {
   processId: string;
+  tenantId: string;
+  authToken: string;
   child: ChildProcessWithoutNullStreams;
   owner: WebContents;
   decoder: JsonLineDecoder;
@@ -38,23 +40,31 @@ interface RunState {
 
 const runs = new Map<string, RunState>();
 let registered = false;
+let hostOptions: ClaudeHostOptions = {};
 
-export function registerClaudeHost(): void {
-  if (registered) return;
-  registered = true;
-  ipcMain.handle(START, startClaude);
-  ipcMain.handle(REPLAY, (_event, processId: string) => [...requireRun(processId).events]);
-  ipcMain.handle(STOP, async (_event, processId: string) => stopRun(requireRun(processId)));
-  ipcMain.handle(RESPOND_APPROVAL, async () => {
-    throw new Error('Claude Code approval E2E is not connected: the installed CLI requires an external permission-prompt MCP tool. No approval was sent.');
-  });
-  ipcMain.handle(STEER, async (_event, processId: string, text: string) => steerRun(requireRun(processId), text));
+export interface ClaudeHostOptions {
+  resolveTenantId?: (token: string) => string;
 }
 
-async function startClaude(event: IpcMainInvokeEvent, request: ClaudeHostInvocation): Promise<{
+export function registerClaudeHost(options: ClaudeHostOptions = {}): void {
+  if (registered) return;
+  registered = true;
+  hostOptions = options;
+  ipcMain.handle(START, (event, token: string, request: ClaudeHostInvocation) => startClaude(event, token, request));
+  ipcMain.handle(REPLAY, (_event, token: string, processId: string) => [...requireRun(processId, token).events]);
+  ipcMain.handle(STOP, async (_event, token: string, processId: string) => stopRun(requireRun(processId, token)));
+  ipcMain.handle(RESPOND_APPROVAL, async (_event, token: string, processId: string) => {
+    requireRun(processId, token);
+    throw new Error('Claude Code approval E2E is not connected: the installed CLI requires an external permission-prompt MCP tool. No approval was sent.');
+  });
+  ipcMain.handle(STEER, async (_event, token: string, processId: string, text: string) => steerRun(requireRun(processId, token), text));
+}
+
+async function startClaude(event: IpcMainInvokeEvent, token: string, request: ClaudeHostInvocation): Promise<{
   processId: string;
   engine: ClaudeEngineDisclosure;
 }> {
+  const tenantId = resolveTenantId(token);
   validateClaudeInvocation(request);
   const processId = randomUUID();
   const executable = resolveClaudeExecutable();
@@ -67,6 +77,8 @@ async function startClaude(event: IpcMainInvokeEvent, request: ClaudeHostInvocat
   });
   const state: RunState = {
     processId,
+    tenantId,
+    authToken: token,
     child,
     owner: event.sender,
     decoder: new JsonLineDecoder(),
@@ -90,6 +102,10 @@ async function startClaude(event: IpcMainInvokeEvent, request: ClaudeHostInvocat
 
 function attachProcess(state: RunState): void {
   state.child.stdout.on('data', (chunk: Buffer) => {
+    if (!isCurrentTenant(state)) {
+      stopUnauthorizedRun(state);
+      return;
+    }
     try {
       state.decoder.push(chunk).forEach((message) => {
         state.wireLog.append('inbound', JSON.stringify(message));
@@ -132,13 +148,17 @@ function stopRun(state: RunState): void {
   if (!state.child.killed) state.child.kill();
 }
 
-export function stopAllClaudeRuns(): number {
-  const active = [...runs.values()].filter((state) => !state.child.killed);
+export function stopAllClaudeRuns(tenantId: string): number {
+  const active = [...runs.values()].filter((state) => state.tenantId === tenantId && !state.child.killed);
   active.forEach(stopRun);
   return active.length;
 }
 
 function publish(state: RunState, message: unknown): void {
+  if (!isCurrentTenant(state)) {
+    stopUnauthorizedRun(state);
+    return;
+  }
   const envelope: EventEnvelope = { processId: state.processId, index: state.events.length + 1, message };
   state.events.push(envelope);
   if (!state.owner.isDestroyed()) state.owner.send(EVENT, envelope);
@@ -149,10 +169,26 @@ function publishStderr(state: RunState, line: string): void {
   publish(state, { type: 'host.stderr', line });
 }
 
-function requireRun(processId: string): RunState {
+function requireRun(processId: string, token: string): RunState {
   const state = runs.get(processId);
   if (!state) throw new Error(`Unknown Claude Code process ${processId}`);
+  const tenantId = resolveTenantId(token);
+  if (state.tenantId !== tenantId) throw new Error('Claude Code process is unavailable in the current tenant');
   return state;
+}
+
+function resolveTenantId(token: string): string {
+  if (typeof token !== 'string' || !token) throw new Error('Claude Code runtime requires an authenticated session token');
+  if (!hostOptions.resolveTenantId) throw new Error('Claude Code runtime tenant resolver is not configured');
+  return hostOptions.resolveTenantId(token);
+}
+
+function isCurrentTenant(state: RunState): boolean {
+  try { return resolveTenantId(state.authToken) === state.tenantId; } catch { return false; }
+}
+
+function stopUnauthorizedRun(state: RunState): void {
+  if (!state.child.killed) state.child.kill();
 }
 
 function resolveClaudeExecutable(): string {

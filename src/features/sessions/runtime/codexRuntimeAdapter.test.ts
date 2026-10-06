@@ -166,11 +166,11 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     let onMessage: ((message: unknown) => void) | undefined;
     const host: CodexCliHost = {
       start: async () => ({ processId: 'process-1' }),
-      subscribe: (_run, callback) => { onMessage = callback; return () => undefined; },
+      subscribe: (_run, _token, callback) => { onMessage = callback; return () => undefined; },
       respondToApproval: async () => undefined,
       stop: async () => undefined,
     };
-    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc' });
+    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc', getAuthToken: () => 'session-a' });
     const handle = await runtime.startSession(draftPlanFromPrompt('审批后继续'));
     const events: RuntimeEvent[] = [];
     runtime.subscribe(handle, (event) => events.push(event));
@@ -189,7 +189,7 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
       sendHumanMessage: async () => undefined,
       stop: async () => undefined,
     };
-    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc' });
+    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc', getAuthToken: () => 'session-a' });
     const handle = await runtime.startSession(draftPlanFromPrompt('等待插话'));
     const events: RuntimeEvent[] = [];
     runtime.subscribe(handle, (event) => events.push(event));
@@ -205,25 +205,42 @@ describe('CodexRuntimeAdapter mapping skeleton', () => {
     });
   });
 
+  it('re-reads the authenticated session token for every host control call', async () => {
+    let token = 'session-a';
+    const start = vi.fn(async () => ({ processId: 'process-1' }));
+    const subscribe = vi.fn(() => () => undefined);
+    const stop = vi.fn(async () => undefined);
+    const host: CodexCliHost = { start, subscribe, stop };
+    const runtime = new CodexRuntimeAdapter({ enabled: true, host, getAuthToken: () => token });
+
+    const handle = await runtime.startSession(draftPlanFromPrompt('验证 token 轮换'));
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ authToken: 'session-a' }), 'session-a');
+    expect(subscribe).toHaveBeenCalledWith(expect.anything(), 'session-a', expect.any(Function));
+
+    token = 'session-b';
+    await runtime.stop(handle);
+    expect(stop).toHaveBeenCalledWith(expect.anything(), 'session-b');
+  });
+
   it('forks through the host from an exact checkpoint and keeps branches separate', async () => {
     let onMessage: ((message: unknown) => void) | undefined;
     const fork = vi.fn().mockResolvedValue({ processId: 'process-fork', nativeSessionId: 'thread-fork' });
     const host: CodexCliHost = {
       start: async () => ({ processId: 'process-source', nativeSessionId: 'thread-source' }),
-      subscribe: (run, callback) => {
+      subscribe: (run, _token, callback) => {
         if (run.processId === 'process-source') onMessage = callback;
         return () => undefined;
       },
       stop: async () => undefined,
       fork,
     };
-    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc' });
+    const runtime = new CodexRuntimeAdapter({ enabled: true, host, protocol: 'app-server-jsonrpc', getAuthToken: () => 'session-a' });
     const source = await runtime.startSession(draftPlanFromPrompt('summarize the folder'));
     onMessage?.({ type: 'item.completed', item: { type: 'agent_message', text: 'source result' } });
     onMessage?.({ type: 'turn.completed', turn_id: 'turn-source' });
 
     const branch = await runtime.forkFromCheckpoint(source, 2, 'Prefer concise output');
-    expect(fork).toHaveBeenCalledWith(expect.objectContaining({ nativeSessionId: 'thread-source' }), { sequence: 2, nativeTurnId: 'turn-source' }, 'Prefer concise output');
+    expect(fork).toHaveBeenCalledWith(expect.objectContaining({ nativeSessionId: 'thread-source' }), 'session-a', { sequence: 2, nativeTurnId: 'turn-source' }, 'Prefer concise output');
     expect(branch).toMatchObject({ nativeSessionId: 'thread-fork', runtimeId: runtime.id });
     expect(branch.sessionId).not.toBe(source.sessionId);
 

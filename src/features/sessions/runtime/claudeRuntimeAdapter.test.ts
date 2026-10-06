@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { draftPlanFromPrompt } from '../model/session';
 import type { RuntimeEvent } from './adapter';
 import {
@@ -41,12 +41,12 @@ describe('ClaudeRuntimeAdapter', () => {
     let publish: ((message: unknown) => void) | undefined;
     const host: ClaudeCliHost = {
       start: async () => ({ processId: 'claude-process-1' }),
-      subscribe: (_run, callback) => { publish = callback; return () => undefined; },
+      subscribe: (_run, _token, callback) => { publish = callback; return () => undefined; },
       respondToApproval: async () => undefined,
       sendHumanMessage: async () => undefined,
       stop: async () => undefined,
     };
-    const runtime = new ClaudeRuntimeAdapter({ enabled: true, host });
+    const runtime = new ClaudeRuntimeAdapter({ enabled: true, host, getAuthToken: () => 'session-a' });
     const handle = await runtime.startSession(draftPlanFromPrompt('做一份摘要'));
     const events: RuntimeEvent[] = [];
     runtime.subscribe(handle, (event) => events.push(event));
@@ -55,5 +55,28 @@ describe('ClaudeRuntimeAdapter', () => {
 
     expect(handle.runtimeId).toBe('claude-code');
     expect(events[0]).toMatchObject({ type: 'result', summary: 'summary ready' });
+  });
+
+  it('re-reads the authenticated session token for every host control call', async () => {
+    let token = 'session-a';
+    const start = vi.fn(async () => ({ processId: 'claude-process-1' }));
+    const subscribe = vi.fn(() => () => undefined);
+    const stop = vi.fn(async () => undefined);
+    const host: ClaudeCliHost = {
+      start,
+      subscribe,
+      respondToApproval: async () => undefined,
+      sendHumanMessage: async () => undefined,
+      stop,
+    };
+    const runtime = new ClaudeRuntimeAdapter({ enabled: true, host, getAuthToken: () => token });
+
+    const handle = await runtime.startSession(draftPlanFromPrompt('验证 token 轮换'));
+    expect(start).toHaveBeenCalledWith(expect.anything(), 'session-a');
+    expect(subscribe).toHaveBeenCalledWith(expect.anything(), 'session-a', expect.any(Function));
+
+    token = 'session-b';
+    await runtime.stop(handle);
+    expect(stop).toHaveBeenCalledWith(expect.anything(), 'session-b');
   });
 });

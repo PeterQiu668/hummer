@@ -43,6 +43,7 @@ interface AcceptInvitationRequest { token: string; displayName: string; email?: 
 
 export interface PersistenceHostRegistration {
   databasePath: string;
+  resolveTenantId(token: string): string;
   resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
   recordMcpConnectorStatus(token: string, record: RuntimeConnectorRecord): void;
   authorizeMcpTool(token: string, request: { serverName: string; toolName: string }): boolean;
@@ -56,7 +57,7 @@ export interface PersistenceHostRegistration {
   close(): void;
 }
 export interface PersistenceHostOptions {
-  stopAll?: () => Promise<number>;
+  stopAll?: (tenantId: string) => Promise<number>;
 }
 
 
@@ -414,8 +415,11 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     return persistence.executionNodes.list(tenantId);
   });
   ipcMain.handle('hummer:execution-nodes:kill-all', async (_event, token: string) => {
-    persistence.identity.currentTenantId(token);
-    return { killed: await options.stopAll?.() ?? 0 };
+    return stopAllForAuthenticatedTenant(
+      (candidate) => persistence.identity.currentTenantId(candidate),
+      token,
+      options.stopAll,
+    );
   });
   ipcMain.handle('hummer:outcomes:define', (_event, request: Authenticated<Omit<DefineOutcomeInput, 'tenantId' | 'actorRef'>>) => {
     const context = persistence.identity.resumeSession(request.token);
@@ -465,6 +469,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
 
   return {
     databasePath: persistence.databasePath,
+    resolveTenantId: (token) => persistence.identity.currentTenantId(token),
     resolveEngineCredential: (token, engineProfileId, envKey) => {
       const tenantId = persistence.identity.currentTenantId(token);
       return credentialVault.resolve(tenantId, engineProfileId, envKey) ?? process.env[envKey];
@@ -530,6 +535,16 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       persistence.close();
     },
   };
+}
+
+export async function stopAllForAuthenticatedTenant(
+  resolveTenantId: (token: string) => string,
+  token: string,
+  stopAll?: (tenantId: string) => Promise<number>,
+): Promise<{ killed: number }> {
+  if (typeof token !== 'string' || !token) throw new Error('Execution node control requires an authenticated session token');
+  const tenantId = resolveTenantId(token);
+  return { killed: await stopAll?.(tenantId) ?? 0 };
 }
 
 async function ingestInboxFile(persistence: DesktopPersistence, tenantId: string, workspaceDirectory: string, requestedPath: string): Promise<void> {

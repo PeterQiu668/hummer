@@ -13,11 +13,11 @@ export interface ClaudeCliInvocation {
 export interface ClaudeCliRun { processId: string; nativeSessionId?: string; engine?: RuntimeEngineDisclosure; }
 
 export interface ClaudeCliHost {
-  start(request: ClaudeCliInvocation): Promise<ClaudeCliRun>;
-  subscribe(run: ClaudeCliRun, callback: (message: unknown) => void): Unsubscribe;
-  respondToApproval(run: ClaudeCliRun, id: string, approved: boolean): Promise<void>;
-  sendHumanMessage(run: ClaudeCliRun, text: string): Promise<void>;
-  stop(run: ClaudeCliRun): Promise<void>;
+  start(request: ClaudeCliInvocation, token: string): Promise<ClaudeCliRun>;
+  subscribe(run: ClaudeCliRun, token: string, callback: (message: unknown) => void): Unsubscribe;
+  respondToApproval(run: ClaudeCliRun, token: string, id: string, approved: boolean): Promise<void>;
+  sendHumanMessage(run: ClaudeCliRun, token: string, text: string): Promise<void>;
+  stop(run: ClaudeCliRun, token: string): Promise<void>;
 }
 
 type RuntimeEventDraft = RuntimeEvent extends infer Event
@@ -36,15 +36,16 @@ export class ClaudeRuntimeAdapter implements RuntimeAdapter {
   readonly id = 'claude-code';
   private readonly states = new Map<string, ClaudeState>();
 
-  constructor(private readonly options: { enabled: boolean; host?: ClaudeCliHost; cwd?: string }) {}
+  constructor(private readonly options: { enabled: boolean; host?: ClaudeCliHost; cwd?: string; getAuthToken?: () => string | null }) {}
 
   async startSession(plan: SessionPlan): Promise<RuntimeHandle> {
     if (!this.options.enabled) throw new Error('ClaudeRuntimeAdapter is disabled');
     if (!this.options.host) throw new Error('No desktop ClaudeCliHost bridge is installed');
-    const run = await this.options.host.start(buildClaudeInvocation(plan, { cwd: this.options.cwd }));
+    const authToken = this.requireAuthToken();
+    const run = await this.options.host.start(buildClaudeInvocation(plan, { cwd: this.options.cwd }), authToken);
     const handle: RuntimeHandle = { runtimeId: this.id, sessionId: `claude_${plan.id}_${Date.now()}`, nativeSessionId: run.nativeSessionId, engine: run.engine };
     const state: ClaudeState = { handle, run, events: [], subscribers: new Set(), unsubscribe: () => undefined };
-    state.unsubscribe = this.options.host.subscribe(run, (message) => {
+    state.unsubscribe = this.options.host.subscribe(run, authToken, (message) => {
       const nativeSessionId = extractClaudeSessionId(message);
       if (nativeSessionId) state.handle.nativeSessionId = nativeSessionId;
       mapClaudeMessage(message).forEach((event) => this.emit(state, event));
@@ -62,7 +63,7 @@ export class ClaudeRuntimeAdapter implements RuntimeAdapter {
 
   async respondToApproval(handle: RuntimeHandle, id: string, approved: boolean): Promise<void> {
     const state = this.requireState(handle);
-    await this.options.host!.respondToApproval(state.run, id, approved);
+    await this.options.host!.respondToApproval(state.run, this.requireAuthToken(), id, approved);
     this.emit(state, {
       type: 'approval_resolved', actorRef: 'human:operator', approvalId: id, approved,
       result: approved ? '真人已批准，执行内核可以继续。' : '真人已拒绝，本次受保护动作不会执行。',
@@ -72,7 +73,7 @@ export class ClaudeRuntimeAdapter implements RuntimeAdapter {
 
   async sendHumanMessage(handle: RuntimeHandle, text: string): Promise<void> {
     const state = this.requireState(handle);
-    await this.options.host!.sendHumanMessage(state.run, text);
+    await this.options.host!.sendHumanMessage(state.run, this.requireAuthToken(), text);
     this.emit(state, {
       type: 'step', category: 'message', status: 'completed', actorRef: 'human:operator',
       title: '你补充了要求', result: text, evidenceRefs: ['claude://session/human-message'],
@@ -84,7 +85,7 @@ export class ClaudeRuntimeAdapter implements RuntimeAdapter {
 
   async stop(handle: RuntimeHandle): Promise<void> {
     const state = this.requireState(handle);
-    await this.options.host!.stop(state.run);
+    await this.options.host!.stop(state.run, this.requireAuthToken());
   }
 
   async forkFromCheckpoint(_handle: RuntimeHandle, _sequence: number, _sop?: string): Promise<RuntimeHandle> {
@@ -101,6 +102,12 @@ export class ClaudeRuntimeAdapter implements RuntimeAdapter {
     const state = this.states.get(handle.sessionId);
     if (!state || handle.runtimeId !== this.id) throw new Error(`Unknown Claude runtime handle ${handle.sessionId}`);
     return state;
+  }
+
+  private requireAuthToken(): string {
+    const token = this.options.getAuthToken?.();
+    if (!token) throw new Error('An authenticated tenant session is required for the Claude desktop runtime');
+    return token;
   }
 }
 

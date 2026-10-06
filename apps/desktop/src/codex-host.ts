@@ -55,6 +55,8 @@ interface PendingRequest {
 
 interface RunState {
   processId: string;
+  tenantId: string;
+  authToken: string;
   protocol: Invocation['protocol'];
   child: ChildProcessWithoutNullStreams;
   owner: WebContents;
@@ -97,6 +99,7 @@ function reasoningEffortArgs(environment: NodeJS.ProcessEnv): string[] {
 }
 
 export interface CodexHostOptions {
+  resolveTenantId?: (token: string) => string;
   resolveCredential?: (token: string, engineProfileId: string, envKey: string) => string | undefined;
   recordMcpConnectorStatus?: (token: string, record: RuntimeConnectorRecord) => void;
   authorizeMcpTool?: (token: string, request: { serverName: string; toolName: string }) => boolean;
@@ -110,22 +113,24 @@ export function registerCodexHost(options: CodexHostOptions = {}): void {
   if (registered) return;
   registered = true;
   hostOptions = options;
-  ipcMain.handle(START, startCodex);
-  ipcMain.handle(REPLAY, (_event, processId: string) => [...requireRun(processId).events]);
-  ipcMain.handle(STOP, async (_event, processId: string) => stopRun(requireRun(processId)));
-  ipcMain.handle(RESPOND_APPROVAL, async (_event, processId: string, approvalId: string, approved: boolean) => {
-    respondToApproval(requireRun(processId), approvalId, approved);
+  ipcMain.handle(START, (event, token: string, request: Invocation) => startCodex(event, token, request));
+  ipcMain.handle(REPLAY, (_event, token: string, processId: string) => [...requireRun(processId, token).events]);
+  ipcMain.handle(STOP, async (_event, token: string, processId: string) => stopRun(requireRun(processId, token)));
+  ipcMain.handle(RESPOND_APPROVAL, async (_event, token: string, processId: string, approvalId: string, approved: boolean) => {
+    respondToApproval(requireRun(processId, token), approvalId, approved);
   });
-  ipcMain.handle(STEER, async (_event, processId: string, text: string) => steerRun(requireRun(processId), text));
-  ipcMain.handle(FORK, (event, processId: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => forkCodex(event, requireRun(processId), checkpoint, sop));
+  ipcMain.handle(STEER, async (_event, token: string, processId: string, text: string) => steerRun(requireRun(processId, token), text));
+  ipcMain.handle(FORK, (event, token: string, processId: string, checkpoint: { sequence: number; nativeTurnId: string }, sop?: string) => forkCodex(event, requireRun(processId, token), token, checkpoint, sop));
   ipcMain.handle(CONNECTORS_LIST, () => listRuntimeConnectors());
 }
 
-async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
+async function startCodex(event: IpcMainInvokeEvent, token: string, request: Invocation): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
+  const tenantId = resolveTenantId(token);
   validateInvocation(request);
   const sandbox = resolveCodexSandbox(request.sandbox);
   const effectiveRequest = {
     ...request,
+    authToken: token,
     sandbox,
     args: request.protocol === 'exec-jsonl' ? replaceSandboxArgument(request.args, sandbox) : request.args,
   };
@@ -166,6 +171,8 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
   });
   state = {
     processId,
+    tenantId,
+    authToken: token,
     protocol: effectiveRequest.protocol,
     child,
     owner: event.sender,
@@ -227,6 +234,7 @@ async function startCodex(event: IpcMainInvokeEvent, request: Invocation): Promi
 async function forkCodex(
   event: IpcMainInvokeEvent,
   source: RunState,
+  token: string,
   checkpoint: { sequence: number; nativeTurnId: string },
   sop?: string,
 ): Promise<{ processId: string; nativeSessionId?: string; engine: EngineDisclosure }> {
@@ -237,7 +245,7 @@ async function forkCodex(
     throw new Error('Codex thread/fork requires a valid HUMMER sequence and native turn id');
   }
 
-  const request = source.invocation;
+  const request = { ...source.invocation, authToken: token };
   validateInvocation(request);
   const processId = randomUUID();
   const profile = engineProfileById(process.env.HUMMER_ENGINE_PROFILE || request.engineProfileId);
@@ -276,6 +284,8 @@ async function forkCodex(
   });
   state = {
     processId,
+    tenantId: source.tenantId,
+    authToken: token,
     protocol: request.protocol,
     child,
     owner: event.sender,
@@ -372,6 +382,10 @@ function attachProcess(state: RunState): void {
 }
 
 function handleNativeMessage(state: RunState, message: unknown): void {
+  if (!isCurrentTenant(state)) {
+    stopUnauthorizedRun(state);
+    return;
+  }
   state.wireLog.append('inbound', JSON.stringify(message));
   const connector = recordMcpStartupStatus(message);
   if (connector && !state.owner.isDestroyed()) {
@@ -500,8 +514,8 @@ async function stopRun(state: RunState): Promise<void> {
   if (!state.child.killed) state.child.kill();
 }
 
-export async function stopAllCodexRuns(): Promise<number> {
-  const active = [...runs.values()].filter((state) => !state.child.killed);
+export async function stopAllCodexRuns(tenantId: string): Promise<number> {
+  const active = [...runs.values()].filter((state) => state.tenantId === tenantId && !state.child.killed);
   await Promise.allSettled(active.map((state) => stopRun(state)));
   return active.length;
 }
@@ -521,6 +535,10 @@ function disclosure(profile: ReturnType<typeof engineProfileById>, request: Invo
 }
 
 function publish(state: RunState, message: unknown): void {
+  if (!isCurrentTenant(state)) {
+    stopUnauthorizedRun(state);
+    return;
+  }
   const envelope: EventEnvelope = { processId: state.processId, index: state.events.length + 1, message };
   state.events.push(envelope);
   if (!state.owner.isDestroyed()) state.owner.send(EVENT, envelope);
@@ -531,10 +549,26 @@ function publishStderr(state: RunState, line: string): void {
   publish(state, { type: 'host.stderr', line });
 }
 
-function requireRun(processId: string): RunState {
+function requireRun(processId: string, token: string): RunState {
   const state = runs.get(processId);
   if (!state) throw new Error(`Unknown Codex process ${processId}`);
+  const tenantId = resolveTenantId(token);
+  if (state.tenantId !== tenantId) throw new Error('Codex process is unavailable in the current tenant');
   return state;
+}
+
+function resolveTenantId(token: string): string {
+  if (typeof token !== 'string' || !token) throw new Error('Codex runtime requires an authenticated session token');
+  if (!hostOptions.resolveTenantId) throw new Error('Codex runtime tenant resolver is not configured');
+  return hostOptions.resolveTenantId(token);
+}
+
+function isCurrentTenant(state: RunState): boolean {
+  try { return resolveTenantId(state.authToken) === state.tenantId; } catch { return false; }
+}
+
+function stopUnauthorizedRun(state: RunState): void {
+  if (!state.child.killed) state.child.kill();
 }
 
 function validateInvocation(request: Invocation): void {

@@ -29,14 +29,14 @@ export interface CodexCliCheckpoint {
 }
 
 export interface CodexCliHost {
-  start(request: CodexCliInvocation): Promise<CodexCliRun>;
-  subscribe(run: CodexCliRun, callback: (message: unknown) => void): Unsubscribe;
-  respondToApproval?(run: CodexCliRun, id: string, approved: boolean): Promise<void>;
-  sendHumanMessage?(run: CodexCliRun, text: string): Promise<void>;
-  pause?(run: CodexCliRun): Promise<void>;
-  resume?(run: CodexCliRun): Promise<void>;
-  stop(run: CodexCliRun): Promise<void>;
-  fork?(run: CodexCliRun, checkpoint: CodexCliCheckpoint, sop?: string): Promise<CodexCliRun>;
+  start(request: CodexCliInvocation, token: string): Promise<CodexCliRun>;
+  subscribe(run: CodexCliRun, token: string, callback: (message: unknown) => void): Unsubscribe;
+  respondToApproval?(run: CodexCliRun, token: string, id: string, approved: boolean): Promise<void>;
+  sendHumanMessage?(run: CodexCliRun, token: string, text: string): Promise<void>;
+  pause?(run: CodexCliRun, token: string): Promise<void>;
+  resume?(run: CodexCliRun, token: string): Promise<void>;
+  stop(run: CodexCliRun, token: string): Promise<void>;
+  fork?(run: CodexCliRun, token: string, checkpoint: CodexCliCheckpoint, sop?: string): Promise<CodexCliRun>;
 }
 
 type RuntimeEventDraft = RuntimeEvent extends infer Event
@@ -74,14 +74,15 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
 
   async startSession(plan: SessionPlan): Promise<RuntimeHandle> {
     this.assertAvailable();
+    const authToken = this.requireAuthToken();
     const sessionId = `codex_${plan.id}_${++this.sessionCounter}`;
     const invocation = buildCodexInvocation(plan, {
       cwd: this.options.cwd,
       protocol: this.options.protocol ?? 'exec-jsonl',
-      authToken: this.options.getAuthToken?.() ?? undefined,
+      authToken,
       sessionId,
     });
-    const run = await this.options.host!.start(invocation);
+    const run = await this.options.host!.start(invocation, authToken);
     const handle: RuntimeHandle = {
       runtimeId: this.id,
       sessionId,
@@ -97,7 +98,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       modelProfile: plan.modelProfile,
       completedTurnIds: new Map(),
     };
-    state.unsubscribeHost = this.options.host!.subscribe(run, (message) => {
+    state.unsubscribeHost = this.options.host!.subscribe(run, authToken, (message) => {
       const nativeSessionId = extractCodexThreadId(message);
       if (nativeSessionId) state.handle.nativeSessionId = nativeSessionId;
       if (isCodexMessageType(message, 'turn.started')) state.startedAtMs = Date.now();
@@ -131,7 +132,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
     if (!this.options.host?.respondToApproval) {
       throw new Error('codex exec --json cannot answer an in-flight approval; use an app-server JSON-RPC host bridge');
     }
-    await this.options.host.respondToApproval(state.run, id, approved);
+    await this.options.host.respondToApproval(state.run, this.requireAuthToken(), id, approved);
     this.emit(state, {
       type: 'approval_resolved',
       actorRef: 'human:operator',
@@ -145,7 +146,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
   async sendHumanMessage(handle: RuntimeHandle, text: string): Promise<void> {
     const state = this.requireState(handle);
     if (!this.options.host?.sendHumanMessage) throw new Error('The configured Codex host cannot steer an active turn');
-    await this.options.host.sendHumanMessage(state.run, text);
+    await this.options.host.sendHumanMessage(state.run, this.requireAuthToken(), text);
     this.emit(state, {
       type: 'step',
       category: 'message',
@@ -160,18 +161,18 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
   async pause(handle: RuntimeHandle): Promise<void> {
     const state = this.requireState(handle);
     if (!this.options.host?.pause) throw new Error('Pause is not exposed by the configured Codex host');
-    await this.options.host.pause(state.run);
+    await this.options.host.pause(state.run, this.requireAuthToken());
   }
 
   async resume(handle: RuntimeHandle): Promise<void> {
     const state = this.requireState(handle);
     if (!this.options.host?.resume) throw new Error('Resume is not exposed by the configured Codex host');
-    await this.options.host.resume(state.run);
+    await this.options.host.resume(state.run, this.requireAuthToken());
   }
 
   async stop(handle: RuntimeHandle): Promise<void> {
     const state = this.requireState(handle);
-    await this.options.host!.stop(state.run);
+    await this.options.host!.stop(state.run, this.requireAuthToken());
   }
 
   async forkFromCheckpoint(handle: RuntimeHandle, sequence: number, sop?: string): Promise<RuntimeHandle> {
@@ -179,7 +180,8 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
     if (!this.options.host?.fork) throw new Error('Fork requires an app-server host that can map a HUMMER checkpoint to a Codex thread fork');
     const nativeTurnId = source.completedTurnIds.get(sequence);
     if (!nativeTurnId) throw new Error('Codex can only fork a HUMMER checkpoint mapped to a completed native turn; sequence ' + sequence + ' is not forkable');
-    const run = await this.options.host.fork(source.run, { sequence, nativeTurnId }, sop);
+    const authToken = this.requireAuthToken();
+    const run = await this.options.host.fork(source.run, authToken, { sequence, nativeTurnId }, sop);
     const forkHandle: RuntimeHandle = {
       runtimeId: this.id,
       sessionId: `${handle.sessionId}_fork_${sequence}`,
@@ -195,7 +197,7 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       completedTurnIds: new Map([...source.completedTurnIds].filter(([checkpointSequence]) => checkpointSequence <= sequence)),
       modelProfile: source.modelProfile,
     };
-    state.unsubscribeHost = this.options.host.subscribe(run, (message) => {
+    state.unsubscribeHost = this.options.host.subscribe(run, authToken, (message) => {
       const nativeSessionId = extractCodexThreadId(message);
       if (nativeSessionId) state.handle.nativeSessionId = nativeSessionId;
       if (isCodexMessageType(message, 'turn.started')) state.startedAtMs = Date.now();
@@ -226,6 +228,12 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
   private assertAvailable(): void {
     if (!this.options.enabled) throw new Error('CodexRuntimeAdapter is disabled');
     if (!this.options.host) throw new Error('No desktop CodexCliHost bridge is installed; browser JavaScript cannot spawn codex.exe directly');
+  }
+
+  private requireAuthToken(): string {
+    const token = this.options.getAuthToken?.();
+    if (!token) throw new Error('An authenticated tenant session is required for the Codex desktop runtime');
+    return token;
   }
 
   private requireState(handle: RuntimeHandle): CodexRuntimeState {
