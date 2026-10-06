@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { canonicalJson } from './canonical-json.js';
+import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 import {
   FleetRejectedError,
   type EnqueueResult,
@@ -71,7 +72,7 @@ interface EventRow {
   event_json: string;
 }
 
-export const RELAY_SCHEMA_VERSION = 11;
+export const RELAY_SCHEMA_VERSION = 12;
 
 function openDatabase(path: string): SqliteDatabase {
   const require = createRequire(import.meta.url);
@@ -130,6 +131,7 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord> {
+    this.advanceClock(now);
     this.#db.prepare(`
       INSERT INTO fleet_nodes (tenant_id, node_id, tenant_ids_json, agent_version, manifest_json, last_seen_at, status, offline_after_ms)
       VALUES (?, ?, ?, ?, ?, ?, 'online', ?)
@@ -145,20 +147,41 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async heartbeat(tenantId: string, claims: HeartbeatClaims, now: string): Promise<FleetNodeRecord> {
-    const result = this.#db.prepare(`UPDATE fleet_nodes SET last_seen_at = ?, status = 'online' WHERE tenant_id = ? AND node_id = ?`)
-      .run(now, tenantId, claims.nodeId);
-    if (result.changes !== 1) throw new FleetRejectedError('node_unknown', 'heartbeat node is not registered for this tenant');
-    return this.requireNode(tenantId, claims.nodeId);
+    this.advanceClock(now);
+    return this.#db.transaction(() => {
+      const node = this.#db.prepare('SELECT 1 AS present FROM fleet_nodes WHERE tenant_id = ? AND node_id = ?')
+        .get<{ present: number }>(tenantId, claims.nodeId);
+      if (!node) throw new FleetRejectedError('node_unknown', 'heartbeat node is not registered for this tenant');
+      this.recoverExpiredLeases(tenantId, now);
+      const active = this.#db.prepare(`
+        SELECT COUNT(*) AS count FROM fleet_tasks
+        WHERE tenant_id = ? AND lease_owner_node_id = ? AND status = 'leased'
+          AND julianday(lease_expires_at) > julianday(?)
+      `).get<{ count: number }>(tenantId, claims.nodeId, now);
+      const activeLeases = active?.count ?? 0;
+      if (claims.running !== activeLeases) {
+        throw new FleetRejectedError(
+          'heartbeat_load_mismatch',
+          `heartbeat reports ${claims.running} running tasks but Relay has ${activeLeases} active leases`,
+        );
+      }
+      this.#db.prepare(`UPDATE fleet_nodes SET last_seen_at = ?, status = 'online' WHERE tenant_id = ? AND node_id = ?`)
+        .run(now, tenantId, claims.nodeId);
+      return this.requireNode(tenantId, claims.nodeId);
+    })();
   }
 
   async getNode(tenantId: string, nodeId: string, now: string): Promise<FleetNodeRecord | null> {
+    this.advanceClock(now);
     this.refreshNode(tenantId, nodeId, now);
     const row = this.#db.prepare('SELECT * FROM fleet_nodes WHERE tenant_id = ? AND node_id = ?').get<NodeRow>(tenantId, nodeId);
     return row ? toNode(row) : null;
   }
 
   async enqueueTask(tenantId: string, envelope: FleetObject, claims: TaskClaims, retryOfTaskId: string | null, now: string): Promise<EnqueueResult> {
-    if (Date.parse(claims.expiresAt) <= Date.parse(now)) throw new FleetRejectedError('task_expired', 'expired task cannot be queued');
+    this.advanceClock(now);
+    const expiresAt = canonicalUtcTimestamp(claims.expiresAt, 'task expiresAt');
+    if (Date.parse(expiresAt) <= Date.parse(now)) throw new FleetRejectedError('task_expired', 'expired task cannot be queued');
     const duplicate = this.#db.prepare('SELECT * FROM fleet_tasks WHERE tenant_id = ? AND idempotency_key = ?')
       .get<TaskRow>(tenantId, claims.idempotencyKey);
     if (duplicate) {
@@ -176,7 +199,7 @@ export class SqliteFleetStore implements FleetStore {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?)
         `).run(
           tenantId, claims.taskId, claims.workOrderId, JSON.stringify(envelope), claims.targetNodeId,
-          claims.targetRuntime, claims.idempotencyKey, claims.leaseMs, claims.expiresAt, claims.originRef, retryOfTaskId,
+          claims.targetRuntime, claims.idempotencyKey, claims.leaseMs, expiresAt, claims.originRef, retryOfTaskId,
         );
         this.#db.prepare(`
           INSERT INTO fleet_task_leases (
@@ -206,32 +229,27 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async claimTask(tenantId: string, nodeId: string, now: string): Promise<FleetTaskRecord | null> {
+    this.advanceClock(now);
     return this.#db.transaction(() => {
       this.refreshNode(tenantId, nodeId, now);
       const node = this.#db.prepare('SELECT * FROM fleet_nodes WHERE tenant_id = ? AND node_id = ?').get<NodeRow>(tenantId, nodeId);
       if (!node) throw new FleetRejectedError('node_unknown', 'claiming node is not registered');
       if (node.status !== 'online') throw new FleetRejectedError('node_offline', 'offline node cannot claim tasks');
-      this.#db.prepare(`
-        UPDATE fleet_tasks
-        SET status = 'queued', lease_owner_node_id = NULL, lease_expires_at = NULL
-        WHERE tenant_id = ? AND status = 'leased' AND lease_expires_at <= ?
-      `).run(tenantId, now);
-      this.#db.prepare(`
-        UPDATE fleet_task_leases SET state = 'queued', lease_expires_at = NULL, updated_at = ?
-        WHERE tenant_id = ? AND state = 'leased' AND lease_expires_at <= ?
-      `).run(now, tenantId, now);
+      this.recoverExpiredLeases(tenantId, now);
       const candidate = this.#db.prepare(`
         SELECT * FROM fleet_tasks
-        WHERE tenant_id = ? AND target_node_id = ? AND status = 'queued' AND expires_at > ?
+        WHERE tenant_id = ? AND target_node_id = ? AND status = 'queued'
+          AND julianday(expires_at) > julianday(?)
         ORDER BY rowid ASC LIMIT 1
       `).get<TaskRow>(tenantId, nodeId, now);
       if (!candidate) return null;
       const leaseExpiresAt = new Date(Date.parse(now) + candidate.lease_ms).toISOString();
-      this.#db.prepare(`
+      const claimed = this.#db.prepare(`
         UPDATE fleet_tasks SET status = 'leased', attempt = attempt + 1,
           lease_owner_node_id = ?, lease_expires_at = ?
         WHERE tenant_id = ? AND task_id = ? AND status = 'queued'
       `).run(nodeId, leaseExpiresAt, tenantId, candidate.task_id);
+      if (claimed.changes !== 1) return null;
       const leased = this.requireTask(tenantId, candidate.task_id);
       this.#db.prepare(`
         UPDATE fleet_task_leases
@@ -243,6 +261,7 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async putEvent(tenantId: string, event: FleetObject, claims: RunEventClaims, now: string): Promise<EventResult> {
+    this.advanceClock(now);
     return this.#db.transaction(() => {
       const duplicate = this.#db.prepare('SELECT * FROM fleet_run_events WHERE tenant_id = ? AND idempotency_key = ?')
         .get<EventRow>(tenantId, claims.idempotencyKey);
@@ -258,6 +277,7 @@ export class SqliteFleetStore implements FleetStore {
       if (node.status !== 'online') throw new FleetRejectedError('node_offline', 'offline node cannot append run events');
       const task = this.requireTaskByWorkOrder(tenantId, claims.workOrderId);
       this.assertActiveLease(task, claims.nodeId, now);
+      assertEventWithinLease(claims.occurredAt, now, task.leaseExpiresAt!, task.leaseMs);
       const last = this.#db.prepare('SELECT MAX(seq) AS seq FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ?')
         .get<{ seq: number | null }>(tenantId, claims.workOrderId);
       const expectedSeq = (last?.seq ?? 0) + 1;
@@ -293,6 +313,7 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async stopTask(tenantId: string, taskId: string, actorRef: string, now: string): Promise<FleetTaskRecord> {
+    this.advanceClock(now);
     return this.#db.transaction(() => {
       const task = this.requireTask(tenantId, taskId);
       if (task.status === 'completed' || task.status === 'failed') throw new FleetRejectedError('invalid_transition', 'terminal task cannot be stopped');
@@ -306,8 +327,10 @@ export class SqliteFleetStore implements FleetStore {
   }
 
   async getTask(tenantId: string, taskId: string, now: string): Promise<FleetTaskRecord | null> {
+    this.advanceClock(now);
     const recovered = this.#db.prepare(`UPDATE fleet_tasks SET status = 'queued', lease_owner_node_id = NULL, lease_expires_at = NULL
-      WHERE tenant_id = ? AND task_id = ? AND status = 'leased' AND lease_expires_at <= ?`).run(tenantId, taskId, now);
+      WHERE tenant_id = ? AND task_id = ? AND status = 'leased'
+        AND julianday(lease_expires_at) <= julianday(?)`).run(tenantId, taskId, now);
     if (recovered.changes > 0) {
       this.#db.prepare(`UPDATE fleet_task_leases SET state = 'queued', lease_expires_at = NULL, updated_at = ? WHERE tenant_id = ? AND task_id = ?`)
         .run(now, tenantId, taskId);
@@ -349,6 +372,11 @@ export class SqliteFleetStore implements FleetStore {
         name TEXT NOT NULL,
         applied_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS relay_clock (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        high_water_at TEXT NOT NULL
+      );
+      INSERT OR IGNORE INTO relay_clock (singleton_id, high_water_at) VALUES (1, '1970-01-01T00:00:00.000Z');
       CREATE TABLE IF NOT EXISTS fleet_nodes (
         tenant_id TEXT NOT NULL,
         node_id TEXT NOT NULL,
@@ -423,8 +451,27 @@ export class SqliteFleetStore implements FleetStore {
         detail TEXT NOT NULL
       );
     `);
-    this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
-      .run(RELAY_SCHEMA_VERSION, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
+    const migration = this.#db.prepare('INSERT OR IGNORE INTO relay_schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
+    migration.run(11, 'fleet_relay_nodes_tasks_leases', new Date(0).toISOString());
+    migration.run(RELAY_SCHEMA_VERSION, 'relay_monotonic_clock', new Date(0).toISOString());
+  }
+
+  private advanceClock(now: string): void {
+    const observedMs = Date.parse(now);
+    if (!Number.isFinite(observedMs)) throw new FleetRejectedError('clock_regression', 'Relay clock produced an invalid timestamp');
+    this.#db.transaction(() => {
+      const clock = this.#db.prepare('SELECT high_water_at FROM relay_clock WHERE singleton_id = 1')
+        .get<{ high_water_at: string }>();
+      if (!clock) throw new FleetRejectedError('clock_regression', 'Relay clock high-water mark is unavailable');
+      const highWaterMs = Date.parse(clock.high_water_at);
+      if (observedMs < highWaterMs) {
+        throw new FleetRejectedError('clock_regression', 'Relay clock moved behind its last accepted timestamp');
+      }
+      if (observedMs > highWaterMs) {
+        this.#db.prepare('UPDATE relay_clock SET high_water_at = ? WHERE singleton_id = 1')
+          .run(new Date(observedMs).toISOString());
+      }
+    })();
   }
 
   private refreshNode(tenantId: string, nodeId: string, now: string): void {
@@ -432,6 +479,20 @@ export class SqliteFleetStore implements FleetStore {
     if (row && Date.parse(now) - Date.parse(row.last_seen_at) >= row.offline_after_ms) {
       this.#db.prepare(`UPDATE fleet_nodes SET status = 'offline' WHERE tenant_id = ? AND node_id = ?`).run(tenantId, nodeId);
     }
+  }
+
+  private recoverExpiredLeases(tenantId: string, now: string): void {
+    this.#db.prepare(`
+      UPDATE fleet_tasks
+      SET status = 'queued', lease_owner_node_id = NULL, lease_expires_at = NULL
+      WHERE tenant_id = ? AND status = 'leased'
+        AND julianday(lease_expires_at) <= julianday(?)
+    `).run(tenantId, now);
+    this.#db.prepare(`
+      UPDATE fleet_task_leases SET state = 'queued', lease_expires_at = NULL, updated_at = ?
+      WHERE tenant_id = ? AND state = 'leased'
+        AND julianday(lease_expires_at) <= julianday(?)
+    `).run(now, tenantId, now);
   }
 
   private requireNode(tenantId: string, nodeId: string): FleetNodeRecord {
@@ -456,7 +517,7 @@ export class SqliteFleetStore implements FleetStore {
   private assertActiveLease(task: FleetTaskRecord, nodeId: string, now: string): void {
     if (task.status !== 'leased' || !task.leaseExpiresAt) throw new FleetRejectedError('invalid_transition', 'task has no active lease');
     if (task.leaseOwnerNodeId !== nodeId) throw new FleetRejectedError('lease_owner_mismatch', 'event node does not own the task lease');
-    if (task.leaseExpiresAt <= now) {
+    if (Date.parse(task.leaseExpiresAt) <= Date.parse(now)) {
       this.#db.prepare(`UPDATE fleet_tasks SET status = 'queued', lease_owner_node_id = NULL, lease_expires_at = NULL WHERE tenant_id = ? AND task_id = ?`)
         .run(task.tenantId, task.taskId);
       this.#db.prepare(`UPDATE fleet_task_leases SET state = 'queued', lease_expires_at = NULL, updated_at = ? WHERE tenant_id = ? AND task_id = ?`)
