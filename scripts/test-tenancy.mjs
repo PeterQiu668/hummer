@@ -19,7 +19,7 @@ function runP0RegressionPair() {
     {
       id: 'TEN-P0-DESKTOP-SESSION-BARE-ID',
       surface: 'Desktop session projection/event read by bare session id',
-      file: 'apps/desktop/src/persistence/runtime-event-store.test.ts',
+      file: 'apps/desktop/src/persistence/tenant-read-isolation.test.ts',
       marker: '\\[TEN-P0-DESKTOP-SESSION-BARE-ID\\]',
       expected: 'A tenant-B authenticated context cannot read tenant-A session metadata or events by knowing its session id.',
     },
