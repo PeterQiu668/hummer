@@ -10,3 +10,5 @@ export type {
   WorkOrderRepository,
   WorkOrderStatus,
 } from './work-order.ts';
+
+export * from './fleet/index.ts';
