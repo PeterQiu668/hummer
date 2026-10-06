@@ -1,4 +1,5 @@
 export * from './canonical-json.js';
+export * from './capability-registry.js';
 export * from './badge-auth.js';
 export * from './contract-adapter.js';
 export * from './fastify-transport.js';

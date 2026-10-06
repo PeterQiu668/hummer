@@ -145,7 +145,9 @@ function controlResourceNotFound(): TransportHttpError {
 function fleetStatus(error: FleetRejectedError): number {
   if (error.code === 'invalid_contract') return 400;
   if (error.code === 'tenant_mismatch' || error.code === 'lease_owner_mismatch' || error.code === 'actor_mismatch') return 403;
-  if (error.code === 'node_unknown' || error.code === 'approval_not_found' || error.code === 'audit_export_not_found') return 404;
+  if (error.code === 'node_unknown' || error.code === 'approval_not_found' || error.code === 'audit_export_not_found'
+    || error.code === 'capability_not_found') return 404;
+  if (error.code === 'capability_trust_denied') return 403;
   if (error.code === 'quota_exceeded') return 429;
   return 409;
 }
@@ -205,6 +207,7 @@ export function createFleetRelayServer(
         nodeId: claims.nodeId,
         ...(claims.authorizedTenantIds ? { authorizedTenantIds: claims.authorizedTenantIds } : {}),
         ...(claims.grantRef ? { tenantGrantRef: claims.grantRef } : {}),
+        authExpiresAt: claims.expiresAt,
       },
     };
   }
@@ -397,6 +400,48 @@ export function createFleetRelayServer(
     const auditExport = await ingress.getAuditExport(session, pathParam(request, 'exportId'));
     if (!auditExport) throw new TransportHttpError(404, 'audit_export_not_found', 'audit export was not found');
     return { auditExport };
+  });
+
+  app.post('/v1/capabilities/versions', async (request) => {
+    const { session } = await authorize(request, 'capability.write');
+    return { capability: await ingress.createCapabilityVersion(session, request.body) };
+  });
+
+  app.post('/v1/capabilities/trials', async (request) => {
+    const { session } = await authorize(request, 'capability.trial.record');
+    return { capability: await ingress.recordCapabilityTrial(session, request.body) };
+  });
+
+  app.post('/v1/capabilities/shares', async (request) => {
+    const { session } = await authorize(request, 'capability.share');
+    return { share: await ingress.createCapabilityShare(session, request.body) };
+  });
+
+  app.get('/v1/capabilities', async (request) => {
+    const { session } = await authorize(request, 'capability.read');
+    assertNoQueryFields(request);
+    return { capabilities: await ingress.listCapabilities(session) };
+  });
+
+  app.get('/v1/capabilities/:packageId', async (request) => {
+    const { session } = await authorize(request, 'capability.read');
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    if (Object.keys(query).some((key) => key !== 'version')) {
+      throw new TransportHttpError(400, 'invalid_contract', 'capability query contains an unknown field');
+    }
+    const rawVersion = query.version;
+    const version = rawVersion === undefined ? undefined
+      : typeof rawVersion === 'string' && /^\d+$/.test(rawVersion) && Number(rawVersion) > 0 ? Number(rawVersion)
+        : NaN;
+    if (Number.isNaN(version)) throw new TransportHttpError(400, 'invalid_contract', 'version must be a positive integer');
+    const capability = await ingress.getCapability(session, pathParam(request, 'packageId'), version);
+    if (!capability) throw new TransportHttpError(404, 'capability_not_found', 'capability was not found');
+    return { capability };
+  });
+
+  app.post('/v1/capabilities/install-gate', async (request) => {
+    const { session } = await authorize(request, 'capability.install.evaluate');
+    return { decision: await ingress.evaluateCapabilityInstall(session, request.body) };
   });
 
   app.get('/v1/nodes/:nodeId/events', async (request, reply: FastifyReply) => {

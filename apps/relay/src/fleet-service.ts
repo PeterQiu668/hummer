@@ -16,7 +16,17 @@ import {
   type TenantChainHead,
   type TenantQuotaCounter,
   type ValidationResult,
+  type CapabilityCatalogItem,
+  type CapabilityRegistryRecord,
 } from './ports.js';
+import type { CapabilityInstallGateDecision, TeamReadOnlyShare } from '@hummer/contracts';
+import {
+  buildCapabilityInvitation,
+  parseCapabilityInstallEvaluateInput,
+  parseCapabilityShareCreateInput,
+  parseCapabilityTrialRecordInput,
+  parseCapabilityVersionCreateInput,
+} from './capability-registry.js';
 import { assertQuotaDay, validateQuotaLimits, validateQuotaUsage } from './governance.js';
 import { assertNodeTenantAuthorization, resolveAuthorizedTenantIds } from './tenant-boundary.js';
 
@@ -307,6 +317,72 @@ export class FleetService implements FleetIngress {
   async getAuditExport(session: AuthenticatedFleetSession, exportId: string): Promise<TenantAuditExport | null> {
     if (!exportId.trim()) throw new FleetRejectedError('audit_export_not_found', 'audit export was not found');
     return this.store.getAuditExport(session.tenantId, exportId);
+  }
+
+  async createCapabilityVersion(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityRegistryRecord> {
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('capability_trust_denied', 'capability authoring requires a human/account control session');
+    }
+    const parsed = parseCapabilityVersionCreateInput(input);
+    assertTenant(parsed.author.tenantId, session.tenantId, 'capability author input');
+    return this.store.createCapabilityVersion(session.tenantId, parsed, session.actorRef, this.isoNow());
+  }
+
+  async recordCapabilityTrial(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityRegistryRecord> {
+    if (!session.nodeId || session.actorRef !== 'system:skill-trial') {
+      throw new FleetRejectedError('capability_trust_denied', 'SkillTrial recording requires the trusted trial service identity');
+    }
+    const parsed = parseCapabilityTrialRecordInput(input);
+    assertTenant(parsed.trial.tenantId, session.tenantId, 'SkillTrial');
+    return this.store.recordCapabilityTrial(session.tenantId, parsed, session.nodeId, this.isoNow());
+  }
+
+  async createCapabilityShare(session: AuthenticatedFleetSession, input: unknown): Promise<TeamReadOnlyShare> {
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('capability_trust_denied', 'capability sharing requires a human/account control session');
+    }
+    const parsed = parseCapabilityShareCreateInput(input);
+    const now = this.isoNow();
+    let invitation;
+    if (parsed.targetTenantId !== session.tenantId) {
+      if (!session.authorizedTenantIds?.includes(parsed.targetTenantId) || !session.tenantGrantRef
+        || !session.authExpiresAt || session.authExpiresAt <= now) {
+        throw new FleetRejectedError('capability_trust_denied', 'cross-tenant share requires an active identity-provider tenant grant');
+      }
+      const record = await this.store.getCapability(session.tenantId, parsed.packageId, parsed.packageVersion);
+      if (!record || record.access !== 'owner') throw new FleetRejectedError('capability_not_found', 'capability version was not found');
+      invitation = buildCapabilityInvitation({
+        invitationId: session.tenantGrantRef,
+        sourceTenantId: session.tenantId,
+        targetTenantId: parsed.targetTenantId,
+        packageId: parsed.packageId,
+        packageVersion: parsed.packageVersion,
+        packageDigest: record.record.packageDigest,
+        expiresAt: session.authExpiresAt,
+      });
+    }
+    return this.store.createCapabilityShare(session.tenantId, parsed, invitation, session.actorRef, now);
+  }
+
+  async listCapabilities(session: AuthenticatedFleetSession): Promise<readonly CapabilityCatalogItem[]> {
+    return this.store.listCapabilities(session.tenantId);
+  }
+
+  async getCapability(
+    session: AuthenticatedFleetSession,
+    packageId: string,
+    packageVersion?: number,
+  ): Promise<CapabilityCatalogItem | null> {
+    if (!packageId.trim() || (packageVersion !== undefined && (!Number.isInteger(packageVersion) || packageVersion < 1))) return null;
+    return this.store.getCapability(session.tenantId, packageId, packageVersion);
+  }
+
+  async evaluateCapabilityInstall(session: AuthenticatedFleetSession, input: unknown): Promise<CapabilityInstallGateDecision> {
+    if (session.nodeId || session.actorRef !== 'system:capability-install-gate') {
+      throw new FleetRejectedError('capability_trust_denied', 'install evaluation requires the trusted install-gate service identity');
+    }
+    const parsed = parseCapabilityInstallEvaluateInput(input);
+    return this.store.recordCapabilityInstallDecision(session.tenantId, parsed, session.actorRef, this.isoNow());
   }
 
   private isoNow(): string {
