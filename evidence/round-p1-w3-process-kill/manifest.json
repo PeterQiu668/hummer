@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-w3-process-kill",
+  "generatedAt": "2026-10-06T20:32:50.087Z",
+  "gitCommit": "334cfeb60860915cff6d32b9d415d2b3ccfe42bc",
+  "prevManifestRootHash": "bf45d1d43f5724c2fc620b055d62ee50e1f58d4a0efaef3fd7f7daecfe7856e0",
+  "files": [
+    {
+      "path": "evidence/round-p1-w3-process-kill/gates.json",
+      "sha256": "e66bdc85c672094e2ebee769144d379e365f64fec902e7fdd7d2fa0d2b070ff2",
+      "bytes": 2017
+    }
+  ],
+  "rootHash": "d3c6777edcf1e0853e4eb8305569bd1f6c106be0ca9aed8792b93cdbdec7864f"
+}

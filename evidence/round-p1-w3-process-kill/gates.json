@@ -1,0 +1,26 @@
+{
+  "round": "P1-W3-process-kill",
+  "generatedAt": "2026-10-06T20:32:49.775Z",
+  "commit": "334cfeb60860915cff6d32b9d415d2b3ccfe42bc",
+  "worktree": "phase0-fleet",
+  "node": "v22.22.2",
+  "commands": [
+    {
+      "cmd": "E:\\npm-cache\\_npx\\5705de4b80ce9477\\node_modules\\node\\bin\\node.exe scripts/test-chaos.mjs --process-kill",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"chaos\",\"mode\":\"process-kill\",\"status\":\"passed\",\"capturedAt\":\"2026-10-06T20:32:49.753Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":1,\"negativeCases\":3,\"checks\":[{\"id\":\"node-process-kill-recovery\",\"status\":\"passed\",\"command\":\"E:\\\\npm-cache\\\\_npx\\\\5705de4b80ce9477\\\\node_modules\\\\node\\\\bin\\\\node.exe --test <REPOSITORY_ROOT>\\\\scripts\\\\test-process-kill.mjs\",\"exitCode\":0,\"tests\":{\"total\":1,\"passed\":1,\"failed\":0,\"pending\":null},\"negativeCases\":3,\"evidence\":[\"a real child process reaches executing, is forcibly killed, and a fresh process recovers the durable journal\"],\"stdoutTail\":\"TAP version 13\\n# Subtest: a forcibly killed node restarts recovery-required within 30 seconds and never re-executes\\nok 1 - a forcibly killed node restarts recovery-required within 30 seconds and never re-executes\\n  ---\\n  duration_ms: 308.3933\\n  type: 'test'\\n  ...\\n1..1\\n# tests 1\\n# suites 0\\n# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n# todo 0\\n# duration_ms 419.8523\",\"stderrTail\":\"\"}],\"limitations\":[\"This is a supervised local Node Agent crash/restart proof; Relay failover and true cross-machine recovery remain separate gates.\"]}\n",
+      "stderr": ""
+    }
+  ],
+  "accepted": {
+    "processKill": "real child process killed at executing; fresh process recovered fail-closed with zero executor calls"
+  },
+  "broken": {},
+  "counts": {
+    "pass": 1,
+    "fail": 0,
+    "skipped": 0
+  },
+  "artifacts": [],
+  "screenshots": []
+}
