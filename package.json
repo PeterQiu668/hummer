@@ -29,6 +29,8 @@
     "evidence:seal": "node scripts/evidence-seal.mjs",
     "capture:p1:foundation": "node scripts/capture-p1-foundation.mjs",
     "verify:fleet:receipt": "node scripts/verify-fleet-receipt.mjs spikes/p0-fleet-receipt/fleet-receipt.json",
+    "verify:tenant-export": "node scripts/verify-tenant-export.mjs",
+    "test:tenant-export": "node --test scripts/test-tenant-export.mjs",
     "audit:dead-controls": "node scripts/audit-dead-controls.mjs",
     "audit:abandoned-3d": "node scripts/audit-abandoned-3d-lineage.mjs",
     "pretest:unit": "npm run config:check",
