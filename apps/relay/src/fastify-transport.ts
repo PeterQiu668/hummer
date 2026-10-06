@@ -144,14 +144,18 @@ export function createFleetRelayServer(
     expectedNodeId?: string,
   ): Promise<AuthorizedRequest> {
     const token = parseBearer(request.headers.authorization);
-    const claims = await options.authenticator.authenticate(token);
-    const expiry = claims ? Date.parse(claims.expiresAt) : Number.NaN;
-    if (!claims || !Number.isFinite(expiry) || expiry <= now().getTime()) {
-      throw new TransportHttpError(401, 'invalid_token', 'Bearer badge token is invalid or expired');
-    }
-    if (!claims.scopes.includes(scope)) {
+    const authorization = await options.authenticator.authorize({
+      token,
+      scope,
+      now: now().toISOString(),
+    });
+    if (!authorization.ok && authorization.reason === 'scope_denied') {
       throw new TransportHttpError(403, 'scope_denied', `badge does not grant ${scope}`);
     }
+    if (!authorization.ok) {
+      throw new TransportHttpError(401, 'invalid_token', 'Bearer badge token is invalid or expired');
+    }
+    const { claims } = authorization;
     if (expectedNodeId !== undefined && claims.nodeId !== expectedNodeId) {
       throw new TransportHttpError(403, 'node_mismatch', 'badge is not bound to this node');
     }
