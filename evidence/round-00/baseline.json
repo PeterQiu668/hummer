@@ -1,0 +1,263 @@
+{
+  "schema": "hummer.phase0.baseline",
+  "version": 1,
+  "capturedAt": "2026-10-06T17:52:35.533Z",
+  "lineage": {
+    "trustedWorktree": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+    "trustedBranch": "codex/m3-development",
+    "trustedHead": "24b726f745139d57f64f3413946740afc0754cf1",
+    "expectedProductHead": "24b726f745139d57f64f3413946740afc0754cf1",
+    "abandonedRootWorktree": "F:\\Users\\claude code",
+    "abandonedRootBranch": "main",
+    "abandonedRootHead": "9118de51cf7c21ff625de7b193e3c027b1aa3a69",
+    "abandonedRootStatus": [
+      "M index.html",
+      " M src/components/collab/ChannelList.tsx",
+      " M src/components/marketplace/Marketplace.tsx",
+      " M src/components/pages/EmployeesPage.tsx",
+      " M src/components/pages/WorkspacePage.tsx",
+      " M src/components/shell/AppShell.tsx",
+      " M src/components/shell/BottomFlow.tsx",
+      " M src/components/shell/LeftNav.tsx",
+      " M src/components/shell/RightConsole.tsx",
+      " M src/components/shell/TopBar.tsx",
+      " M src/components/ui/AgentAvatar.tsx",
+      " M src/styles.css",
+      "?? \"boss recruitment system/\"",
+      "?? caishuifa-agent/",
+      "?? docs/hummer-reboot-v11.md",
+      "?? src/components/ui/ChibiAvatar.tsx",
+      "?? tianming-mandate/",
+      "?? \"\\351\\201\\207\\350\\247\\201AI-\\350\\267\\257\\346\\274\\224\\345\\216\\237\\345\\236\\213/\""
+    ]
+  },
+  "inheritedWorkingTree": {
+    "status": [
+      "M apps/desktop/src/config/deepseek-pricing.json",
+      " M apps/desktop/src/config/engine-profiles.json",
+      " M apps/desktop/src/config/tool-definitions.json",
+      " M spikes/m2-persistence/restart-evidence.json",
+      " M spikes/m4-identity/two-profile-evidence.json",
+      " M src/features/engines/engine-profiles.json",
+      " M src/features/sessions/runtime/runtime-pricing.json",
+      " M src/features/tools/tool-definitions.json"
+    ],
+    "fileEvidence": [
+      {
+        "path": "apps/desktop/src/config/deepseek-pricing.json",
+        "sha256": "e2e1a1c99884a7766496ae6233cc4b877467dde62fe43a8aeedb6e1257637919"
+      },
+      {
+        "path": "apps/desktop/src/config/engine-profiles.json",
+        "sha256": "3b1538464754767845435bb98a1805c91793902a5e0a1199abb663088fc4f3eb"
+      },
+      {
+        "path": "apps/desktop/src/config/tool-definitions.json",
+        "sha256": "0fd7d1dfd72a402f1683bb887b8a6ca5109945eca307d95e4ae59f1c69cfbdd4"
+      },
+      {
+        "path": "src/features/engines/engine-profiles.json",
+        "sha256": "975e1f0abb131b5b25151cda316e5db371fed32c74fd99c02a6699ab7ccfb28e"
+      },
+      {
+        "path": "src/features/sessions/runtime/runtime-pricing.json",
+        "sha256": "e2e1a1c99884a7766496ae6233cc4b877467dde62fe43a8aeedb6e1257637919"
+      },
+      {
+        "path": "src/features/tools/tool-definitions.json",
+        "sha256": "0fd7d1dfd72a402f1683bb887b8a6ca5109945eca307d95e4ae59f1c69cfbdd4"
+      },
+      {
+        "path": "spikes/m2-persistence/restart-evidence.json",
+        "sha256": "7eff3584d4c629c2d7aeed93e66d4bfbb03a6c2ff7b2706365daa57755f49301"
+      },
+      {
+        "path": "spikes/m4-identity/two-profile-evidence.json",
+        "sha256": "c15d7725071a8a377e4b77f4b03848be137aeb818b536367785ccbdf184151ed"
+      }
+    ],
+    "policy": "Recorded only. Never include these inherited changes in Phase 0 commits."
+  },
+  "versions": {
+    "desktopApplication": "0.6.0-internal.1",
+    "electronRuntime": "39.8.10"
+  },
+  "gates": [
+    {
+      "command": "node --version",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:52:36.819Z",
+      "finishedAt": "2026-10-06T17:52:36.902Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "v24.16.0"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "npm.cmd --version",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:52:36.903Z",
+      "finishedAt": "2026-10-06T17:52:37.768Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "11.13.0"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "codex.cmd --version",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:52:37.768Z",
+      "finishedAt": "2026-10-06T17:52:38.220Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "codex-cli 0.160.1"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "npm.cmd run config:check",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:52:38.220Z",
+      "finishedAt": "2026-10-06T17:52:39.413Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "> hummer-enterprise-workspace@0.2.0 config:check",
+        "> node packages/config/scripts/generate.mjs --check"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "npm.cmd run typecheck",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:52:39.413Z",
+      "finishedAt": "2026-10-06T17:53:06.362Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "> hummer-enterprise-workspace@0.2.0 pretypecheck",
+        "> npm run config:generate",
+        "> hummer-enterprise-workspace@0.2.0 config:generate",
+        "> node packages/config/scripts/generate.mjs",
+        "> hummer-enterprise-workspace@0.2.0 typecheck",
+        "> tsc -b --noEmit"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "npm.cmd run build",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:53:06.362Z",
+      "finishedAt": "2026-10-06T17:53:33.393Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "> hummer-enterprise-workspace@0.2.0 prebuild",
+        "> npm run config:generate",
+        "> hummer-enterprise-workspace@0.2.0 config:generate",
+        "> node packages/config/scripts/generate.mjs",
+        "> hummer-enterprise-workspace@0.2.0 build",
+        "> tsc -b && vite build",
+        "vite v6.4.3 building for production...",
+        "transforming...",
+        "✓ 1993 modules transformed.",
+        "rendering chunks...",
+        "computing gzip size...",
+        "dist/index.html                   0.44 kB │ gzip:   0.33 kB",
+        "dist/assets/index-TzUswYGV.css   49.06 kB │ gzip:   9.53 kB",
+        "dist/assets/index-DPjqZidd.js   557.92 kB │ gzip: 170.80 kB",
+        "✓ built in 9.77s",
+        "(!) Some chunks are larger than 500 kB after minification. Consider:",
+        "- Using dynamic import() to code-split the application",
+        "- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks",
+        "- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "npm.cmd test",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:53:33.393Z",
+      "finishedAt": "2026-10-06T17:54:03.769Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "> hummer-enterprise-workspace@0.2.0 test",
+        "> npm run audit:dead-controls && npm run test:unit && npm run test:ui",
+        "> hummer-enterprise-workspace@0.2.0 audit:dead-controls",
+        "> node scripts/audit-dead-controls.mjs",
+        "Dead control audit passed: every native button has onClick or type=\"submit\".",
+        "> hummer-enterprise-workspace@0.2.0 pretest:unit",
+        "> npm run config:check",
+        "> hummer-enterprise-workspace@0.2.0 config:check",
+        "> node packages/config/scripts/generate.mjs --check",
+        "> hummer-enterprise-workspace@0.2.0 test:unit",
+        "> vitest run --config vitest.config.ts",
+        " RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/m3-verify",
+        " Test Files  57 passed (57)",
+        "      Tests  217 passed (217)",
+        "   Start at  01:53:38",
+        "   Duration  10.44s (transform 2.23s, setup 0ms, import 10.81s, tests 8.54s, environment 8ms)",
+        "> hummer-enterprise-workspace@0.2.0 test:ui",
+        "> vitest run --config vitest.ui.config.ts",
+        " RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/m3-verify",
+        " Test Files  14 passed (14)",
+        "      Tests  38 passed (38)",
+        "   Start at  01:53:51",
+        "   Duration  12.40s (transform 6.44s, setup 12.83s, import 8.94s, tests 18.28s, environment 54.21s)"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "node scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/verifiable-outcome-receipt.json",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:54:03.769Z",
+      "finishedAt": "2026-10-06T17:54:03.907Z",
+      "exitCode": 0,
+      "signal": null,
+      "outputTail": [
+        "{\"valid\":true,\"checkedFields\":135,\"checkedEvents\":6,\"rootHash\":\"35548a28057b2e9209e194842b76afcfd27429f59d9859dac0068103ae06f9f1\"}"
+      ],
+      "spawnError": null
+    },
+    {
+      "command": "node scripts/verify-receipt.mjs spikes/m5a-outcome-ledger/tampered-outcome-receipt.json",
+      "cwd": "F:\\Users\\claude code\\.claude\\worktrees\\m3-verify",
+      "startedAt": "2026-10-06T17:54:03.908Z",
+      "finishedAt": "2026-10-06T17:54:04.046Z",
+      "exitCode": 1,
+      "signal": null,
+      "outputTail": [
+        "{\"valid\":false,\"field\":\"/receipt/outcome/verdict\",\"reason\":\"field hash mismatch\"}"
+      ],
+      "spawnError": null
+    }
+  ],
+  "assertions": {
+    "trustedHeadMatchesExpected": true,
+    "inheritedDirtyFileCount": 8,
+    "configCheckPassed": true,
+    "typecheckPassed": true,
+    "buildPassed": true,
+    "fullTestPassed": true,
+    "validReceiptAccepted": true,
+    "tamperedReceiptRejected": true,
+    "codexVersionPinned": false
+  },
+  "blockers": [
+    {
+      "id": "BLK-P0-CODEX-PIN",
+      "severity": "important",
+      "status": "open",
+      "expected": "codex-cli 0.153.4",
+      "observed": "codex-cli 0.160.1",
+      "policy": "Do not bypass. Runtime dispatch verification remains blocked until aligned."
+    }
+  ],
+  "source": "scripts\\capture-phase0-baseline.mjs"
+}
