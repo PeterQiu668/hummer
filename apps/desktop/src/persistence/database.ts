@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { ApprovalPolicyStore } from './approval-policy-store.js';
 import { BuiltinToolExecutor } from './builtin-tool-executor.js';
 import { ControlledWriteStore } from './controlled-write-store.js';
+import { DemoSessionStore } from './demo-session-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
 import { EngineCredentialStore } from './engine-credential-store.js';
 import { EgressDeliveryStore } from './egress-delivery-store.js';
@@ -106,6 +107,7 @@ export class DesktopPersistence {
   readonly organization: OrganizationStore;
   readonly approvalPolicies: ApprovalPolicyStore;
   readonly controlledWrites: ControlledWriteStore;
+  readonly demoSessions: DemoSessionStore;
   readonly builtinTools: BuiltinToolExecutor;
   readonly executionNodes: ExecutionNodeStore;
   readonly engineCredentials: EngineCredentialStore;
@@ -131,6 +133,7 @@ export class DesktopPersistence {
     this.organization = new OrganizationStore(database);
     this.approvalPolicies = new ApprovalPolicyStore(database);
     this.controlledWrites = new ControlledWriteStore(database, this.approvalPolicies, this.evidence);
+    this.demoSessions = new DemoSessionStore(database, now);
     this.executionNodes = new ExecutionNodeStore(database);
     this.engineCredentials = new EngineCredentialStore(database, now);
     this.egressDeliveries = new EgressDeliveryStore(database, this.approvalPolicies, this.evidence);

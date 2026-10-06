@@ -11,6 +11,16 @@ export type { EncryptedEngineCredential, EngineCredentialStatus } from './engine
 export type { DigitalEmployeeRecord, HireDigitalEmployeeInput } from './organization-store.js';
 export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
 export type { ControlledWriteInput, ControlledWriteResult } from './controlled-write-store.js';
+export type {
+  DemoCaptureIngestResult,
+  DemoCaptureMetadata,
+  DemoDeletionAuditEntry,
+  DemoSessionSegment,
+  DemoSessionV1,
+  DemoSourceBoundary,
+  IngestDemoCaptureInput,
+  StartDemoSessionInput,
+} from './demo-session-store.js';
 export type { ExternalSendDraftInput } from './builtin-tool-executor.js';
 export type { ApprovedArtifactExportInput, EgressDeliveryRecord } from './egress-delivery-store.js';
 export type { ToolDefinitionRecord, ToolInvocationRecord, RecordToolInvocationInput } from './tool-registry-store.js';

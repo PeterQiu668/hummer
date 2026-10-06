@@ -14,3 +14,4 @@ export type {
 export * from './fleet/index.ts';
 export * from './tenancy/index.ts';
 export * from './capability/index.ts';
+export * from './privacy/index.ts';

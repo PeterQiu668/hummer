@@ -22,6 +22,7 @@
     "test:perf": "node scripts/test-perf.mjs",
     "test:capability": "node scripts/test-capability.mjs",
     "test:skill-replay": "node scripts/test-skill-replay.mjs",
+    "test:privacy": "node scripts/test-privacy.mjs",
     "test:fleet": "node scripts/test-fleet.mjs",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
