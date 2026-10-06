@@ -38,6 +38,7 @@
     "test:ui": "vitest run --config vitest.ui.config.ts",
     "test:watch": "vitest --config vitest.ui.config.ts",
     "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:web-e2e": "node scripts/e2e-web-relay.mjs",
     "desktop:build": "npm run build -w @hummer/desktop",
     "desktop:start": "npm run start -w @hummer/desktop",
     "desktop:package:win": "npm run build && npm run desktop:build && npm run package:win -w @hummer/desktop",
