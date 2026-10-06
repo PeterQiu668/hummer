@@ -13,6 +13,7 @@ import {
   type FleetValidators,
   type ValidationResult,
 } from './ports.js';
+import { assertNodeTenantAuthorization, resolveAuthorizedTenantIds } from './tenant-boundary.js';
 
 export interface FleetServiceOptions {
   offlineAfterMs?: number;
@@ -58,10 +59,26 @@ export class FleetService implements FleetIngress {
     const result = this.validators.nodeManifest.validate(input);
     accepted(result);
     assertNode(session, result.meta.nodeId, 'node manifest');
-    if (!result.meta.tenantIds.includes(session.tenantId)) {
-      throw new FleetRejectedError('tenant_mismatch', 'node manifest is not authorized for this tenant');
-    }
-    return this.store.registerNode(session.tenantId, result.value, result.meta, this.isoNow(), this.#offlineAfterMs);
+    const authorizedTenantIds = resolveAuthorizedTenantIds(
+      session.tenantId,
+      session.authorizedTenantIds,
+      session.tenantGrantRef,
+    );
+    assertNodeTenantAuthorization(
+      session.tenantId,
+      result.meta.tenantIds,
+      authorizedTenantIds,
+      session.tenantGrantRef,
+    );
+    return this.store.registerNode(
+      session.tenantId,
+      result.value,
+      result.meta,
+      authorizedTenantIds,
+      session.tenantGrantRef,
+      this.isoNow(),
+      this.#offlineAfterMs,
+    );
   }
 
   async heartbeat(session: AuthenticatedFleetSession, input: unknown): Promise<FleetNodeRecord> {

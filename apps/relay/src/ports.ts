@@ -142,6 +142,10 @@ export interface AuthenticatedFleetSession {
   actorRef: string;
   /** Present for node badge tokens. Transport adapters must never trust a caller-supplied node id. */
   nodeId?: string;
+  /** Omitted means exactly `tenantId`; multiple tenants require an explicit identity-provider grant. */
+  authorizedTenantIds?: readonly string[];
+  /** Required opaque reference when `authorizedTenantIds` contains multiple tenants. */
+  tenantGrantRef?: string;
 }
 
 export type NodeStatus = 'online' | 'offline';
@@ -199,7 +203,7 @@ export interface RelayAuditEntry {
 }
 
 export interface FleetStore {
-  registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, now: string, offlineAfterMs: number): Promise<FleetNodeRecord>;
+  registerNode(tenantId: string, manifest: FleetObject, claims: NodeClaims, authorizedTenantIds: readonly string[], tenantGrantRef: string | undefined, now: string, offlineAfterMs: number): Promise<FleetNodeRecord>;
   heartbeat(tenantId: string, claims: HeartbeatClaims, now: string): Promise<FleetNodeRecord>;
   getNode(tenantId: string, nodeId: string, now: string): Promise<FleetNodeRecord | null>;
   enqueueTask(tenantId: string, envelope: FleetObject, claims: TaskClaims, retryOfTaskId: string | null, now: string): Promise<EnqueueResult>;

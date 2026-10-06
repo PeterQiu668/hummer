@@ -161,7 +161,13 @@ export function createFleetRelayServer(
     }
     return {
       claims,
-      session: { tenantId: claims.tenantId, actorRef: claims.actorRef, nodeId: claims.nodeId },
+      session: {
+        tenantId: claims.tenantId,
+        actorRef: claims.actorRef,
+        nodeId: claims.nodeId,
+        ...(claims.authorizedTenantIds ? { authorizedTenantIds: claims.authorizedTenantIds } : {}),
+        ...(claims.grantRef ? { tenantGrantRef: claims.grantRef } : {}),
+      },
     };
   }
 

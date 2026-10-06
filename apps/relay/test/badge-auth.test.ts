@@ -64,7 +64,7 @@ describe('CapabilityGrantRegistry', () => {
       capabilities: ['node.register', 'node.heartbeat'], paths: ['outputs/report.md'],
       maxUses: 3, usedCount: 0, status: 'active',
     });
-    const persistedView = JSON.stringify(registry.list());
+    const persistedView = JSON.stringify(registry.list('tenant-a'));
     expect(persistedView).not.toContain(TOKEN_A);
     expect(persistedView).not.toContain('tokenDigest');
 
@@ -77,7 +77,7 @@ describe('CapabilityGrantRegistry', () => {
         maxUses: 3, usedCount: 1,
       },
     });
-    expect(registry.get('grant-1')).toMatchObject({ usedCount: 1, status: 'active' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 1, status: 'active' });
   });
 
   it('does not spend a use when the requested capability is outside the grant', async () => {
@@ -85,9 +85,9 @@ describe('CapabilityGrantRegistry', () => {
     registry.issue(authority(), grant({ maxUses: 1 }));
 
     expect(await authorize(registry, TOKEN_A, 'task.claim')).toEqual({ ok: false, reason: 'scope_denied' });
-    expect(registry.get('grant-1')).toMatchObject({ usedCount: 0, status: 'active' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 0, status: 'active' });
     expect((await authorize(registry, TOKEN_A, 'node.register')).ok).toBe(true);
-    expect(registry.get('grant-1')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 1, status: 'exhausted' });
   });
 
   it('enforces maxUses exactly and fails closed after exhaustion', async () => {
@@ -97,7 +97,7 @@ describe('CapabilityGrantRegistry', () => {
     expect((await authorize(registry, TOKEN_A, 'task.claim')).ok).toBe(true);
     expect((await authorize(registry, TOKEN_A, 'task.claim')).ok).toBe(true);
     expect(await authorize(registry, TOKEN_A, 'task.claim')).toEqual({ ok: false, reason: 'uses_exhausted' });
-    expect(registry.get('grant-1')).toMatchObject({ usedCount: 2, maxUses: 2, status: 'exhausted' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 2, maxUses: 2, status: 'exhausted' });
   });
 
   it('expires at the exact boundary without spending another use', async () => {
@@ -106,14 +106,14 @@ describe('CapabilityGrantRegistry', () => {
 
     expect(await authorize(registry, TOKEN_A, 'node.register', '2026-10-07T00:00:01.000Z'))
       .toEqual({ ok: false, reason: 'expired' });
-    expect(registry.get('grant-1')).toMatchObject({ usedCount: 0, status: 'expired' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 0, status: 'expired' });
   });
 
   it('revokes immediately and never returns the plaintext in the revocation record', async () => {
     const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
     registry.issue(authority(), grant());
 
-    const revoked = registry.revoke('grant-1');
+    const revoked = registry.revoke('tenant-a', 'grant-1');
     expect(revoked).toMatchObject({ status: 'revoked', revokedAt: NOW, tokenRef: 'grant:grant-1' });
     expect(JSON.stringify(revoked)).not.toContain(TOKEN_A);
     expect(await authorize(registry, TOKEN_A, 'node.register')).toEqual({ ok: false, reason: 'revoked' });
@@ -126,14 +126,14 @@ describe('CapabilityGrantRegistry', () => {
     registry.issue(authority(), grant({ maxUses: 3 }));
     expect((await authorize(registry, TOKEN_A, 'node.register')).ok).toBe(true);
 
-    const rotated = registry.rotate('grant-1', grant({
+    const rotated = registry.rotate('tenant-a', 'grant-1', grant({
       grantId: 'grant-2', capabilities: ['node.heartbeat'], expiresAt: '2026-10-07T00:30:00.000Z', maxUses: 2,
     }));
     expect(rotated.token).toBe(TOKEN_B);
     expect(rotated.grant).toMatchObject({
       tokenRef: 'grant:grant-2', rotatedFromGrantRef: 'grant:grant-1', usedCount: 0, maxUses: 2,
     });
-    expect(registry.get('grant-1')).toMatchObject({
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({
       status: 'rotated', revokedAt: NOW, rotatedToGrantRef: 'grant:grant-2', usedCount: 1,
     });
     expect(await authorize(registry, TOKEN_A, 'node.register')).toEqual({ ok: false, reason: 'revoked' });
@@ -155,7 +155,7 @@ describe('CapabilityGrantRegistry', () => {
     expect(() => registry.issue(authority(), input)).toThrowError(
       expect.objectContaining({ code: 'authority_scope_exceeded' }),
     );
-    expect(registry.list()).toEqual([]);
+    expect(registry.list('tenant-a')).toEqual([]);
   });
 
   it('rejects expired authorities, expired grants, invalid maxUses, and unknown capabilities', () => {
@@ -176,7 +176,7 @@ describe('CapabilityGrantRegistry', () => {
       const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
       expect(() => registry.issue(authority({ paths: [path] }), grant({ paths: [path] })))
         .toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
-      expect(registry.list()).toEqual([]);
+      expect(registry.list('tenant-a')).toEqual([]);
     },
   );
 
@@ -185,7 +185,7 @@ describe('CapabilityGrantRegistry', () => {
     const unknown = `hgr_${'z'.repeat(43)}`;
     expect(await authorize(registry, unknown, 'task.claim')).toEqual({ ok: false, reason: 'unknown' });
     try {
-      registry.revoke('missing-grant');
+      registry.revoke('tenant-a', 'missing-grant');
       throw new Error('expected revoke to fail');
     } catch (error) {
       expect(error).toBeInstanceOf(CapabilityGrantError);
@@ -205,7 +205,7 @@ describe('CapabilityGrantRegistry', () => {
     expect(() => registry.issue(authority({ workOrderId: 'work-2', issuedToRunId: 'run-2' }), grant({
       grantId: 'grant-2', workOrderId: 'work-2', issuedToRunId: 'run-2',
     }))).toThrowError(expect.objectContaining({ code: 'duplicate_grant' }));
-    expect(registry.list()).toHaveLength(1);
+    expect(registry.list('tenant-a')).toHaveLength(1);
   });
 
   it('refuses rotation that exceeds the source remaining uses and leaves the source active', async () => {
@@ -215,44 +215,51 @@ describe('CapabilityGrantRegistry', () => {
     registry.issue(authority(), grant({ capabilities: ['task.claim'], maxUses: 2 }));
     expect((await authorize(registry, TOKEN_A, 'task.claim')).ok).toBe(true);
 
-    expect(() => registry.rotate('grant-1', grant({
+    expect(() => registry.rotate('tenant-a', 'grant-1', grant({
       grantId: 'grant-2', capabilities: ['task.claim'], maxUses: 2,
     }))).toThrowError(expect.objectContaining({ code: 'authority_scope_exceeded' }));
-    expect(registry.get('grant-1')).toMatchObject({ status: 'active', usedCount: 1 });
-    expect(registry.get('grant-2')).toBeNull();
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ status: 'active', usedCount: 1 });
+    expect(registry.get('tenant-a', 'grant-2')).toBeNull();
   });
 
   it('restores usedCount and revocation from a digest-only persistence snapshot', async () => {
     const first = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
     first.issue(authority(), grant({ capabilities: ['task.claim'], maxUses: 2 }));
     expect((await authorize(first, TOKEN_A, 'task.claim')).ok).toBe(true);
-    const snapshot = first.snapshot();
+    const snapshot = first.snapshot('tenant-a');
     expect(JSON.stringify(snapshot)).not.toContain(TOKEN_A);
     expect(snapshot[0]?.tokenDigest).toMatch(/^[a-f0-9]{64}$/);
 
-    const resumed = new CapabilityGrantRegistry({ now: () => new Date(NOW), initialRecords: snapshot });
-    expect(resumed.get('grant-1')).toMatchObject({ usedCount: 1, status: 'active' });
+    const resumed = new CapabilityGrantRegistry({
+      now: () => new Date(NOW), initialTenantId: 'tenant-a', initialRecords: snapshot,
+    });
+    expect(resumed.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 1, status: 'active' });
     expect((await authorize(resumed, TOKEN_A, 'task.claim')).ok).toBe(true);
     expect(await authorize(resumed, TOKEN_A, 'task.claim')).toEqual({ ok: false, reason: 'uses_exhausted' });
 
-    const revokedSnapshot = resumed.snapshot();
-    const exhausted = new CapabilityGrantRegistry({ now: () => new Date(NOW), initialRecords: revokedSnapshot });
+    const revokedSnapshot = resumed.snapshot('tenant-a');
+    const exhausted = new CapabilityGrantRegistry({
+      now: () => new Date(NOW), initialTenantId: 'tenant-a', initialRecords: revokedSnapshot,
+    });
     expect(await authorize(exhausted, TOKEN_A, 'task.claim')).toEqual({ ok: false, reason: 'uses_exhausted' });
   });
 
   it('fails closed on unknown or inconsistent persisted grant state', () => {
     const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
     registry.issue(authority(), grant());
-    const [snapshot] = registry.snapshot();
+    const [snapshot] = registry.snapshot('tenant-a');
     expect(snapshot).toBeDefined();
 
     expect(() => new CapabilityGrantRegistry({
+      initialTenantId: 'tenant-a',
       initialRecords: [{ ...snapshot!, autoApprove: true } as typeof snapshot & { autoApprove: boolean }],
     })).toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
     expect(() => new CapabilityGrantRegistry({
+      initialTenantId: 'tenant-a',
       initialRecords: [{ ...snapshot!, usedCount: snapshot!.maxUses, status: 'active' }],
     })).toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
     expect(() => new CapabilityGrantRegistry({
+      initialTenantId: 'tenant-a',
       initialRecords: [{ ...snapshot!, tokenDigest: TOKEN_A }],
     })).toThrowError(expect.objectContaining({ code: 'invalid_grant' }));
   });
