@@ -5,6 +5,7 @@
     { "path": "./tsconfig.node.json" },
     { "path": "./apps/api" },
     { "path": "./apps/desktop" },
-    { "path": "./packages/contracts" }
+    { "path": "./packages/contracts" },
+    { "path": "./packages/capability-runtime" }
   ]
 }
