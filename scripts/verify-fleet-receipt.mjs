@@ -155,21 +155,36 @@ function verifyFleetEnvelope(envelope, absoluteReceiptPath, baseDirectory) {
     for (let artifactIndex = 0; artifactIndex < child.artifactRefs.length; artifactIndex += 1) {
       const artifact = child.artifactRefs[artifactIndex];
       const artifactPath = `${path}/artifactRefs/${artifactIndex}`;
-      invalid = strictObject(artifact, artifactPath, ['artifactId', 'path', 'sha256'], ['artifactId', 'path', 'sha256']);
+      invalid = strictObject(
+        artifact,
+        artifactPath,
+        ['artifactId', 'path', 'mediaType', 'bytes', 'sha256'],
+        ['artifactId', 'path', 'mediaType', 'bytes', 'sha256'],
+      );
       if (invalid) return invalid;
       if (!isIdentifier(artifact.artifactId)) return failure(`${artifactPath}/artifactId`, 'invalid artifact ID');
       if (artifactIds.has(artifact.artifactId)) return failure(`${artifactPath}/artifactId`, 'duplicate artifact ID');
       artifactIds.add(artifact.artifactId);
       if (!node.artifactIds.has(artifact.artifactId)) return failure(`${artifactPath}/artifactId`, 'artifact is not declared by its node');
       node.referencedArtifactIds.add(artifact.artifactId);
+      if (!isMediaType(artifact.mediaType)) return failure(`${artifactPath}/mediaType`, 'invalid artifact media type');
+      if (!Number.isSafeInteger(artifact.bytes) || artifact.bytes < 0) {
+        return failure(`${artifactPath}/bytes`, 'artifact byte length must be a non-negative integer');
+      }
       if (!isSha256(artifact.sha256)) return failure(`${artifactPath}/sha256`, 'invalid artifact SHA-256');
       const resolvedArtifact = resolveContainedFile(baseDirectory, artifact.path, `${artifactPath}/path`);
       if (!resolvedArtifact.valid) return resolvedArtifact.result;
       if (artifactPaths.has(resolvedArtifact.path)) return failure(`${artifactPath}/path`, 'duplicate artifact path');
       artifactPaths.add(resolvedArtifact.path);
-      if (sha256(readFileSync(resolvedArtifact.path)) !== artifact.sha256) {
+      const artifactBytes = readFileSync(resolvedArtifact.path);
+      if (artifactBytes.length !== artifact.bytes) {
+        return failure(`${artifactPath}/bytes`, 'artifact file byte length mismatch');
+      }
+      if (sha256(artifactBytes) !== artifact.sha256) {
         return failure(`${artifactPath}/sha256`, 'artifact file hash mismatch');
       }
+      const provenance = validateArtifactProvenance(childEnvelope, artifact, artifactPath);
+      if (provenance) return provenance;
       checkedArtifacts += 1;
     }
   }
@@ -223,6 +238,41 @@ function validateChainHead(chainHead, nodes, tenantId) {
   if (!Number.isSafeInteger(chainHead.position) || chainHead.position < 0) return failure(`${path}/position`, 'chain head position must be a non-negative integer');
   if (!isSha256(chainHead.hash)) return failure(`${path}/hash`, 'invalid chain head hash');
   if (!isIsoDate(chainHead.at)) return failure(`${path}/at`, 'chain head time must be an ISO 8601 UTC timestamp');
+  return null;
+}
+
+function validateArtifactProvenance(childEnvelope, artifact, artifactPath) {
+  const evidenceRef = `evidence://sha256/${artifact.sha256}`;
+  const receipt = childEnvelope.receipt;
+  const outcomeMatches = receipt?.outcome?.evidenceRef === evidenceRef;
+  const tools = Array.isArray(receipt?.tools) ? receipt.tools : [];
+  const evidenceTools = tools.filter((tool) => isPlainObject(tool)
+    && tool.status === 'completed'
+    && Array.isArray(tool.evidenceRefs)
+    && tool.evidenceRefs.includes(evidenceRef));
+
+  if (!outcomeMatches && evidenceTools.length === 0) {
+    return failure(`${artifactPath}/sha256`, 'artifact hash is not referenced by the child receipt evidence');
+  }
+
+  const descriptors = evidenceTools.flatMap((tool) => {
+    if (!isPlainObject(tool.result)) return [];
+    const nested = Array.isArray(tool.result.artifacts)
+      ? tool.result.artifacts.filter(isPlainObject)
+      : [];
+    return [tool.result, ...nested];
+  }).filter((descriptor) => descriptor.sha256 === artifact.sha256);
+
+  if (descriptors.length === 0) {
+    return failure(`${artifactPath}/sha256`, 'child receipt evidence does not describe this artifact hash');
+  }
+  if (!descriptors.some((descriptor) => (descriptor.sizeBytes ?? descriptor.bytes) === artifact.bytes)) {
+    return failure(`${artifactPath}/bytes`, 'artifact byte length does not match child receipt evidence');
+  }
+  if (!descriptors.some((descriptor) => descriptor.mediaType === artifact.mediaType
+    && (descriptor.sizeBytes ?? descriptor.bytes) === artifact.bytes)) {
+    return failure(`${artifactPath}/mediaType`, 'artifact media type does not match child receipt evidence');
+  }
   return null;
 }
 
@@ -336,6 +386,12 @@ function isIdentifier(value, prefix = '') {
 
 function isRuntime(value) {
   return ['codex', 'claude', 'deepseek', 'cli-other', 'gui-exec'].includes(value);
+}
+
+function isMediaType(value) {
+  return typeof value === 'string'
+    && value.length <= 200
+    && /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+(?:\s*;\s*[A-Za-z0-9!#$&^_.+-]+=(?:[A-Za-z0-9!#$&^_.+-]+|"[^"\r\n]*"))*$/.test(value);
 }
 
 function isSha256(value) {
