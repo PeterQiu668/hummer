@@ -1,0 +1,108 @@
+{
+  "schema": "hummer.outcome-receipt",
+  "version": 1,
+  "receipt": {
+    "generatedAt": "2026-10-07T01:00:00.000Z",
+    "tenantId": "tenant_fixture",
+    "outcome": {
+      "id": "outcome_wo_child_b",
+      "tenantId": "tenant_fixture",
+      "outcomeDefinitionId": "definition_fleet_fixture",
+      "workOrderId": "wo_child_b",
+      "sessionId": "session_wo_child_b",
+      "approvalId": null,
+      "verdict": "accepted",
+      "acceptedBy": "employee:agent-b",
+      "evidenceRef": "evidence://sha256/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "occurredAt": "2026-10-07T01:00:00.000Z"
+    },
+    "definition": {
+      "id": "definition_fleet_fixture",
+      "tenantId": "tenant_fixture",
+      "actionPattern": "fleet.fixture",
+      "title": "Synthetic fleet fixture",
+      "acceptanceCriteria": "Receipt verifies independently",
+      "unitPriceCny": null,
+      "riskLevel": "low",
+      "enabled": true,
+      "createdAt": "2026-10-07T01:00:00.000Z",
+      "updatedAt": "2026-10-07T01:00:00.000Z"
+    },
+    "costs": [],
+    "tools": [],
+    "totalCostCny": 0,
+    "approval": null,
+    "chainIntegrity": {
+      "valid": true,
+      "checked": 1
+    }
+  },
+  "domainEvents": [
+    {
+      "position": 1,
+      "id": "evt_wo_child_b",
+      "tenantId": "tenant_fixture",
+      "aggregateType": "work_order",
+      "aggregateId": "wo_child_b",
+      "aggregateVersion": 1,
+      "type": "outcome.accepted",
+      "occurredAt": "2026-10-07T01:00:00.000Z",
+      "actorRef": "employee:agent-b",
+      "correlationId": "corr_wo_child_b",
+      "payload": {
+        "verdict": "accepted"
+      },
+      "canonicalPayload": "{\"verdict\":\"accepted\"}",
+      "previousHash": null,
+      "hash": "c69c5fe2a43a0de2721bd2fdd0e8a3a826bf2a6b2930ee184ea8b9409e39038f"
+    }
+  ],
+  "manifest": {
+    "algorithm": "SHA-256",
+    "rootHash": "04ee5f229e69344bc298fcdd48b4d602da27f33fa2fcb96d8e62e1df648943bc",
+    "fieldHashes": {
+      "/receipt/generatedAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/receipt/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
+      "/receipt/outcome/id": "70387b0cc1a62616a1773b46e63e5d814027f3b8bac238b52eacd2f99443dfc7",
+      "/receipt/outcome/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
+      "/receipt/outcome/outcomeDefinitionId": "98e12bf14f4bf968097798da79d53d57fa94878535e1353f4058c58957aaf6b8",
+      "/receipt/outcome/workOrderId": "ba9a67a56480971efbfe7c6a70671268c84fab9b498b16aa633061b325483e25",
+      "/receipt/outcome/sessionId": "269de0ec64bf59807eaa47b8c349b318b48d942d20684f1a845371cc95d62a5a",
+      "/receipt/outcome/approvalId": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "/receipt/outcome/verdict": "d288c584af270151f7b7cd7977b94160ce1d7b501dee2d6308f2ac84ebaacc99",
+      "/receipt/outcome/acceptedBy": "66fd1f8ed776b41764de681205dee68bb56dbf31bef9b1077479fbb87e8f9ba3",
+      "/receipt/outcome/evidenceRef": "959bed28d3e494b50b05470b49efc5c9f27005051e4394938c0d15eb1a0c8af8",
+      "/receipt/outcome/occurredAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/receipt/definition/id": "98e12bf14f4bf968097798da79d53d57fa94878535e1353f4058c58957aaf6b8",
+      "/receipt/definition/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
+      "/receipt/definition/actionPattern": "1591a451fd62ec6a237303521abd339f5a3af9b3d2510cfe00351d81fd314615",
+      "/receipt/definition/title": "1fa706f45e1adecba45312a83e45bc96aa75bcda7f2a73cc41621c426e7301af",
+      "/receipt/definition/acceptanceCriteria": "25a31620a3998fa1337d8bd9509ef01f42fbf1020d81b4ba3402cbc08eff470d",
+      "/receipt/definition/unitPriceCny": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "/receipt/definition/riskLevel": "364bb7082249ee9fbc5247ee49735c4246f271b82c2745a35107ddda0d7cabcc",
+      "/receipt/definition/enabled": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "/receipt/definition/createdAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/receipt/definition/updatedAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/receipt/costs": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "/receipt/tools": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "/receipt/totalCostCny": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "/receipt/approval": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "/receipt/chainIntegrity/valid": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "/receipt/chainIntegrity/checked": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "/domainEvents/0/position": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "/domainEvents/0/id": "acfad5d690fefed3b01184363f6abb44e316adbb3f2d4db606cc4e78add32b31",
+      "/domainEvents/0/tenantId": "b15ba71822d3ed9a014278b78b8624f70b55e244460c40c3aa1df5445043b004",
+      "/domainEvents/0/aggregateType": "4b5b687d5075f991f3ba3d06a93e6e8ecab3a5411fbe70dcc9b2bc4f1a2faed7",
+      "/domainEvents/0/aggregateId": "ba9a67a56480971efbfe7c6a70671268c84fab9b498b16aa633061b325483e25",
+      "/domainEvents/0/aggregateVersion": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "/domainEvents/0/type": "909c0ed0d1e264f3ab225e3a39ba1e26ff77c3a2adeaee24556897242f4d1d43",
+      "/domainEvents/0/occurredAt": "80653959fa5a07893bda421e7fa20afdf8cbf1e1e6ba68ffa050303da67bfa4d",
+      "/domainEvents/0/actorRef": "66fd1f8ed776b41764de681205dee68bb56dbf31bef9b1077479fbb87e8f9ba3",
+      "/domainEvents/0/correlationId": "edf8a9a08bd9e2fd2f4fe60e0f3df1e193d9b0ff55c48b2fd07ad040e82f91ba",
+      "/domainEvents/0/payload/verdict": "d288c584af270151f7b7cd7977b94160ce1d7b501dee2d6308f2ac84ebaacc99",
+      "/domainEvents/0/canonicalPayload": "ff26b05f6ac2121f8b3edb56683053c33dba412b3ca32e1fb7072d9a6de25328",
+      "/domainEvents/0/previousHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "/domainEvents/0/hash": "b18d78fdf66f2c61473cd7b6c322a9168c8ab68c31acb8811835ea39698bc3ab"
+    }
+  }
+}
