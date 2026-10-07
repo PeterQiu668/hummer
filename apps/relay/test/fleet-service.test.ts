@@ -159,6 +159,11 @@ function approvalDecision(index = 1, overrides: Partial<Record<string, unknown>>
   };
 }
 
+function nonApprovedDecision(index: number, decision: 'denied' | 'expired' | 'revoked') {
+  const { grantedScope: _grantedScope, ...record } = approvalDecision(index);
+  return { ...record, decision };
+}
+
 function harness(factory: () => FleetStore) {
   currentTime = Date.parse('2026-10-07T00:00:00.000Z');
   const store = factory();
@@ -202,6 +207,60 @@ for (const [name, factory] of [
         .rejects.toMatchObject({ code: 'approval_replayed' });
       expect(await store.getApprovalRequest(TENANT, 'request-1')).toMatchObject({ action: 'task.execute', target: 'task-1' });
       expect(await store.getApprovalDecision(TENANT, 'request-1')).toMatchObject({ decision: 'approved' });
+    });
+
+    it.each(['denied', 'expired', 'revoked'] as const)(
+      'atomically terminalizes and consumes a %s decision without permitting re-claim, approval, or stop',
+      async (disposition) => {
+        const { service, store } = harness(factory);
+        await service.register(NODE_SESSION, node());
+        await service.enqueue(SESSION, task());
+        await service.claim(NODE_SESSION, NODE);
+        await service.requestApproval(NODE_SESSION, 'task-1', approvalRequest());
+
+        expect(await service.decideApproval(CONTROL_SESSION, 'request-1', nonApprovedDecision(1, disposition)))
+          .toMatchObject({ decisionId: 'decision-1', decision: disposition });
+        expect(await store.getTask(TENANT, 'task-1', new Date(currentTime).toISOString())).toMatchObject({
+          status: 'failed', leaseOwnerNodeId: null, leaseExpiresAt: null,
+        });
+        expect(await service.claim(NODE_SESSION, NODE)).toBeNull();
+        await expect(service.ack(NODE_SESSION, event(1, 1, 'started')))
+          .rejects.toMatchObject({ code: 'invalid_transition' });
+
+        expect(await service.consumeApproval(NODE_SESSION, NODE, 'task-1', 'request-1')).toMatchObject({
+          request: { requestId: 'request-1' },
+          decision: { decisionId: 'decision-1', decision: disposition },
+        });
+        await expect(service.consumeApproval(NODE_SESSION, NODE, 'task-1', 'request-1'))
+          .rejects.toMatchObject({ code: 'approval_replayed' });
+        await expect(service.decideApproval(CONTROL_SESSION, 'request-1', approvalDecision(1, { decisionId: 'late-approved' })))
+          .rejects.toMatchObject({ code: 'approval_replayed' });
+        await expect(service.stop(CONTROL_SESSION, 'task-1'))
+          .rejects.toMatchObject({ code: 'invalid_transition' });
+
+        const approvalAudit = (await store.listTenantAudit(TENANT))
+          .filter((entry) => entry.action === 'approval.decided' || entry.action === 'approval.consumed');
+        expect(approvalAudit).toMatchObject([
+          { action: 'approval.decided', metadata: { requestId: 'request-1', taskId: 'task-1', decision: disposition, taskStatus: 'failed' } },
+          { action: 'approval.consumed', metadata: { taskId: 'task-1', decisionId: 'decision-1', decision: disposition } },
+        ]);
+        expect(approvalAudit[1]?.previousHash).toBe(approvalAudit[0]?.hash);
+      },
+    );
+
+    it('does not persist a non-approved decision when its terminal task transition is invalid', async () => {
+      const { service, store } = harness(factory);
+      await service.register(NODE_SESSION, node());
+      await service.enqueue(SESSION, task());
+      await service.claim(NODE_SESSION, NODE);
+      await service.requestApproval(NODE_SESSION, 'task-1', approvalRequest());
+      await service.stop(CONTROL_SESSION, 'task-1');
+
+      await expect(service.decideApproval(CONTROL_SESSION, 'request-1', nonApprovedDecision(1, 'denied')))
+        .rejects.toMatchObject({ code: 'invalid_transition' });
+      expect(await store.getApprovalDecision(TENANT, 'request-1')).toBeNull();
+      expect(await store.getTask(TENANT, 'task-1', new Date(currentTime).toISOString())).toMatchObject({ status: 'blocked' });
+      expect((await store.listTenantAudit(TENANT)).filter((entry) => entry.action === 'approval.decided')).toHaveLength(0);
     });
 
     it('rejects cross-binding, expanded scope, expiry, and a second immutable decision', async () => {

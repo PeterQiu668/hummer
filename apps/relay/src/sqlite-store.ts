@@ -692,6 +692,10 @@ export class SqliteFleetStore implements FleetStore {
       `).get<{ decision_id: string }>(tenantId, claims.requestId, claims.decisionId);
       if (existing) throw new FleetRejectedError('approval_replayed', 'approval request already has an immutable decision');
       assertDecisionWithinRequest(request, claims, now);
+      const task = this.requireTask(tenantId, request.taskId);
+      if (claims.decision !== 'approved' && task.status !== 'queued' && task.status !== 'leased') {
+        throw new FleetRejectedError('invalid_transition', 'non-approved decision cannot replace a terminal or stopped task state');
+      }
       this.#db.prepare(`
         INSERT INTO fleet_approval_decisions (
           tenant_id, decision_id, request_id, decider_actor_ref, decided_at, decision,
@@ -702,8 +706,21 @@ export class SqliteFleetStore implements FleetStore {
         claims.decision, claims.grantedScope ? JSON.stringify(claims.grantedScope) : null,
         JSON.stringify(decision), now,
       );
+      if (claims.decision !== 'approved') {
+        this.#db.prepare(`
+          UPDATE fleet_tasks
+          SET status = 'failed', lease_owner_node_id = NULL, lease_expires_at = NULL
+          WHERE tenant_id = ? AND task_id = ?
+        `).run(tenantId, request.taskId);
+        this.#db.prepare(`
+          UPDATE fleet_task_leases
+          SET state = 'failed', lease_expires_at = NULL, updated_at = ?
+          WHERE tenant_id = ? AND task_id = ?
+        `).run(now, tenantId, request.taskId);
+      }
       this.appendTenantAudit(tenantId, 'approval.decided', claims.decisionId, request.nodeId, claims.deciderActorRef, now, {
-        requestId: claims.requestId, decision: claims.decision,
+        requestId: claims.requestId, taskId: request.taskId, decision: claims.decision,
+        taskStatus: claims.decision === 'approved' ? task.status : 'failed',
       });
       return this.requireApprovalDecision(tenantId, claims.requestId);
     })();
@@ -726,24 +743,25 @@ export class SqliteFleetStore implements FleetStore {
         throw new FleetRejectedError('lease_owner_mismatch', 'approval request is not bound to this node');
       }
       const task = this.requireTask(tenantId, taskId);
-      this.assertActiveLease(task, nodeId, now);
       const decision = this.findApprovalDecision(tenantId, requestId);
       if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
-      if (decision.decision !== 'approved') {
-        throw new FleetRejectedError('invalid_transition', 'approval decision does not authorize execution');
-      }
-      assertDecisionWithinRequest(request, decision, now);
       const consumed = this.#db.prepare(`
         SELECT 1 AS present FROM fleet_approval_consumptions WHERE tenant_id = ? AND request_id = ?
       `).get<{ present: number }>(tenantId, requestId);
       if (consumed) throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
+      if (decision.decision === 'approved') {
+        this.assertActiveLease(task, nodeId, now);
+        assertDecisionWithinRequest(request, decision, now);
+      } else if (task.status !== 'failed' || task.leaseOwnerNodeId !== null || task.leaseExpiresAt !== null) {
+        throw new FleetRejectedError('invalid_transition', 'non-approved decision is not bound to a terminal task state');
+      }
       this.#db.prepare(`
         INSERT INTO fleet_approval_consumptions (
           tenant_id, request_id, decision_id, task_id, node_id, run_id, consumed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(tenantId, requestId, decision.decisionId, taskId, nodeId, request.runId, now);
       this.appendTenantAudit(tenantId, 'approval.consumed', requestId, nodeId, `system:${nodeId}`, now, {
-        taskId, decisionId: decision.decisionId,
+        taskId, decisionId: decision.decisionId, decision: decision.decision,
       });
       return { request: request.request, decision: decision.decisionRecord };
     })();

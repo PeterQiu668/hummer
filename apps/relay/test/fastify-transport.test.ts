@@ -75,6 +75,11 @@ const approvalDecision = (index = 1, overrides: Record<string, unknown> = {}) =>
   ...overrides,
 });
 
+const nonApprovedDecision = (index: number, decision: 'denied' | 'expired' | 'revoked') => {
+  const { grantedScope: _grantedScope, ...record } = approvalDecision(index);
+  return { ...record, decision };
+};
+
 // SSE expiry is enforced against the wall clock after authorization. Keep the
 // ordinary fixture badges unambiguously live; expiry-specific cases pass an
 // explicit timestamp relative to the service's injected NOW value below.
@@ -186,6 +191,55 @@ describe('Fastify fleet relay transport', () => {
       method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,
       headers: authorization('node-token'),
     })).json()).toMatchObject({ error: { code: 'approval_replayed' } });
+  });
+
+  it('binds an HTTP denial to a terminal task and permits exactly one node consumption', async () => {
+    const { app, events, store } = harness();
+    openApps.push({ app, events });
+    await register(app);
+    await enqueue(app);
+    await app.inject({ method: 'POST', url: `/v1/nodes/${NODE}/tasks/claim`, headers: authorization('node-token') });
+    await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
+      headers: authorization('node-token'), payload: approvalRequest(),
+    });
+
+    const decided = await app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('control-token'), payload: nonApprovedDecision(1, 'denied'),
+    });
+    expect(decided.statusCode).toBe(200);
+    expect(await store.getTask(TENANT, 'delivery-1', NOW)).toMatchObject({
+      status: 'failed', leaseOwnerNodeId: null, leaseExpiresAt: null,
+    });
+    expect((await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/claim`, headers: authorization('node-token'),
+    })).statusCode).toBe(204);
+    const executionAttempt = await app.inject({
+      method: 'POST', url: '/v1/tasks/ack', headers: authorization('node-token'), payload: runEvent(1, 1, 'started'),
+    });
+    expect(executionAttempt.statusCode).toBe(409);
+    expect(executionAttempt.json()).toMatchObject({ error: { code: 'invalid_transition' } });
+
+    const consumed = await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,
+      headers: authorization('node-token'),
+    });
+    expect(consumed.statusCode).toBe(200);
+    expect(consumed.json()).toMatchObject({ decision: { decision: 'denied', decisionId: 'decision-1' } });
+    const replayed = await app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,
+      headers: authorization('node-token'),
+    });
+    expect(replayed.statusCode).toBe(409);
+    expect(replayed.json()).toMatchObject({ error: { code: 'approval_replayed' } });
+    expect((await app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('control-token'), payload: approvalDecision(1, { decisionId: 'late-approved' }),
+    })).json()).toMatchObject({ error: { code: 'approval_replayed' } });
+    expect((await app.inject({
+      method: 'POST', url: '/v1/tasks/delivery-1/stop', headers: authorization('control-token'),
+    })).json()).toMatchObject({ error: { code: 'invalid_transition' } });
   });
 
   it('rejects unknown approval fields and system-authored decisions before persistence', async () => {

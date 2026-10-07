@@ -275,17 +275,11 @@ export class HummerNodeAgent {
     if (
       decision.requestId !== localRequest.requestId ||
       decision.tenantId !== this.tenantId ||
-      decision.decision !== 'approved' ||
       !/^(?:human|account):/.test(decision.deciderActorRef)
     ) {
-      throw new NodeAgentError('approval_not_authorized', 'Execution requires a matching approved decision from an authenticated human or account actor');
+      throw new NodeAgentError('approval_not_authorized', 'Approval consumption requires a matching decision from an authenticated human or account actor');
     }
-    if (!decision.grantedScope?.capabilities.includes('task.execute')) {
-      throw new NodeAgentError('approval_scope_denied', 'Approval scope does not grant task.execute');
-    }
-    if (!Number.isFinite(Date.parse(decision.grantedScope.expiresAt)) || Date.parse(decision.grantedScope.expiresAt) <= this.#clock().getTime()) {
-      throw new NodeAgentError('approval_expired', 'Approval scope has expired');
-    }
+    const rejectionReason = approvalRejectionReason(decision.decision);
     const known = this.#requireKnownClaim(claimId);
     const decisionRecord = {
       claimId,
@@ -296,6 +290,29 @@ export class HummerNodeAgent {
       approvalRequestHash: digest(requestValidation.value),
       approvalDecisionHash: digest(validation.value),
     };
+    if (rejectionReason) {
+      try {
+        this.#record({ type: 'approval_decision_consumed', ...decisionRecord });
+        this.#recordTerminal(claimId, 'rejected', undefined, rejectionReason);
+      } catch (error) {
+        this.#pending.delete(claimId);
+        this.#recoveryRequired.add(claimId);
+        throw error;
+      }
+      this.#pending.delete(claimId);
+      this.#terminal.add(claimId);
+      await this.#transport.reportClaimStatus({ claimId, state: 'rejected', reasonCode: rejectionReason }, this.#context());
+      return { state: 'rejected', claimId, reasonCode: rejectionReason };
+    }
+    if (decision.decision !== 'approved') {
+      throw new NodeAgentError('approval_not_authorized', 'Approval decision has an unsupported disposition');
+    }
+    if (!decision.grantedScope?.capabilities.includes('task.execute')) {
+      throw new NodeAgentError('approval_scope_denied', 'Approval scope does not grant task.execute');
+    }
+    if (!Number.isFinite(Date.parse(decision.grantedScope.expiresAt)) || Date.parse(decision.grantedScope.expiresAt) <= this.#clock().getTime()) {
+      throw new NodeAgentError('approval_expired', 'Approval scope has expired');
+    }
     try {
       this.#record({ type: 'approval_decision_consumed', ...decisionRecord });
       this.#record({ type: 'executing', ...decisionRecord });
@@ -540,6 +557,14 @@ function safeClaimId(value) {
 /** @param {unknown} error */
 function safeErrorCode(error) {
   return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : 'operation_failed';
+}
+
+/** @param {unknown} decision */
+function approvalRejectionReason(decision) {
+  if (decision === 'denied') return 'approval_denied';
+  if (decision === 'expired') return 'approval_expired';
+  if (decision === 'revoked') return 'approval_revoked';
+  return undefined;
 }
 
 /** @param {unknown} value */
