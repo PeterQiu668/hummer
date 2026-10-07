@@ -27,6 +27,10 @@ export const BADGE_SCOPES = [
   'capability.install.evaluate',
   'marketplace.report',
   'marketplace.moderate',
+  'marketplace.claim',
+  'marketplace.offer',
+  'marketplace.order',
+  'marketplace.settle',
   'capability.bundle.publish',
   'capability.bundle.consume',
 ] as const;

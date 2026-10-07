@@ -143,6 +143,56 @@ export interface PublicMarketplaceHttpPort {
     targetTenantId: string;
     gate: unknown;
   }): Readonly<Record<string, unknown>>;
+  declareAuthorClaim(input: {
+    claimId: string;
+    listingId: string;
+    sourceTenantId: string;
+    claimantActorRef: string;
+    declarationEvidenceDigest: string;
+  }): Readonly<Record<string, unknown>>;
+  verifyAuthorClaim(input: {
+    claimId: string;
+    requestTenantId: string;
+    moderatorActorRef: string;
+    verificationEvidenceDigest: string;
+  }): Readonly<Record<string, unknown>>;
+  revokeAuthorClaim(input: {
+    claimId: string;
+    sourceTenantId: string;
+    claimantActorRef: string;
+    reason: string;
+  }): Readonly<Record<string, unknown>>;
+  createDryRunOffer(input: {
+    offerId: string;
+    claimId: string;
+    sourceTenantId: string;
+    actorRef: string;
+    priceCents: number;
+  }): Readonly<Record<string, unknown>>;
+  withdrawDryRunOffer(input: {
+    offerId: string;
+    sourceTenantId: string;
+    actorRef: string;
+  }): Readonly<Record<string, unknown>>;
+  placeDryRunOrder(input: {
+    orderId: string;
+    offerId: string;
+    installAttemptId: string;
+    buyerTenantId: string;
+    buyerActorRef: string;
+    termsDigest: string;
+  }): Readonly<Record<string, unknown>>;
+  settleDryRunOrder(input: {
+    settlementId: string;
+    orderId: string;
+    sourceTenantId: string;
+    actorRef: string;
+  }): Readonly<Record<string, unknown>>;
+  reconcileDryRunSettlement(input: {
+    settlementId: string;
+    requestTenantId: string;
+    actorRef: string;
+  }): Readonly<Record<string, unknown>>;
 }
 
 function parseBearer(header: string | undefined): string {
@@ -202,11 +252,24 @@ function requiredText(value: unknown, field: string, maxLength = 2_000): string 
   return value.trim();
 }
 
+function requiredPositiveInteger(value: unknown, field: string, maximum = 1_000_000_000): number {
+  if (!Number.isSafeInteger(value) || Number(value) <= 0 || Number(value) > maximum) {
+    throw new TransportHttpError(400, 'invalid_contract', `${field} must be positive integer cents`);
+  }
+  return Number(value);
+}
+
 function publicMarket(options: FleetRelayServerOptions): PublicMarketplaceHttpPort {
   if (!options.publicMarket) {
     throw new TransportHttpError(503, 'public_market_unavailable', 'public marketplace is not configured');
   }
   return options.publicMarket;
+}
+
+function requireHumanMarketplaceActor(claims: BadgeTokenClaims, action: string): void {
+  if (claims.nodeId || !claims.actorRef.startsWith('human:')) {
+    throw new TransportHttpError(403, 'human_badge_required', `${action} requires a human badge`);
+  }
 }
 
 function marketFailure(error: unknown): never {
@@ -512,6 +575,144 @@ export function createFleetRelayServer(
       pathParam(request, 'taskId'),
       pathParam(request, 'requestId'),
     );
+  });
+
+  app.post('/v1/marketplace/author-claims', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.claim');
+    requireHumanMarketplaceActor(claims, 'author claim');
+    const body = exactBody(
+      request.body,
+      ['claimId', 'listingId', 'declarationEvidenceDigest'],
+      'marketplace author claim',
+    );
+    try {
+      return { claim: publicMarket(options).declareAuthorClaim({
+        claimId: requiredText(body.claimId, 'claimId', 128),
+        listingId: requiredText(body.listingId, 'listingId', 128),
+        sourceTenantId: claims.tenantId,
+        claimantActorRef: claims.actorRef,
+        declarationEvidenceDigest: requiredText(body.declarationEvidenceDigest, 'declarationEvidenceDigest', 64),
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/author-claims/:claimId/verify', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.moderate');
+    requireHumanMarketplaceActor(claims, 'author claim verification');
+    const body = exactBody(request.body, ['verificationEvidenceDigest'], 'author claim verification');
+    try {
+      return { claim: publicMarket(options).verifyAuthorClaim({
+        claimId: pathParam(request, 'claimId'),
+        requestTenantId: claims.tenantId,
+        moderatorActorRef: claims.actorRef,
+        verificationEvidenceDigest: requiredText(body.verificationEvidenceDigest, 'verificationEvidenceDigest', 64),
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/author-claims/:claimId/revoke', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.claim');
+    requireHumanMarketplaceActor(claims, 'author claim revocation');
+    const body = exactBody(request.body, ['reason'], 'author claim revocation');
+    try {
+      return { claim: publicMarket(options).revokeAuthorClaim({
+        claimId: pathParam(request, 'claimId'),
+        sourceTenantId: claims.tenantId,
+        claimantActorRef: claims.actorRef,
+        reason: requiredText(body.reason, 'reason'),
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/offers', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.offer');
+    requireHumanMarketplaceActor(claims, 'dry-run offer');
+    const body = exactBody(request.body, ['offerId', 'claimId', 'priceCents'], 'dry-run offer');
+    try {
+      return { offer: publicMarket(options).createDryRunOffer({
+        offerId: requiredText(body.offerId, 'offerId', 128),
+        claimId: requiredText(body.claimId, 'claimId', 128),
+        sourceTenantId: claims.tenantId,
+        actorRef: claims.actorRef,
+        priceCents: requiredPositiveInteger(body.priceCents, 'priceCents'),
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/offers/:offerId/withdraw', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.offer');
+    requireHumanMarketplaceActor(claims, 'dry-run offer withdrawal');
+    assertNoFields(request.body);
+    try {
+      return { offer: publicMarket(options).withdrawDryRunOffer({
+        offerId: pathParam(request, 'offerId'),
+        sourceTenantId: claims.tenantId,
+        actorRef: claims.actorRef,
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/orders', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.order');
+    requireHumanMarketplaceActor(claims, 'dry-run order');
+    const body = exactBody(
+      request.body,
+      ['orderId', 'offerId', 'installAttemptId', 'termsDigest'],
+      'dry-run order',
+    );
+    try {
+      return { order: publicMarket(options).placeDryRunOrder({
+        orderId: requiredText(body.orderId, 'orderId', 128),
+        offerId: requiredText(body.offerId, 'offerId', 128),
+        installAttemptId: requiredText(body.installAttemptId, 'installAttemptId', 128),
+        buyerTenantId: claims.tenantId,
+        buyerActorRef: claims.actorRef,
+        termsDigest: requiredText(body.termsDigest, 'termsDigest', 64),
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/orders/:orderId/settlements', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.settle');
+    requireHumanMarketplaceActor(claims, 'dry-run settlement');
+    const body = exactBody(request.body, ['settlementId'], 'dry-run settlement');
+    try {
+      return { settlement: publicMarket(options).settleDryRunOrder({
+        settlementId: requiredText(body.settlementId, 'settlementId', 128),
+        orderId: pathParam(request, 'orderId'),
+        sourceTenantId: claims.tenantId,
+        actorRef: claims.actorRef,
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.get('/v1/marketplace/settlements/:settlementId/reconciliation', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.settle');
+    requireHumanMarketplaceActor(claims, 'dry-run settlement reconciliation');
+    assertNoQueryFields(request);
+    try {
+      return { reconciliation: publicMarket(options).reconcileDryRunSettlement({
+        settlementId: pathParam(request, 'settlementId'),
+        requestTenantId: claims.tenantId,
+        actorRef: claims.actorRef,
+      }) };
+    } catch (error) {
+      marketFailure(error);
+    }
   });
 
   app.get('/v1/nodes/:nodeId/tasks/:taskId/approval-requests/:requestId/authorization', async (request) => {

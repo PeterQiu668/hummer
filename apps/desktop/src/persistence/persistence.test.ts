@@ -64,7 +64,7 @@ describe('desktop persistence migrations', () => {
 
     const persistence = openPersistence({ dataDirectory: directory });
 
-    expect(persistence.schemaVersion()).toBe(16);
+    expect(persistence.schemaVersion()).toBe(17);
     expect(persistence.listTables()).toEqual(expect.arrayContaining([
       'fleet_nodes',
       'fleet_task_leases',
@@ -81,6 +81,11 @@ describe('desktop persistence migrations', () => {
       'marketplace_moderation_actions',
       'marketplace_install_attempts',
       'fleet_dispatch_outbox',
+      'marketplace_author_claims',
+      'marketplace_offers',
+      'marketplace_orders',
+      'marketplace_settlements',
+      'marketplace_ledger_entries',
     ]));
     expect(persistence.appliedMigrations().find((migration) => migration.version === 11)).toMatchObject({
       version: 11,
@@ -89,6 +94,7 @@ describe('desktop persistence migrations', () => {
     expect(persistence.appliedMigrations()).toEqual(expect.arrayContaining([
       expect.objectContaining({ version: 15, name: 'p2_w10_public_marketplace_kernel' }),
       expect.objectContaining({ version: 16, name: 'p1_fleet_dispatch_outbox' }),
+      expect.objectContaining({ version: 17, name: 'p3_dry_run_marketplace_commerce' }),
     ]));
     persistence.close();
   });

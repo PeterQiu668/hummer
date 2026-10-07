@@ -16,7 +16,7 @@ import {
 import { openPersistence } from '../../desktop/src/persistence/database.js';
 import { openPublicMarketStore, type PublicMarketStore } from '../../../packages/public-market/src/index.js';
 import { isPublicCapabilityListing } from '../../../src/features/capabilities/publicMarketResponseValidator.js';
-import { createStaticBadgeTokenAuthenticator } from '../src/badge-auth.js';
+import { createStaticBadgeTokenAuthenticator, type BadgeScope } from '../src/badge-auth.js';
 import { createFleetRelayServer, type PublicMarketplaceHttpPort } from '../src/fastify-transport.js';
 import type { FleetIngress } from '../src/ports.js';
 
@@ -103,6 +103,112 @@ describe('[PUBLIC-MARKET-HTTP-E2E] public Relay surface and protected moderation
     fixture.market.close();
   });
 
+  it('exposes claim-verified dry-run commerce while rejecting payment fields and wrong roles', async () => {
+    const fixture = setup();
+    const { app } = server(fixture);
+
+    const unknownField = await app.inject({
+      method: 'POST', url: '/v1/marketplace/author-claims',
+      headers: { authorization: 'Bearer source-commerce-token' },
+      payload: {
+        claimId: 'claim-http', listingId: 'listing-research', declarationEvidenceDigest: digest,
+        autoVerify: true,
+      },
+    });
+    expect(unknownField.statusCode).toBe(400);
+
+    const claim = await app.inject({
+      method: 'POST', url: '/v1/marketplace/author-claims',
+      headers: { authorization: 'Bearer source-commerce-token' },
+      payload: { claimId: 'claim-http', listingId: 'listing-research', declarationEvidenceDigest: digest },
+    });
+    expect(claim.statusCode).toBe(200);
+    expect(claim.json().claim.status).toBe('pending');
+
+    const selfVerify = await app.inject({
+      method: 'POST', url: '/v1/marketplace/author-claims/claim-http/verify',
+      headers: { authorization: 'Bearer source-commerce-token' },
+      payload: { verificationEvidenceDigest: digest },
+    });
+    expect(selfVerify.statusCode).toBe(403);
+    const verified = await app.inject({
+      method: 'POST', url: '/v1/marketplace/author-claims/claim-http/verify',
+      headers: { authorization: 'Bearer moderator-token' },
+      payload: { verificationEvidenceDigest: 'b'.repeat(64) },
+    });
+    expect(verified.statusCode).toBe(200);
+    expect(verified.json().claim.status).toBe('verified');
+
+    const offer = await app.inject({
+      method: 'POST', url: '/v1/marketplace/offers',
+      headers: { authorization: 'Bearer source-commerce-token' },
+      payload: { offerId: 'offer-http', claimId: 'claim-http', priceCents: 9_900 },
+    });
+    expect(offer.statusCode).toBe(200);
+    expect(offer.json().offer).toMatchObject({ priceCents: 9_900, currency: 'CNY', mode: 'dry_run' });
+
+    const install = await app.inject({
+      method: 'POST', url: '/v1/public/capabilities/listing-research/install-authorizations',
+      headers: { authorization: 'Bearer installer-token' },
+      payload: { attemptId: 'attempt-http-commerce', targetTenantId: fixture.targetTenantId, gate: installGate(fixture) },
+    });
+    expect(install.statusCode).toBe(200);
+
+    const paymentField = await app.inject({
+      method: 'POST', url: '/v1/marketplace/orders',
+      headers: { authorization: 'Bearer buyer-commerce-token' },
+      payload: {
+        orderId: 'order-forbidden', offerId: 'offer-http', installAttemptId: 'attempt-http-commerce',
+        termsDigest: 'c'.repeat(64), paymentToken: 'forbidden',
+      },
+    });
+    expect(paymentField.statusCode).toBe(400);
+
+    const order = await app.inject({
+      method: 'POST', url: '/v1/marketplace/orders',
+      headers: { authorization: 'Bearer buyer-commerce-token' },
+      payload: {
+        orderId: 'order-http', offerId: 'offer-http', installAttemptId: 'attempt-http-commerce',
+        termsDigest: 'c'.repeat(64),
+      },
+    });
+    expect(order.statusCode).toBe(200);
+    expect(order.json().order).toMatchObject({ amountCents: 9_900, currency: 'CNY', mode: 'dry_run', status: 'placed' });
+
+    const buyerCannotSettle = await app.inject({
+      method: 'POST', url: '/v1/marketplace/orders/order-http/settlements',
+      headers: { authorization: 'Bearer buyer-commerce-token' }, payload: { settlementId: 'settlement-wrong-role' },
+    });
+    expect(buyerCannotSettle.statusCode).toBe(403);
+    const settlement = await app.inject({
+      method: 'POST', url: '/v1/marketplace/orders/order-http/settlements',
+      headers: { authorization: 'Bearer source-commerce-token' }, payload: { settlementId: 'settlement-http' },
+    });
+    expect(settlement.statusCode).toBe(200);
+    expect(settlement.json().settlement.mode).toBe('dry_run');
+
+    const reconciliation = await app.inject({
+      method: 'GET', url: '/v1/marketplace/settlements/settlement-http/reconciliation',
+      headers: { authorization: 'Bearer source-commerce-token' },
+    });
+    expect(reconciliation.statusCode).toBe(200);
+    expect(reconciliation.json().reconciliation).toMatchObject({
+      amountCents: 9_900, debitCents: 9_900, creditCents: 9_900,
+      signedBalanceCents: 0, reconciled: true, mode: 'dry_run',
+    });
+    const crossTenantReconciliation = await app.inject({
+      method: 'GET', url: '/v1/marketplace/settlements/settlement-http/reconciliation',
+      headers: { authorization: 'Bearer moderator-settle-token' },
+    });
+    expect(crossTenantReconciliation.statusCode).toBe(403);
+    expect(JSON.stringify({
+      claim: claim.json(), offer: offer.json(), order: order.json(), settlement: settlement.json(),
+    })).not.toMatch(/paymentToken|cardNumber|bankAccount|payout|invoice|webhook/i);
+
+    await app.close();
+    fixture.market.close();
+  });
+
   it('returns an explicit unavailable response instead of fallback data when no market adapter is configured', async () => {
     const { app } = createFleetRelayServer({} as FleetIngress, {
       authenticator: createStaticBadgeTokenAuthenticator([]),
@@ -158,6 +264,14 @@ function server(fixture: Fixture) {
     listOpenReports: (tenantId, actorRef) => fixture.market.listOpenReports(tenantId, actorRef) as unknown as readonly Readonly<Record<string, unknown>>[],
     takeDown: (input) => fixture.market.takeDown(input),
     authorizeInstall: (input) => fixture.market.authorizeInstall({ ...input, gate: input.gate as CapabilityInstallGateInput }) as unknown as Readonly<Record<string, unknown>>,
+    declareAuthorClaim: (input) => fixture.market.declareAuthorClaim(input) as unknown as Readonly<Record<string, unknown>>,
+    verifyAuthorClaim: (input) => fixture.market.verifyAuthorClaim(input) as unknown as Readonly<Record<string, unknown>>,
+    revokeAuthorClaim: (input) => fixture.market.revokeAuthorClaim(input) as unknown as Readonly<Record<string, unknown>>,
+    createDryRunOffer: (input) => fixture.market.createDryRunOffer(input) as unknown as Readonly<Record<string, unknown>>,
+    withdrawDryRunOffer: (input) => fixture.market.withdrawDryRunOffer(input) as unknown as Readonly<Record<string, unknown>>,
+    placeDryRunOrder: (input) => fixture.market.placeDryRunOrder(input) as unknown as Readonly<Record<string, unknown>>,
+    settleDryRunOrder: (input) => fixture.market.settleDryRunOrder(input) as unknown as Readonly<Record<string, unknown>>,
+    reconcileDryRunSettlement: (input) => fixture.market.reconcileDryRunSettlement(input) as unknown as Readonly<Record<string, unknown>>,
   };
   return createFleetRelayServer({} as FleetIngress, {
     publicMarket,
@@ -166,11 +280,16 @@ function server(fixture: Fixture) {
       badge('reporter-token', fixture.reporterTenantId, fixture.reporterActorRef, ['marketplace.report']),
       badge('moderator-token', fixture.moderationTenantId, fixture.moderatorActorRef, ['marketplace.moderate']),
       badge('installer-token', fixture.targetTenantId, fixture.targetActorRef, ['capability.install.evaluate']),
+      badge('source-commerce-token', fixture.sourceTenantId, fixture.sourceActorRef, [
+        'marketplace.claim', 'marketplace.offer', 'marketplace.settle',
+      ]),
+      badge('buyer-commerce-token', fixture.targetTenantId, fixture.targetActorRef, ['marketplace.order']),
+      badge('moderator-settle-token', fixture.moderationTenantId, fixture.moderatorActorRef, ['marketplace.settle']),
     ]),
   });
 }
 
-function badge(token: string, tenantId: string, actorRef: string, scopes: Array<'marketplace.report' | 'marketplace.moderate' | 'capability.install.evaluate'>) {
+function badge(token: string, tenantId: string, actorRef: string, scopes: BadgeScope[]) {
   return { token, tokenId: `token-${token}`, tenantId, actorRef, scopes, expiresAt: '2026-10-08T10:00:00.000Z' };
 }
 

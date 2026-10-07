@@ -1067,6 +1067,208 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'fleet outbox actor is not an active tenant member'); END;
     `,
   },
+  {
+    version: 17,
+    name: 'p3_dry_run_marketplace_commerce',
+    sql: `
+      CREATE TABLE marketplace_author_claims (
+        claim_id TEXT PRIMARY KEY,
+        listing_id TEXT NOT NULL,
+        source_tenant_id TEXT NOT NULL,
+        claimant_actor_ref TEXT NOT NULL CHECK (claimant_actor_ref GLOB 'human:*'),
+        declaration_evidence_digest TEXT NOT NULL CHECK (length(declaration_evidence_digest) = 64),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'verified', 'revoked')),
+        declared_at TEXT NOT NULL,
+        verified_by_actor_ref TEXT CHECK (verified_by_actor_ref IS NULL OR verified_by_actor_ref GLOB 'human:*'),
+        verification_evidence_digest TEXT CHECK (verification_evidence_digest IS NULL OR length(verification_evidence_digest) = 64),
+        verified_at TEXT,
+        revoked_at TEXT,
+        revocation_reason TEXT,
+        UNIQUE (listing_id, claimant_actor_ref),
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (source_tenant_id) REFERENCES tenants(id),
+        CHECK (
+          (status = 'pending' AND verified_by_actor_ref IS NULL AND verification_evidence_digest IS NULL
+            AND verified_at IS NULL AND revoked_at IS NULL AND revocation_reason IS NULL)
+          OR
+          (status = 'verified' AND verified_by_actor_ref IS NOT NULL AND verification_evidence_digest IS NOT NULL
+            AND verified_at IS NOT NULL AND revoked_at IS NULL AND revocation_reason IS NULL)
+          OR
+          (status = 'revoked' AND revoked_at IS NOT NULL AND length(revocation_reason) > 0)
+        )
+      );
+
+      CREATE UNIQUE INDEX marketplace_one_verified_claim
+        ON marketplace_author_claims (listing_id) WHERE status = 'verified';
+
+      CREATE TABLE marketplace_offers (
+        offer_id TEXT PRIMARY KEY,
+        listing_id TEXT NOT NULL,
+        claim_id TEXT NOT NULL,
+        source_tenant_id TEXT NOT NULL,
+        price_cents INTEGER NOT NULL CHECK (price_cents > 0),
+        currency TEXT NOT NULL CHECK (currency = 'CNY'),
+        mode TEXT NOT NULL CHECK (mode = 'dry_run'),
+        status TEXT NOT NULL CHECK (status IN ('active', 'withdrawn')),
+        created_by_actor_ref TEXT NOT NULL CHECK (created_by_actor_ref GLOB 'human:*'),
+        created_at TEXT NOT NULL,
+        withdrawn_at TEXT,
+        UNIQUE (offer_id, listing_id),
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (claim_id) REFERENCES marketplace_author_claims(claim_id),
+        FOREIGN KEY (source_tenant_id) REFERENCES tenants(id),
+        CHECK (
+          (status = 'active' AND withdrawn_at IS NULL)
+          OR (status = 'withdrawn' AND withdrawn_at IS NOT NULL)
+        )
+      );
+
+      CREATE UNIQUE INDEX marketplace_one_active_offer
+        ON marketplace_offers (listing_id) WHERE status = 'active';
+
+      CREATE TABLE marketplace_orders (
+        order_id TEXT PRIMARY KEY,
+        offer_id TEXT NOT NULL,
+        listing_id TEXT NOT NULL,
+        install_attempt_id TEXT NOT NULL,
+        source_tenant_id TEXT NOT NULL,
+        buyer_tenant_id TEXT NOT NULL,
+        buyer_actor_ref TEXT NOT NULL CHECK (buyer_actor_ref GLOB 'human:*'),
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        currency TEXT NOT NULL CHECK (currency = 'CNY'),
+        mode TEXT NOT NULL CHECK (mode = 'dry_run'),
+        status TEXT NOT NULL CHECK (status IN ('placed', 'settled')),
+        terms_digest TEXT NOT NULL CHECK (length(terms_digest) = 64),
+        created_at TEXT NOT NULL,
+        settled_at TEXT,
+        FOREIGN KEY (offer_id, listing_id) REFERENCES marketplace_offers(offer_id, listing_id),
+        FOREIGN KEY (install_attempt_id) REFERENCES marketplace_install_attempts(attempt_id),
+        FOREIGN KEY (source_tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (buyer_tenant_id) REFERENCES tenants(id),
+        CHECK (
+          (status = 'placed' AND settled_at IS NULL)
+          OR (status = 'settled' AND settled_at IS NOT NULL)
+        )
+      );
+
+      CREATE TABLE marketplace_settlements (
+        settlement_id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL UNIQUE,
+        listing_id TEXT NOT NULL,
+        source_tenant_id TEXT NOT NULL,
+        buyer_tenant_id TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        currency TEXT NOT NULL CHECK (currency = 'CNY'),
+        mode TEXT NOT NULL CHECK (mode = 'dry_run'),
+        initiated_by_actor_ref TEXT NOT NULL CHECK (initiated_by_actor_ref GLOB 'human:*'),
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (order_id) REFERENCES marketplace_orders(order_id),
+        FOREIGN KEY (listing_id) REFERENCES listings(listing_id),
+        FOREIGN KEY (source_tenant_id) REFERENCES tenants(id),
+        FOREIGN KEY (buyer_tenant_id) REFERENCES tenants(id)
+      );
+
+      CREATE TABLE marketplace_ledger_entries (
+        entry_id TEXT PRIMARY KEY,
+        settlement_id TEXT NOT NULL,
+        account_ref TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK (direction IN ('debit', 'credit')),
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        currency TEXT NOT NULL CHECK (currency = 'CNY'),
+        mode TEXT NOT NULL CHECK (mode = 'dry_run'),
+        created_at TEXT NOT NULL,
+        UNIQUE (settlement_id, direction),
+        FOREIGN KEY (settlement_id) REFERENCES marketplace_settlements(settlement_id)
+      );
+
+      CREATE TRIGGER marketplace_author_claims_no_delete
+        BEFORE DELETE ON marketplace_author_claims
+        BEGIN SELECT RAISE(ABORT, 'marketplace author claims are retained for audit'); END;
+      CREATE TRIGGER marketplace_author_claims_identity_immutable
+        BEFORE UPDATE OF claim_id, listing_id, source_tenant_id, claimant_actor_ref,
+          declaration_evidence_digest, declared_at ON marketplace_author_claims
+        BEGIN SELECT RAISE(ABORT, 'marketplace author claim identity is immutable'); END;
+      CREATE TRIGGER marketplace_author_claims_transition_guard
+        BEFORE UPDATE OF status ON marketplace_author_claims
+        WHEN NOT (
+          (OLD.status = 'pending' AND NEW.status IN ('verified', 'revoked'))
+          OR (OLD.status = 'verified' AND NEW.status = 'revoked')
+        )
+        BEGIN SELECT RAISE(ABORT, 'marketplace author claim transition is invalid'); END;
+
+      CREATE TRIGGER marketplace_offers_no_delete
+        BEFORE DELETE ON marketplace_offers
+        BEGIN SELECT RAISE(ABORT, 'marketplace offers are retained for audit'); END;
+      CREATE TRIGGER marketplace_offers_payload_immutable
+        BEFORE UPDATE OF offer_id, listing_id, claim_id, source_tenant_id, price_cents,
+          currency, mode, created_by_actor_ref, created_at ON marketplace_offers
+        BEGIN SELECT RAISE(ABORT, 'marketplace offer payload is immutable'); END;
+      CREATE TRIGGER marketplace_offers_transition_guard
+        BEFORE UPDATE OF status ON marketplace_offers
+        WHEN NOT (OLD.status = 'active' AND NEW.status = 'withdrawn')
+        BEGIN SELECT RAISE(ABORT, 'marketplace offer transition is invalid'); END;
+      CREATE TRIGGER marketplace_offers_claim_guard
+        BEFORE INSERT ON marketplace_offers
+        WHEN NOT EXISTS (
+          SELECT 1 FROM marketplace_author_claims
+          WHERE claim_id = NEW.claim_id
+            AND listing_id = NEW.listing_id
+            AND source_tenant_id = NEW.source_tenant_id
+            AND claimant_actor_ref = NEW.created_by_actor_ref
+            AND status = 'verified'
+        )
+        BEGIN SELECT RAISE(ABORT, 'dry-run offer requires an exact verified author claim'); END;
+
+      CREATE TRIGGER marketplace_orders_no_delete
+        BEFORE DELETE ON marketplace_orders
+        BEGIN SELECT RAISE(ABORT, 'marketplace orders are retained for audit'); END;
+      CREATE TRIGGER marketplace_orders_payload_immutable
+        BEFORE UPDATE OF order_id, offer_id, listing_id, install_attempt_id, source_tenant_id,
+          buyer_tenant_id, buyer_actor_ref, amount_cents, currency, mode, terms_digest, created_at
+        ON marketplace_orders
+        BEGIN SELECT RAISE(ABORT, 'marketplace order payload is immutable'); END;
+      CREATE TRIGGER marketplace_orders_transition_guard
+        BEFORE UPDATE OF status ON marketplace_orders
+        WHEN NOT (OLD.status = 'placed' AND NEW.status = 'settled')
+        BEGIN SELECT RAISE(ABORT, 'marketplace order transition is invalid'); END;
+      CREATE TRIGGER marketplace_orders_install_guard
+        BEFORE INSERT ON marketplace_orders
+        WHEN NOT EXISTS (
+          SELECT 1 FROM marketplace_install_attempts
+          WHERE attempt_id = NEW.install_attempt_id
+            AND listing_id = NEW.listing_id
+            AND target_tenant_id = NEW.buyer_tenant_id
+            AND decision = 'approved'
+        )
+        BEGIN SELECT RAISE(ABORT, 'dry-run order requires an approved exact install attempt'); END;
+      CREATE TRIGGER marketplace_orders_offer_guard
+        BEFORE INSERT ON marketplace_orders
+        WHEN NOT EXISTS (
+          SELECT 1 FROM marketplace_offers
+          WHERE offer_id = NEW.offer_id
+            AND listing_id = NEW.listing_id
+            AND source_tenant_id = NEW.source_tenant_id
+            AND price_cents = NEW.amount_cents
+            AND currency = NEW.currency
+            AND mode = 'dry_run'
+            AND status = 'active'
+        )
+        BEGIN SELECT RAISE(ABORT, 'dry-run order must match an active exact offer'); END;
+
+      CREATE TRIGGER marketplace_settlements_no_update
+        BEFORE UPDATE ON marketplace_settlements
+        BEGIN SELECT RAISE(ABORT, 'marketplace settlements are immutable'); END;
+      CREATE TRIGGER marketplace_settlements_no_delete
+        BEFORE DELETE ON marketplace_settlements
+        BEGIN SELECT RAISE(ABORT, 'marketplace settlements are retained for audit'); END;
+      CREATE TRIGGER marketplace_ledger_entries_no_update
+        BEFORE UPDATE ON marketplace_ledger_entries
+        BEGIN SELECT RAISE(ABORT, 'marketplace ledger entries are immutable'); END;
+      CREATE TRIGGER marketplace_ledger_entries_no_delete
+        BEFORE DELETE ON marketplace_ledger_entries
+        BEGIN SELECT RAISE(ABORT, 'marketplace ledger entries are retained for audit'); END;
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

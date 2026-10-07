@@ -104,6 +104,73 @@ export interface MarketplaceReportRecord {
   resolvedAt: string | null;
 }
 
+export interface MarketplaceAuthorClaimRecord {
+  claimId: string;
+  listingId: string;
+  sourceTenantId: string;
+  claimantActorRef: string;
+  status: 'pending' | 'verified' | 'revoked';
+  declarationEvidenceDigest: string;
+  verificationEvidenceDigest: string | null;
+  declaredAt: string;
+  verifiedAt: string | null;
+  revokedAt: string | null;
+  revocationReason: string | null;
+}
+
+export interface MarketplaceDryRunOffer {
+  offerId: string;
+  listingId: string;
+  claimId: string;
+  sourceTenantId: string;
+  priceCents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  status: 'active' | 'withdrawn';
+  createdAt: string;
+  withdrawnAt: string | null;
+}
+
+export interface MarketplaceDryRunOrder {
+  orderId: string;
+  offerId: string;
+  listingId: string;
+  installAttemptId: string;
+  sourceTenantId: string;
+  buyerTenantId: string;
+  buyerActorRef: string;
+  amountCents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  status: 'placed' | 'settled';
+  termsDigest: string;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export interface MarketplaceDryRunSettlement {
+  settlementId: string;
+  orderId: string;
+  listingId: string;
+  sourceTenantId: string;
+  buyerTenantId: string;
+  amountCents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  createdAt: string;
+}
+
+export interface MarketplaceDryRunReconciliation {
+  settlementId: string;
+  orderId: string;
+  mode: 'dry_run';
+  amountCents: number;
+  debitCents: number;
+  creditCents: number;
+  signedBalanceCents: number;
+  reconciled: boolean;
+}
+
 interface PackageRow {
   source_tenant_id: string;
   package_id: string;
@@ -129,6 +196,62 @@ interface ReportRow {
   status: 'open' | 'resolved_actioned';
   created_at: string;
   resolved_at: string | null;
+}
+
+interface AuthorClaimRow {
+  claim_id: string;
+  listing_id: string;
+  source_tenant_id: string;
+  claimant_actor_ref: string;
+  declaration_evidence_digest: string;
+  status: 'pending' | 'verified' | 'revoked';
+  declared_at: string;
+  verification_evidence_digest: string | null;
+  verified_at: string | null;
+  revoked_at: string | null;
+  revocation_reason: string | null;
+}
+
+interface OfferRow {
+  offer_id: string;
+  listing_id: string;
+  claim_id: string;
+  source_tenant_id: string;
+  price_cents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  status: 'active' | 'withdrawn';
+  created_at: string;
+  withdrawn_at: string | null;
+}
+
+interface OrderRow {
+  order_id: string;
+  offer_id: string;
+  listing_id: string;
+  install_attempt_id: string;
+  source_tenant_id: string;
+  buyer_tenant_id: string;
+  buyer_actor_ref: string;
+  amount_cents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  status: 'placed' | 'settled';
+  terms_digest: string;
+  created_at: string;
+  settled_at: string | null;
+}
+
+interface SettlementRow {
+  settlement_id: string;
+  order_id: string;
+  listing_id: string;
+  source_tenant_id: string;
+  buyer_tenant_id: string;
+  amount_cents: number;
+  currency: 'CNY';
+  mode: 'dry_run';
+  created_at: string;
 }
 
 /**
@@ -342,6 +465,251 @@ export class PublicMarketStore {
     return decision;
   }
 
+  declareAuthorClaim(input: {
+    claimId: string;
+    listingId: string;
+    sourceTenantId: string;
+    claimantActorRef: string;
+    declarationEvidenceDigest: string;
+  }): MarketplaceAuthorClaimRecord {
+    this.requireTenantHuman(input.sourceTenantId, input.claimantActorRef);
+    requireDigest(input.declarationEvidenceDigest, 'Author claim declaration evidence');
+    const listing = this.listingRow(input.listingId);
+    if (!listing || listing.status !== 'public' || listing.source_tenant_id !== input.sourceTenantId) {
+      throw new Error('Public listing is unavailable for author claim');
+    }
+    const declaredAt = this.now().toISOString();
+    this.database.prepare(`
+      INSERT INTO marketplace_author_claims (
+        claim_id, listing_id, source_tenant_id, claimant_actor_ref,
+        declaration_evidence_digest, status, declared_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?)
+    `).run(
+      input.claimId, input.listingId, input.sourceTenantId, input.claimantActorRef,
+      input.declarationEvidenceDigest, declaredAt,
+    );
+    return this.authorClaim(input.claimId)!;
+  }
+
+  verifyAuthorClaim(input: {
+    claimId: string;
+    requestTenantId: string;
+    moderatorActorRef: string;
+    verificationEvidenceDigest: string;
+  }): MarketplaceAuthorClaimRecord {
+    this.requireModerator(input.requestTenantId, input.moderatorActorRef);
+    requireDigest(input.verificationEvidenceDigest, 'Author claim verification evidence');
+    const claim = this.authorClaimRow(input.claimId);
+    if (!claim || claim.status !== 'pending') throw new Error('Pending author claim is unavailable');
+    const verifiedAt = this.now().toISOString();
+    this.database.prepare(`
+      UPDATE marketplace_author_claims
+      SET status = 'verified', verified_by_actor_ref = ?,
+          verification_evidence_digest = ?, verified_at = ?
+      WHERE claim_id = ? AND status = 'pending'
+    `).run(input.moderatorActorRef, input.verificationEvidenceDigest, verifiedAt, input.claimId);
+    return this.authorClaim(input.claimId)!;
+  }
+
+  revokeAuthorClaim(input: {
+    claimId: string;
+    sourceTenantId: string;
+    claimantActorRef: string;
+    reason: string;
+  }): MarketplaceAuthorClaimRecord {
+    this.requireTenantHuman(input.sourceTenantId, input.claimantActorRef);
+    const reason = input.reason.trim();
+    if (!reason) throw new Error('Author claim revocation reason is required');
+    const claim = this.authorClaimRow(input.claimId);
+    if (!claim || claim.source_tenant_id !== input.sourceTenantId || claim.claimant_actor_ref !== input.claimantActorRef
+      || !['pending', 'verified'].includes(claim.status)) {
+      throw new Error('Author claim is unavailable for revocation');
+    }
+    const revokedAt = this.now().toISOString();
+    const revoke = this.database.transaction(() => {
+      this.database.prepare(`
+        UPDATE marketplace_offers SET status = 'withdrawn', withdrawn_at = ?
+        WHERE claim_id = ? AND status = 'active'
+      `).run(revokedAt, input.claimId);
+      this.database.prepare(`
+        UPDATE marketplace_author_claims
+        SET status = 'revoked', revoked_at = ?, revocation_reason = ?
+        WHERE claim_id = ? AND status IN ('pending', 'verified')
+      `).run(revokedAt, reason, input.claimId);
+    });
+    revoke();
+    return this.authorClaim(input.claimId)!;
+  }
+
+  createDryRunOffer(input: {
+    offerId: string;
+    claimId: string;
+    sourceTenantId: string;
+    actorRef: string;
+    priceCents: number;
+  }): MarketplaceDryRunOffer {
+    this.requireTenantHuman(input.sourceTenantId, input.actorRef);
+    requirePositiveCents(input.priceCents);
+    const claim = this.authorClaimRow(input.claimId);
+    if (!claim || claim.status !== 'verified' || claim.source_tenant_id !== input.sourceTenantId
+      || claim.claimant_actor_ref !== input.actorRef) {
+      throw new Error('Verified author claim is required for a dry-run offer');
+    }
+    const listing = this.listingRow(claim.listing_id);
+    if (!listing || listing.status !== 'public') throw new Error('Public listing is unavailable for dry-run offer');
+    const createdAt = this.now().toISOString();
+    this.database.prepare(`
+      INSERT INTO marketplace_offers (
+        offer_id, listing_id, claim_id, source_tenant_id, price_cents,
+        currency, mode, status, created_by_actor_ref, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'CNY', 'dry_run', 'active', ?, ?)
+    `).run(
+      input.offerId, claim.listing_id, input.claimId, input.sourceTenantId,
+      input.priceCents, input.actorRef, createdAt,
+    );
+    return this.dryRunOffer(input.offerId)!;
+  }
+
+  withdrawDryRunOffer(input: {
+    offerId: string;
+    sourceTenantId: string;
+    actorRef: string;
+  }): MarketplaceDryRunOffer {
+    this.requireTenantHuman(input.sourceTenantId, input.actorRef);
+    const offer = this.offerRow(input.offerId);
+    if (!offer || offer.status !== 'active' || offer.source_tenant_id !== input.sourceTenantId) {
+      throw new Error('Active dry-run offer is unavailable');
+    }
+    const claim = this.authorClaimRow(offer.claim_id);
+    if (!claim || claim.claimant_actor_ref !== input.actorRef) throw new Error('Marketplace authorization denied');
+    this.database.prepare(`
+      UPDATE marketplace_offers SET status = 'withdrawn', withdrawn_at = ?
+      WHERE offer_id = ? AND status = 'active'
+    `).run(this.now().toISOString(), input.offerId);
+    return this.dryRunOffer(input.offerId)!;
+  }
+
+  placeDryRunOrder(input: {
+    orderId: string;
+    offerId: string;
+    installAttemptId: string;
+    buyerTenantId: string;
+    buyerActorRef: string;
+    termsDigest: string;
+  }): MarketplaceDryRunOrder {
+    this.requireTenantHuman(input.buyerTenantId, input.buyerActorRef);
+    requireDigest(input.termsDigest, 'Dry-run order terms');
+    const offer = this.offerRow(input.offerId);
+    if (!offer || offer.status !== 'active') throw new Error('Active dry-run offer is unavailable');
+    const createdAt = this.now().toISOString();
+    this.database.prepare(`
+      INSERT INTO marketplace_orders (
+        order_id, offer_id, listing_id, install_attempt_id, source_tenant_id,
+        buyer_tenant_id, buyer_actor_ref, amount_cents, currency, mode,
+        status, terms_digest, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CNY', 'dry_run', 'placed', ?, ?)
+    `).run(
+      input.orderId, input.offerId, offer.listing_id, input.installAttemptId,
+      offer.source_tenant_id, input.buyerTenantId, input.buyerActorRef,
+      offer.price_cents, input.termsDigest, createdAt,
+    );
+    return this.dryRunOrder(input.orderId)!;
+  }
+
+  settleDryRunOrder(input: {
+    settlementId: string;
+    orderId: string;
+    sourceTenantId: string;
+    actorRef: string;
+  }): MarketplaceDryRunSettlement {
+    this.requireTenantHuman(input.sourceTenantId, input.actorRef);
+    const order = this.orderRow(input.orderId);
+    if (!order || order.status !== 'placed' || order.source_tenant_id !== input.sourceTenantId) {
+      throw new Error('Placed dry-run order is unavailable');
+    }
+    const offer = this.offerRow(order.offer_id);
+    const claim = offer ? this.authorClaimRow(offer.claim_id) : undefined;
+    if (!claim || claim.status !== 'verified' || claim.claimant_actor_ref !== input.actorRef) {
+      throw new Error('Verified author claim is required for dry-run settlement');
+    }
+    const createdAt = this.now().toISOString();
+    const settle = this.database.transaction(() => {
+      this.database.prepare(`
+        INSERT INTO marketplace_settlements (
+          settlement_id, order_id, listing_id, source_tenant_id, buyer_tenant_id,
+          amount_cents, currency, mode, initiated_by_actor_ref, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'CNY', 'dry_run', ?, ?)
+      `).run(
+        input.settlementId, input.orderId, order.listing_id, order.source_tenant_id,
+        order.buyer_tenant_id, order.amount_cents, input.actorRef, createdAt,
+      );
+      const entry = this.database.prepare(`
+        INSERT INTO marketplace_ledger_entries (
+          entry_id, settlement_id, account_ref, direction, amount_cents, currency, mode, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'CNY', 'dry_run', ?)
+      `);
+      entry.run(`${input.settlementId}-buyer`, input.settlementId, `tenant:${order.buyer_tenant_id}`, 'debit', order.amount_cents, createdAt);
+      entry.run(`${input.settlementId}-author`, input.settlementId, `tenant:${order.source_tenant_id}`, 'credit', order.amount_cents, createdAt);
+      this.database.prepare(`
+        UPDATE marketplace_orders SET status = 'settled', settled_at = ?
+        WHERE order_id = ? AND status = 'placed'
+      `).run(createdAt, input.orderId);
+    });
+    settle();
+    return this.dryRunSettlement(input.settlementId)!;
+  }
+
+  reconcileDryRunSettlement(input: {
+    settlementId: string;
+    requestTenantId: string;
+    actorRef: string;
+  }): MarketplaceDryRunReconciliation {
+    this.requireTenantHuman(input.requestTenantId, input.actorRef);
+    const settlement = this.settlementRow(input.settlementId);
+    if (!settlement) throw new Error('Dry-run settlement is unavailable');
+    if (![settlement.source_tenant_id, settlement.buyer_tenant_id].includes(input.requestTenantId)) {
+      throw new Error('Marketplace authorization denied');
+    }
+    const entries = this.database.prepare(`
+      SELECT direction, amount_cents FROM marketplace_ledger_entries
+      WHERE settlement_id = ? ORDER BY direction
+    `).all<{ direction: 'debit' | 'credit'; amount_cents: number }>(input.settlementId);
+    const debitCents = entries.filter((entry) => entry.direction === 'debit').reduce((sum, entry) => sum + entry.amount_cents, 0);
+    const creditCents = entries.filter((entry) => entry.direction === 'credit').reduce((sum, entry) => sum + entry.amount_cents, 0);
+    const signedBalanceCents = creditCents - debitCents;
+    return {
+      settlementId: input.settlementId,
+      orderId: settlement.order_id,
+      mode: 'dry_run',
+      amountCents: settlement.amount_cents,
+      debitCents,
+      creditCents,
+      signedBalanceCents,
+      reconciled: entries.length === 2 && debitCents === settlement.amount_cents
+        && creditCents === settlement.amount_cents && signedBalanceCents === 0,
+    };
+  }
+
+  authorClaim(claimId: string): MarketplaceAuthorClaimRecord | undefined {
+    const row = this.authorClaimRow(claimId);
+    return row ? mapAuthorClaim(row) : undefined;
+  }
+
+  dryRunOffer(offerId: string): MarketplaceDryRunOffer | undefined {
+    const row = this.offerRow(offerId);
+    return row ? mapOffer(row) : undefined;
+  }
+
+  dryRunOrder(orderId: string): MarketplaceDryRunOrder | undefined {
+    const row = this.orderRow(orderId);
+    return row ? mapOrder(row) : undefined;
+  }
+
+  dryRunSettlement(settlementId: string): MarketplaceDryRunSettlement | undefined {
+    const row = this.settlementRow(settlementId);
+    return row ? mapSettlement(row) : undefined;
+  }
+
   private packageRow(tenantId: string, packageId: string, packageVersion: number): PackageRow | undefined {
     return this.database.prepare(`
       SELECT source_tenant_id, package_id, package_version, package_digest, package_json, integrity_digest
@@ -362,6 +730,30 @@ export class PublicMarketStore {
        AND p.package_version = l.package_version
       WHERE l.listing_id = ?
     `).get<ListingRow>(listingId);
+  }
+
+  private authorClaimRow(claimId: string): AuthorClaimRow | undefined {
+    return this.database.prepare(`
+      SELECT * FROM marketplace_author_claims WHERE claim_id = ?
+    `).get<AuthorClaimRow>(claimId);
+  }
+
+  private offerRow(offerId: string): OfferRow | undefined {
+    return this.database.prepare(`
+      SELECT * FROM marketplace_offers WHERE offer_id = ?
+    `).get<OfferRow>(offerId);
+  }
+
+  private orderRow(orderId: string): OrderRow | undefined {
+    return this.database.prepare(`
+      SELECT * FROM marketplace_orders WHERE order_id = ?
+    `).get<OrderRow>(orderId);
+  }
+
+  private settlementRow(settlementId: string): SettlementRow | undefined {
+    return this.database.prepare(`
+      SELECT * FROM marketplace_settlements WHERE settlement_id = ?
+    `).get<SettlementRow>(settlementId);
   }
 
   private requireModerator(requestTenantId: string, actorRef: string): void {
@@ -474,8 +866,82 @@ function mapReport(row: ReportRow): MarketplaceReportRecord {
   };
 }
 
+function mapAuthorClaim(row: AuthorClaimRow): MarketplaceAuthorClaimRecord {
+  return {
+    claimId: row.claim_id,
+    listingId: row.listing_id,
+    sourceTenantId: row.source_tenant_id,
+    claimantActorRef: row.claimant_actor_ref,
+    status: row.status,
+    declarationEvidenceDigest: row.declaration_evidence_digest,
+    verificationEvidenceDigest: row.verification_evidence_digest,
+    declaredAt: row.declared_at,
+    verifiedAt: row.verified_at,
+    revokedAt: row.revoked_at,
+    revocationReason: row.revocation_reason,
+  };
+}
+
+function mapOffer(row: OfferRow): MarketplaceDryRunOffer {
+  return {
+    offerId: row.offer_id,
+    listingId: row.listing_id,
+    claimId: row.claim_id,
+    sourceTenantId: row.source_tenant_id,
+    priceCents: row.price_cents,
+    currency: row.currency,
+    mode: row.mode,
+    status: row.status,
+    createdAt: row.created_at,
+    withdrawnAt: row.withdrawn_at,
+  };
+}
+
+function mapOrder(row: OrderRow): MarketplaceDryRunOrder {
+  return {
+    orderId: row.order_id,
+    offerId: row.offer_id,
+    listingId: row.listing_id,
+    installAttemptId: row.install_attempt_id,
+    sourceTenantId: row.source_tenant_id,
+    buyerTenantId: row.buyer_tenant_id,
+    buyerActorRef: row.buyer_actor_ref,
+    amountCents: row.amount_cents,
+    currency: row.currency,
+    mode: row.mode,
+    status: row.status,
+    termsDigest: row.terms_digest,
+    createdAt: row.created_at,
+    settledAt: row.settled_at,
+  };
+}
+
+function mapSettlement(row: SettlementRow): MarketplaceDryRunSettlement {
+  return {
+    settlementId: row.settlement_id,
+    orderId: row.order_id,
+    listingId: row.listing_id,
+    sourceTenantId: row.source_tenant_id,
+    buyerTenantId: row.buyer_tenant_id,
+    amountCents: row.amount_cents,
+    currency: row.currency,
+    mode: row.mode,
+    createdAt: row.created_at,
+  };
+}
+
 function requireSameTenant(actual: string, expected: string): void {
   if (actual !== expected) throw new Error('Marketplace authorization denied');
+}
+
+function requireDigest(value: string, label: string): void {
+  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error(`${label} must be a SHA-256 digest`);
+}
+
+function requirePositiveCents(value: number): void {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 1_000_000_000) {
+    throw new Error('Dry-run offer price must be positive integer cents');
+  }
 }
 
 function sha256(value: string): string {

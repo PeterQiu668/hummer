@@ -224,6 +224,129 @@ describe('[PUBLIC-MARKET-TAKEDOWN] report and human moderation', () => {
   });
 });
 
+describe('[MARKETPLACE-P3-DRY-RUN] author claims, orders, and reconciliation', () => {
+  it('requires a separately verified author claim and reconciles an exact dry-run debit and credit', () => {
+    const fixture = setup();
+    registerAndPublish(fixture);
+    const claim = fixture.market.declareAuthorClaim({
+      claimId: 'claim-research',
+      listingId: 'listing-research',
+      sourceTenantId: fixture.sourceTenantId,
+      claimantActorRef: fixture.sourceActorRef,
+      declarationEvidenceDigest: digest,
+    });
+    expect(claim.status).toBe('pending');
+    expect(() => fixture.market.createDryRunOffer({
+      offerId: 'offer-too-early', claimId: claim.claimId,
+      sourceTenantId: fixture.sourceTenantId, actorRef: fixture.sourceActorRef, priceCents: 9_900,
+    })).toThrow(/verified author claim/i);
+
+    const verified = fixture.market.verifyAuthorClaim({
+      claimId: claim.claimId,
+      requestTenantId: fixture.moderationTenantId,
+      moderatorActorRef: fixture.moderatorActorRef,
+      verificationEvidenceDigest: 'b'.repeat(64),
+    });
+    expect(verified).toMatchObject({ status: 'verified', verificationEvidenceDigest: 'b'.repeat(64) });
+    const offer = fixture.market.createDryRunOffer({
+      offerId: 'offer-research', claimId: claim.claimId,
+      sourceTenantId: fixture.sourceTenantId, actorRef: fixture.sourceActorRef, priceCents: 9_900,
+    });
+    expect(offer).toMatchObject({ priceCents: 9_900, currency: 'CNY', mode: 'dry_run', status: 'active' });
+
+    fixture.market.authorizeInstall({
+      attemptId: 'attempt-commerce', listingId: 'listing-research',
+      targetTenantId: fixture.targetTenantId, gate: installGate(fixture),
+    });
+    const order = fixture.market.placeDryRunOrder({
+      orderId: 'order-research', offerId: offer.offerId, installAttemptId: 'attempt-commerce',
+      buyerTenantId: fixture.targetTenantId, buyerActorRef: fixture.targetActorRef,
+      termsDigest: 'c'.repeat(64),
+    });
+    expect(order).toMatchObject({
+      listingId: 'listing-research', amountCents: 9_900, currency: 'CNY', mode: 'dry_run', status: 'placed',
+    });
+    const settlement = fixture.market.settleDryRunOrder({
+      settlementId: 'settlement-research', orderId: order.orderId,
+      sourceTenantId: fixture.sourceTenantId, actorRef: fixture.sourceActorRef,
+    });
+    expect(settlement).toMatchObject({ amountCents: 9_900, currency: 'CNY', mode: 'dry_run' });
+    expect(fixture.market.dryRunOrder(order.orderId)?.status).toBe('settled');
+    expect(fixture.market.reconcileDryRunSettlement({
+      settlementId: settlement.settlementId,
+      requestTenantId: fixture.sourceTenantId,
+      actorRef: fixture.sourceActorRef,
+    })).toEqual({
+      settlementId: 'settlement-research', orderId: 'order-research', mode: 'dry_run', amountCents: 9_900,
+      debitCents: 9_900, creditCents: 9_900, signedBalanceCents: 0, reconciled: true,
+    });
+    expect(() => fixture.market.reconcileDryRunSettlement({
+      settlementId: settlement.settlementId,
+      requestTenantId: fixture.moderationTenantId,
+      actorRef: fixture.moderatorActorRef,
+    })).toThrow(/^Marketplace authorization denied$/);
+    const bytes = JSON.stringify({ offer, order, settlement });
+    for (const forbidden of ['cardNumber', 'bankAccount', 'paymentToken', 'payout', 'invoice', 'webhook']) {
+      expect(bytes).not.toContain(forbidden);
+    }
+    fixture.market.close();
+  });
+
+  it('fails closed on forged moderation, missing install approval, replayed settlement, and revoked authorship', () => {
+    const fixture = setup();
+    registerAndPublish(fixture);
+    fixture.market.declareAuthorClaim({
+      claimId: 'claim-negative', listingId: 'listing-research', sourceTenantId: fixture.sourceTenantId,
+      claimantActorRef: fixture.sourceActorRef, declarationEvidenceDigest: digest,
+    });
+    expect(() => fixture.market.verifyAuthorClaim({
+      claimId: 'claim-negative', requestTenantId: fixture.sourceTenantId,
+      moderatorActorRef: fixture.sourceActorRef, verificationEvidenceDigest: digest,
+    })).toThrow(/^Marketplace authorization denied$/);
+    fixture.market.verifyAuthorClaim({
+      claimId: 'claim-negative', requestTenantId: fixture.moderationTenantId,
+      moderatorActorRef: fixture.moderatorActorRef, verificationEvidenceDigest: digest,
+    });
+    const offer = fixture.market.createDryRunOffer({
+      offerId: 'offer-negative', claimId: 'claim-negative', sourceTenantId: fixture.sourceTenantId,
+      actorRef: fixture.sourceActorRef, priceCents: 19_800,
+    });
+    expect(() => fixture.market.placeDryRunOrder({
+      orderId: 'order-no-install', offerId: offer.offerId, installAttemptId: 'attempt-missing',
+      buyerTenantId: fixture.targetTenantId, buyerActorRef: fixture.targetActorRef, termsDigest: digest,
+    })).toThrow(/approved exact install attempt/i);
+
+    fixture.market.authorizeInstall({
+      attemptId: 'attempt-negative', listingId: 'listing-research',
+      targetTenantId: fixture.targetTenantId, gate: installGate(fixture, { gateId: 'gate-commerce-negative' }),
+    });
+    const order = fixture.market.placeDryRunOrder({
+      orderId: 'order-negative', offerId: offer.offerId, installAttemptId: 'attempt-negative',
+      buyerTenantId: fixture.targetTenantId, buyerActorRef: fixture.targetActorRef, termsDigest: digest,
+    });
+    fixture.market.settleDryRunOrder({
+      settlementId: 'settlement-negative', orderId: order.orderId,
+      sourceTenantId: fixture.sourceTenantId, actorRef: fixture.sourceActorRef,
+    });
+    expect(() => fixture.market.settleDryRunOrder({
+      settlementId: 'settlement-replay', orderId: order.orderId,
+      sourceTenantId: fixture.sourceTenantId, actorRef: fixture.sourceActorRef,
+    })).toThrow(/placed dry-run order/i);
+
+    const revoked = fixture.market.revokeAuthorClaim({
+      claimId: 'claim-negative', sourceTenantId: fixture.sourceTenantId,
+      claimantActorRef: fixture.sourceActorRef, reason: 'Author withdrew the verified claim.',
+    });
+    expect(revoked.status).toBe('revoked');
+    expect(fixture.market.dryRunOffer(offer.offerId)?.status).toBe('withdrawn');
+    expect(() => fixture.market.placeDryRunOrder({
+      orderId: 'order-after-revoke', offerId: offer.offerId, installAttemptId: 'attempt-negative',
+      buyerTenantId: fixture.targetTenantId, buyerActorRef: fixture.targetActorRef, termsDigest: digest,
+    })).toThrow(/active dry-run offer/i);
+    fixture.market.close();
+  });
+});
+
 function setup(): Fixture {
   const directory = temporaryDirectory();
   const persistence = openPersistence({ dataDirectory: directory, now: () => new Date(at) });
