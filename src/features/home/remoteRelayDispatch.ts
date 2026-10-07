@@ -1,11 +1,14 @@
 import { configureRemoteRelayExecutionNodes } from '../execution-nodes/executionNodeClient';
 import {
   RemoteRelayClient,
+  type RemoteRelayApprovalRequest,
   type RemoteRelayClientOptions,
   type RemoteRelayNode,
 } from '../execution-nodes/remoteRelayClient';
 import type { StartWorkDispatchIntentPort } from './startWorkDispatch';
 import type { BatchDispatchNode, BatchDispatchPort, BatchRuntime } from './batchDispatch';
+import type { FleetControlPort } from './FleetControlPanel';
+import { currentIdentity } from '../identity/identityClient';
 import {
   configureRemoteCapabilityCatalog,
   type CapabilityInstallerBoundary,
@@ -87,6 +90,44 @@ export function remoteBatchDispatchPort(): BatchDispatchPort | undefined {
     listNodes: async () => (await client.listNodes()).flatMap(toBatchNode),
     enqueueBatch: (envelopes) => client.enqueueBatch(envelopes),
   };
+}
+
+export function remoteFleetControlPort(): FleetControlPort | undefined {
+  const client = deployment?.client;
+  if (!client) return undefined;
+  return {
+    listTasks: () => client.listTasks(),
+    listApprovalRequests: () => client.listApprovalRequests(),
+    async decideApproval(input) {
+      const identity = currentIdentity();
+      if (!identity) throw new Error('当前没有有效的身份会话。');
+      const request = await client.getApprovalRequest(input.requestId);
+      const requestedScope = scopeFromRequest(request);
+      const decision = {
+        schema: 'hummer.approval-decision',
+        version: 1,
+        decisionId: `decision-${crypto.randomUUID()}`,
+        requestId: input.requestId,
+        tenantId: identity.tenant.id,
+        deciderActorRef: `human:${identity.membership.humanUserId}`,
+        decidedAt: new Date().toISOString(),
+        decision: input.decision,
+        ...(input.rationale ? { rationale: input.rationale } : {}),
+        ...(input.decision === 'approved' ? { grantedScope: requestedScope } : {}),
+      };
+      return client.decideApproval(input.requestId, decision);
+    },
+    stopTask: (taskId) => client.stopTask(taskId),
+  };
+}
+
+function scopeFromRequest(request: RemoteRelayApprovalRequest): Record<string, unknown> {
+  const scope = request.requestedScope
+    ?? (request.request && typeof request.request === 'object' ? request.request.requestedScope : undefined);
+  if (!scope || typeof scope !== 'object' || Array.isArray(scope)) {
+    throw new Error('Relay 审批请求缺少受控授权范围。');
+  }
+  return scope as Record<string, unknown>;
 }
 
 function toBatchNode(node: RemoteRelayNode): BatchDispatchNode[] {

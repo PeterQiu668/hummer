@@ -88,6 +88,28 @@ describe('RemoteRelayClient', () => {
     expect(JSON.stringify(result)).not.toContain(badge);
   });
 
+  it('uses the authenticated control routes for an explicit approval decision and stop', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => 'opaque-badge',
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await client.decideApproval('request/one', { decision: 'denied' });
+    await client.stopTask('task/one');
+
+    expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
+      ['https://relay.example.test/v1/approval-requests/request%2Fone/decision', 'POST', '{"decision":"denied"}'],
+      ['https://relay.example.test/v1/tasks/task%2Fone/stop', 'POST', '{}'],
+    ]);
+    expect(calls.every((call) => new Headers(call.init?.headers).get('authorization') === 'Bearer opaque-badge')).toBe(true);
+  });
+
   it('reads the tenant-scoped capability catalog through the authenticated Relay route', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toBe('https://relay.example.test/v1/capabilities');

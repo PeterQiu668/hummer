@@ -162,6 +162,20 @@ export class RemoteRelayClient {
     });
   }
 
+  decideApproval(requestId: string, decision: unknown): Promise<unknown> {
+    return this.request(`/v1/approval-requests/${encodeURIComponent(requestId)}/decision`, {
+      method: 'POST',
+      body: JSON.stringify(decision),
+    });
+  }
+
+  stopTask(taskId: string): Promise<unknown> {
+    return this.request(`/v1/tasks/${encodeURIComponent(taskId)}/stop`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
   async enqueueBatch(envelopes: readonly unknown[]): Promise<readonly RemoteRelayBatchResult[]> {
     const results: RemoteRelayBatchResult[] = [];
     for (let index = 0; index < envelopes.length; index += 1) {
