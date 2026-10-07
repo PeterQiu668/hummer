@@ -1,5 +1,10 @@
 import type { RiskClass } from '@hummer/contracts';
 
+const MAX_READ_ATTESTATION_BYTES = 1_048_576;
+const SAFE_READ_ATTESTATION_PATH = /^(?![A-Za-z]:)(?!\/)(?!.*:)(?!.*[\x00-\x1F\x7F])(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?!.*\\)(?!.*\/$).+$/u;
+const WINDOWS_DEVICE_SEGMENT = /^(?:con|prn|aux|nul|clock\$|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
+const GRANT_REF = /^[A-Za-z0-9._:-]+$/u;
+
 export const START_WORK_CONTROLLED_RISK_CLASSES = [
   'egress',
   'write',
@@ -33,6 +38,13 @@ export type StartWorkRiskClass = 'none' | RiskClass;
 export type StartWorkPlanStatus = 'pending' | 'confirmed' | 'rejected';
 export type StartWorkDecision = 'confirm' | 'reject';
 
+export interface StartWorkReadAttestation {
+  kind: 'fs.read.attest.v1';
+  path: string;
+  maxBytes: number;
+  grantRef: string;
+}
+
 export interface StartWorkPlanStep {
   id: string;
   title: string;
@@ -50,6 +62,7 @@ export interface StartWorkPlan {
   steps: StartWorkPlanStep[];
   decidedBy: string | null;
   decidedAt: string | null;
+  execution?: StartWorkReadAttestation;
 }
 
 export interface StartWorkPlanValidation {
@@ -70,6 +83,7 @@ export function validatePendingStartWorkPlan(plan: StartWorkPlan): StartWorkPlan
   if (typeof plan.target !== 'string' || !plan.target.trim()) errors.push('计划缺少目标');
   if (plan.status !== 'pending') errors.push('只允许载入待确认计划');
   if (plan.decidedBy !== null || plan.decidedAt !== null) errors.push('待确认计划不能包含既有决策');
+  if (plan.execution !== undefined) errors.push(...validateStartWorkReadAttestation(plan.execution).errors);
   if (!Array.isArray(plan.steps) || plan.steps.length < 2 || plan.steps.length > 5) {
     errors.push('计划必须包含 2–5 个步骤');
     return { ok: false, errors };
@@ -94,6 +108,37 @@ export function validatePendingStartWorkPlan(plan: StartWorkPlan): StartWorkPlan
     }
   }
 
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateStartWorkReadAttestation(value: unknown): StartWorkPlanValidation {
+  const errors: string[] = [];
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, errors: ['只读证明配置格式无效'] };
+  }
+  const execution = value as Record<string, unknown>;
+  const keys = Object.keys(execution).sort();
+  if (keys.join(',') !== 'grantRef,kind,maxBytes,path') errors.push('只读证明配置包含未知字段');
+  if (execution.kind !== 'fs.read.attest.v1') errors.push('只读证明类型无效');
+
+  const path = execution.path;
+  if (typeof path !== 'string' || path.length < 1 || path.length > 1024 || !SAFE_READ_ATTESTATION_PATH.test(path)) {
+    errors.push('文件路径必须是严格的工作区相对路径');
+  } else {
+    const unsafeSegment = path.split('/').some((segment) => /[. ]$/u.test(segment) || WINDOWS_DEVICE_SEGMENT.test(segment));
+    if (unsafeSegment) errors.push('文件路径包含 Windows 保留名或尾随点/空格');
+  }
+
+  if (!Number.isInteger(execution.maxBytes)
+    || Number(execution.maxBytes) < 1
+    || Number(execution.maxBytes) > MAX_READ_ATTESTATION_BYTES) {
+    errors.push('最大读取字节必须是 1–1048576 的整数');
+  }
+
+  const grantRef = execution.grantRef;
+  if (typeof grantRef !== 'string' || grantRef.length < 1 || grantRef.length > 128 || !GRANT_REF.test(grantRef)) {
+    errors.push('一次性授权引用格式无效');
+  }
   return { ok: errors.length === 0, errors };
 }
 

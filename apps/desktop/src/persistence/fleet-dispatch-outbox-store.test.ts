@@ -79,6 +79,24 @@ describe('transactional Fleet dispatch outbox', () => {
     })).toThrow('unknown field');
     expect(() => persistence.fleetDispatchOutbox.stage({
       tenantId, actorRef, envelope: envelope(tenantId, {
+        idempotencyKey: 'delivery-plan-no-grant',
+        executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096 },
+      }), occurredAt: NOW,
+    })).toThrow('requires a one-use grant');
+    expect(() => persistence.fleetDispatchOutbox.stage({
+      tenantId, actorRef, envelope: envelope(tenantId, {
+        idempotencyKey: 'delivery-unsafe-plan', grantRef: 'grant:unsafe',
+        executionPlan: { kind: 'fs.read.attest.v1', path: '../secret.txt', maxBytes: 4096 },
+      }), occurredAt: NOW,
+    })).toThrow('strict portable relative path');
+    expect(() => persistence.fleetDispatchOutbox.stage({
+      tenantId, actorRef, envelope: envelope(tenantId, {
+        idempotencyKey: 'delivery-plan-unknown', grantRef: 'grant:unknown',
+        executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096, autoApprove: true },
+      }), occurredAt: NOW,
+    })).toThrow('execution plan contains unknown field');
+    expect(() => persistence.fleetDispatchOutbox.stage({
+      tenantId, actorRef, envelope: envelope(tenantId, {
         idempotencyKey: 'delivery-large', workOrderTask: {
           ...workOrderTask(), target: 'x'.repeat(32_768), expectedDeliverable: 'y'.repeat(32_768),
         },

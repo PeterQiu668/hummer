@@ -10,6 +10,7 @@ import {
   type StartWorkDispatchIntentPort,
 } from './startWorkDispatch';
 import type { StartWorkPlan } from './startWorkPlan';
+import type { StartWorkReadAttestation } from './startWorkPlan';
 
 export interface StartWorkFlowProps {
   planner: Planner;
@@ -36,7 +37,7 @@ export default function StartWorkFlow({
   const [dispatching, setDispatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requestPlan = async (target: string) => {
+  const requestPlan = async (target: string, execution?: StartWorkReadAttestation) => {
     setError(null);
     setIntent(null);
     try {
@@ -45,7 +46,7 @@ export default function StartWorkFlow({
         nodePort?.list() ?? Promise.resolve([]),
       ]);
       setSourcePlan(nextSourcePlan);
-      setPlan(adaptSessionPlanToStartWorkPlan(nextSourcePlan, nodes));
+      setPlan(adaptSessionPlanToStartWorkPlan(nextSourcePlan, nodes, execution));
     } catch (cause) {
       setSourcePlan(null);
       setPlan(null);
@@ -96,7 +97,7 @@ export default function StartWorkFlow({
         decisionActorRef={decisionActorRef}
         now={now}
         dispatchAvailable={Boolean(dispatchIntentPort)}
-        onPlanRequest={(target) => { void requestPlan(target); }}
+        onPlanRequest={(target, execution) => { void requestPlan(target, execution); }}
         onDecision={decide}
       />
       {dispatching ? <p className="mx-auto mb-4 max-w-3xl text-sm hum-muted" role="status">正在提交到 Relay…</p> : null}

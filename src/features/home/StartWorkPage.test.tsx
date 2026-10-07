@@ -80,6 +80,52 @@ describe('StartWorkPage', () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
+  it('requires an explicit safe path and pre-provisioned one-use grant before drafting a read attestation', () => {
+    const onPlanRequest = vi.fn();
+    render(<StartWorkPage plan={null} onPlanRequest={onPlanRequest} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: '你想完成什么' }), {
+      target: { value: '证明周报文件内容摘要' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /只读文件证明/ }));
+    expect(screen.getByRole('button', { name: '生成待确认计划' })).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '工作区相对路径' }), {
+      target: { value: '../secrets.txt' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: '一次性授权引用' }), {
+      target: { value: 'grant:weekly-1' },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('严格的工作区相对路径');
+    expect(screen.getByRole('button', { name: '生成待确认计划' })).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '工作区相对路径' }), {
+      target: { value: 'reports/weekly.txt' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: '最大读取字节' }), {
+      target: { value: '4096' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '生成待确认计划' }));
+
+    expect(onPlanRequest).toHaveBeenCalledWith('证明周报文件内容摘要', {
+      kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096, grantRef: 'grant:weekly-1',
+    });
+  });
+
+  it('shows the exact read-attestation scope before confirmation', () => {
+    render(<StartWorkPage plan={pendingPlan({
+      execution: {
+        kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096, grantRef: 'grant:weekly-1',
+      },
+    })} />);
+
+    const scope = screen.getByLabelText('只读证明批准范围');
+    expect(scope).toHaveTextContent('reports/weekly.txt');
+    expect(scope).toHaveTextContent('4096 字节');
+    expect(scope).toHaveTextContent('grant:weekly-1');
+    expect(scope).toHaveTextContent('不会返回正文');
+  });
+
   it('fails closed for an invalid step count or terminal inbound state', () => {
     const onDecision = vi.fn();
     const { rerender } = render(<StartWorkPage plan={pendingPlan({ steps: [pendingPlan().steps[0]] })} onDecision={onDecision} />);
@@ -156,6 +202,18 @@ describe('start work plan state model', () => {
     expect(validatePendingStartWorkPlan(malformed)).toEqual({
       ok: false,
       errors: ['第 1 步格式无效'],
+    });
+  });
+
+  it('rejects Windows device aliases and unknown read-attestation fields', () => {
+    expect(validatePendingStartWorkPlan(pendingPlan({
+      execution: {
+        kind: 'fs.read.attest.v1', path: 'reports/CON.txt', maxBytes: 4096, grantRef: 'grant:weekly-1',
+        autoApprove: true,
+      } as unknown as StartWorkPlan['execution'],
+    }))).toEqual({
+      ok: false,
+      errors: ['只读证明配置包含未知字段', '文件路径包含 Windows 保留名或尾随点/空格'],
     });
   });
 });

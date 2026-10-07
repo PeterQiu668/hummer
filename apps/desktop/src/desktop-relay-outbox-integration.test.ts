@@ -38,6 +38,10 @@ describe('Desktop Relay durable outbox integration', () => {
       const pending = persistence.fleetDispatchOutbox.listPending(identity.tenantId, identity.actorRef);
       expect(pending).toHaveLength(1);
       expect(pending[0]).toMatchObject({ status: 'pending', attemptCount: 1, idempotencyKey: envelope.idempotencyKey });
+      expect(pending[0].envelope).toMatchObject({
+        grantRef: 'grant:outbox-read-1',
+        executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/outbox.txt', maxBytes: 4096 },
+      });
       observedBeforeNetwork = true;
       if (url.endsWith('/v1/control/session')) return json({ session: { tenantId: identity.tenantId, actorRef: identity.actorRef } });
       const body = JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -151,6 +155,8 @@ function taskEnvelope(tenantId: string) {
     tenantId, targetNodeId: 'node-outbox', targetRuntime: 'codex', idempotencyKey: 'delivery-outbox-integration',
     leaseMs: 30_000, approvalPolicyRef: 'policy-human-confirmation', expiresAt: '2026-10-07T09:00:00.000Z',
     originRef: 'work-outbox-integration',
+    grantRef: 'grant:outbox-read-1',
+    executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/outbox.txt', maxBytes: 4096 },
   };
 }
 

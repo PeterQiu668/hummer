@@ -1,7 +1,7 @@
 import type { TaskEnvelope, WorkOrderTask } from '@hummer/contracts';
 import type { ExecutionNodeRecord } from '../execution-nodes/executionNodeClient';
 import type { SessionPlan } from '../sessions/model/session';
-import type { StartWorkPlan, StartWorkRiskClass } from './startWorkPlan';
+import type { StartWorkPlan, StartWorkReadAttestation, StartWorkRiskClass } from './startWorkPlan';
 import { validateDispatchableStartWorkPlan } from './startWorkPlan';
 
 export interface StartWorkDispatchIntent {
@@ -21,9 +21,13 @@ export interface StartWorkDispatchIntentPort {
 export function adaptSessionPlanToStartWorkPlan(
   source: SessionPlan,
   nodes: readonly ExecutionNodeRecord[],
+  execution?: StartWorkReadAttestation,
 ): StartWorkPlan {
-  const node = nodes.find((candidate) => candidate.status === 'online' && candidate.currentSessionId === null)
-    ?? nodes.find((candidate) => candidate.status === 'online');
+  const eligibleNodes = execution
+    ? nodes.filter((candidate) => advertisedCapabilities(candidate).includes('fs.read'))
+    : nodes;
+  const node = eligibleNodes.find((candidate) => candidate.status === 'online' && candidate.currentSessionId === null)
+    ?? eligibleNodes.find((candidate) => candidate.status === 'online');
   const targetRuntime = node ? fleetRuntime(node.runtimeId) : null;
   const totalCost = estimatedPlanCost(source.estimate);
   const steps = source.understanding.slice(0, 5);
@@ -35,6 +39,7 @@ export function adaptSessionPlanToStartWorkPlan(
     status: 'pending',
     decidedBy: null,
     decidedAt: null,
+    ...(execution ? { execution } : {}),
     steps: steps.map((title, index) => ({
       id: `${source.id}:step:${index + 1}`,
       title,
@@ -83,6 +88,14 @@ export function createStartWorkDispatchIntent(input: {
     approvalPolicyRef: 'phase0-default-deny',
     expiresAt: new Date(Date.parse(input.confirmedAt) + 15 * 60_000).toISOString(),
     originRef: input.sourcePlan.workOrderId ?? `wo_${input.plan.id}`,
+    ...(input.plan.execution ? {
+      grantRef: input.plan.execution.grantRef,
+      executionPlan: {
+        kind: input.plan.execution.kind,
+        path: input.plan.execution.path,
+        maxBytes: input.plan.execution.maxBytes,
+      },
+    } : {}),
   };
   return {
     schema: 'hummer.start-work-dispatch-intent',
@@ -93,6 +106,10 @@ export function createStartWorkDispatchIntent(input: {
     confirmedAt: input.confirmedAt,
     envelope,
   };
+}
+
+function advertisedCapabilities(node: ExecutionNodeRecord): string[] {
+  return node.permissionScope.split(/[\s,;]+/u).map((entry) => entry.trim()).filter(Boolean);
 }
 
 function classifyRisk(step: string, tools: readonly string[]): StartWorkRiskClass {

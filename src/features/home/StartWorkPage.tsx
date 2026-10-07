@@ -14,8 +14,10 @@ import {
   totalEstimatedCostCny,
   validateDispatchableStartWorkPlan,
   validatePendingStartWorkPlan,
+  validateStartWorkReadAttestation,
   type StartWorkDecision,
   type StartWorkPlan,
+  type StartWorkReadAttestation,
   type StartWorkRiskClass,
 } from './startWorkPlan';
 
@@ -30,7 +32,7 @@ export interface StartWorkPageProps {
   plan: StartWorkPlan | null;
   decisionActorRef?: string;
   now?: () => string;
-  onPlanRequest?: (target: string) => void;
+  onPlanRequest?: (target: string, execution?: StartWorkReadAttestation) => void;
   onDecision?: (plan: StartWorkPlan, decision: StartWorkDecision) => void;
   dispatchAvailable?: boolean;
 }
@@ -52,6 +54,10 @@ export default function StartWorkPage({
     plan: StartWorkPlan;
   } | null>(null);
   const [target, setTarget] = useState('');
+  const [readAttestationEnabled, setReadAttestationEnabled] = useState(false);
+  const [readPath, setReadPath] = useState('');
+  const [readMaxBytes, setReadMaxBytes] = useState('1048576');
+  const [grantRef, setGrantRef] = useState('');
   const currentPlan = localDecision?.sourcePlan === plan ? localDecision.plan : plan;
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const validation = useMemo(
@@ -64,6 +70,16 @@ export default function StartWorkPage({
   );
   const actorIsHuman = decisionActorRef.startsWith('human:') && decisionActorRef.length > 'human:'.length;
   const dispatchValidation = currentPlan ? validateDispatchableStartWorkPlan(currentPlan) : { ok: false, errors: [] };
+  const readAttestation = useMemo<StartWorkReadAttestation>(() => ({
+    kind: 'fs.read.attest.v1',
+    path: readPath,
+    maxBytes: Number(readMaxBytes),
+    grantRef,
+  }), [grantRef, readMaxBytes, readPath]);
+  const readAttestationValidation = useMemo(
+    () => validateStartWorkReadAttestation(readAttestation),
+    [readAttestation],
+  );
   const canReject = Boolean(currentPlan && validation.ok && actorIsHuman);
   const canConfirm = Boolean(canReject && dispatchValidation.ok && dispatchAvailable);
 
@@ -100,13 +116,71 @@ export default function StartWorkPage({
               onChange={(event) => setTarget(event.target.value)}
               placeholder="例如：整理两台设备上的客户资料，生成一份带证据的摘要"
             />
+            <div className="mt-4 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-canvas)] p-4">
+              <label className="flex items-start gap-3 text-sm font-medium text-[var(--text-ink)]">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={readAttestationEnabled}
+                  onChange={(event) => setReadAttestationEnabled(event.target.checked)}
+                />
+                <span>
+                  只读文件证明（SHA-256）
+                  <span className="mt-1 block text-xs font-normal hum-muted">只读取受控工作区中的一个明确文件，不返回文件正文。</span>
+                </span>
+              </label>
+              {readAttestationEnabled ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="只读文件证明配置">
+                  <label className="text-xs hum-muted sm:col-span-2">
+                    工作区相对路径
+                    <input
+                      className="hum-input mt-1"
+                      aria-label="工作区相对路径"
+                      value={readPath}
+                      onChange={(event) => setReadPath(event.target.value)}
+                      placeholder="reports/weekly.txt"
+                    />
+                  </label>
+                  <label className="text-xs hum-muted">
+                    最大读取字节
+                    <input
+                      className="hum-input mt-1"
+                      aria-label="最大读取字节"
+                      inputMode="numeric"
+                      value={readMaxBytes}
+                      onChange={(event) => setReadMaxBytes(event.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs hum-muted">
+                    一次性授权引用
+                    <input
+                      className="hum-input mt-1"
+                      aria-label="一次性授权引用"
+                      value={grantRef}
+                      onChange={(event) => setGrantRef(event.target.value)}
+                      placeholder="grant:task-001"
+                    />
+                  </label>
+                  {!readAttestationValidation.ok ? (
+                    <ul className="list-disc space-y-1 pl-5 text-xs text-[var(--error)] sm:col-span-2" role="alert">
+                      {readAttestationValidation.errors.map((error) => <li key={error}>{error}</li>)}
+                    </ul>
+                  ) : null}
+                  <p className="text-xs hum-faint sm:col-span-2">授权引用必须已经由运维离线预配置；它不是授权 token，也不会绕过人工确认。</p>
+                </div>
+              ) : null}
+            </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <p className="text-xs hum-muted" role="status">还没有可确认计划。提交目标只会请求生成计划。</p>
               <button
                 type="button"
                 className="hum-btn is-primary"
-                disabled={!target.trim() || !onPlanRequest}
-                onClick={() => onPlanRequest?.(target.trim())}
+                disabled={!target.trim() || !onPlanRequest || (readAttestationEnabled && !readAttestationValidation.ok)}
+                onClick={() => {
+                  if (!onPlanRequest) return;
+                  if (readAttestationEnabled) onPlanRequest(target.trim(), readAttestation);
+                  else onPlanRequest(target.trim());
+                }}
               >
                 生成待确认计划
               </button>
@@ -157,6 +231,17 @@ export default function StartWorkPage({
             </span>
             <span className="hum-chip"><CircleDollarSign size={13} aria-hidden="true" />{formatCost(estimatedCost)}</span>
           </div>
+          {currentPlan.execution ? (
+            <div className="mt-4 rounded-xl border border-[var(--brand)] bg-[var(--brand-soft)] p-4" aria-label="只读证明批准范围">
+              <p className="text-sm font-semibold text-[var(--text-strong)]">只读文件证明</p>
+              <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                <div><dt className="hum-faint">精确路径</dt><dd className="mt-1 break-all font-mono">{currentPlan.execution.path}</dd></div>
+                <div><dt className="hum-faint">读取上限</dt><dd className="mt-1">{currentPlan.execution.maxBytes} 字节</dd></div>
+                <div><dt className="hum-faint">单次授权</dt><dd className="mt-1 break-all font-mono">{currentPlan.execution.grantRef}</dd></div>
+              </dl>
+              <p className="mt-2 text-xs hum-muted">确认后只允许读取这个相对路径并生成字节数与 SHA-256；不会返回正文。</p>
+            </div>
+          ) : null}
         </div>
 
         <div className="hum-card p-5">

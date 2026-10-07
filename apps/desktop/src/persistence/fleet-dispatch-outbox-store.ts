@@ -6,8 +6,10 @@ const MAX_RESPONSE_BYTES = 128 * 1024;
 const TASK_ENVELOPE_FIELDS = new Set([
   'schema', 'version', 'workOrderTask', 'tenantId', 'targetNodeId', 'targetRuntime',
   'idempotencyKey', 'leaseMs', 'approvalPolicyRef', 'grantRef', 'expiresAt',
-  'originRef', 'capabilityRef',
+  'originRef', 'capabilityRef', 'executionPlan',
 ]);
+const SAFE_READ_ATTESTATION_PATH = /^(?![A-Za-z]:)(?!\/)(?!.*:)(?!.*[\x00-\x1F\x7F])(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?!.*\\)(?!.*\/$).+$/u;
+const WINDOWS_DEVICE_SEGMENT = /^(?:con|prn|aux|nul|clock\$|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
 
 export interface FleetDispatchOutboxRecord {
   outboxId: string;
@@ -210,6 +212,10 @@ function prepare(input: StageFleetDispatchInput) {
   requireIdentifier(envelope.originRef, 'TaskEnvelope origin');
   if (envelope.grantRef !== undefined) requireIdentifier(envelope.grantRef, 'TaskEnvelope grant');
   if (envelope.capabilityRef !== undefined) requireIdentifier(envelope.capabilityRef, 'TaskEnvelope capability');
+  if (envelope.executionPlan !== undefined) {
+    if (envelope.grantRef === undefined) throw new Error('TaskEnvelope execution plan requires a one-use grant');
+    validateExecutionPlan(envelope.executionPlan);
+  }
   const expiresAt = requireUtcTimestamp(envelope.expiresAt, 'TaskEnvelope expiry');
   if (Date.parse(expiresAt) <= Date.parse(occurredAt)) throw new Error('TaskEnvelope is already expired');
   validateWorkOrderTask(envelope.workOrderTask);
@@ -220,6 +226,24 @@ function prepare(input: StageFleetDispatchInput) {
     tenantId, actorRef, occurredAt, idempotencyKey, envelopeJson, envelopeSha256,
     outboxId: `outbox-${sha256Hex(`${tenantId}\0${idempotencyKey}`).slice(0, 32)}`,
   };
+}
+
+function validateExecutionPlan(value: unknown): void {
+  const plan = requireRecord(value, 'TaskEnvelope execution plan');
+  const fields = ['kind', 'path', 'maxBytes'];
+  const unknown = Object.keys(plan).find((field) => !fields.includes(field));
+  if (unknown) throw new Error(`TaskEnvelope execution plan contains unknown field ${unknown}`);
+  if (Object.keys(plan).length !== fields.length || plan.kind !== 'fs.read.attest.v1') {
+    throw new Error('TaskEnvelope execution plan is unsupported');
+  }
+  const path = requireBoundedText(plan.path, 'TaskEnvelope execution path', 1, 1024);
+  if (!SAFE_READ_ATTESTATION_PATH.test(path)
+    || path.split('/').some((segment) => /[. ]$/u.test(segment) || WINDOWS_DEVICE_SEGMENT.test(segment))) {
+    throw new Error('TaskEnvelope execution path must be a strict portable relative path');
+  }
+  if (!Number.isInteger(plan.maxBytes) || Number(plan.maxBytes) < 1 || Number(plan.maxBytes) > 1_048_576) {
+    throw new Error('TaskEnvelope execution maxBytes is invalid');
+  }
 }
 
 function mapRow(row: OutboxRow): FleetDispatchOutboxRecord {
