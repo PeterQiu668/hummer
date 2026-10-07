@@ -75,7 +75,10 @@ const approvalDecision = (index = 1, overrides: Record<string, unknown> = {}) =>
   ...overrides,
 });
 
-function badge(token: string, tenantId: string, nodeId: string | undefined, scopes: readonly BadgeScope[], expiresAt = '2026-10-07T01:00:00Z') {
+// SSE expiry is enforced against the wall clock after authorization. Keep the
+// ordinary fixture badges unambiguously live; expiry-specific cases pass an
+// explicit timestamp relative to the service's injected NOW value below.
+function badge(token: string, tenantId: string, nodeId: string | undefined, scopes: readonly BadgeScope[], expiresAt = '2099-01-01T00:00:00Z') {
   return { token, tokenId: `badge-${token}`, tenantId, actorRef: nodeId ? `system:${nodeId}` : 'human:operator', nodeId, scopes, expiresAt };
 }
 
@@ -95,7 +98,7 @@ function harness() {
     badge('expired-token', TENANT, NODE, NODE_SCOPES, '2026-10-06T23:59:59Z'),
     {
       token: 'system-control-token', tokenId: 'badge-system-control', tenantId: TENANT,
-      actorRef: 'system:auto', scopes: ['approval.decide'], expiresAt: '2026-10-07T01:00:00Z',
+      actorRef: 'system:auto', scopes: ['approval.decide'], expiresAt: '2099-01-01T00:00:00Z',
     },
   ]);
   const result = createFleetRelayServer(service, { authenticator, now: () => new Date(NOW) });
