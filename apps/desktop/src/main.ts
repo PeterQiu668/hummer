@@ -8,6 +8,11 @@ import { inspectRuntimeEnvironment } from './runtime-environment-doctor.js';
 import { WorkspaceExecBroker } from './workspace-exec-broker.js';
 import { WorkspaceExecService } from './workspace-exec-service.js';
 import { registerDiagnosticExportHost, type DiagnosticExportHostRegistration } from './diagnostic-export-host.js';
+import {
+  consumeDesktopRelayTrustedConfig,
+  registerDesktopRelayHost,
+  type DesktopRelayHostRegistration,
+} from './desktop-relay-host.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 let persistenceHost: PersistenceHostRegistration | undefined;
@@ -15,6 +20,7 @@ let workspaceExecBroker: WorkspaceExecBroker | undefined;
 let workspaceExecService: WorkspaceExecService | undefined;
 let workspaceExecCheck: Promise<ReturnType<WorkspaceExecService['currentHealth']>> | undefined;
 let diagnosticExportHost: DiagnosticExportHostRegistration | undefined;
+let desktopRelayHost: DesktopRelayHostRegistration | undefined;
 
 async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
@@ -42,6 +48,7 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 app.whenReady().then(async () => {
+  const desktopRelayConfig = consumeDesktopRelayTrustedConfig(process.env);
   persistenceHost = registerPersistenceHost({
     stopAll: async (tenantId) => (await stopAllCodexRuns(tenantId)) + stopAllClaudeRuns(tenantId),
   });
@@ -71,6 +78,10 @@ app.whenReady().then(async () => {
       workspaceExecService?.currentHealth() ?? await runWorkspaceExecCheck(),
     ),
   });
+  desktopRelayHost = registerDesktopRelayHost({
+    config: desktopRelayConfig,
+    resolveIdentity: persistenceHost.resolveRelayIdentity,
+  });
   registerCodexHost({
     resolveTenantId: persistenceHost.resolveTenantId,
     authorizeApproval: persistenceHost.authorizeRuntimeApproval,
@@ -95,6 +106,8 @@ app.on('before-quit', () => {
   ipcMain.removeHandler('hummer:environment:install-guide');
   diagnosticExportHost?.close();
   diagnosticExportHost = undefined;
+  desktopRelayHost?.close();
+  desktopRelayHost = undefined;
   persistenceHost?.close();
   void workspaceExecBroker?.close();
   workspaceExecBroker = undefined;

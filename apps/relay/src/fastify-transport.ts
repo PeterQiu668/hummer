@@ -486,6 +486,15 @@ export function createFleetRelayServer(
     return { task };
   });
 
+  app.get('/v1/control/session', async (request) => {
+    const { claims } = await authorize(request, 'node.read');
+    assertNoQueryFields(request);
+    if (claims.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(claims.actorRef)) {
+      throw new TransportHttpError(403, 'control_badge_required', 'Desktop control requires a human/account badge');
+    }
+    return { session: { tenantId: claims.tenantId, actorRef: claims.actorRef } };
+  });
+
   app.get('/v1/control/nodes', async (request) => {
     const { session } = await authorize(request, 'node.read');
     assertNoQueryFields(request);

@@ -54,6 +54,7 @@ interface AcceptInvitationRequest { token: string; displayName: string; email?: 
 export interface PersistenceHostRegistration {
   databasePath: string;
   resolveTenantId(token: string): string;
+  resolveRelayIdentity(token: string): { tenantId: string; actorRef: string };
   authorizeRuntimeApproval(token: string, context: DesktopRoleActionContext['approve_high_risk']): void;
   resolveEngineCredential(token: string, engineProfileId: string, envKey: string): string | undefined;
   recordMcpConnectorStatus(token: string, record: RuntimeConnectorRecord): void;
@@ -597,6 +598,10 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   return {
     databasePath: persistence.databasePath,
     resolveTenantId: (token) => persistence.identity.currentTenantId(token),
+    resolveRelayIdentity: (token) => {
+      const context = persistence.identity.resumeSession(token);
+      return { tenantId: context.tenant.id, actorRef: `account:${context.account.id}` };
+    },
     authorizeRuntimeApproval: (token, approvalContext) => {
       const context = persistence.identity.resumeSession(token);
       requireDesktopRoleAction(context, 'approve_high_risk', approvalContext);

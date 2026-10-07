@@ -57,7 +57,7 @@ function requireToken(): string {
   return token;
 }
 
-function toExecutionNode(node: RemoteRelayNode): ExecutionNodeRecord {
+export function toExecutionNode(node: RemoteRelayNode): ExecutionNodeRecord {
   const runtimes = Array.isArray(node.manifest.runtimes) ? node.manifest.runtimes : [];
   const availableRuntime = runtimes.find((entry) => entry && typeof entry === 'object'
     && (entry as { available?: unknown }).available === true);

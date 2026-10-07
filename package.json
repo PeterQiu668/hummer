@@ -29,6 +29,7 @@
     "test:demo-session-ui": "node scripts/test-demo-session-ui.mjs",
     "test:windows-uia-capture": "node scripts/test-windows-uia-capture.mjs",
     "test:risk-approval-matrix": "node scripts/test-risk-approval-matrix.mjs",
+    "test:desktop-relay-bridge": "npm run config:check && vitest run --config vitest.config.ts apps/desktop/src/desktop-relay-host.test.ts src/features/execution-nodes/desktopRelayPort.test.ts apps/relay/test/fastify-transport.test.ts",
     "test:distillation": "node scripts/test-distillation.mjs",
     "test:upgrade-rollback": "node scripts/test-upgrade-rollback.mjs",
     "test:diagnostics": "node scripts/test-diagnostics.mjs",

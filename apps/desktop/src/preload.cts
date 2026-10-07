@@ -133,6 +133,18 @@ contextBridge.exposeInMainWorld('hummerExecutionNodes', {
   killAll: (token: string) => ipcRenderer.invoke('hummer:execution-nodes:kill-all', token),
 });
 
+contextBridge.exposeInMainWorld('hummerDesktopRelay', {
+  status: () => ipcRenderer.invoke('hummer:relay:status'),
+  listNodes: (token: string) => ipcRenderer.invoke('hummer:relay:list-nodes', token),
+  enqueueTask: (token: string, envelope: unknown) => ipcRenderer.invoke('hummer:relay:enqueue-task', token, envelope),
+  listTasks: (token: string) => ipcRenderer.invoke('hummer:relay:list-tasks', token),
+  listApprovalRequests: (token: string) => ipcRenderer.invoke('hummer:relay:list-approval-requests', token),
+  decideApproval: (request: { token: string; requestId: string; decision: 'approved' | 'denied'; rationale?: string }) => (
+    ipcRenderer.invoke('hummer:relay:decide-approval', request)
+  ),
+  stopTask: (token: string, taskId: string) => ipcRenderer.invoke('hummer:relay:stop-task', token, taskId),
+});
+
 contextBridge.exposeInMainWorld('hummerControlledWrite', {
   write: (request: unknown) => ipcRenderer.invoke('hummer:controlled-write:write', request),
 });

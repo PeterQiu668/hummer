@@ -92,7 +92,7 @@ function harness() {
   const authenticator = createStaticBadgeTokenAuthenticator([
     badge('node-token', TENANT, NODE, NODE_SCOPES),
     badge('node-b-token', TENANT, 'node-b', NODE_SCOPES),
-    badge('control-token', TENANT, undefined, ['task.enqueue', 'task.stop', 'approval.decide']),
+    badge('control-token', TENANT, undefined, ['node.read', 'task.enqueue', 'task.stop', 'approval.decide']),
     badge('tenant-b-token', 'tenant-b', undefined, ['task.enqueue', 'task.stop']),
     badge('claim-only-token', TENANT, NODE, ['task.claim']),
     badge('expired-token', TENANT, NODE, NODE_SCOPES, '2026-10-06T23:59:59Z'),
@@ -142,6 +142,25 @@ describe('Fastify fleet relay transport', () => {
     const stopped = await app.inject({ method: 'POST', url: '/v1/tasks/delivery-2/stop', headers: authorization('control-token') });
     expect(stopped.statusCode).toBe(200);
     expect(stopped.json()).toMatchObject({ task: { status: 'blocked' } });
+  });
+
+  it('projects the authenticated human/account control identity without exposing badge material', async () => {
+    const { app, events } = harness();
+    openApps.push({ app, events });
+
+    const response = await app.inject({
+      method: 'GET', url: '/v1/control/session', headers: authorization('control-token'),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ session: { tenantId: TENANT, actorRef: 'human:operator' } });
+    expect(response.body).not.toContain('control-token');
+
+    expect((await app.inject({
+      method: 'GET', url: '/v1/control/session?tenantId=other', headers: authorization('control-token'),
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: 'GET', url: '/v1/control/session', headers: authorization('node-token'),
+    })).statusCode).toBe(403);
   });
 
   it('rejects missing, wrong, expired and under-scoped badge tokens', async () => {
