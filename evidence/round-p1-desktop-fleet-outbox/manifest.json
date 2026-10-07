@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-desktop-fleet-outbox",
+  "generatedAt": "2026-10-07T03:57:30.984Z",
+  "gitCommit": "2d78a2e59374cecbdf2e9357ee78140f06407b83",
+  "prevManifestRootHash": "9fd97e3dd48193a6b19afbe1abd067b89d5d0284aad03898411da9bef61f2ef7",
+  "files": [
+    {
+      "path": "evidence/round-p1-desktop-fleet-outbox/gate.json",
+      "sha256": "c4a204fbe8312a2c07c675e9ca415990bf3e109ae9743eea4504af9b1f1f1978",
+      "bytes": 3039
+    }
+  ],
+  "rootHash": "d8751bdf9980bcac214d115e19fb033bbef092fc1fe7fae4f28c8c19a2f14c21"
+}

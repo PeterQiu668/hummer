@@ -1,0 +1,37 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "desktop-fleet-durable-outbox",
+  "mode": "sqlite-http-response-loss-and-process-kill",
+  "status": "passed",
+  "capturedAt": "2026-10-07T03:57:30.055Z",
+  "commit": "2d78a2e59374cecbdf2e9357ee78140f06407b83",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "command": {
+    "cmd": "npm run test:desktop:outbox",
+    "exitCode": 0,
+    "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:desktop:outbox\n> npm run desktop:build && vitest run --config vitest.config.ts apps/desktop/src/persistence/fleet-dispatch-outbox-store.test.ts apps/desktop/src/desktop-relay-host.test.ts apps/desktop/src/desktop-relay-outbox-integration.test.ts apps/desktop/src/persistence/persistence.test.ts apps/desktop/src/persistence/tenant-governance-store.test.ts && node --test scripts/test-desktop-outbox-process-kill.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 desktop:build\n> npm run build -w @hummer/desktop\n\n\n> @hummer/desktop@0.6.0-internal.1 prebuild\n> node ../../packages/config/scripts/generate.mjs\n\n\n> @hummer/desktop@0.6.0-internal.1 build\n> tsc -b\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  5 passed (5)\n      Tests  37 passed (37)\n   Start at  11:57:21\n   Duration  5.62s (transform 6.41s, setup 0ms, import 11.21s, tests 4.85s, environment 1ms)\n\nTAP version 13\n# Subtest: a committed Desktop fleet outbox item survives an abrupt process kill\nok 1 - a committed Desktop fleet outbox item survives an abrupt process kill\n  ---\n  duration_ms: 1444.8845\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1936.0071\n",
+    "stderr": ""
+  },
+  "checks": [
+    "Desktop build completed before the gate",
+    "five focused files passed 37 tests",
+    "SQLite row existed before the first network mutation",
+    "response-lost replay reused identical TaskEnvelope bytes and converged on Relay inserted=false",
+    "mismatched successful Relay responses remained pending with a safe error code",
+    "concurrent renderer requests single-flighted one outbox delivery",
+    "expired and permanent failures terminalized without infinite retry",
+    "a committed outbox row survived a forcibly killed child process and was read by a fresh process",
+    "badge and renderer session token canaries were absent from the persisted database surfaces under test"
+  ],
+  "limitations": [
+    "Durability applies only to the Desktop StartWork Relay path; intake confirmation and browser/mobile paths remain outside this outbox.",
+    "Delivery is at-least-once. Relay idempotency converges retries to one logical task; this is not transport exactly-once.",
+    "The process-kill gate kills a dedicated persistence child, not a packaged Electron executable.",
+    "The outbox insert is atomic on its own SQLite transaction; it is not a cross-table business transaction with a separate WorkOrder fact."
+  ]
+}
