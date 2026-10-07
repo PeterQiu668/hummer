@@ -247,6 +247,10 @@ export interface CapabilityVersionSource {
 
 export interface CapabilityVersionCreateInput extends CapabilityVersionSource {
   author: CapabilityPackageAuthorInput;
+  /** Transient verification input; never persisted by the capability registry. */
+  outcomeReceipt: unknown;
+  /** Canonical base64 artifact bytes; transient and never persisted. */
+  artifactContentBase64: string;
 }
 
 export interface CapabilityRegistryRecord extends CapabilityVersionSource {

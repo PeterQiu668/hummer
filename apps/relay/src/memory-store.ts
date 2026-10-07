@@ -33,6 +33,7 @@ import {
 import type { CapabilityInstallGateDecision, CapabilityInstallGateInput, CapabilityShareInvitation, SkillTrialSystemRecordInput, TeamReadOnlyShare } from '@hummer/contracts';
 import {
   assertCapabilityHistory,
+  assertCapabilityDraftSource,
   capabilityRecordFromShare,
   buildCapabilityShare,
   createTrialAggregate,
@@ -538,11 +539,10 @@ export class MemoryFleetStore implements FleetStore {
     const events = this.#events.get(key(tenantId, task.workOrderId)) ?? [];
     const artifact = events.find((entry) => entry.claims.eventId === input.artifactEventId && entry.claims.type === 'artifact');
     const completed = events.find((entry) => entry.claims.eventId === input.completedEventId && entry.claims.type === 'completed');
-    const eventIds = new Set(events.map((entry) => entry.claims.eventId));
-    if (!artifact || !completed || input.author.evidenceRefs.some((reference) => !eventIds.has(reference))
-      || !eventIds.has(input.author.receiptRef)) {
+    if (!artifact || !completed) {
       throw new FleetRejectedError('capability_not_found', 'completed task evidence was not found');
     }
+    assertCapabilityDraftSource({ tenantId, input, task, events });
     const history = [...this.#capabilityPackages.values()].filter((record) =>
       record.tenantId === tenantId && record.packageId === input.author.packageId);
     const packageDigest = assertCapabilityHistory(history, input.author);

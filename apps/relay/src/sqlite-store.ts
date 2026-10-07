@@ -37,6 +37,7 @@ import {
 } from './ports.js';
 import {
   assertCapabilityHistory,
+  assertCapabilityDraftSource,
   capabilityRecordFromShare,
   buildCapabilityShare,
   createTrialAggregate,
@@ -929,15 +930,30 @@ export class SqliteFleetStore implements FleetStore {
         .get<EventRow>(tenantId, task.work_order_id, input.artifactEventId);
       const completed = this.#db.prepare(`SELECT * FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ? AND type = 'completed'`)
         .get<EventRow>(tenantId, task.work_order_id, input.completedEventId);
-      const referenced = input.author.evidenceRefs.map((reference) => this.#db.prepare(`
-        SELECT event_id FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ?
-      `).get<{ event_id: string }>(tenantId, task.work_order_id, reference));
-      const receipt = this.#db.prepare(`
-        SELECT event_id FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? AND event_id = ?
-      `).get<{ event_id: string }>(tenantId, task.work_order_id, input.author.receiptRef);
-      if (!artifact || !completed || referenced.some((row) => !row) || !receipt) {
+      if (!artifact || !completed) {
         throw new FleetRejectedError('capability_not_found', 'completed task evidence was not found');
       }
+      const eventRows = this.#db.prepare(`
+        SELECT * FROM fleet_run_events WHERE tenant_id = ? AND work_order_id = ? ORDER BY seq
+      `).all<EventRow>(tenantId, task.work_order_id);
+      assertCapabilityDraftSource({
+        tenantId,
+        input,
+        task: toTask(task),
+        events: eventRows.map((row) => ({
+          claims: {
+            eventId: row.event_id,
+            tenantId: row.tenant_id,
+            workOrderId: row.work_order_id,
+            nodeId: row.node_id,
+            seq: row.seq,
+            occurredAt: row.occurred_at,
+            type: row.type,
+            idempotencyKey: row.idempotency_key,
+          },
+          event: jsonObject(row.event_json),
+        })),
+      });
       const history = this.#db.prepare(`SELECT * FROM capability_packages WHERE tenant_id = ? AND package_id = ? ORDER BY package_version`)
         .all<CapabilityPackageRow>(tenantId, input.author.packageId).map(toCapabilityPackage);
       const packageDigest = assertCapabilityHistory(history, input.author);
