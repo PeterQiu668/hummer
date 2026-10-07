@@ -346,6 +346,11 @@ export class MemoryFleetStore implements FleetStore {
       throw new FleetRejectedError('approval_replayed', 'approval request already has an immutable decision');
     }
     assertDecisionWithinRequest(request, claims, now);
+    const task = this.#tasks.get(key(tenantId, request.taskId));
+    if (!task) throw new FleetRejectedError('approval_not_found', 'pending claim was not found');
+    if (claims.decision !== 'approved' && task.status !== 'queued' && task.status !== 'leased') {
+      throw new FleetRejectedError('invalid_transition', 'non-approved decision cannot replace a terminal or stopped task state');
+    }
     const record: ApprovalDecisionRecord = {
       ...claims,
       ...(claims.grantedScope ? { grantedScope: clone(claims.grantedScope) } : {}),
@@ -354,8 +359,14 @@ export class MemoryFleetStore implements FleetStore {
     };
     this.#approvalDecisions.set(key(tenantId, claims.requestId), record);
     this.#approvalDecisionIds.add(key(tenantId, claims.decisionId));
+    if (claims.decision !== 'approved') {
+      task.status = 'failed';
+      task.leaseOwnerNodeId = null;
+      task.leaseExpiresAt = null;
+    }
     this.appendTenantAudit(tenantId, 'approval.decided', claims.decisionId, request.nodeId, claims.deciderActorRef, now, {
-      requestId: claims.requestId, decision: claims.decision,
+      requestId: claims.requestId, taskId: request.taskId, decision: claims.decision,
+      taskStatus: claims.decision === 'approved' ? task.status : 'failed',
     });
     return clone(record);
   }
@@ -374,16 +385,21 @@ export class MemoryFleetStore implements FleetStore {
     if (request.nodeId !== nodeId) throw new FleetRejectedError('lease_owner_mismatch', 'approval request is not bound to this node');
     const task = this.#tasks.get(key(tenantId, taskId));
     if (!task) throw new FleetRejectedError('approval_not_found', 'pending claim was not found');
-    this.assertActiveLease(task, nodeId, now);
     if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
-    if (decision.decision !== 'approved') throw new FleetRejectedError('invalid_transition', 'approval decision does not authorize execution');
-    assertDecisionWithinRequest(request, decision, now);
     const consumptionKey = key(tenantId, requestId);
     if (this.#approvalConsumptions.has(consumptionKey)) {
       throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
     }
+    if (decision.decision === 'approved') {
+      this.assertActiveLease(task, nodeId, now);
+      assertDecisionWithinRequest(request, decision, now);
+    } else if (task.status !== 'failed' || task.leaseOwnerNodeId !== null || task.leaseExpiresAt !== null) {
+      throw new FleetRejectedError('invalid_transition', 'non-approved decision is not bound to a terminal task state');
+    }
     this.#approvalConsumptions.add(consumptionKey);
-    this.appendTenantAudit(tenantId, 'approval.consumed', requestId, nodeId, `system:${nodeId}`, now, { taskId, decisionId: decision.decisionId });
+    this.appendTenantAudit(tenantId, 'approval.consumed', requestId, nodeId, `system:${nodeId}`, now, {
+      taskId, decisionId: decision.decisionId, decision: decision.decision,
+    });
     return { request: clone(request.request), decision: clone(decision.decisionRecord) };
   }
 

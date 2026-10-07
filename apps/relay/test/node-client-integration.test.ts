@@ -70,6 +70,11 @@ function approval(index: number, overrides: Record<string, unknown> = {}) {
   };
 }
 
+function nonApprovedDecision(index: number, decision: 'denied' | 'expired' | 'revoked') {
+  const { grantedScope: _grantedScope, ...record } = approval(index);
+  return { ...record, decision };
+}
+
 function runEvents(index: number) {
   const common = (seq: number) => ({
     schema: 'hummer.run-event', version: 1, eventId: `event-${index}-${seq}`,
@@ -250,6 +255,39 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
     const wrongClient = new RelayHttpClient({ baseUrl, badgeToken: 'wrong-badge' });
     await expect(wrongClient.claimTask({ nodeId: NODE, tenantId: TENANT })).rejects.toBeInstanceOf(RelayClientError);
     await expect(wrongClient.claimTask({ nodeId: NODE, tenantId: TENANT })).rejects.toMatchObject({ statusCode: 401, retryable: false });
+    expect(executions).toHaveLength(0);
+
+    stream.close();
+    await stream.done;
+  });
+
+  it('consumes a real HTTP denial once, terminalizes Relay and Node, and never calls the executor', async () => {
+    const { baseUrl, client, store } = await createHarness();
+    const executions: unknown[] = [];
+    const states: Array<{ state: string }> = [];
+    const agent = createAgent(client, executions, 4);
+    await client.registerNode(manifest, { nodeId: NODE, tenantId: TENANT });
+    const stream = client.connectAgent(agent, { onState: (state: unknown) => states.push(state as { state: string }) });
+    await stream.ready;
+    await enqueue(baseUrl, 4);
+    await waitFor(() => states.some((state) => state.state === 'pending_confirmation'));
+    await agent.requestApproval('delivery-4', approvalRequest(4));
+
+    const controlClient = new RelayHttpClient({ baseUrl, badgeToken: CONTROL_TOKEN });
+    await controlClient.decideApproval('request-4', nonApprovedDecision(4, 'denied'));
+    expect(await store.getTask(TENANT, 'delivery-4', NOW)).toMatchObject({
+      status: 'failed', leaseOwnerNodeId: null, leaseExpiresAt: null,
+    });
+    expect(await agent.confirmAndExecute('delivery-4')).toEqual({
+      state: 'rejected', claimId: 'delivery-4', reasonCode: 'approval_denied',
+    });
+    expect(await agent.confirmAndExecute('delivery-4')).toEqual({ state: 'duplicate', claimId: 'delivery-4' });
+    await expect(client.consumeApprovalDecision('delivery-4', 'request-4', { nodeId: NODE, tenantId: TENANT }))
+      .rejects.toMatchObject({ code: 'approval_replayed', retryable: false });
+    await expect(controlClient.decideApproval('request-4', { ...approval(4), decisionId: 'late-approved' }))
+      .rejects.toMatchObject({ code: 'approval_replayed' });
+    await expect(controlClient.stopTask('delivery-4')).rejects.toMatchObject({ code: 'invalid_transition' });
+    expect(await client.claimTask({ nodeId: NODE, tenantId: TENANT })).toBeNull();
     expect(executions).toHaveLength(0);
 
     stream.close();

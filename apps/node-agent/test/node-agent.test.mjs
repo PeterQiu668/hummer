@@ -177,6 +177,36 @@ test('fails closed when the Relay returns a decision that is not an approved hum
   assert.equal(calls.executions.length, 0);
 });
 
+for (const [decision, reasonCode] of [
+  ['denied', 'approval_denied'],
+  ['expired', 'approval_expired'],
+  ['revoked', 'approval_revoked'],
+]) {
+  test(`consumes a ${decision} Relay decision into one durable rejected terminal without execution`, async () => {
+    const { agent, calls } = createHarness({
+      contractValidator: {
+        validateApprovalDecision: (value) => ({
+          ok: true,
+          value: {
+            requestId: value.requestId,
+            tenantId: 'tenant_a',
+            decision,
+            deciderActorRef: 'human:owner',
+          },
+        }),
+      },
+    });
+    await stageApproval(agent);
+
+    assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'rejected', claimId: 'claim_1', reasonCode });
+    assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'duplicate', claimId: 'claim_1' });
+    assert.deepEqual(agent.stopClaim('claim_1'), { state: 'duplicate', claimId: 'claim_1' });
+    assert.equal(calls.approvalConsumptions.length, 1);
+    assert.equal(calls.executions.length, 0);
+    assert.deepEqual(calls.statuses.at(-1), { claimId: 'claim_1', state: 'rejected', reasonCode });
+  });
+}
+
 test('fails closed when approval does not grant task.execute', async () => {
   const { agent, calls } = createHarness({
     contractValidator: {
@@ -353,6 +383,39 @@ test('a completed file-journal delivery stays terminal after agent reconstructio
   const journalText = readFileSync(journalPath, 'utf8');
   assert.doesNotMatch(journalText, /test-grant-value|safe preview|"envelope":/);
   assert.match(journalText, /"receiptHash":"[a-f0-9]{64}"/);
+});
+
+test('a denied file-journal delivery stays rejected and never re-consumes or executes after reconstruction', async () => {
+  const journalPath = temporaryJournalPath();
+  const decisionValidator = {
+    validateApprovalDecision: (value) => ({
+      ok: true,
+      value: {
+        requestId: value.requestId,
+        tenantId: 'tenant_a',
+        decision: 'denied',
+        deciderActorRef: 'human:owner',
+      },
+    }),
+  };
+  const first = createHarness({
+    journal: new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) }),
+    contractValidator: decisionValidator,
+  });
+  await stageApproval(first.agent);
+  assert.deepEqual(await first.agent.confirmAndExecute('claim_1'), {
+    state: 'rejected', claimId: 'claim_1', reasonCode: 'approval_denied',
+  });
+
+  const second = createHarness({
+    journal: new FileExecutionJournal({ path: journalPath, clock: () => new Date(now) }),
+    contractValidator: decisionValidator,
+  });
+  assert.deepEqual(await second.agent.confirmAndExecute('claim_1'), { state: 'duplicate', claimId: 'claim_1' });
+  assert.equal(second.calls.approvalConsumptions.length, 0);
+  assert.equal(second.calls.executions.length, 0);
+  assert.match(readFileSync(journalPath, 'utf8'), /"terminalState":"rejected"/);
+  assert.match(readFileSync(journalPath, 'utf8'), /"reasonCode":"approval_denied"/);
 });
 
 test('an executing record recovered after a crash requires operator recovery and never retries', async () => {
