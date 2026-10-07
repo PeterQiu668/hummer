@@ -363,6 +363,20 @@ describe('[CAP-MANIFEST] bundle and manifest verification', () => {
     expect(denied.status).toBe(1);
     expect(JSON.parse(denied.stderr)).toMatchObject({ valid: false, code: 'verification.failed' });
     expect(denied.stderr).toContain('file.digest_mismatch:work.md');
+
+    const forgedReceipt = mutableClone(bundle);
+    const receipt = JSON.parse(forgedReceipt.files['receipt.json']) as { manifest: { rootHash: string } };
+    receipt.manifest.rootHash = 'f'.repeat(64);
+    forgedReceipt.files['receipt.json'] = `${JSON.stringify(receipt, null, 2)}\n`;
+    forgedReceipt.fileDigests['receipt.json'] = sha256(forgedReceipt.files['receipt.json']);
+    forgedReceipt.descriptor.fileDigests['receipt.json'] = forgedReceipt.fileDigests['receipt.json'];
+    forgedReceipt.rootHash = sha256(AGENT_SKILLS_FILES.slice().sort().map((name) =>
+      `${name}\u0000${forgedReceipt.fileDigests[name]}\n`).join(''));
+    const forgedPath = join(directory, 'forged-receipt.json');
+    await writeFile(forgedPath, `${JSON.stringify(forgedReceipt)}\n`, 'utf8');
+    const forged = spawnSync(process.execPath, [command, forgedPath], { encoding: 'utf8', windowsHide: true });
+    expect(forged.status).toBe(1);
+    expect(forged.stderr).toContain('receipt.manifest_integrity');
   });
 
   it('rejects altered bytes, digests, root hashes, descriptors and extra files', () => {
