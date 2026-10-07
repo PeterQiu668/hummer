@@ -153,6 +153,20 @@ export class RelayHttpClient {
     return this.#request('POST', `/v1/tasks/${segment(taskId)}/stop`);
   }
 
+  /** Publishes an already approved immutable eight-file bundle through a control badge. */
+  async publishTrustedBundle(bundle) {
+    return this.#request('POST', '/v1/trusted-bundles', bundle);
+  }
+
+  /** Downloads a node-bound bundle without writing to the filesystem. */
+  async fetchTrustedBundle(bundleId, context) {
+    const response = requireRecord(await this.#request(
+      'GET', `/v1/nodes/${segment(context.nodeId)}/trusted-bundles/${segment(bundleId)}`, undefined, context,
+    ), 'trusted bundle response');
+    if (!Object.hasOwn(response, 'bundle')) throw new RelayClientError('invalid_relay_response', 'Relay trusted bundle response is missing bundle');
+    return response.bundle;
+  }
+
   /**
    * @param {{nodeId: string, onEvent?: (event: RelaySseEvent) => void|Promise<void>, onError?: (error: unknown) => void}} options
    */
@@ -249,7 +263,7 @@ export class RelayHttpClient {
   }
 
   /**
-   * @param {'POST'} method
+   * @param {'POST'|'GET'} method
    * @param {string} path
    * @param {unknown} [body]
    * @param {TransportContext} [_context]

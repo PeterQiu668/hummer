@@ -21,6 +21,7 @@
     "test:contract": "node scripts/test-contract.mjs",
     "test:perf": "node scripts/test-perf.mjs",
     "test:capability": "node scripts/test-capability.mjs",
+    "test:trusted-bundle-bridge": "node scripts/test-trusted-bundle-bridge.mjs",
     "test:skill-replay": "node scripts/test-skill-replay.mjs",
     "test:privacy": "node scripts/test-privacy.mjs",
     "test:distillation": "node scripts/test-distillation.mjs",

@@ -25,6 +25,8 @@ export const BADGE_SCOPES = [
   'capability.trial.record',
   'capability.share',
   'capability.install.evaluate',
+  'capability.bundle.publish',
+  'capability.bundle.consume',
 ] as const;
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];
