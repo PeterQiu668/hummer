@@ -7,6 +7,7 @@ describe('MySettingsDrawer', () => {
   afterEach(() => {
     delete window.hummerEngineCredentials;
     delete window.hummerEngineProfiles;
+    delete window.hummerDiagnostics;
     localStorage.clear();
   });
 
@@ -47,5 +48,21 @@ describe('MySettingsDrawer', () => {
     }));
     expect(input).toHaveValue('');
     expect(screen.queryByDisplayValue('sk-fake-ui-secret')).not.toBeInTheDocument();
+  });
+
+  it('exports a verified diagnostic receipt without exposing a destination control', async () => {
+    localStorage.setItem('hummer.auth.session', 'session-token');
+    window.hummerDiagnostics = {
+      exportBundle: vi.fn().mockResolvedValue({
+        archiveSha256: 'a'.repeat(64),
+        archiveBytes: 512,
+        fileCount: 2,
+      }),
+    };
+    render(<MySettingsDrawer />);
+
+    fireEvent.click(screen.getByRole('button', { name: '导出脱敏诊断包' }));
+    await waitFor(() => expect(window.hummerDiagnostics?.exportBundle).toHaveBeenCalledWith('session-token'));
+    expect(screen.queryByRole('textbox', { name: /诊断/ })).not.toBeInTheDocument();
   });
 });

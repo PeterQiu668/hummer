@@ -1,6 +1,6 @@
 # ADR-056: synthetic upgrade rollback and verifiable diagnostic bundle
 
-Status: accepted for W6 local evidence
+Status: accepted; Desktop export path implemented with compiled-bundle evidence
 
 ## Context
 
@@ -35,6 +35,13 @@ or independently verify the listed diagnostic files.
 6. Token/credential content, SQLite magic bytes and database paths, all
    DemoSession/recording bytes, binary files, traversal, and unlisted ZIP
    entries are rejected. These inputs are never silently copied into a bundle.
+7. The production Desktop renderer receives one authenticated `exportBundle`
+   method. The trusted main process owns the native save dialog and builds the
+   archive only from generated runtime and export summaries; it does not expose
+   filesystem selection or raw diagnostic inputs to the renderer.
+8. ZIP publication stages in the destination directory, fsyncs, closes, and
+   verifies the staged bytes before an atomic no-overwrite hard-link publish.
+   Write/publish failures remove staging; an existing destination is preserved.
 
 ## Consequences
 
@@ -45,7 +52,8 @@ or independently verify the listed diagnostic files.
   synthetic model. It does not prove electron-builder or NSIS behavior.
 - A signed NSIS cross-version install/upgrade/rollback on clean Windows
   machines, installer process interruption, registry effects, locked running
-  binaries, and packaged-app diagnostic UI export remain pending and must not
-  be reported as complete.
+  binaries, and native save-dialog automation remain pending and must not be
+  reported as complete. The diagnostic gate covers the compiled Electron
+  main/preload bundle and real ZIP bytes, not an installed application.
 - No shared API contract, migration, real installation, registry key, or user
   data directory changes in this decision.

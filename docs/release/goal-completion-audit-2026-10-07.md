@@ -77,11 +77,14 @@ These requirements must remain pending until their own external evidence exists;
 
 ## Post-audit delta
 
-The follow-up through `03505e4` closes four local evidence gaps without changing the overall decision:
+The follow-up through `03505e4` plus the later packaged-diagnostic slice closes five local evidence gaps without changing the overall decision:
 
 - a real loopback Fastify Relay is now exercised by the production Web and Node clients against one store, and four 390×844 screenshots are sealed;
 - a bounded production Windows UIAutomation adapter is proven against a non-sensitive local WinForms fixture, with pause/allowlist/window-loss zero-write negatives;
 - the trusted-bundle Relay has a restart-safe immutable SQLite adapter with lock and injected-write-failure negatives;
 - the dependency-free capability-export verifier is included in a sealed evidence round.
+- the Desktop settings/preload/main path exports a real create-only diagnostic
+  ZIP from generated summaries, and a compiled-bundle gate scans its exact
+  entries and SHA-256 values while proving secret rejection and no partial file.
 
-The new chain head is `evidence/round-p2-runtime-surfaces-2/manifest.json`, root `949ad6e2228d094e5462ba07d40e08b649c8deb1a0a57e5a793a8c1853578d9c`. A preceding 9/10 failed round is retained in the chain. Phase completion remains blocked by the true-machine, real-expert, verified-real-outcome, packaged-installer, external-install, retention, and payment requirements listed above.
+The new chain head is `evidence/round-p2-runtime-surfaces-2/manifest.json`, root `949ad6e2228d094e5462ba07d40e08b649c8deb1a0a57e5a793a8c1853578d9c`. A preceding 9/10 failed round is retained in the chain. Phase completion remains blocked by the true-machine, real-expert, verified-real-outcome, packaged-installer/native-dialog automation, external-install, retention, and payment requirements listed above.

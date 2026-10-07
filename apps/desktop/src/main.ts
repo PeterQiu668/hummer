@@ -7,12 +7,14 @@ import { registerClaudeHost, stopAllClaudeRuns } from './claude-host.js';
 import { inspectRuntimeEnvironment } from './runtime-environment-doctor.js';
 import { WorkspaceExecBroker } from './workspace-exec-broker.js';
 import { WorkspaceExecService } from './workspace-exec-service.js';
+import { registerDiagnosticExportHost, type DiagnosticExportHostRegistration } from './diagnostic-export-host.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 let persistenceHost: PersistenceHostRegistration | undefined;
 let workspaceExecBroker: WorkspaceExecBroker | undefined;
 let workspaceExecService: WorkspaceExecService | undefined;
 let workspaceExecCheck: Promise<ReturnType<WorkspaceExecService['currentHealth']>> | undefined;
+let diagnosticExportHost: DiagnosticExportHostRegistration | undefined;
 
 async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
@@ -61,6 +63,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('hummer:environment:install-guide', (_event, target: 'codex' | 'container' = 'codex') => shell.openExternal(
     target === 'container' ? 'https://podman-desktop.io/docs/installation/windows-install' : 'https://www.npmjs.com/package/@openai/codex',
   ));
+  diagnosticExportHost = registerDiagnosticExportHost({
+    resolveTenantId: persistenceHost.resolveTenantId,
+    getEnvironment: async () => inspectRuntimeEnvironment(
+      process.env,
+      undefined,
+      workspaceExecService?.currentHealth() ?? await runWorkspaceExecCheck(),
+    ),
+  });
   registerCodexHost({
     resolveTenantId: persistenceHost.resolveTenantId,
     authorizeApproval: persistenceHost.authorizeRuntimeApproval,
@@ -83,6 +93,8 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   ipcMain.removeHandler('hummer:environment:check');
   ipcMain.removeHandler('hummer:environment:install-guide');
+  diagnosticExportHost?.close();
+  diagnosticExportHost = undefined;
   persistenceHost?.close();
   void workspaceExecBroker?.close();
   workspaceExecBroker = undefined;
