@@ -8,3 +8,4 @@ export * from './governance.js';
 export * from './memory-store.js';
 export * from './ports.js';
 export * from './sqlite-store.js';
+export * from './trusted-bundle-relay.js';

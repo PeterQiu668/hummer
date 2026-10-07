@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@hummer/contracts': fileURLToPath(new URL('./packages/contracts/src/index.ts', import.meta.url)),
+      '@hummer/capability-runtime': fileURLToPath(new URL('./packages/capability-runtime/src/index.ts', import.meta.url)),
     },
   },
   test: {

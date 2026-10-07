@@ -13,6 +13,7 @@
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@hummer/contracts": "*"
+    "@hummer/contracts": "*",
+    "@hummer/capability-runtime": "*"
   }
 }

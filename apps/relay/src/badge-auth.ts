@@ -27,6 +27,8 @@ export const BADGE_SCOPES = [
   'capability.install.evaluate',
   'marketplace.report',
   'marketplace.moderate',
+  'capability.bundle.publish',
+  'capability.bundle.consume',
 ] as const;
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];
