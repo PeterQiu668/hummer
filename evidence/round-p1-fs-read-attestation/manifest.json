@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-fs-read-attestation",
+  "generatedAt": "2026-10-07T05:30:02.619Z",
+  "gitCommit": "251bfc5e985da355d6b34673de7a5d0ce7680f64",
+  "prevManifestRootHash": "0c1ff301e87d0b7aa90f62ec9a2bf57efc6eaea7e4aeb36b4bb2f5a85c787ae9",
+  "files": [
+    {
+      "path": "evidence/round-p1-fs-read-attestation/gate.json",
+      "sha256": "a61bc1a32567e685402fe82b63e42e6db2b14dfe9260b859382351cc85f49517",
+      "bytes": 26717
+    }
+  ],
+  "rootHash": "2363ed3842765365f43ba88bb13a00cee7c9c743c2f656c06777777257bd8151"
+}
