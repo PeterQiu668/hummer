@@ -18,6 +18,7 @@ export type {
   DemoSessionSegment,
   DemoSessionV1,
   DemoSourceBoundary,
+  IngestDemoCaptureBatchInput,
   IngestDemoCaptureInput,
   StartDemoSessionInput,
 } from './demo-session-store.js';

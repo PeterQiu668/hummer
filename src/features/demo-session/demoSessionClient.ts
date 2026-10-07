@@ -6,6 +6,10 @@ export interface DemoSessionStartInput {
   captureMode: DemoSessionV1['captureMode'];
 }
 
+export type DemoSessionUiaCaptureResult =
+  | { accepted: true; processId: number; app: string; window: string; capturedRecords: number; session: DemoSessionV1 }
+  | { accepted: false; reason: 'paused' | 'ended' | 'outside_source_boundary'; capturedRecords: 0; session: DemoSessionV1 };
+
 interface DemoSessionHost {
   start(request: Authenticated<DemoSessionStartInput>): Promise<DemoSessionV1>;
   get(request: Authenticated<{ sessionId: string }>): Promise<DemoSessionV1>;
@@ -15,6 +19,7 @@ interface DemoSessionHost {
   deleteSegment(request: Authenticated<{ sessionId: string; segmentId: string }>): Promise<DemoSessionV1>;
   markRedacted(request: Authenticated<{ sessionId: string; policyRef: string }>): Promise<DemoSessionV1>;
   exportReview(request: Authenticated<{ sessionId: string }>): Promise<DemoSessionV1>;
+  captureUia(request: Authenticated<{ sessionId: string; processId: number; windowTitle: string }>): Promise<DemoSessionUiaCaptureResult>;
 }
 
 interface Authenticated<T> { token: string; input: T }
@@ -28,6 +33,7 @@ export interface DemoSessionPort {
   deleteSegment(sessionId: string, segmentId: string): Promise<DemoSessionV1>;
   markRedacted(sessionId: string, policyRef: string): Promise<DemoSessionV1>;
   exportReview(sessionId: string): Promise<DemoSessionV1>;
+  captureUia(sessionId: string, processId: number, windowTitle: string): Promise<DemoSessionUiaCaptureResult>;
 }
 
 declare global {
@@ -47,6 +53,7 @@ export function demoSessionPort(): DemoSessionPort | undefined {
     deleteSegment: (sessionId, segmentId) => host.deleteSegment(request({ sessionId, segmentId })),
     markRedacted: (sessionId, policyRef) => host.markRedacted(request({ sessionId, policyRef })),
     exportReview: (sessionId) => host.exportReview(request({ sessionId })),
+    captureUia: (sessionId, processId, windowTitle) => host.captureUia(request({ sessionId, processId, windowTitle })),
   };
 }
 

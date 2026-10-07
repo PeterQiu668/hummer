@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { DemoSessionV1 } from '@hummer/contracts';
-import { CircleStop, Eye, Pause, Play, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
+import { CircleStop, Eye, Pause, Play, RotateCcw, ScanSearch, ShieldCheck, Trash2 } from 'lucide-react';
 import { demoSessionPort } from './demoSessionClient';
 
 const REDACTION_POLICY = 'local-human-review-v1';
@@ -16,6 +16,9 @@ export default function DemoSessionPage() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [processId, setProcessId] = useState('');
+  const [exactWindowTitle, setExactWindowTitle] = useState('');
+  const [captureNotice, setCaptureNotice] = useState('');
 
   const mutate = async (action: () => Promise<DemoSessionV1>) => {
     setBusy(true);
@@ -56,6 +59,25 @@ export default function DemoSessionPage() {
     }
   };
 
+  const captureUia = async () => {
+    if (!port || !session) return;
+    setBusy(true);
+    setError('');
+    setCaptureNotice('');
+    try {
+      const result = await port.captureUia(session.sessionId, Number(processId), exactWindowTitle);
+      setSession(result.session);
+      setReview(null);
+      setCaptureNotice(result.accepted
+        ? `已采集 ${result.capturedRecords} 条 ${result.app} 可访问性元数据。`
+        : `未写入：会话状态为 ${result.reason}。`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main className="h-full overflow-y-auto bg-neutral-50 p-4 md:p-6">
       <div className="mx-auto max-w-5xl space-y-4">
@@ -66,10 +88,10 @@ export default function DemoSessionPage() {
               <h1 className="mt-1 text-xl font-semibold text-neutral-900">教它做我的活</h1>
               <p className="mt-1 max-w-2xl text-[12px] leading-5 text-neutral-600">先划定允许的应用与窗口，再控制演示会话。当前页面只管理本地元数据状态与复核投影。</p>
             </div>
-            <span className="rounded-full border border-warning/30 bg-warning-soft px-3 py-1 text-[11px] font-medium text-warning">采集适配器未连接 · 本地内核</span>
+            <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[11px] font-medium text-success">Windows UIAutomation · 仅本机元数据</span>
           </div>
           <div role="note" className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] leading-5 text-neutral-600">
-            当前不会采集屏幕、键盘原文、视频或真实操作。没有连接 OS 采集适配器，也不代表已经完成专家零工具录制。
+            当前只按显式进程 ID、精确窗口标题和会话白名单读取 Windows 可访问性元数据；不会采集屏幕、键盘原文或视频，也不会上传。此能力不代表已经完成真实专家验收。
           </div>
         </header>
 
@@ -101,6 +123,16 @@ export default function DemoSessionPage() {
                 {session.status !== 'ended' && <button type="button" disabled={busy} onClick={() => { void mutate(() => port!.end(session.sessionId)); }} className="hum-btn"><CircleStop size={13} />结束</button>}
               </div>
               <dl className="mt-4 grid gap-3 rounded-md bg-neutral-50 p-3 text-[11px] md:grid-cols-3"><Fact label="应用白名单" value={session.sourceBoundary.apps.join('、')} /><Fact label="窗口白名单" value={session.sourceBoundary.windows.join('、')} /><Fact label="明确排除" value={session.sourceBoundary.excluded.join('、') || '无'} /></dl>
+              <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-[11px] font-medium text-neutral-700">单次 Windows UIAutomation 采集</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-[160px_1fr_auto]">
+                  <input aria-label="目标进程 ID" inputMode="numeric" value={processId} onChange={(event) => setProcessId(event.target.value)} className="hum-input" placeholder="进程 ID" />
+                  <input aria-label="精确窗口标题" value={exactWindowTitle} onChange={(event) => setExactWindowTitle(event.target.value)} className="hum-input" placeholder="必须与窗口白名单完全一致" />
+                  <button type="button" disabled={busy || session.status !== 'capturing' || !/^\d+$/.test(processId) || !exactWindowTitle} onClick={() => { void captureUia(); }} className="hum-btn is-primary disabled:cursor-not-allowed disabled:opacity-50"><ScanSearch size={13} />采集一次可访问性元数据</button>
+                </div>
+                <p className="mt-2 text-[10px] text-neutral-500">不监听键盘，不截屏，不录制视频；每次采集都重新核验 PID、精确标题与当前 DemoSession 白名单。</p>
+                {captureNotice && <p role="status" className="mt-2 text-[11px] text-success">{captureNotice}</p>}
+              </div>
             </section>
 
             <section className="rounded-md border border-neutral-200 bg-white p-5 shadow-sm">

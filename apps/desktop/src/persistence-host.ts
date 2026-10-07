@@ -35,6 +35,8 @@ import {
   type DesktopRoleActionContext,
 } from './desktop-role-policy.js';
 import type { IdentityContext, MembershipRole } from './persistence/identity-store.js';
+import { DemoSessionUiaCaptureService } from './demo-session-uia-capture.js';
+import type { WindowsUiaCaptureAdapter } from './windows-uia-capture.js';
 
 interface SessionRecordRequest {
   token: string;
@@ -69,6 +71,8 @@ export interface PersistenceHostOptions {
   stopAll?: (tenantId: string) => Promise<number>;
   /** Test-only seam. Never enable this from the packaged Desktop bootstrap. */
   enableDemoSessionSyntheticInjector?: boolean;
+  /** Test-only dependency seam. Packaged Desktop uses the real local Windows adapter. */
+  demoSessionUiaAdapter?: WindowsUiaCaptureAdapter;
 }
 
 
@@ -127,6 +131,7 @@ const CHANNELS = [
   'hummer:demo-session:delete-segment',
   'hummer:demo-session:mark-redacted',
   'hummer:demo-session:export-review',
+  'hummer:demo-session:capture-uia',
   'hummer:demo-session:test-inject-synthetic',
 ] as const;
 
@@ -135,6 +140,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   const workspaceDirectory = resolve(process.env.HUMMER_CODEX_CWD ?? process.cwd());
   const executionWorkspaceRoot = resolve(process.env.HUMMER_EXEC_WORKSPACE_ROOT ?? join(app.getPath('userData'), 'workspace'));
   const persistence = openPersistence({ dataDirectory });
+  const demoSessionUia = new DemoSessionUiaCaptureService(persistence, options.demoSessionUiaAdapter);
   const inboxWatcher = new WorkOrderInboxWatcher();
   const credentialVault = new CredentialVault(persistence.engineCredentials, {
     available: () => safeStorage.isEncryptionAvailable(),
@@ -355,6 +361,15 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
     requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
     return persistence.demoSessions.exportForEgress(tenantId, request.input.sessionId);
+  });
+  ipcMain.handle('hummer:demo-session:capture-uia', async (_event, request: Authenticated<{
+    sessionId: string;
+    processId: number;
+    windowTitle: string;
+  }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return demoSessionUia.capture({ ...request.input, tenantId });
   });
   if (options.enableDemoSessionSyntheticInjector) {
     ipcMain.handle('hummer:demo-session:test-inject-synthetic', (_event, request: Authenticated<{

@@ -116,6 +116,7 @@ contextBridge.exposeInMainWorld('hummerDemoSessions', {
   deleteSegment: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:delete-segment', request),
   markRedacted: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:mark-redacted', request),
   exportReview: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:export-review', request),
+  captureUia: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:capture-uia', request),
 });
 contextBridge.exposeInMainWorld('hummerEnvironmentDoctor', {
   check: (force = false) => ipcRenderer.invoke('hummer:environment:check', force),

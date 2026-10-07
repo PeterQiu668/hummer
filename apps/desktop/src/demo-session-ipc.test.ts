@@ -24,6 +24,7 @@ vi.mock('electron', () => ({
 
 import { registerPersistenceHost, type PersistenceHostRegistration } from './persistence-host.js';
 import type { IdentityContext } from './persistence/index.js';
+import { WindowsUiaCaptureAdapter, type WindowsUiaProbe } from './windows-uia-capture.js';
 
 let directory = '';
 let registration: PersistenceHostRegistration;
@@ -127,6 +128,53 @@ describe('[DEMO-SESSION-IPC] trusted local DemoSession bridge', () => {
       window: '支付',
       metadata: { kind: 'input-event', action: 'click' },
     }))).resolves.toEqual({ accepted: false, reason: 'outside_source_boundary' });
+  });
+
+  it('binds the real UIAutomation IPC to the authenticated owner and writes zero records for paused, wrong-window, and cross-session requests', async () => {
+    registration.close();
+    electron.handlers.clear();
+    const probe = vi.fn<WindowsUiaProbe>().mockResolvedValue({
+      processId: 4242, app: 'HummerUiaFixture', window: 'HUMMER UIA Fixture',
+      nodes: [{ role: 'Window', automationId: 'FixtureWindow' }],
+    });
+    registration = registerPersistenceHost({
+      enableDemoSessionSyntheticInjector: true,
+      demoSessionUiaAdapter: new WindowsUiaCaptureAdapter({ platform: 'win32', probe }),
+    });
+    const owner = await createCompany('UiaOwner');
+    const foreign = await createCompany('UiaForeign');
+    const started = await invoke<DemoSessionV1>('hummer:demo-session:start', auth(owner, {
+      sourceBoundary: { apps: ['HummerUiaFixture'], windows: ['HUMMER UIA Fixture'], excluded: ['Password'] },
+      captureMode: 'events-only',
+    }));
+
+    await expect(invoke('hummer:demo-session:capture-uia', auth(foreign, {
+      sessionId: started.sessionId, processId: 4242, windowTitle: 'HUMMER UIA Fixture',
+    }))).rejects.toThrow(/unavailable in the current tenant/);
+    expect(probe).not.toHaveBeenCalled();
+
+    await expect(invoke('hummer:demo-session:capture-uia', auth(owner, {
+      sessionId: started.sessionId, processId: 4242, windowTitle: 'Wrong Window',
+    }))).rejects.toThrow(/boundary/);
+    expect(probe).not.toHaveBeenCalled();
+
+    await expect(invoke('hummer:demo-session:capture-uia', auth(owner, {
+      tenantId: foreign.tenant.id,
+      sessionId: started.sessionId, processId: 4242, windowTitle: 'HUMMER UIA Fixture',
+    }))).resolves.toMatchObject({ accepted: true, capturedRecords: 1, session: { tenantId: owner.tenant.id } });
+    expect(probe).toHaveBeenCalledOnce();
+
+    const pausedSession = await invoke<DemoSessionV1>('hummer:demo-session:start', auth(owner, {
+      sourceBoundary: { apps: ['HummerUiaFixture'], windows: ['HUMMER UIA Fixture'], excluded: ['Password'] },
+      captureMode: 'events-only',
+    }));
+    await action(owner, 'pause', pausedSession.sessionId);
+    await expect(invoke('hummer:demo-session:capture-uia', auth(owner, {
+      sessionId: pausedSession.sessionId, processId: 4242, windowTitle: 'HUMMER UIA Fixture',
+    }))).resolves.toMatchObject({ accepted: false, reason: 'paused', capturedRecords: 0 });
+    expect(probe).toHaveBeenCalledOnce();
+    const unchanged = await invoke<DemoSessionV1>('hummer:demo-session:get', auth(owner, { sessionId: pausedSession.sessionId }));
+    expect(unchanged.segments[0]).toMatchObject({ recordCount: 0 });
   });
 });
 
