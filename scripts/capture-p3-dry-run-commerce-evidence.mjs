@@ -7,10 +7,10 @@ const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('Run this capture through npm so npm_execpath is pinned and explicit');
 
 const repository = resolve(import.meta.dirname, '..');
-const round = 'round-p3-dry-run-commerce-rerun-1';
+const round = 'round-p3-dry-run-commerce-rerun-2';
 const directory = resolve(repository, 'evidence', round);
 const path = resolve(directory, 'gate.json');
-if (existsSync(path)) throw new Error('Phase 3 dry-run commerce rerun evidence already exists; never overwrite a completed round');
+if (existsSync(path)) throw new Error('Phase 3 dry-run commerce rerun 2 evidence already exists; never overwrite a completed round');
 
 const commands = [
   ['run', 'typecheck'],

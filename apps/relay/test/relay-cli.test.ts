@@ -20,7 +20,7 @@ beforeAll(async () => {
     resolve(relayRoot, 'tsconfig.cli.json'),
   ], { cwd: relayRoot });
   await execFileAsync(process.execPath, [resolve(relayRoot, 'scripts/prepare-cli-dist.mjs')], { cwd: relayRoot });
-}, 20_000);
+}, 60_000);
 
 function config(databasePath: string, overrides: Record<string, unknown> = {}) {
   return {
