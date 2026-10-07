@@ -1,7 +1,7 @@
 # Goal completion audit — 2026-10-07
 
 Audited baseline: `6490f3a`  
-Current follow-up at audit time: `58c8965`  
+Current local checkpoint: `6ce9dac`  
 Normative source: `HUMMER×AgentHub_内测底座_Codex目标模式主提示词_v1.1.md`
 
 ## Decision
@@ -57,7 +57,9 @@ The repository is a credible local Alpha substrate. It is **not** evidence that 
 
 L1, L2, and L6 are proven. L5 and L7 are proven only for local deterministic injection/capacity. L3 is incomplete, L4 is contradicted by the lack of a second machine, L8 lacks real capture, and L9 lacks real GUI/CUA. The goal's rule that all nine layers are required therefore prevents a completion claim.
 
-## Highest-value safe local work
+## Highest-value safe local work at the audited baseline
+
+The items below were subsequently completed by the post-audit slices described later in this document. They are retained as audit history, not as current next actions.
 
 1. Real loopback Fastify Relay + Node + Web production-client E2E, with sealed 390 px screenshots.
 2. Windows UIAutomation metadata capture against an explicitly allowlisted, non-sensitive fixture window; no screenshot/video/raw-key capture.
@@ -108,3 +110,17 @@ The sealed chain head is
 This closes the **local single-host** Desktop-shared-Relay technical gap under
 `AC-P1-15` and the local “no settings page” dispatch/approve/stop path under
 `AC-P0-05`. Their literal external/two-machine acceptance remains incomplete.
+
+## Current closeout addendum
+
+The local checkpoint through `6ce9dac` closes the remaining authorized technical-preparation work without claiming external acceptance:
+
+- Phase 3 migration v17, author declaration/revocation, independent human verification, positive-integer CNY dry-run offers, install-bound orders, immutable equal debit/credit settlement, and zero-balance reconciliation are implemented.
+- Payment-provider dependencies, payment credentials, real collection, custody, payout, refund, invoice, tax, KYC/AML, and provider networking remain absent and prohibited.
+- `AC-P3-01` through `AC-P3-03` have local executable evidence. `AC-P3-04` has a formally delivered decision pack, but that means “submitted for L3 decision,” not approved.
+- The private Alpha stage-0 record is now a strict machine-checked contract. It rejects missing approval, placeholders, unknown or secret-bearing fields, same-device claims, non-HTTPS Relay URLs, expired certificates, over-eight-hour or over-scoped badges, unsafe transfer channels, unsafe canaries, production data, unsafe executors, public exposure, deletion, and real payment.
+- The unfilled template intentionally returns `status: blocked` and exit code 2. A passing record does not authenticate the approver and authorizes nothing by itself.
+
+The latest evidence chain head is `evidence/round-private-alpha-preflight-rerun-1/manifest.json`, root `cde65bbf389e3e501a88cb9b6d3234baae3180731f8c6473cbea81e70adc4635`. It includes typecheck, build, 65 contract assertions/46 negatives, 13 preflight assertions/21 negatives, the expected blocked-template exit 2, both security modes, Relay 210/210, and root unit 749/749. The preceding failed capture is retained at root `67c6c28202fd49de1b3520c2c8a5bdefd215c4e1eaa545aff3034ea20297b265`.
+
+No further local test can prove the remaining literal requirements. Completion still requires external state and human authority: a second Windows machine, approved private TLS/network configuration, a real non-developer operator and expert, real install timing and tasks, retention/reuse observation, external installs and takedown, and any payment signal or real-commerce decision. Until those exist, the project remains `待推进` and the full goal must not be marked complete.

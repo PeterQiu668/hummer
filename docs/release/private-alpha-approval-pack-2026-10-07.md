@@ -16,7 +16,7 @@
 - Desktop 持久 outbox、人工审批、撤销/超时、一次性 task grant 与结果回执；
 - 唯一生产执行器为只读摘要 `fs.read.attest.v1`，不返回文件正文；
 - 最新封存证据 root 为
-  `0d035b1fae390ec6b424ef181d2ce407f8249a92f227e47b3d65b9446ad98897`。
+  `cde65bbf389e3e501a88cb9b6d3234baae3180731f8c6473cbea81e70adc4635`。
 
 ## 仍需人工提供或批准的外部条件
 
