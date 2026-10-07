@@ -9,6 +9,8 @@ export { default as BatchDispatchPanel } from './BatchDispatchPanel';
 export type { BatchDispatchPanelProps } from './BatchDispatchPanel';
 export {
   START_WORK_RISK_CLASSES,
+  START_WORK_CONTROLLED_RISK_CLASSES,
+  START_WORK_RISK_PRESENTATION,
   decideStartWorkPlan,
   totalEstimatedCostCny,
   validatePendingStartWorkPlan,

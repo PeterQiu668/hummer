@@ -32,7 +32,7 @@ function setup(sourcePlan?: SessionPlan) {
 async function requestPlan() {
   fireEvent.change(screen.getByRole('textbox', { name: '你想完成什么' }), { target: { value: '整理客户资料并生成摘要' } });
   fireEvent.click(screen.getByRole('button', { name: '生成待确认计划' }));
-  expect((await screen.findAllByText('办公室电脑')).length).toBeGreaterThanOrEqual(2);
+  expect(await screen.findByLabelText('第 1 步审批上下文')).toHaveTextContent('执行目标：办公室电脑 · codex');
 }
 
 describe('StartWorkFlow relay seam', () => {
