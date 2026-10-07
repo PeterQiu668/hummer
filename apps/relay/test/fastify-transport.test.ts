@@ -97,7 +97,7 @@ function harness() {
   const authenticator = createStaticBadgeTokenAuthenticator([
     badge('node-token', TENANT, NODE, NODE_SCOPES),
     badge('node-b-token', TENANT, 'node-b', NODE_SCOPES),
-    badge('control-token', TENANT, undefined, ['node.read', 'task.enqueue', 'task.stop', 'approval.decide']),
+    badge('control-token', TENANT, undefined, ['node.read', 'task.enqueue', 'task.stop', 'approval.read', 'approval.decide']),
     badge('tenant-b-token', 'tenant-b', undefined, ['task.enqueue', 'task.stop']),
     badge('claim-only-token', TENANT, NODE, ['task.claim']),
     badge('expired-token', TENANT, NODE, NODE_SCOPES, '2026-10-06T23:59:59Z'),
@@ -199,6 +199,14 @@ describe('Fastify fleet relay transport', () => {
     });
     expect(decided.statusCode).toBe(200);
     expect(decided.json()).toMatchObject({ decision: { decisionId: 'decision-1', decision: 'approved' } });
+
+    const approvalList = await app.inject({
+      method: 'GET', url: '/v1/control/approval-requests', headers: authorization('control-token'),
+    });
+    expect(approvalList.statusCode).toBe(200);
+    expect(approvalList.json()).toMatchObject({
+      approvalRequests: [{ requestId: 'request-1', decision: { decisionId: 'decision-1', decision: 'approved' } }],
+    });
 
     const consumed = await app.inject({
       method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests/request-1/consume`,

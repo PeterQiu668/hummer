@@ -248,7 +248,11 @@ export class FleetService implements FleetIngress {
   async listApprovalRequests(
     session: AuthenticatedFleetSession,
   ): Promise<readonly ApprovalRequestRecord[]> {
-    return this.store.listApprovalRequests(session.tenantId);
+    const requests = await this.store.listApprovalRequests(session.tenantId);
+    return Promise.all(requests.map(async (request) => {
+      const decision = await this.store.getApprovalDecision(session.tenantId, request.requestId);
+      return decision ? { ...request, decision } : request;
+    }));
   }
 
   async configureQuota(

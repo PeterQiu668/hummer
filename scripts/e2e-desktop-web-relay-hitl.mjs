@@ -10,7 +10,7 @@ import { MemoryExecutionJournal } from '../apps/node-agent/src/execution-journal
 import { RelayHttpClient } from '../apps/node-agent/src/relay-http-client.mjs';
 
 const root = process.cwd();
-const rendererUrl = 'http://127.0.0.1:4190';
+const rendererUrl = 'http://127.0.0.1:4187';
 const nodeId = 'node-hitl-codex';
 const desktopBadge = 'desktop-hitl-control-badge-never-persist';
 const webBadge = 'web-hitl-control-badge-never-persist';
@@ -22,8 +22,11 @@ const evidenceDir = resolve(evidenceRoot, round);
 const screenshotsDir = resolve(evidenceDir, 'screenshots');
 const gatePath = resolve(evidenceDir, 'gate.json');
 const failurePath = resolve(evidenceDir, 'failure.json');
-const profileDir = resolve(evidenceDir, 'desktop-profile');
-const dataDir = resolve(evidenceDir, 'desktop-data');
+const codexProbeRoot = 'F:\\AgentWorkspace\\10_Working\\hummer\\codex';
+const runtimeDir = resolve(codexProbeRoot, `hitl-runtime-${round}`);
+const profileDir = resolve(runtimeDir, 'desktop-profile');
+const dataDir = resolve(runtimeDir, 'desktop-data');
+const codexProbe = resolve(codexProbeRoot, `hitl-codex-0.153.4-${round}.cmd`);
 const viteOutput = [];
 let assertions = 0;
 
@@ -32,9 +35,11 @@ if (existsSync(evidenceDir)) throw new Error(`evidence round already exists: ${r
 mkdirSync(screenshotsDir, { recursive: true });
 mkdirSync(profileDir, { recursive: true });
 mkdirSync(dataDir, { recursive: true });
+mkdirSync(codexProbeRoot, { recursive: true });
+writeFileSync(codexProbe, '@echo off\r\necho codex-cli 0.153.4\r\n', { encoding: 'utf8', flag: 'wx' });
 
 const vite = spawn(process.execPath, [
-  'node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '4190', '--strictPort',
+  'node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '4187', '--strictPort',
 ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 vite.stdout.on('data', (chunk) => viteOutput.push(chunk.toString()));
 vite.stderr.on('data', (chunk) => viteOutput.push(chunk.toString()));
@@ -66,7 +71,7 @@ try {
     HUMMER_RELAY_BASE_URL: relay.baseUrl,
     HUMMER_RELAY_BADGE_TOKEN: desktopBadge,
     HUMMER_RELAY_TENANT_ID: identity.tenant.id,
-    HUMMER_RELAY_ACTOR_REF: `human:${identity.membership.humanUserId}`,
+    HUMMER_RELAY_ACTOR_REF: `account:${identity.account.id}`,
   });
   desktopPage = await desktop.firstWindow();
   await waitForWorkbench(desktopPage);
@@ -96,6 +101,7 @@ try {
   await waitForWorkbench(webPage);
 
   const approvedTitle = '网页派活后由桌面明确批准';
+  await webPage.getByRole('button', { name: '开始做' }).click();
   await dispatchFromUi(webPage, approvedTitle);
   const approvedTask = await waitForTask(relayStore, identity.tenant.id, approvedTitle);
   await waitForState(states, approvedTask.taskId, 'pending_confirmation');
@@ -132,6 +138,11 @@ try {
   check((await relayStore.getTask(identity.tenant.id, deniedTask.taskId, now())).status === 'failed', 'denied Relay task is not terminal failed');
 
   const stoppedTitle = '桌面派活后由操作者停止';
+  await desktopPage.getByRole('button', { name: '返回工作台' }).click();
+  await waitForWorkbench(desktopPage);
+  await desktopPage.getByRole('button', { name: '开始做' }).click();
+  await desktopPage.getByText('当前没有待审批动作。', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+  check(await desktopPage.getByRole('button', { name: /批准并继续：/ }).count() === 0, 'decided approvals resurfaced after the control panel remounted');
   await dispatchFromUi(desktopPage, stoppedTitle);
   const stoppedTask = await waitForTask(relayStore, identity.tenant.id, stoppedTitle);
   await waitForState(states, stoppedTask.taskId, 'pending_confirmation');
@@ -220,7 +231,7 @@ async function startRelay(identity) {
   const future = '2099-01-01T00:00:00.000Z';
   const tenantId = identity.tenant.id;
   const authenticator = relay.createStaticBadgeTokenAuthenticator([
-    { token: desktopBadge, tokenId: 'badge-desktop-hitl', tenantId, actorRef: `human:${identity.membership.humanUserId}`, scopes: ['node.read', 'task.read', 'approval.read', 'task.enqueue', 'task.stop', 'approval.decide'], expiresAt: future },
+    { token: desktopBadge, tokenId: 'badge-desktop-hitl', tenantId, actorRef: `account:${identity.account.id}`, scopes: ['node.read', 'task.read', 'approval.read', 'task.enqueue', 'task.stop', 'approval.decide'], expiresAt: future },
     { token: webBadge, tokenId: 'badge-web-hitl', tenantId, actorRef: 'human:web-owner', scopes: ['node.read', 'task.read', 'approval.read', 'task.enqueue'], expiresAt: future },
     { token: nodeBadge, tokenId: 'badge-node-hitl', tenantId, actorRef: `system:${nodeId}`, nodeId, scopes: ['node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect', 'approval.request', 'approval.consume'], expiresAt: future },
   ]);
@@ -340,7 +351,12 @@ async function waitForDecision(store, tenantId, requestId, decision) {
 }
 
 async function waitForApprovalButton(page, request, prefix) {
-  await page.getByRole('button', { name: new RegExp(`${prefix}：.*${escapeRegex(request.target)}`) }).waitFor({ state: 'visible', timeout: 20_000 });
+  try {
+    await page.getByRole('button', { name: new RegExp(`${prefix}：.*${escapeRegex(request.target)}`) }).waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '[body unavailable]');
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nVisible UI:\n${body.slice(0, 6_000)}`);
+  }
 }
 
 async function waitForValue(read, label, timeoutMs = 20_000) {
@@ -356,7 +372,7 @@ async function waitForValue(read, label, timeoutMs = 20_000) {
 function launchDesktop(extraEnv = {}) {
   return electron.launch({
     args: [resolve(root, 'apps/desktop/dist/main.js'), '--disable-gpu', `--user-data-dir=${profileDir}`],
-    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', HUMMER_RENDERER_URL: rendererUrl, HUMMER_CODEX_CWD: evidenceDir, HUMMER_DATA_DIR: dataDir, ...extraEnv },
+    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', HUMMER_RENDERER_URL: rendererUrl, HUMMER_CODEX_CWD: evidenceDir, HUMMER_CODEX_PATH: codexProbe, HUMMER_DATA_DIR: dataDir, ...extraEnv },
   });
 }
 
@@ -372,7 +388,12 @@ async function createDesktopCompany(page) {
 }
 
 async function waitForWorkbench(page) {
-  await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+  try {
+    await page.getByRole('heading', { name: '工作台' }).waitFor({ state: 'visible', timeout: 30_000 });
+  } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '[body unavailable]');
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nVisible UI:\n${body.slice(0, 4_000)}`);
+  }
 }
 
 async function readDesktopIdentity(page) {
