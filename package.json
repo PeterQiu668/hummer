@@ -54,6 +54,8 @@
     "local:stack": "npm run build:cli -w @hummer/relay && npm run desktop:build && node scripts/hummer-local-stack.mjs",
     "test:local:stack": "npm run build:cli -w @hummer/relay && node scripts/test-local-stack.mjs",
     "test:local:stack:first-run": "npm run build && npm run desktop:build && npm run build:cli -w @hummer/relay && node scripts/e2e-local-stack-first-run.mjs",
+    "validate:private-alpha:preflight": "node scripts/validate-private-alpha-preflight.mjs",
+    "test:private-alpha:preflight": "node scripts/test-private-alpha-preflight.mjs",
     "capture:p1:local-stack": "node scripts/capture-p1-local-stack-evidence.mjs",
     "capture:p1:first-run-identity": "node scripts/capture-p1-first-run-identity-claim-evidence.mjs",
     "capture:p3:dry-run-commerce": "node scripts/capture-p3-dry-run-commerce-evidence.mjs",

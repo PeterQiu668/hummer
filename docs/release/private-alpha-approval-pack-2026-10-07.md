@@ -16,7 +16,7 @@
 - Desktop 持久 outbox、人工审批、撤销/超时、一次性 task grant 与结果回执；
 - 唯一生产执行器为只读摘要 `fs.read.attest.v1`，不返回文件正文；
 - 最新封存证据 root 为
-  `1230b210d00fcd5026830f6c5d6753fc1eafd12cdbae1731d8fa4a48264b4b11`。
+  `0d035b1fae390ec6b424ef181d2ce407f8249a92f227e47b3d65b9446ad98897`。
 
 ## 仍需人工提供或批准的外部条件
 
@@ -55,6 +55,17 @@ VPN、改路由或开账号，它仍属于单独 L3 动作。公开域名或公�
    junction、reparse point 或硬链接。
 3. 确认 Relay/Desktop 主机有足够磁盘，并备份当前非秘密配置。
 4. 预期证据：`preflight.json`、安装包哈希、操作者与设备匿名编号。
+
+预检必须从 `docs/release/private-alpha-preflight.template.json` 复制到本轮独立
+工作目录后填写，禁止把真实 badge 值写入文件。填写完成后运行：
+
+```powershell
+npm run validate:private-alpha:preflight -- <本轮-preflight.json>
+```
+
+只有输出 `status: ready` 且退出码为 0 才能请求进入阶段 1。未填写模板必定
+输出 `status: blocked` 和退出码 2；校验器只读本地 JSON，不联网、不启动服务、
+不修改网络或防火墙。布尔批准字段只能证明材料完整，不能替代丘总的真实授权记录。
 
 ### 阶段 1：受控安装与接入
 

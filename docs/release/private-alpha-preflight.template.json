@@ -1,0 +1,71 @@
+{
+  "schema": "hummer.private-alpha-preflight",
+  "version": 1,
+  "approval": {
+    "approved": false,
+    "approvedByRef": "REPLACE_WITH_OWNER_REF",
+    "approvedAt": "REPLACE_WITH_ISO_TIMESTAMP",
+    "scope": "private-alpha-a-fs-read-attest-v1"
+  },
+  "controller": {
+    "deviceRef": "REPLACE_WITH_CONTROLLER_DEVICE_REF",
+    "os": "win32",
+    "osVersion": "REPLACE_WITH_WINDOWS_VERSION",
+    "operatorRef": "REPLACE_WITH_OPERATOR_REF"
+  },
+  "node": {
+    "deviceRef": "REPLACE_WITH_DISTINCT_NODE_DEVICE_REF",
+    "os": "win32",
+    "osVersion": "REPLACE_WITH_WINDOWS_VERSION",
+    "operatorRef": "REPLACE_WITH_OPERATOR_REF"
+  },
+  "network": {
+    "mode": "private_tls_gateway",
+    "relayUrl": "https://REPLACE_WITH_PRIVATE_GATEWAY/relay",
+    "allowedNodeAddress": "REPLACE_WITH_APPROVED_PRIVATE_ADDRESS",
+    "certificateSha256": "REPLACE_WITH_LOWERCASE_SHA256",
+    "certificateNotBefore": "REPLACE_WITH_ISO_TIMESTAMP",
+    "certificateNotAfter": "REPLACE_WITH_ISO_TIMESTAMP"
+  },
+  "badge": {
+    "badgeId": "REPLACE_WITH_NON_SECRET_BADGE_ID",
+    "tenantId": "REPLACE_WITH_TEST_TENANT_ID",
+    "nodeId": "REPLACE_WITH_NODE_DEVICE_REF",
+    "scopes": [
+      "node.register",
+      "node.heartbeat",
+      "task.claim",
+      "task.event",
+      "stream.connect",
+      "approval.request",
+      "approval.consume"
+    ],
+    "issuedAt": "REPLACE_WITH_ISO_TIMESTAMP",
+    "expiresAt": "REPLACE_WITH_AT_MOST_8_HOURS_LATER",
+    "transferChannel": "offline_manual"
+  },
+  "installer": {
+    "path": "C:\\REPLACE_WITH_LOCAL_INSTALLER_PATH\\HUMMER-Setup.exe",
+    "sha256": "REPLACE_WITH_LOWERCASE_SHA256",
+    "unsignedApproved": false
+  },
+  "canary": {
+    "workspaceRoot": "C:\\REPLACE_WITH_DEDICATED_WORKSPACE",
+    "path": "C:\\REPLACE_WITH_DEDICATED_WORKSPACE\\canary.txt",
+    "sha256": "REPLACE_WITH_LOWERCASE_SHA256",
+    "bytes": 0,
+    "containsBusinessData": false,
+    "isReparsePoint": false,
+    "hardLinkCount": 1
+  },
+  "evidenceDirectory": "C:\\REPLACE_WITH_CREATE_ONLY_EVIDENCE_DIRECTORY",
+  "safeguards": {
+    "publicExposure": false,
+    "productionData": false,
+    "shellExecutor": false,
+    "networkExecutor": false,
+    "writeExecutor": false,
+    "deleteExecutor": false,
+    "realPayment": false
+  }
+}
