@@ -30,6 +30,18 @@ tenant/account binding.
 - the Electron onboarding gate used a version-only Codex 0.153.4 test probe;
   this proves identity onboarding, not a real Codex task execution.
 
+## Sealed evidence
+
+- feature commit: `d490eb2a8a94c381999c53fdf5c05b87a9de2a43`;
+- evidence round: `evidence/round-p1-first-run-identity-claim/`;
+- root hash: `1230b210d00fcd5026830f6c5d6753fc1eafd12cdbae1731d8fa4a48264b4b11`;
+- predecessor root: `f12897dd70173ea9c2f56f168f792e12696165815ce716aed4f63d9ee692465b`;
+- eight captured commands exited `0`: 18 focused Desktop tests, 64 local-stack
+  assertions, 62 fresh-Electron assertions, 209 Relay tests, 746 root unit
+  tests, and 96 UI tests, plus typecheck and production build;
+- the gate contains no generated plaintext claim/control/node/issuer bearer
+  pattern; seal verification passed 9 assertions and 2 tamper cases.
+
 ## Remaining limits
 
 The stack is still single-host loopback. A different tenant/account requires a

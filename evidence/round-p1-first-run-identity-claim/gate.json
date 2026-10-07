@@ -1,0 +1,78 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "first-run-desktop-identity-claim",
+  "mode": "fresh-electron-authenticated-local-pipe-claim",
+  "status": "passed",
+  "capturedAt": "2026-10-07T07:18:32.921Z",
+  "commit": "d490eb2a8a94c381999c53fdf5c05b87a9de2a43",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-BltfyyW6.js    187.02 kB │ gzip:  55.23 kB\ndist/assets/index-B7CirJCT.js                          641.86 kB │ gzip: 194.29 kB\n✓ built in 17.63s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm exec -- vitest run --config vitest.config.ts apps/desktop/src/local-stack-claim.test.ts apps/desktop/src/desktop-relay-host.test.ts apps/desktop/src/parent-lifetime.test.ts",
+      "exitCode": 0,
+      "stdout": "\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  3 passed (3)\n      Tests  18 passed (18)\n   Start at  15:13:01\n   Duration  908ms (transform 480ms, setup 0ms, import 780ms, tests 193ms, environment 0ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:local:stack",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:local:stack\n> npm run build:cli -w @hummer/relay && node scripts/test-local-stack.mjs\n\n\n> @hummer/relay@0.1.0-alpha.0 build:cli\n> tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs\n\n{\"status\":\"passed\",\"assertions\":64,\"checks\":[\"one command starts real Relay and Node with ephemeral in-memory credentials\",\"live named-pipe status and coordinated stop are available without a network admin port\",\"a second supervisor is rejected and the same durable state can restart\",\"authenticated Desktop identity claim starts Relay and rejects bad tokens and conflicting identities\",\"configs state SQLite journal and receipts contain no plaintext generated bearer patterns\"]}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:local:stack:first-run",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:local:stack:first-run\n> npm run build && npm run desktop:build && npm run build:cli -w @hummer/relay && node scripts/e2e-local-stack-first-run.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-BltfyyW6.js    187.02 kB │ gzip:  55.23 kB\ndist/assets/index-B7CirJCT.js                          641.86 kB │ gzip: 194.29 kB\n✓ built in 17.36s\n\n> hummer-enterprise-workspace@0.2.0 desktop:build\n> npm run build -w @hummer/desktop\n\n\n> @hummer/desktop@0.6.0-internal.1 prebuild\n> node ../../packages/config/scripts/generate.mjs\n\n\n> @hummer/desktop@0.6.0-internal.1 build\n> tsc -b\n\n\n> @hummer/relay@0.1.0-alpha.0 build:cli\n> tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs\n\n{\"status\":\"passed\",\"assertions\":62,\"tenantRef\":\"fnv1a:b204bdb0\",\"actorRef\":\"fnv1a:810ae9b1\",\"checks\":[\"fresh Desktop created its own tenant and account without prefilled identifiers\",\"Desktop main claimed the local stack through an authenticated named pipe\",\"Relay and Node started only after the verified identity claim\",\"Desktop listed the claimed Node through its trusted Relay bridge\",\"claim token was absent from renderer storage and all persisted test bytes\"]}\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm test -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.062,\"dispatchP95Ms\":0.947,\"eventWriteP95Ms\":0.302,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.615,\"dispatchP95Ms\":11.243,\"eventWriteP95Ms\":4.628,\"rejectedOverLimit\":true}\n\n Test Files  22 passed (22)\n      Tests  209 passed (209)\n   Start at  15:15:45\n   Duration  31.92s (transform 10.66s, setup 0ms, import 87.20s, tests 69.94s, environment 4ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:unit",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.041,\"dispatchP95Ms\":1.134,\"eventWriteP95Ms\":0.305,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.791,\"dispatchP95Ms\":6.247,\"eventWriteP95Ms\":5.687,\"rejectedOverLimit\":true}\n\n Test Files  113 passed (113)\n      Tests  746 passed (746)\n   Start at  15:16:24\n   Duration  70.99s (transform 15.20s, setup 0ms, import 104.44s, tests 106.50s, environment 22ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:ui",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  23 passed (23)\n      Tests  96 passed (96)\n   Start at  15:17:41\n   Duration  51.47s (transform 39.60s, setup 96.41s, import 47.28s, tests 39.67s, environment 312.31s)\n\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "config v2 starts without tenant or account identifiers and waits for authenticated Desktop identity",
+    "bad claim token leaves Relay and Node stopped while the valid claim starts both services exactly once",
+    "Desktop persistence resolves the authoritative identity and Relay late configuration is immutable",
+    "fresh Electron UI creates a company without prefilled identifiers and lists the claimed Node online",
+    "claim token and Relay control badge never reach renderer storage or persisted test bytes",
+    "legacy explicit identity mode still starts stops and restarts with secret scans clean",
+    "Relay full tests and root unit UI build and typecheck regressions remain green"
+  ],
+  "limitations": [
+    "The gate runs on one Windows host over loopback rather than a signed installer on a second device.",
+    "The Electron onboarding gate uses a version-only Codex probe and does not execute a real Codex task.",
+    "Loopback bootstrap is not production TLS IdP KMS or remote enrollment evidence."
+  ]
+}

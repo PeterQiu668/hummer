@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-first-run-identity-claim",
+  "generatedAt": "2026-10-07T07:18:55.131Z",
+  "gitCommit": "d490eb2a8a94c381999c53fdf5c05b87a9de2a43",
+  "prevManifestRootHash": "f12897dd70173ea9c2f56f168f792e12696165815ce716aed4f63d9ee692465b",
+  "files": [
+    {
+      "path": "evidence/round-p1-first-run-identity-claim/gate.json",
+      "sha256": "ff71decf159f9ee7e05e6ebd65b91e173b204da019d757ebf3994a9127803c59",
+      "bytes": 9274
+    }
+  ],
+  "rootHash": "1230b210d00fcd5026830f6c5d6753fc1eafd12cdbae1731d8fa4a48264b4b11"
+}
