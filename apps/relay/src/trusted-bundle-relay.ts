@@ -20,7 +20,7 @@ export interface ApprovedBundleAuthorization {
 }
 export type ApprovedInstallDecisionLookup = (tenantId: string, gateId: string) => Promise<ApprovedBundleAuthorization | null> | ApprovedBundleAuthorization | null;
 
-class TrustedBundleRelayError extends Error {
+export class TrustedBundleRelayError extends Error {
   constructor(readonly statusCode: number, readonly code: string, message: string) {
     super(message);
     this.name = 'TrustedBundleRelayError';
@@ -39,33 +39,54 @@ function canonicalJson(value: unknown): string {
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 function storageKey(tenantId: string, bundleId: string): string { return `${tenantId}\0${bundleId}`; }
 
+export interface TrustedBundleRelayStore {
+  publish(claims: BadgeTokenClaims, input: unknown, authorization: ApprovedBundleAuthorization): TrustedBundlePublishResult;
+  consume(claims: BadgeTokenClaims, nodeId: string, bundleId: string): TrustedBundleEnvelopeV1;
+}
+
+export function validateTrustedBundleAuthorization(
+  envelope: TrustedBundleEnvelopeV1,
+  authorization: ApprovedBundleAuthorization,
+): void {
+  const gateValidation = validateCapabilityContract('CapabilityInstallGateInput', authorization.gateInput);
+  if (gateValidation.issues) throw new TrustedBundleRelayError(403, 'decision_mismatch', 'persisted install gate evidence is invalid');
+  const gateInput: CapabilityInstallGateInput = gateValidation.value;
+  const derivedDecision = createCapabilityInstallGateDecision(gateInput);
+  if (derivedDecision.decision !== 'approved' || canonicalJson(authorization.decision) !== canonicalJson(derivedDecision) ||
+      canonicalJson(authorization.decision) !== canonicalJson(envelope.decision) || gateInput.gateId !== envelope.gateId ||
+      gateInput.requestDigest !== envelope.requestDigest || gateInput.shareDigest !== envelope.shareDigest ||
+      gateInput.targetTenantId !== envelope.tenantId || canonicalJson(gateInput.share) !== canonicalJson(envelope.share)) {
+    throw new TrustedBundleRelayError(403, 'decision_mismatch', 'bundle is not bound to the Relay approved install decision');
+  }
+  const transportedDigests = Object.fromEntries(envelope.descriptor.files.map((file) => [file.path, file.sha256]));
+  if (gateInput.exportDescriptor.format !== 'agent-skills' || gateInput.exportDescriptor.installEntry !== 'manifest.json' ||
+      canonicalJson(gateInput.exportDescriptor.fileDigests) !== canonicalJson(transportedDigests)) {
+    throw new TrustedBundleRelayError(403, 'descriptor_mismatch', 'transported bytes do not match the approved install gate descriptor');
+  }
+}
+
+export function validateTrustedBundlePublication(
+  claims: BadgeTokenClaims,
+  input: unknown,
+  authorization: ApprovedBundleAuthorization,
+): TrustedBundleEnvelopeV1 {
+  if (claims.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(claims.actorRef)) {
+    throw new TrustedBundleRelayError(403, 'control_badge_required', 'bundle publication requires a human/account control badge');
+  }
+  const validation = validateTrustedBundleContract('TrustedBundleEnvelopeV1', input);
+  if (validation.issues) throw new TrustedBundleRelayError(400, 'invalid_bundle', validation.issues[0]?.message ?? 'invalid trusted bundle');
+  const envelope = validation.value;
+  if (claims.tenantId !== envelope.tenantId) throw new TrustedBundleRelayError(403, 'tenant_mismatch', 'bundle tenant does not match the authenticated badge');
+  validateTrustedBundleAuthorization(envelope, authorization);
+  return envelope;
+}
+
 /** Reference store. Persistent stores must retain these immutable/idempotent semantics. */
-export class MemoryTrustedBundleRelayStore {
+export class MemoryTrustedBundleRelayStore implements TrustedBundleRelayStore {
   readonly #bundles = new Map<string, TrustedBundleEnvelopeV1>();
 
   publish(claims: BadgeTokenClaims, input: unknown, authorization: ApprovedBundleAuthorization): TrustedBundlePublishResult {
-    if (claims.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(claims.actorRef)) {
-      throw new TrustedBundleRelayError(403, 'control_badge_required', 'bundle publication requires a human/account control badge');
-    }
-    const validation = validateTrustedBundleContract('TrustedBundleEnvelopeV1', input);
-    if (validation.issues) throw new TrustedBundleRelayError(400, 'invalid_bundle', validation.issues[0]?.message ?? 'invalid trusted bundle');
-    const envelope = validation.value;
-    if (claims.tenantId !== envelope.tenantId) throw new TrustedBundleRelayError(403, 'tenant_mismatch', 'bundle tenant does not match the authenticated badge');
-    const gateValidation = validateCapabilityContract('CapabilityInstallGateInput', authorization.gateInput);
-    if (gateValidation.issues) throw new TrustedBundleRelayError(403, 'decision_mismatch', 'persisted install gate evidence is invalid');
-    const gateInput: CapabilityInstallGateInput = gateValidation.value;
-    const derivedDecision = createCapabilityInstallGateDecision(gateInput);
-    if (derivedDecision.decision !== 'approved' || canonicalJson(authorization.decision) !== canonicalJson(derivedDecision) ||
-        canonicalJson(authorization.decision) !== canonicalJson(envelope.decision) || gateInput.gateId !== envelope.gateId ||
-        gateInput.requestDigest !== envelope.requestDigest || gateInput.shareDigest !== envelope.shareDigest ||
-        gateInput.targetTenantId !== envelope.tenantId || canonicalJson(gateInput.share) !== canonicalJson(envelope.share)) {
-      throw new TrustedBundleRelayError(403, 'decision_mismatch', 'bundle is not bound to the Relay approved install decision');
-    }
-    const transportedDigests = Object.fromEntries(envelope.descriptor.files.map((file) => [file.path, file.sha256]));
-    if (gateInput.exportDescriptor.format !== 'agent-skills' || gateInput.exportDescriptor.installEntry !== 'manifest.json' ||
-        canonicalJson(gateInput.exportDescriptor.fileDigests) !== canonicalJson(transportedDigests)) {
-      throw new TrustedBundleRelayError(403, 'descriptor_mismatch', 'transported bytes do not match the approved install gate descriptor');
-    }
+    const envelope = validateTrustedBundlePublication(claims, input, authorization);
     const key = storageKey(envelope.tenantId, envelope.bundleId);
     const existing = this.#bundles.get(key);
     if (existing) {
@@ -88,7 +109,7 @@ export class MemoryTrustedBundleRelayStore {
 export interface TrustedBundleRelayServerOptions {
   readonly authenticator: BadgeTokenAuthenticator;
   readonly approvedDecisionLookup: ApprovedInstallDecisionLookup;
-  readonly store?: MemoryTrustedBundleRelayStore;
+  readonly store?: TrustedBundleRelayStore;
   readonly now?: () => Date;
 }
 
@@ -104,7 +125,7 @@ function pathParam(request: FastifyRequest, name: string): string {
   return value;
 }
 
-export function createTrustedBundleRelayServer(options: TrustedBundleRelayServerOptions): { readonly app: FastifyInstance; readonly store: MemoryTrustedBundleRelayStore } {
+export function createTrustedBundleRelayServer(options: TrustedBundleRelayServerOptions): { readonly app: FastifyInstance; readonly store: TrustedBundleRelayStore } {
   const app = Fastify({ logger: false, bodyLimit: 524_288 });
   const store = options.store ?? new MemoryTrustedBundleRelayStore();
   const now = options.now ?? (() => new Date());
