@@ -53,11 +53,18 @@ import type { Planner } from '../../features/planning/planner';
 import { createDefaultPlanner } from '../../features/planning/plannerFactory';
 import { desktopToolRegistryPort } from '../../features/tools/toolRegistryClient';
 import { desktopExecutionNodePort } from '../../features/execution-nodes/executionNodeClient';
+import {
+  desktopRelayExecutionNodePort,
+  desktopRelayPort,
+  desktopRelayStartWorkDispatchPort,
+  isDesktopRelayConfigured,
+} from '../../features/execution-nodes/desktopRelayPort';
 import StartWorkFlow from '../../features/home/StartWorkFlow';
 import BatchDispatchPanel from '../../features/home/BatchDispatchPanel';
+import FleetControlPanel from '../../features/home/FleetControlPanel';
 import type { StartWorkDispatchIntentPort } from '../../features/home/startWorkDispatch';
-import { remoteBatchDispatchPort, remoteStartWorkDispatchPort } from '../../features/home/remoteRelayDispatch';
-import { currentTenantId } from '../../features/identity/identityClient';
+import { remoteBatchDispatchPort, remoteFleetControlPort, remoteStartWorkDispatchPort } from '../../features/home/remoteRelayDispatch';
+import { currentIdentity, currentTenantId } from '../../features/identity/identityClient';
 import {
   desktopWorkOrderIntakePort,
   type WorkOrderInboxRecord,
@@ -102,6 +109,7 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
   const [sopDraft, setSopDraft] = useState('');
   const [followUp, setFollowUp] = useState('');
   const [startWorkOpen, setStartWorkOpen] = useState(false);
+  const [desktopRelayConfigured, setDesktopRelayConfigured] = useState(false);
 
   useEffect(() => {
     if (!workbenchPrefill) return;
@@ -128,7 +136,16 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
   const browserRelaySurface = typeof window !== 'undefined' && !window.hummerDesktop;
   const activePlanner = useMemo(() => planner ?? createDefaultPlanner(runtime), [planner, runtime]);
   const intakePort = useMemo(() => desktopWorkOrderIntakePort(), []);
-  const executionNodePort = useMemo(() => desktopExecutionNodePort(), []);
+  const localExecutionNodePort = useMemo(() => desktopExecutionNodePort(), []);
+  const trustedDesktopRelayPort = useMemo(() => desktopRelayPort(), []);
+  const relayExecutionNodePort = useMemo(
+    () => desktopRelayConfigured ? desktopRelayExecutionNodePort() : undefined,
+    [desktopRelayConfigured],
+  );
+  const relayDispatchIntentPort = useMemo(
+    () => desktopRelayConfigured ? desktopRelayStartWorkDispatchPort() : undefined,
+    [desktopRelayConfigured],
+  );
   const browserRemoteDispatchPort = useMemo(
     () => browserRelaySurface ? remoteStartWorkDispatchPort() : undefined,
     [],
@@ -137,9 +154,28 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
     () => browserRelaySurface ? remoteBatchDispatchPort() : undefined,
     [],
   );
-  const effectiveDispatchIntentPort = dispatchIntentPort ?? browserRemoteDispatchPort;
+  const browserFleetControl = useMemo(
+    () => browserRelaySurface ? remoteFleetControlPort() : undefined,
+    [],
+  );
+  const executionNodePort = relayExecutionNodePort ?? localExecutionNodePort;
+  const effectiveDispatchIntentPort = dispatchIntentPort ?? relayDispatchIntentPort ?? browserRemoteDispatchPort;
+  const fleetControlPort = desktopRelayConfigured ? trustedDesktopRelayPort : browserFleetControl;
   const startWorkTenantId = currentTenantId() ?? 'tenant_demo';
+  const decisionActorRef = currentIdentity()?.membership.humanUserId
+    ? `human:${currentIdentity()!.membership.humanUserId}`
+    : 'human:operator';
   const toolRegistryPort = useMemo(() => desktopToolRegistryPort(), []);
+
+  useEffect(() => {
+    let active = true;
+    void isDesktopRelayConfigured().then((configured) => {
+      if (active) setDesktopRelayConfigured(configured);
+    }).catch(() => {
+      if (active) setDesktopRelayConfigured(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -581,11 +617,13 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
           <StartWorkFlow
             planner={activePlanner}
             nodePort={executionNodePort}
+            decisionActorRef={decisionActorRef}
             tenantId={startWorkTenantId}
             planDefaults={{ assignee, approvalMode, attachmentNames, modelProfile, engineProfileId: profile.id, workContext }}
             dispatchIntentPort={effectiveDispatchIntentPort}
           />
           {browserRelaySurface ? <BatchDispatchPanel port={browserBatchDispatchPort} tenantId={startWorkTenantId} /> : null}
+          <FleetControlPanel port={fleetControlPort} />
         </div>
       </WorkspacePage>
     );
@@ -628,6 +666,7 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
           ) : (
             <div className="mx-auto w-full max-w-[1180px] space-y-6">
               {nodeBar}
+              <FleetControlPanel port={fleetControlPort} />
               {pendingIntakes.length > 0 && (
                 <PendingWorkOrders records={pendingIntakes} busy={planningBusy} onConfirm={(record) => { void confirmIntake(record); }} />
               )}
@@ -703,6 +742,7 @@ export default function WorkbenchPage({ runtime: providedRuntime, sessionStore, 
       <div className="min-h-full px-3 py-3 sm:px-4 lg:px-5">
         <div className="mx-auto max-w-[1500px] space-y-3">
           {nodeBar}
+          <FleetControlPanel port={fleetControlPort} />
           <section className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
             <span className={`hum-chip ${session.status === 'blocked' || session.status === 'cancelled' || session.status === 'interrupted' ? 'is-error' : session.status === 'awaiting_approval' ? 'is-warning' : session.status === 'delivered' ? 'is-success' : 'is-brand'}`}>
               <span className="hum-dot" /> {sessionStateText}
