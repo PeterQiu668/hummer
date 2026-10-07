@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, connect } from 'node:net';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createNodeAgentDaemonFromFile } from '../apps/node-agent/src/daemon.mjs';
 
 const CONFIG_SCHEMA = 'hummer.local-stack-config';
-const CONFIG_VERSION = 1;
+const CONFIG_VERSION = 2;
 const STATE_SCHEMA = 'hummer.local-stack-state';
 const STATE_VERSION = 1;
 const CONTROL_ENV = 'HUMMER_LOCAL_CONTROL_BADGE';
@@ -17,6 +17,7 @@ const NODE_ENV = 'HUMMER_LOCAL_NODE_BADGE';
 const ISSUER_ENV = 'HUMMER_LOCAL_TASK_GRANT_ISSUER';
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const ACCOUNT_ACTOR = /^account:[A-Za-z0-9_-]+$/u;
+const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/u;
 
 const [command, ...arguments_] = process.argv.slice(2);
 
@@ -48,23 +49,22 @@ async function loadConfig(path) {
   try { value = JSON.parse(await readFile(path, 'utf8')); } catch {
     throw failure('invalid_local_stack_config', 'local stack config could not be read as JSON');
   }
-  exactRecord(value, [
-    'schema', 'version', 'stateRoot', 'workspaceRoot', 'tenantId', 'actorRef', 'nodeId',
-    'runtime', 'launchDesktop',
-  ], 'local stack config');
-  if (value.schema !== CONFIG_SCHEMA || value.version !== CONFIG_VERSION) {
-    throw failure('invalid_local_stack_config', `config must use ${CONFIG_SCHEMA} version ${CONFIG_VERSION}`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || value.schema !== CONFIG_SCHEMA || ![1, CONFIG_VERSION].includes(value.version)) {
+    throw failure('invalid_local_stack_config', `config must use ${CONFIG_SCHEMA} version 1 or ${CONFIG_VERSION}`);
   }
+  exactRecord(value, value.version === 1
+    ? ['schema', 'version', 'stateRoot', 'workspaceRoot', 'tenantId', 'actorRef', 'nodeId', 'runtime', 'launchDesktop']
+    : ['schema', 'version', 'stateRoot', 'workspaceRoot', 'identity', 'nodeId', 'runtime', 'launchDesktop'],
+  'local stack config');
   const stateRoot = absolutePath(value.stateRoot, 'stateRoot');
   const workspaceRoot = absolutePath(value.workspaceRoot, 'workspaceRoot');
   if (normalize(stateRoot) === normalize(workspaceRoot)) {
     throw failure('invalid_local_stack_config', 'stateRoot and workspaceRoot must be separate');
   }
-  const tenantId = identifier(value.tenantId, 'tenantId');
-  if (typeof value.actorRef !== 'string' || !ACCOUNT_ACTOR.test(value.actorRef)) {
-    throw failure('invalid_local_stack_config', 'actorRef must be an account actor from the existing Desktop identity');
-  }
-  const actorRef = value.actorRef;
+  const identity = value.version === 1
+    ? explicitIdentity(value.tenantId, value.actorRef)
+    : parseIdentityMode(value.identity);
   const nodeId = identifier(value.nodeId, 'nodeId');
   const runtime = exactRecord(value.runtime, ['provider', 'executable'], 'runtime');
   if (!['codex', 'claude', 'deepseek', 'cli-other'].includes(runtime.provider)) {
@@ -82,18 +82,61 @@ async function loadConfig(path) {
   if (typeof value.launchDesktop !== 'boolean') {
     throw failure('invalid_local_stack_config', 'launchDesktop must be a boolean');
   }
+  if (identity.mode === 'desktop-claim' && !value.launchDesktop) {
+    if (!identity.claimTokenEnv) {
+      throw failure('invalid_local_stack_config', 'headless desktop-claim identity requires claimTokenEnv');
+    }
+  }
   return {
-    schema: CONFIG_SCHEMA, version: CONFIG_VERSION, stateRoot, workspaceRoot,
-    tenantId, actorRef, nodeId,
+    schema: CONFIG_SCHEMA, version: value.version, stateRoot, workspaceRoot,
+    identity, nodeId,
     runtime: { provider: runtime.provider, ...(runtime.executable ? { executable: runtime.executable } : {}) },
     launchDesktop: value.launchDesktop,
   };
+}
+
+function parseIdentityMode(value) {
+  const identity = exactRecord(value, ['mode', 'tenantId', 'actorRef', 'claimTokenEnv'], 'identity');
+  if (identity.mode === 'desktop-claim') {
+    if (identity.tenantId !== undefined || identity.actorRef !== undefined) {
+      throw failure('invalid_local_stack_config', 'desktop-claim identity cannot predeclare tenantId or actorRef');
+    }
+    if (identity.claimTokenEnv !== undefined
+      && (typeof identity.claimTokenEnv !== 'string' || !ENV_NAME.test(identity.claimTokenEnv))) {
+      throw failure('invalid_local_stack_config', 'identity.claimTokenEnv is invalid');
+    }
+    return { mode: 'desktop-claim', ...(identity.claimTokenEnv ? { claimTokenEnv: identity.claimTokenEnv } : {}) };
+  }
+  if (identity.mode === 'explicit') {
+    if (identity.claimTokenEnv !== undefined) {
+      throw failure('invalid_local_stack_config', 'explicit identity cannot configure claimTokenEnv');
+    }
+    return explicitIdentity(identity.tenantId, identity.actorRef);
+  }
+  throw failure('invalid_local_stack_config', 'identity.mode must be desktop-claim or explicit');
+}
+
+function explicitIdentity(tenantValue, actorValue) {
+  const tenantId = identifier(tenantValue, 'tenantId');
+  if (typeof actorValue !== 'string' || !ACCOUNT_ACTOR.test(actorValue)) {
+    throw failure('invalid_local_stack_config', 'actorRef must be an account actor from the Desktop identity');
+  }
+  return { mode: 'explicit', tenantId, actorRef: actorValue };
+}
+
+function validateClaimIdentity(value) {
+  const identity = exactRecord(value, ['tenantId', 'actorRef'], 'claim identity');
+  const parsed = explicitIdentity(identity.tenantId, identity.actorRef);
+  return { tenantId: parsed.tenantId, actorRef: parsed.actorRef };
 }
 
 async function run(config, configPath) {
   const repository = resolve(import.meta.dirname, '..');
   const activeRoot = join(config.stateRoot, 'active');
   const historyRoot = join(config.stateRoot, 'runs');
+  const claimToken = config.identity.claimTokenEnv
+    ? consumeEnvironmentSecret(config.identity.claimTokenEnv)
+    : opaque('claim');
   await prepareOwnedRoot(config.stateRoot);
   await mkdir(config.workspaceRoot, { recursive: true });
   await mkdir(historyRoot, { recursive: true });
@@ -116,34 +159,17 @@ async function run(config, configPath) {
   const controlToken = opaque('control');
   const nodeToken = opaque('node');
   const issuerSecret = opaque('issuer');
-  const relayConfig = {
-    schema: 'hummer.relay-config', version: 3, host: '127.0.0.1', port: 0,
-    databasePath: join(config.stateRoot, 'fleet.sqlite'),
-    taskGrantDatabasePath: join(config.stateRoot, 'task-grants.sqlite'),
-    taskGrantIssuerSecretEnv: ISSUER_ENV,
-    badges: [
-      {
-        tokenEnv: CONTROL_ENV, tokenId: `control-${sessionId}`, tenantId: config.tenantId,
-        actorRef: config.actorRef,
-        scopes: ['node.read', 'task.read', 'task.enqueue', 'task.stop', 'approval.read', 'approval.decide'],
-        expiresAt,
-      },
-      {
-        tokenEnv: NODE_ENV, tokenId: `node-${sessionId}`, tenantId: config.tenantId,
-        actorRef: `system:${config.nodeId}`, nodeId: config.nodeId,
-        scopes: ['node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect', 'approval.request', 'approval.consume'],
-        expiresAt,
-      },
-    ],
-  };
-  await writeJsonExclusive(relayConfigPath, relayConfig);
 
   let relay;
   let node;
   let desktop;
   let controlServer;
   let closing;
-  let currentState = baseState('starting');
+  let boundIdentity = config.identity.mode === 'explicit'
+    ? { tenantId: config.identity.tenantId, actorRef: config.identity.actorRef }
+    : null;
+  let serviceStart;
+  let currentState = baseState(boundIdentity ? 'starting' : 'waiting_for_identity');
   await publishState(currentState);
 
   const shutdown = async (reason, finalStatus = 'stopped') => {
@@ -168,8 +194,8 @@ async function run(config, configPath) {
   function baseState(status) {
     return {
       schema: STATE_SCHEMA, version: STATE_VERSION, status, sessionId,
-      supervisorPid: process.pid, pipeName, tenantId: config.tenantId,
-      actorRef: config.actorRef, nodeId: config.nodeId, configRef: digest(configPath),
+      supervisorPid: process.pid, pipeName, identityMode: config.identity.mode,
+      ...(boundIdentity ?? {}), nodeId: config.nodeId, configRef: digest(configPath),
       stateRootRef: digest(config.stateRoot), workspaceRootRef: digest(config.workspaceRoot),
       startedAt: new Date().toISOString(), launchDesktop: config.launchDesktop,
     };
@@ -179,39 +205,100 @@ async function run(config, configPath) {
     await writeFile(statePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8' });
   }
 
-  try {
-    process.env[CONTROL_ENV] = controlToken;
-    process.env[NODE_ENV] = nodeToken;
-    process.env[ISSUER_ENV] = issuerSecret;
-    const relayModulePath = join(repository, 'apps', 'relay', 'dist', 'apps', 'relay', 'src', 'cli.js');
-    if (!existsSync(relayModulePath)) {
-      throw failure('relay_not_built', 'Relay CLI output is missing; run npm run build:cli -w @hummer/relay');
+  const startServices = async (identityInput) => {
+    const identity = validateClaimIdentity(identityInput);
+    if (boundIdentity && (boundIdentity.tenantId !== identity.tenantId || boundIdentity.actorRef !== identity.actorRef)) {
+      throw failure('identity_already_bound', 'local stack is already bound to another Desktop identity');
     }
-    const { startRelayDaemon } = await import(pathToFileURL(relayModulePath).href);
-    relay = await startRelayDaemon(relayConfigPath);
+    if (serviceStart) return serviceStart;
+    boundIdentity = identity;
+    serviceStart = (async () => {
+      currentState = { ...currentState, status: 'starting', ...identity };
+      await publishState(currentState);
+      const relayConfig = {
+        schema: 'hummer.relay-config', version: 3, host: '127.0.0.1', port: 0,
+        databasePath: join(config.stateRoot, 'fleet.sqlite'),
+        taskGrantDatabasePath: join(config.stateRoot, 'task-grants.sqlite'),
+        taskGrantIssuerSecretEnv: ISSUER_ENV,
+        badges: [
+          {
+            tokenEnv: CONTROL_ENV, tokenId: `control-${sessionId}`, tenantId: identity.tenantId,
+            actorRef: identity.actorRef,
+            scopes: ['node.read', 'task.read', 'task.enqueue', 'task.stop', 'approval.read', 'approval.decide'],
+            expiresAt,
+          },
+          {
+            tokenEnv: NODE_ENV, tokenId: `node-${sessionId}`, tenantId: identity.tenantId,
+            actorRef: `system:${config.nodeId}`, nodeId: config.nodeId,
+            scopes: ['node.register', 'node.heartbeat', 'task.claim', 'task.event', 'stream.connect', 'approval.request', 'approval.consume'],
+            expiresAt,
+          },
+        ],
+      };
+      await writeJsonExclusive(relayConfigPath, relayConfig);
+      process.env[CONTROL_ENV] = controlToken;
+      process.env[NODE_ENV] = nodeToken;
+      process.env[ISSUER_ENV] = issuerSecret;
+      const relayModulePath = join(repository, 'apps', 'relay', 'dist', 'apps', 'relay', 'src', 'cli.js');
+      if (!existsSync(relayModulePath)) {
+        throw failure('relay_not_built', 'Relay CLI output is missing; run npm run build:cli -w @hummer/relay');
+      }
+      const { startRelayDaemon } = await import(pathToFileURL(relayModulePath).href);
+      relay = await startRelayDaemon(relayConfigPath);
 
-    const nodeConfig = {
-      schema: 'hummer.node-agent-config', version: 4,
-      nodeId: config.nodeId, tenantId: config.tenantId, relayBaseUrl: `${relay.address}/`,
-      badgeTokenEnv: NODE_ENV, grantExpiresAt: expiresAt,
-      grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
-      journalPath: join(config.stateRoot, 'node-execution.jsonl'),
-      receiptRoot: join(config.stateRoot, 'receipts'), workspaceRoot: config.workspaceRoot,
-      heartbeatIntervalMs: 15_000, pollIntervalMs: 500, approvalTtlMs: 300_000,
-      runtime: config.runtime, capabilities: ['fs.read'],
-      mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read'] },
-      approval: { riskClass: 'unknown' },
-    };
-    await writeJsonExclusive(nodeConfigPath, nodeConfig);
-    process.env[NODE_ENV] = nodeToken;
-    node = await createNodeAgentDaemonFromFile({
-      configPath: nodeConfigPath,
-      logger: (entry) => process.stdout.write(`${JSON.stringify({ source: 'node', ...entry })}\n`),
+      const nodeConfig = {
+        schema: 'hummer.node-agent-config', version: 4,
+        nodeId: config.nodeId, tenantId: identity.tenantId, relayBaseUrl: `${relay.address}/`,
+        badgeTokenEnv: NODE_ENV, grantExpiresAt: expiresAt,
+        grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
+        journalPath: join(config.stateRoot, 'node-execution.jsonl'),
+        receiptRoot: join(config.stateRoot, 'receipts'), workspaceRoot: config.workspaceRoot,
+        heartbeatIntervalMs: 15_000, pollIntervalMs: 500, approvalTtlMs: 300_000,
+        runtime: config.runtime, capabilities: ['fs.read'],
+        mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read'] },
+        approval: { riskClass: 'unknown' },
+      };
+      await writeJsonExclusive(nodeConfigPath, nodeConfig);
+      process.env[NODE_ENV] = nodeToken;
+      node = await createNodeAgentDaemonFromFile({
+        configPath: nodeConfigPath,
+        logger: (entry) => process.stdout.write(`${JSON.stringify({ source: 'node', ...entry })}\n`),
+      });
+      await node.start();
+      currentState = {
+        ...currentState, status: 'running', relayAddress: relay.address,
+        relayDatabaseRef: relay.databaseRef, taskGrantDatabaseRef: relay.taskGrantDatabaseRef,
+        ...(desktop?.pid ? { desktopPid: desktop.pid } : {}),
+      };
+      await publishState(currentState);
+      process.stdout.write(`${JSON.stringify(currentState)}\n`);
+      return {
+        baseUrl: `${relay.address}/`, badgeToken: controlToken,
+        tenantId: identity.tenantId, actorRef: identity.actorRef,
+      };
+    })().catch((error) => {
+      setImmediate(() => { void shutdown('service_start_failed', 'failed'); });
+      throw error;
     });
-    await node.start();
+    return serviceStart;
+  };
 
-    controlServer = createControlServer(() => currentState, shutdown);
+  try {
+    controlServer = createControlServer({
+      getState: () => currentState,
+      shutdown,
+      claimToken,
+      claim: async (identity) => {
+        const claimed = await startServices(identity);
+        return {
+          schema: 'hummer.local-stack-claim-result', version: 1,
+          identity: { tenantId: claimed.tenantId, actorRef: claimed.actorRef },
+          relay: claimed,
+        };
+      },
+    });
     await listen(controlServer, pipeName);
+    if (boundIdentity) await startServices(boundIdentity);
 
     if (config.launchDesktop) {
       const electronPath = (await import('electron')).default;
@@ -225,25 +312,25 @@ async function run(config, configPath) {
         stdio: ['pipe', 'inherit', 'inherit'],
         env: {
           ...process.env,
-          HUMMER_RELAY_BASE_URL: `${relay.address}/`,
-          HUMMER_RELAY_BADGE_TOKEN: controlToken,
-          HUMMER_RELAY_TENANT_ID: config.tenantId,
-          HUMMER_RELAY_ACTOR_REF: config.actorRef,
+          ...(config.identity.mode === 'desktop-claim' ? {
+            HUMMER_LOCAL_STACK_CLAIM_PIPE: pipeName,
+            HUMMER_LOCAL_STACK_CLAIM_TOKEN: claimToken,
+          } : {
+            HUMMER_RELAY_BASE_URL: `${relay.address}/`,
+            HUMMER_RELAY_BADGE_TOKEN: controlToken,
+            HUMMER_RELAY_TENANT_ID: boundIdentity.tenantId,
+            HUMMER_RELAY_ACTOR_REF: boundIdentity.actorRef,
+          }),
           HUMMER_EXEC_WORKSPACE_ROOT: config.workspaceRoot,
           HUMMER_CODEX_CWD: config.workspaceRoot,
           HUMMER_EXIT_ON_STDIN_END: '1',
         },
       });
       desktop.once('exit', () => { if (!closing) void shutdown('desktop_exit'); });
+      currentState = { ...currentState, desktopPid: desktop.pid };
+      await publishState(currentState);
     }
-
-    currentState = {
-      ...currentState, status: 'running', relayAddress: relay.address,
-      relayDatabaseRef: relay.databaseRef, taskGrantDatabaseRef: relay.taskGrantDatabaseRef,
-      ...(desktop?.pid ? { desktopPid: desktop.pid } : {}),
-    };
-    await publishState(currentState);
-    process.stdout.write(`${JSON.stringify(currentState)}\n`);
+    if (!boundIdentity) process.stdout.write(`${JSON.stringify(currentState)}\n`);
     process.once('SIGINT', () => { void shutdown('SIGINT'); });
     process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
     await new Promise((resolveRun) => {
@@ -259,15 +346,17 @@ async function run(config, configPath) {
   }
 }
 
-function createControlServer(getState, shutdown) {
+function createControlServer({ getState, shutdown, claimToken, claim }) {
   return createServer((socket) => {
     socket.setEncoding('utf8');
     let buffer = '';
+    let handled = false;
     socket.on('data', (chunk) => {
       buffer += chunk;
-      if (buffer.length > 4096) return socket.destroy();
+      if (buffer.length > 16_384) return socket.destroy();
       const newline = buffer.indexOf('\n');
-      if (newline < 0) return;
+      if (newline < 0 || handled) return;
+      handled = true;
       let input;
       try { input = JSON.parse(buffer.slice(0, newline)); } catch { return socket.end(`${JSON.stringify({ error: 'invalid_request' })}\n`); }
       if (input?.command === 'status') return socket.end(`${JSON.stringify(getState())}\n`);
@@ -276,9 +365,30 @@ function createControlServer(getState, shutdown) {
         setImmediate(() => { void shutdown('control_stop'); });
         return;
       }
+      if (input?.command === 'claim') {
+        if (!safeSecretEqual(input.auth, claimToken)) {
+          return socket.end(`${JSON.stringify({ error: { code: 'claim_unauthorized', message: 'Local stack rejected the identity claim' } })}\n`);
+        }
+        void Promise.resolve().then(() => claim(input.identity)).then(
+          (result) => socket.end(`${JSON.stringify(result)}\n`),
+          (error) => {
+            const code = typeof error === 'object' && error !== null && 'code' in error
+              ? String(error.code).slice(0, 64) : 'claim_rejected';
+            socket.end(`${JSON.stringify({ error: { code, message: 'Local stack rejected the identity claim' } })}\n`);
+          },
+        );
+        return;
+      }
       socket.end(`${JSON.stringify({ error: 'unsupported_command' })}\n`);
     });
   });
+}
+
+function safeSecretEqual(input, expected) {
+  if (typeof input !== 'string') return false;
+  const left = Buffer.from(input, 'utf8');
+  const right = Buffer.from(expected, 'utf8');
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 async function requestStatus(config) {
@@ -396,6 +506,15 @@ function normalize(path) {
 
 function opaque(prefix) { return `${prefix}_${randomBytes(32).toString('base64url')}`; }
 function digest(value) { return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`; }
+
+function consumeEnvironmentSecret(name) {
+  const value = process.env[name];
+  Reflect.deleteProperty(process.env, name);
+  if (typeof value !== 'string' || value.length < 32 || /\s/u.test(value)) {
+    throw failure('claim_token_missing', `identity claim environment variable ${name} is missing or invalid`);
+  }
+  return value;
+}
 
 function failure(code, message) {
   const error = new Error(message);

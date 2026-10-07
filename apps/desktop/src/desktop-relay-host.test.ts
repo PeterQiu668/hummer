@@ -60,6 +60,36 @@ describe('trusted Desktop Relay main-process bridge', () => {
     expect(env.HUMMER_RELAY_BADGE_TOKEN).toBeUndefined();
   });
 
+  it('allows exactly one trusted main-process late configuration and then replays through it', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/v1/control/session')) return json({ session: { tenantId: TENANT, actorRef: ACTOR } });
+      if (url.endsWith('/v1/control/nodes')) return json({ nodes: [node()] });
+      throw new Error(`unexpected ${url}`);
+    });
+    const registration = registerDesktopRelayHost({
+      config: null,
+      resolveIdentity: () => ({ tenantId: TENANT, actorRef: ACTOR }),
+      outbox: memoryOutbox(),
+      fetch: fetchMock as typeof fetch,
+      outboxRetryIntervalMs: 0,
+    });
+    registrations.push(registration);
+
+    expect(await invoke(DESKTOP_RELAY_CHANNELS.status)).toEqual({ configured: false });
+    await expect(invoke(DESKTOP_RELAY_CHANNELS.listNodes, TOKEN)).rejects.toMatchObject({ code: 'relay_not_configured' });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    registration.configure({
+      baseUrl: 'https://relay.example.test', badgeToken: BADGE, tenantId: TENANT, actorRef: ACTOR,
+    });
+    expect(await invoke(DESKTOP_RELAY_CHANNELS.status)).toEqual({ configured: true });
+    expect(await invoke(DESKTOP_RELAY_CHANNELS.listNodes, TOKEN)).toEqual([node()]);
+    expect(() => registration.configure({
+      baseUrl: 'https://relay.example.test', badgeToken: 'replacement-badge', tenantId: TENANT, actorRef: ACTOR,
+    })).toThrow(expect.objectContaining({ code: 'relay_already_configured' }));
+  });
+
   it('authenticates local and remote identities before serving the complete renderer control port', async () => {
     const requests: Array<{ url: string; init: RequestInit; body: unknown }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {

@@ -6,27 +6,41 @@ the only production action remains `fs.read.attest.v1`.
 
 ## One-time configuration
 
-Create a JSON file outside the repository. It contains identity and paths but
-no bearer tokens or issuer secret:
+Create a JSON file outside the repository. The default Desktop mode contains
+paths and runtime selection but no identity, bearer token, or issuer secret:
 
 ```json
 {
   "schema": "hummer.local-stack-config",
-  "version": 1,
+  "version": 2,
   "stateRoot": "C:\\Users\\you\\AppData\\Local\\HUMMER\\local-stack",
   "workspaceRoot": "C:\\Users\\you\\HUMMER\\workspace",
-  "tenantId": "tenant-from-existing-desktop",
-  "actorRef": "account:account-from-existing-desktop",
+  "identity": { "mode": "desktop-claim" },
   "nodeId": "node-local-1",
   "runtime": { "provider": "codex" },
   "launchDesktop": true
 }
 ```
 
-`tenantId` and `actorRef` must exactly match the Desktop identity already in
-the selected Desktop data directory. The supervisor does not forge, migrate, or
-guess a Desktop identity. A mismatch remains fail-closed at the Desktop bridge.
-Set `launchDesktop` to `false` for a headless Relay/Node host.
+On first run the supervisor opens Desktop in `waiting_for_identity`. After the
+operator creates or resumes a Desktop session, Desktop main resolves the
+authoritative tenant/account from its own persistence store and claims the
+stack through an authenticated local named pipe. Relay and Node start only
+after that claim. The renderer never receives the claim token or Relay badge.
+
+For a headless Relay/Node host, use explicit identity mode:
+
+```json
+"identity": {
+  "mode": "explicit",
+  "tenantId": "tenant-provisioned-by-the-operator",
+  "actorRef": "account:account-provisioned-by-the-operator"
+}
+```
+
+Version 1 explicit configs remain accepted for compatibility. Automated or
+externally launched Desktop tests may name `identity.claimTokenEnv`; the value
+is consumed from the supervisor environment and never written to config.
 
 The `stateRoot` must be empty on first use. HUMMER claims it with an ownership
 marker and thereafter writes only its local Fleet database, task-grant
@@ -51,17 +65,19 @@ be used directly:
 .\hummer-local-stack.cmd stop --config C:\absolute\hummer-local-stack.json
 ```
 
-`run` stays in the foreground. It generates fresh control, node, and issuer
-secrets in memory; config files contain environment-variable names only. Relay
-consumes all three inputs, Node consumes its badge, and Desktop consumes its
-control badge. The supervisor exposes status/stop through a local named pipe,
-not an HTTP administration port. `stop` asks Desktop to quit through stdin,
-then closes Node, Relay, and both SQLite stores before archiving the run state.
+`run` stays in the foreground. It generates a fresh identity-claim token and
+fresh control, node, and issuer secrets in memory. Desktop consumes the claim
+token, Relay consumes its three inputs, Node consumes its badge, and Desktop
+main receives the control badge only through the authenticated pipe. The
+supervisor exposes status/stop through that local pipe, not an HTTP
+administration port. `stop` asks Desktop to quit through stdin, then closes
+Node, Relay, and both SQLite stores before archiving the run state.
 
 ## Boundaries
 
 - loopback HTTP only; this is not TLS or remote deployment evidence;
-- one existing Desktop account/tenant binding per config;
+- one Desktop account/tenant binding per running stack; switching to another
+  identity requires a stack restart;
 - eight-hour ephemeral badge window, requiring a stack restart after expiry;
 - generated plaintext credentials are never written to config, state, logs,
   SQLite, journal, receipts, or status;

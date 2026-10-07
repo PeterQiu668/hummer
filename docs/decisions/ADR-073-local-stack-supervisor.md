@@ -16,8 +16,9 @@ endpoint would also create a new control surface solely for local startup.
 
 1. Add a foreground `hummer-local-stack` supervisor with strict `run`,
    `status`, and `stop` commands and a Windows `.cmd` shim.
-2. The one-time config contains only an existing Desktop tenant/account
-   identity and absolute state/workspace paths. It never contains credentials.
+2. Version 1 config contains an explicit Desktop tenant/account and absolute
+   state/workspace paths. ADR-074 adds version 2 Desktop identity claim so a
+   first-run config no longer needs those identifiers.
 3. Each run creates fresh eight-hour control badge, node badge, and task-grant
    issuer values in memory. Existing Relay, Node, and Desktop consumers delete
    their environment entries after bootstrap.
@@ -34,8 +35,7 @@ endpoint would also create a new control surface solely for local startup.
 
 - After one non-secret config is prepared, the local internal-test stack starts
   with one command and stops with one command.
-- Identity bootstrap remains explicit: the supervisor refuses to guess or forge
-  the Desktop tenant/account. First-time identity provisioning is not solved by
-  this slice.
+- ADR-074 supersedes the first-run identity limitation while preserving the
+  rule that the supervisor never guesses or forges tenant/account identifiers.
 - This remains a single-host loopback workflow, not evidence for TLS, IdP/KMS,
   code signing, a second device, or external users.

@@ -71,6 +71,7 @@ export interface PersistenceHostRegistration {
 }
 export interface PersistenceHostOptions {
   stopAll?: (tenantId: string) => Promise<number>;
+  onRelayIdentityReady?: (identity: { tenantId: string; actorRef: string }) => Promise<void> | void;
   /** Test-only seam. Never enable this from the packaged Desktop bootstrap. */
   enableDemoSessionSyntheticInjector?: boolean;
   /** Test-only dependency seam. Packaged Desktop uses the real local Windows adapter. */
@@ -152,6 +153,19 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
   persistence.runtimeEvents.interruptStaleRealSessions(new Date().toISOString());
   const runtimeId = process.env.HUMMER_RUNTIME_SHELL === 'claude' ? 'claude-code' : 'codex-cli';
   const nodeTenants = new Map<string, string>();
+  const relayIdentityReady = async (context: IdentityContext): Promise<IdentityContext> => {
+    try {
+      await options.onRelayIdentityReady?.({
+        tenantId: context.tenant.id,
+        actorRef: `account:${context.account.id}`,
+      });
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error
+        ? String(error.code).slice(0, 64) : 'identity_claim_failed';
+      process.stderr.write(`${JSON.stringify({ event: 'local_stack.identity_claim_failed', code })}\n`);
+    }
+    return context;
+  };
 
   ipcMain.handle('hummer:engine-profiles:list', (_event, token: string | null) => {
     const configured = new Set<string>();
@@ -387,11 +401,11 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     });
   }
 
-  ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
-  ipcMain.handle('hummer:identity:accept-invitation', (_event, input: AcceptInvitationRequest) => persistence.identity.acceptInvitation(input));
-  ipcMain.handle('hummer:identity:resume', (_event, token: string) => persistence.identity.resumeSession(token));
+  ipcMain.handle('hummer:identity:create-company', async (_event, input: CreateCompanyInput) => relayIdentityReady(persistence.identity.createCompany(input)));
+  ipcMain.handle('hummer:identity:accept-invitation', async (_event, input: AcceptInvitationRequest) => relayIdentityReady(persistence.identity.acceptInvitation(input)));
+  ipcMain.handle('hummer:identity:resume', async (_event, token: string) => relayIdentityReady(persistence.identity.resumeSession(token)));
   ipcMain.handle('hummer:identity:list-tenants', (_event, token: string) => persistence.identity.listTenants(token));
-  ipcMain.handle('hummer:identity:switch-tenant', (_event, request: { token: string; tenantId: string }) => persistence.identity.switchTenant(request.token, request.tenantId));
+  ipcMain.handle('hummer:identity:switch-tenant', async (_event, request: { token: string; tenantId: string }) => relayIdentityReady(persistence.identity.switchTenant(request.token, request.tenantId)));
   ipcMain.handle('hummer:identity:list-members', (_event, token: string) => persistence.identity.listMembers(token));
   ipcMain.handle('hummer:identity:create-invitation', (_event, request: InvitationRequest) => {
     const context = persistence.identity.resumeSession(request.token);

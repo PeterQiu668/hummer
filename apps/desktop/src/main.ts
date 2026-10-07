@@ -14,6 +14,7 @@ import {
   type DesktopRelayHostRegistration,
 } from './desktop-relay-host.js';
 import { bindParentStdinLifetime } from './parent-lifetime.js';
+import { consumeLocalStackClaimClient } from './local-stack-claim.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 let persistenceHost: PersistenceHostRegistration | undefined;
@@ -51,8 +52,22 @@ async function createWindow(): Promise<BrowserWindow> {
 app.whenReady().then(async () => {
   bindParentStdinLifetime(process.env, process.stdin, () => app.quit());
   const desktopRelayConfig = consumeDesktopRelayTrustedConfig(process.env);
+  const localStackClaimClient = consumeLocalStackClaimClient(process.env);
+  if (desktopRelayConfig && localStackClaimClient) {
+    throw new Error('Desktop Relay cannot use static and local-stack claim bootstrap together');
+  }
+  let localStackRelayConfigured = false;
   persistenceHost = registerPersistenceHost({
     stopAll: async (tenantId) => (await stopAllCodexRuns(tenantId)) + stopAllClaudeRuns(tenantId),
+    onRelayIdentityReady: async (identity) => {
+      if (!localStackClaimClient || localStackRelayConfigured) return;
+      const claimed = await localStackClaimClient.claim(identity);
+      if (localStackRelayConfigured) return;
+      if (!desktopRelayHost) throw new Error('Desktop Relay host is not ready for local-stack identity claim');
+      desktopRelayHost.configure(claimed);
+      localStackRelayConfigured = true;
+      await desktopRelayHost.replayPending();
+    },
   });
   workspaceExecService = new WorkspaceExecService({
     workspaceRoot: resolve(process.env.HUMMER_EXEC_WORKSPACE_ROOT ?? join(app.getPath('userData'), 'workspace')),

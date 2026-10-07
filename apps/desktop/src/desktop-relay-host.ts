@@ -36,6 +36,7 @@ export interface DesktopRelayHostOptions {
 }
 
 export interface DesktopRelayHostRegistration {
+  configure(config: DesktopRelayTrustedConfig): void;
   replayPending(): Promise<{ delivered: number; failed: number }>;
   close(): void;
 }
@@ -103,24 +104,26 @@ export function consumeDesktopRelayTrustedConfig(env: NodeJS.ProcessEnv): Deskto
 }
 
 export function registerDesktopRelayHost(options: DesktopRelayHostOptions): DesktopRelayHostRegistration {
-  const client = options.config
-    ? new DesktopRelayHttpClient(options.config, options.fetch, options.now, options.decisionIdFactory)
+  let config = options.config;
+  let client = config
+    ? new DesktopRelayHttpClient(config, options.fetch, options.now, options.decisionIdFactory)
     : null;
   const authenticate = (token: unknown): DesktopRelayIdentity => {
     if (typeof token !== 'string' || token.length < 8) {
       throw new DesktopRelayError(401, 'invalid_session', 'An authenticated desktop session is required');
     }
     const identity = options.resolveIdentity(token);
-    if (!client || !options.config) {
+    if (!client || !config) {
       throw new DesktopRelayError(503, 'relay_not_configured', 'Desktop Relay is not configured');
     }
-    if (identity.tenantId !== options.config.tenantId || identity.actorRef !== options.config.actorRef) {
+    if (identity.tenantId !== config.tenantId || identity.actorRef !== config.actorRef) {
       throw new DesktopRelayError(403, 'identity_mismatch', 'Desktop session is not authorized for the configured Relay identity');
     }
     return identity;
   };
   const deliveries = new Map<string, Promise<unknown>>();
   let replayInFlight: Promise<{ delivered: number; failed: number }> | null = null;
+  let retryTimer: ReturnType<typeof setInterval> | null = null;
   const deliver = (record: FleetDispatchOutboxRecord): Promise<unknown> => {
     if (record.status === 'delivered' && record.response) return Promise.resolve(record.response);
     const existing = deliveries.get(record.outboxId);
@@ -219,13 +222,23 @@ export function registerDesktopRelayHost(options: DesktopRelayHostOptions): Desk
   });
 
   const registration: DesktopRelayHostRegistration = {
+    configure(nextConfig) {
+      const nextClient = new DesktopRelayHttpClient(nextConfig, options.fetch, options.now, options.decisionIdFactory);
+      if (config || client) {
+        throw new DesktopRelayError(409, 'relay_already_configured', 'Desktop Relay configuration is immutable after bootstrap');
+      }
+      config = { ...nextConfig };
+      client = nextClient;
+      startRetryTimer();
+    },
     replayPending() {
       if (replayInFlight) return replayInFlight;
       replayInFlight = (async () => {
-        if (!client || !options.config) return { delivered: 0, failed: 0 };
+        if (!client || !config) return { delivered: 0, failed: 0 };
+        const activeConfig = config;
         let delivered = 0;
         let failed = 0;
-        for (const record of options.outbox.listPending(options.config.tenantId, options.config.actorRef)) {
+        for (const record of options.outbox.listPending(activeConfig.tenantId, activeConfig.actorRef)) {
           try {
             await deliver(record);
             delivered += 1;
@@ -243,14 +256,16 @@ export function registerDesktopRelayHost(options: DesktopRelayHostOptions): Desk
     },
   };
   const retryIntervalMs = options.outboxRetryIntervalMs ?? 15_000;
-  const retryTimer = client && retryIntervalMs > 0
-    ? setInterval(() => {
+  const startRetryTimer = () => {
+    if (!client || retryIntervalMs <= 0 || retryTimer) return;
+    retryTimer = setInterval(() => {
       void registration.replayPending().catch(() => {
         process.stderr.write('{"event":"fleet.outbox.replay_failed"}\n');
       });
-    }, retryIntervalMs)
-    : null;
-  retryTimer?.unref();
+    }, retryIntervalMs);
+    retryTimer.unref();
+  };
+  startRetryTimer();
   return registration;
 }
 

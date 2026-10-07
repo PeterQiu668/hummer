@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -10,6 +12,7 @@ const repository = resolve(import.meta.dirname, '..');
 const cli = resolve(repository, 'scripts', 'hummer-local-stack.mjs');
 const scratch = await mkdtemp(join(tmpdir(), 'hummer-local-stack-test-'));
 const stateRoot = join(scratch, 'state');
+const claimStateRoot = join(scratch, 'claim-state');
 const workspaceRoot = join(scratch, 'workspace');
 const configPath = join(scratch, 'local-stack.json');
 let assertions = 0;
@@ -55,10 +58,52 @@ try {
   child = undefined;
   await assertNoPlaintextSecrets(stateRoot);
 
+  const claimToken = `claim_${randomBytes(32).toString('base64url')}`;
+  await writeFile(configPath, `${JSON.stringify({
+    schema: 'hummer.local-stack-config', version: 2,
+    stateRoot: claimStateRoot, workspaceRoot,
+    identity: { mode: 'desktop-claim', claimTokenEnv: 'HUMMER_TEST_CLAIM_TOKEN' },
+    nodeId: 'node-local-test', runtime: { provider: 'codex' }, launchDesktop: false,
+  }, null, 2)}\n`, 'utf8');
+  const waiting = await start('waiting_for_identity', { HUMMER_TEST_CLAIM_TOKEN: claimToken });
+  check(waiting.state.tenantId === undefined && waiting.state.actorRef === undefined, 'waiting state exposed a guessed identity');
+  const unauthorized = await pipeRequest(waiting.state.pipeName, {
+    command: 'claim', auth: 'wrong-claim-token-value-that-is-long-enough',
+    identity: { tenantId: 'tenant-claimed', actorRef: 'account:owner-claimed' },
+  });
+  check(unauthorized.error?.code === 'claim_unauthorized', 'bad claim token was not rejected');
+  check((await command('status')).status === 'waiting_for_identity', 'unauthorized claim changed supervisor state');
+  const claimed = await pipeRequest(waiting.state.pipeName, {
+    command: 'claim', auth: claimToken,
+    identity: { tenantId: 'tenant-claimed', actorRef: 'account:owner-claimed' },
+  });
+  check(claimed.schema === 'hummer.local-stack-claim-result', 'authenticated identity claim did not return Relay config');
+  check(claimed.identity?.tenantId === 'tenant-claimed' && claimed.identity?.actorRef === 'account:owner-claimed', 'claim response changed the Desktop identity');
+  const session = await fetch(`${claimed.relay.baseUrl}v1/control/session`, {
+    headers: { authorization: `Bearer ${claimed.relay.badgeToken}` },
+  });
+  check(session.status === 200, 'claimed control badge did not authenticate to Relay');
+  check(JSON.stringify(await session.json()) === JSON.stringify({
+    session: { tenantId: 'tenant-claimed', actorRef: 'account:owner-claimed' },
+  }), 'Relay session did not match the claimed Desktop identity');
+  const claimedStatus = await command('status');
+  check(claimedStatus.status === 'running' && claimedStatus.tenantId === 'tenant-claimed', 'claim did not transition the stack to running');
+  const conflicting = await pipeRequest(waiting.state.pipeName, {
+    command: 'claim', auth: claimToken,
+    identity: { tenantId: 'tenant-other', actorRef: 'account:owner-other' },
+  });
+  check(conflicting.error?.code === 'identity_already_bound', 'a second identity was not rejected');
+  await command('stop');
+  const claimedExit = await waitForExit(child, 15_000);
+  check(claimedExit.code === 0, 'claimed supervisor did not stop cleanly');
+  child = undefined;
+  await assertNoPlaintextSecrets(claimStateRoot, [claimToken, claimed.relay.badgeToken]);
+
   process.stdout.write(`${JSON.stringify({ status: 'passed', assertions, checks: [
     'one command starts real Relay and Node with ephemeral in-memory credentials',
     'live named-pipe status and coordinated stop are available without a network admin port',
     'a second supervisor is rejected and the same durable state can restart',
+    'authenticated Desktop identity claim starts Relay and rejects bad tokens and conflicting identities',
     'configs state SQLite journal and receipts contain no plaintext generated bearer patterns',
   ] })}\n`);
 } finally {
@@ -66,9 +111,9 @@ try {
   await rm(scratch, { recursive: true, force: true });
 }
 
-async function start() {
+async function start(expectedStatus = 'running', environment = {}) {
   child = spawn(process.execPath, [cli, 'run', '--config', configPath], {
-    cwd: repository, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    cwd: repository, env: { ...process.env, ...environment }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   let stdout = '';
   let stderr = '';
@@ -81,7 +126,7 @@ async function start() {
     for (const line of stdout.split(/\r?\n/u).filter(Boolean)) {
       let value;
       try { value = JSON.parse(line); } catch { continue; }
-      if (value?.schema === 'hummer.local-stack-state' && value?.status === 'running') {
+      if (value?.schema === 'hummer.local-stack-state' && value?.status === expectedStatus) {
         return {
           state: value,
           events: stdout.split(/\r?\n/u).filter(Boolean).flatMap((candidate) => {
@@ -108,12 +153,33 @@ async function archivedRun(sessionId) {
   return join(root, match);
 }
 
-async function assertNoPlaintextSecrets(root) {
-  const pattern = /(?:control|node|issuer)_[A-Za-z0-9_-]{40,}/u;
+async function assertNoPlaintextSecrets(root, forbidden = []) {
+  const pattern = /(?:control|node|issuer|claim)_[A-Za-z0-9_-]{40,}/u;
   for (const path of await files(root)) {
     const bytes = await readFile(path);
-    check(!pattern.test(bytes.toString('latin1')), `plaintext secret pattern found in ${path}`);
+    const text = bytes.toString('latin1');
+    check(!pattern.test(text), `plaintext secret pattern found in ${path}`);
+    for (const secret of forbidden) check(!text.includes(secret), `known plaintext secret found in ${path}`);
   }
+}
+
+function pipeRequest(pipeName, request) {
+  return new Promise((resolveRequest, reject) => {
+    const socket = connect(pipeName);
+    let buffer = '';
+    const timer = setTimeout(() => { socket.destroy(); reject(new Error('pipe request timed out')); }, 15_000);
+    socket.setEncoding('utf8');
+    socket.once('connect', () => socket.write(`${JSON.stringify(request)}\n`));
+    socket.on('data', (chunk) => {
+      buffer += chunk;
+      const newline = buffer.indexOf('\n');
+      if (newline < 0) return;
+      clearTimeout(timer);
+      socket.end();
+      resolveRequest(JSON.parse(buffer.slice(0, newline)));
+    });
+    socket.once('error', (error) => { clearTimeout(timer); reject(error); });
+  });
 }
 
 async function files(root) {
