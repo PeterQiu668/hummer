@@ -108,6 +108,34 @@ export interface FleetRelayServerOptions {
   authenticator: BadgeTokenAuthenticator;
   now?: () => Date;
   events?: FleetSseBroker;
+  /** Optional W10 public marketplace adapter. Absence is an explicit 503, never sample data. */
+  publicMarket?: PublicMarketplaceHttpPort;
+}
+
+export interface PublicMarketplaceHttpPort {
+  browse(): readonly Readonly<Record<string, unknown>>[];
+  report(input: {
+    reportId: string;
+    listingId: string;
+    reporterTenantId: string;
+    reporterActorRef: string;
+    reason: string;
+  }): Readonly<Record<string, unknown>>;
+  listOpenReports(requestTenantId: string, actorRef: string): readonly Readonly<Record<string, unknown>>[];
+  takeDown(input: {
+    actionId: string;
+    reportId: string;
+    listingId: string;
+    requestTenantId: string;
+    moderatorActorRef: string;
+    reason: string;
+  }): void;
+  authorizeInstall(input: {
+    attemptId: string;
+    listingId: string;
+    targetTenantId: string;
+    gate: unknown;
+  }): Readonly<Record<string, unknown>>;
 }
 
 function parseBearer(header: string | undefined): string {
@@ -140,6 +168,45 @@ function assertNoQueryFields(request: FastifyRequest): void {
 
 function controlResourceNotFound(): TransportHttpError {
   return new TransportHttpError(404, 'control_resource_not_found', 'control-plane resource was not found');
+}
+
+function exactBody(input: unknown, allowed: readonly string[], subject: string): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TransportHttpError(400, 'invalid_contract', `${subject} must be an object`);
+  }
+  const body = input as Record<string, unknown>;
+  if (Object.keys(body).some((key) => !allowed.includes(key))) {
+    throw new TransportHttpError(400, 'invalid_contract', `${subject} contains an unknown field`);
+  }
+  return body;
+}
+
+function requiredText(value: unknown, field: string, maxLength = 2_000): string {
+  if (typeof value !== 'string' || !value.trim() || value.length > maxLength) {
+    throw new TransportHttpError(400, 'invalid_contract', `${field} is required`);
+  }
+  return value.trim();
+}
+
+function publicMarket(options: FleetRelayServerOptions): PublicMarketplaceHttpPort {
+  if (!options.publicMarket) {
+    throw new TransportHttpError(503, 'public_market_unavailable', 'public marketplace is not configured');
+  }
+  return options.publicMarket;
+}
+
+function marketFailure(error: unknown): never {
+  const message = error instanceof Error ? error.message : 'Marketplace request failed';
+  if (/authorization denied/i.test(message)) {
+    throw new TransportHttpError(403, 'marketplace_forbidden', 'marketplace authorization denied');
+  }
+  if (/unavailable|not found/i.test(message)) {
+    throw new TransportHttpError(404, 'public_listing_not_found', 'public capability listing was not found');
+  }
+  if (/required|invalid|does not match|not bound/i.test(message)) {
+    throw new TransportHttpError(400, 'invalid_contract', message);
+  }
+  throw error;
 }
 
 function fleetStatus(error: FleetRejectedError): number {
@@ -226,6 +293,108 @@ export function createFleetRelayServer(
       return reply.status(statusCode).send({ error: { code: 'invalid_request', message: 'request was rejected' } });
     }
     return reply.status(500).send({ error: { code: 'internal_error', message: 'relay request failed' } });
+  });
+
+  app.get('/v1/public/capabilities', async (request) => {
+    assertNoQueryFields(request);
+    return { listings: publicMarket(options).browse() };
+  });
+
+  app.get('/v1/public/capabilities/:listingId', async (request) => {
+    assertNoQueryFields(request);
+    const listingId = pathParam(request, 'listingId');
+    const listing = publicMarket(options).browse().find((item) => item.listingId === listingId);
+    if (!listing) throw new TransportHttpError(404, 'public_listing_not_found', 'public capability listing was not found');
+    return { listing };
+  });
+
+  app.post('/v1/public/capabilities/:listingId/reports', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.report');
+    if (claims.nodeId || !claims.actorRef.startsWith('human:')) {
+      throw new TransportHttpError(403, 'human_badge_required', 'marketplace reports require a human badge');
+    }
+    const body = exactBody(request.body, ['reportId', 'reason'], 'marketplace report');
+    try {
+      const report = publicMarket(options).report({
+        reportId: requiredText(body.reportId, 'reportId', 128),
+        listingId: pathParam(request, 'listingId'),
+        reporterTenantId: claims.tenantId,
+        reporterActorRef: claims.actorRef,
+        reason: requiredText(body.reason, 'reason'),
+      });
+      return {
+        report: {
+          reportId: report.reportId,
+          listingId: report.listingId,
+          status: report.status,
+          createdAt: report.createdAt,
+        },
+      };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/public/capabilities/:listingId/install-authorizations', async (request) => {
+    const { claims } = await authorize(request, 'capability.install.evaluate');
+    if (claims.nodeId || !/^(?:human|account):/.test(claims.actorRef)) {
+      throw new TransportHttpError(403, 'control_badge_required', 'install authorization requires a human/account badge');
+    }
+    const body = exactBody(request.body, ['attemptId', 'targetTenantId', 'gate'], 'public install authorization');
+    const targetTenantId = requiredText(body.targetTenantId, 'targetTenantId', 128);
+    if (targetTenantId !== claims.tenantId) {
+      throw new TransportHttpError(403, 'tenant_mismatch', 'install authorization is bound to the badge tenant');
+    }
+    const gate = body.gate as Record<string, unknown> | undefined;
+    if (!gate || gate.requestedByActorRef !== claims.actorRef) {
+      throw new TransportHttpError(403, 'actor_mismatch', 'install authorization is bound to the badge actor');
+    }
+    try {
+      return {
+        decision: publicMarket(options).authorizeInstall({
+          attemptId: requiredText(body.attemptId, 'attemptId', 128),
+          listingId: pathParam(request, 'listingId'),
+          targetTenantId,
+          gate,
+        }),
+      };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.get('/v1/marketplace/moderation/reports', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.moderate');
+    if (claims.nodeId || !claims.actorRef.startsWith('human:')) {
+      throw new TransportHttpError(403, 'human_badge_required', 'marketplace moderation requires a human badge');
+    }
+    assertNoQueryFields(request);
+    try {
+      return { reports: publicMarket(options).listOpenReports(claims.tenantId, claims.actorRef) };
+    } catch (error) {
+      marketFailure(error);
+    }
+  });
+
+  app.post('/v1/marketplace/moderation/listings/:listingId/takedown', async (request) => {
+    const { claims } = await authorize(request, 'marketplace.moderate');
+    if (claims.nodeId || !claims.actorRef.startsWith('human:')) {
+      throw new TransportHttpError(403, 'human_badge_required', 'marketplace moderation requires a human badge');
+    }
+    const body = exactBody(request.body, ['actionId', 'reportId', 'reason'], 'marketplace takedown');
+    try {
+      publicMarket(options).takeDown({
+        actionId: requiredText(body.actionId, 'actionId', 128),
+        reportId: requiredText(body.reportId, 'reportId', 128),
+        listingId: pathParam(request, 'listingId'),
+        requestTenantId: claims.tenantId,
+        moderatorActorRef: claims.actorRef,
+        reason: requiredText(body.reason, 'reason'),
+      });
+      return { status: 'taken_down' };
+    } catch (error) {
+      marketFailure(error);
+    }
   });
 
   app.post('/v1/nodes/register', async (request) => {

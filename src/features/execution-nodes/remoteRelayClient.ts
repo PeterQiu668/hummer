@@ -1,4 +1,5 @@
 import type { CapabilityCatalogItem } from '../capabilities/capabilityCatalogClient';
+import type { PublicCapabilityListing } from '../capabilities/publicMarketClient';
 
 export interface RemoteRelayNode {
   nodeId: string;
@@ -106,6 +107,48 @@ export class RemoteRelayClient {
     return payload.capabilities;
   }
 
+  async listPublicCapabilities(): Promise<readonly PublicCapabilityListing[]> {
+    const payload = await this.publicRequest<{ listings?: unknown }>('/v1/public/capabilities');
+    const { isPublicCapabilityListing } = await import('../capabilities/publicMarketResponseValidator');
+    if (!Array.isArray(payload.listings) || payload.listings.some((item) => !isPublicCapabilityListing(item))) {
+      throw new RemoteRelayError(502, 'invalid_response', 'Relay returned an invalid public capability catalog');
+    }
+    return payload.listings;
+  }
+
+  async getPublicCapability(listingId: string): Promise<PublicCapabilityListing> {
+    const payload = await this.publicRequest<{ listing?: unknown }>(
+      `/v1/public/capabilities/${encodeURIComponent(listingId)}`,
+    );
+    const { isPublicCapabilityListing } = await import('../capabilities/publicMarketResponseValidator');
+    if (!isPublicCapabilityListing(payload.listing)) {
+      throw new RemoteRelayError(502, 'invalid_response', 'Relay returned an invalid public capability listing');
+    }
+    return payload.listing;
+  }
+
+  async reportPublicCapability(
+    listingId: string,
+    reason: string,
+  ): Promise<{ reportId: string; status: 'open'; createdAt: string }> {
+    const reportId = `report-${crypto.randomUUID()}`;
+    const payload = await this.request<{ report?: unknown }>(
+      `/v1/public/capabilities/${encodeURIComponent(listingId)}/reports`,
+      { method: 'POST', body: JSON.stringify({ reportId, reason }) },
+    );
+    if (!isReportReceipt(payload.report, reportId, listingId)) {
+      throw new RemoteRelayError(502, 'invalid_response', 'Relay returned an invalid marketplace report receipt');
+    }
+    return payload.report;
+  }
+
+  authorizePublicCapabilityInstall(listingId: string, input: unknown): Promise<unknown> {
+    return this.request(`/v1/public/capabilities/${encodeURIComponent(listingId)}/install-authorizations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
   async getApprovalRequest(requestId: string): Promise<RemoteRelayApprovalRequest> {
     return (await this.request<{ approvalRequest: RemoteRelayApprovalRequest }>(
       `/v1/control/approval-requests/${encodeURIComponent(requestId)}`,
@@ -154,6 +197,33 @@ export class RemoteRelayClient {
     }
     return payload as T;
   }
+
+  private async publicRequest<T>(path: string): Promise<T> {
+    const response = await this.#fetch(`${this.#baseUrl}${path}`, {
+      headers: { accept: 'application/json' },
+    });
+    const payload = await parseResponse(response);
+    if (!response.ok) {
+      const error = asErrorPayload(payload);
+      throw new RemoteRelayError(response.status, error.code, error.message);
+    }
+    return payload as T;
+  }
+}
+
+function isReportReceipt(
+  value: unknown,
+  reportId: string,
+  listingId: string,
+): value is { reportId: string; status: 'open'; createdAt: string } {
+  if (!value || typeof value !== 'object') return false;
+  const report = value as Record<string, unknown>;
+  return Object.keys(report).every((key) => ['reportId', 'listingId', 'status', 'createdAt'].includes(key))
+    && report.reportId === reportId
+    && report.listingId === listingId
+    && report.status === 'open'
+    && typeof report.createdAt === 'string'
+    && Number.isFinite(Date.parse(report.createdAt));
 }
 
 async function parseResponse(response: Response): Promise<unknown> {

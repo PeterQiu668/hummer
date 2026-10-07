@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleUserRound,
   Link2,
+  Globe2,
   Network,
   Search,
   ShieldCheck,
@@ -24,11 +25,13 @@ import {
   type CapabilityCatalogItem,
 } from '../../features/capabilities/capabilityCatalogClient';
 import { RemoteRelayError } from '../../features/execution-nodes/remoteRelayClient';
+import PublicMarketPanel from '../../features/capabilities/PublicMarketPanel';
 
-type CapabilityTab = 'apps' | 'experts' | 'skills' | 'knowledge' | 'models';
+type CapabilityTab = 'apps' | 'public' | 'experts' | 'skills' | 'knowledge' | 'models';
 
 const tabs: Array<{ key: CapabilityTab; label: string; icon: typeof Blocks }> = [
   { key: 'apps', label: '工作应用', icon: Link2 },
+  { key: 'public', label: '能力网络', icon: Globe2 },
   { key: 'experts', label: '专家', icon: CircleUserRound },
   { key: 'skills', label: '技能', icon: Wrench },
   { key: 'knowledge', label: '企业知识', icon: BookOpen },
@@ -141,6 +144,7 @@ export default function MCPAppsPage() {
   return <WorkspacePage title="能力与连接" sub="把专家经验、可复用技能、企业知识、模型和日常工作应用装进团队。" actions={<span className={`hum-chip ${connectedCount ? 'is-success' : 'is-muted'}`}><Check size={11} /> {connectedCount ? `${connectedCount} 个运行连接已验证` : '尚无已验证连接'}</span>} sticky={<div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{tabs.map((item) => { const Icon = item.icon; return <button type="button" key={item.key} onClick={() => setTab(item.key)} className={`hum-btn is-sm ${tab === item.key ? 'is-primary' : ''}`}><Icon size={12} /> {item.label}</button>; })}</div><div className="relative w-full sm:w-64"><Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" /><input aria-label="搜索能力与连接" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索专家、技能或应用" className="hum-input pl-7" /></div></div>}>
     <div className="mx-auto max-w-[1280px] p-5">
       {tab === 'apps' && <AppsPanel query={query} apps={mcpApps} connectors={runtimeConnectors} tools={toolDefinitions} hostAvailable={Boolean(connectorPort && toolRegistry)} verifyingTool={verifyingTool} onVerifyLocalMcp={verifyLocalMcp} />}
+      {tab === 'public' && <PublicMarketPanel query={query} />}
       {tab === 'experts' && <ExpertsPanel query={query} />}
       {tab === 'skills' && <SkillsPanel query={query} items={capabilityItems} load={capabilityLoad} loadMessage={capabilityLoadMessage} installerAvailable={Boolean(capabilityPort?.installerAvailable)} installState={capabilityInstallState} onInstall={installCapability} />}
       {tab === 'knowledge' && <KnowledgePanel query={query} />}

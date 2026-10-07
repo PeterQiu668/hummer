@@ -28,6 +28,7 @@ describe('Capabilities and connections page', () => {
     expect(screen.getByRole('button', { name: '企业知识' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '模型' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '工作应用' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '能力网络' })).toBeInTheDocument();
     expect(screen.getByText('飞书')).toBeInTheDocument();
     expect(screen.getByText('钉钉')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '未来规划' })).toBeInTheDocument();
