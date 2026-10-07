@@ -53,6 +53,7 @@ interface AcceptInvitationRequest { token: string; displayName: string; email?: 
 
 export interface PersistenceHostRegistration {
   databasePath: string;
+  fleetDispatchOutbox: DesktopPersistence['fleetDispatchOutbox'];
   resolveTenantId(token: string): string;
   resolveRelayIdentity(token: string): { tenantId: string; actorRef: string };
   authorizeRuntimeApproval(token: string, context: DesktopRoleActionContext['approve_high_risk']): void;
@@ -597,6 +598,7 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
 
   return {
     databasePath: persistence.databasePath,
+    fleetDispatchOutbox: persistence.fleetDispatchOutbox,
     resolveTenantId: (token) => persistence.identity.currentTenantId(token),
     resolveRelayIdentity: (token) => {
       const context = persistence.identity.resumeSession(token);

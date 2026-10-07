@@ -1001,6 +1001,72 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'moderation actions are append-only'); END;
     `,
   },
+  {
+    version: 16,
+    name: 'p1_fleet_dispatch_outbox',
+    sql: `
+      CREATE TABLE fleet_dispatch_outbox (
+        outbox_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        actor_ref TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        envelope_sha256 TEXT NOT NULL CHECK (length(envelope_sha256) = 64),
+        envelope_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'delivered', 'rejected')),
+        attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        last_attempt_at TEXT,
+        last_error_code TEXT,
+        delivered_at TEXT,
+        rejected_at TEXT,
+        relay_task_id TEXT,
+        relay_inserted INTEGER CHECK (relay_inserted IN (0, 1)),
+        response_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, idempotency_key),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+        CHECK (
+          (status = 'pending' AND delivered_at IS NULL AND rejected_at IS NULL
+            AND relay_task_id IS NULL AND relay_inserted IS NULL AND response_json IS NULL)
+          OR
+          (status = 'delivered' AND delivered_at IS NOT NULL AND rejected_at IS NULL
+            AND relay_task_id IS NOT NULL AND relay_inserted IS NOT NULL AND response_json IS NOT NULL)
+          OR
+          (status = 'rejected' AND rejected_at IS NOT NULL AND last_error_code IS NOT NULL
+            AND delivered_at IS NULL AND relay_task_id IS NULL AND relay_inserted IS NULL AND response_json IS NULL)
+        )
+      );
+
+      CREATE INDEX fleet_dispatch_outbox_pending
+        ON fleet_dispatch_outbox (tenant_id, actor_ref, status, created_at, outbox_id);
+
+      CREATE TRIGGER fleet_dispatch_outbox_payload_immutable
+        BEFORE UPDATE OF outbox_id, tenant_id, actor_ref, idempotency_key, envelope_sha256, envelope_json, created_at
+        ON fleet_dispatch_outbox
+        BEGIN SELECT RAISE(ABORT, 'fleet outbox payload is immutable'); END;
+
+      CREATE TRIGGER fleet_dispatch_outbox_terminal_immutable
+        BEFORE UPDATE ON fleet_dispatch_outbox
+        WHEN OLD.status != 'pending'
+        BEGIN SELECT RAISE(ABORT, 'fleet outbox terminal state is immutable'); END;
+
+      CREATE TRIGGER fleet_dispatch_outbox_no_delete
+        BEFORE DELETE ON fleet_dispatch_outbox
+        BEGIN SELECT RAISE(ABORT, 'fleet outbox history is retained'); END;
+
+      CREATE TRIGGER fleet_dispatch_outbox_actor_guard
+        BEFORE INSERT ON fleet_dispatch_outbox
+        WHEN NOT EXISTS (
+          SELECT 1 FROM memberships
+          WHERE tenant_id = NEW.tenant_id AND status = 'active'
+            AND (
+              (NEW.actor_ref GLOB 'account:*' AND account_id = substr(NEW.actor_ref, 9))
+              OR (NEW.actor_ref GLOB 'human:*' AND human_user_id = substr(NEW.actor_ref, 7))
+            )
+        )
+        BEGIN SELECT RAISE(ABORT, 'fleet outbox actor is not an active tenant member'); END;
+    `,
+  },
 ];
 export function applyMigrations(database: SqliteDatabase): void {
   database.exec(`

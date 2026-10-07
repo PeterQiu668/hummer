@@ -5,6 +5,7 @@ import { BuiltinToolExecutor } from './builtin-tool-executor.js';
 import { ControlledWriteStore } from './controlled-write-store.js';
 import { DemoSessionStore } from './demo-session-store.js';
 import { ExecutionNodeStore } from './execution-node-store.js';
+import { FleetDispatchOutboxStore } from './fleet-dispatch-outbox-store.js';
 import { EngineCredentialStore } from './engine-credential-store.js';
 import { EgressDeliveryStore } from './egress-delivery-store.js';
 import { DomainEventStore, type DomainEventInput, type IntegrityResult, type StoredDomainEvent } from './domain-event-store.js';
@@ -110,6 +111,7 @@ export class DesktopPersistence {
   readonly demoSessions: DemoSessionStore;
   readonly builtinTools: BuiltinToolExecutor;
   readonly executionNodes: ExecutionNodeStore;
+  readonly fleetDispatchOutbox: FleetDispatchOutboxStore;
   readonly engineCredentials: EngineCredentialStore;
   readonly egressDeliveries: EgressDeliveryStore;
   readonly identity: IdentityStore;
@@ -135,6 +137,7 @@ export class DesktopPersistence {
     this.controlledWrites = new ControlledWriteStore(database, this.approvalPolicies, this.evidence);
     this.demoSessions = new DemoSessionStore(database, now);
     this.executionNodes = new ExecutionNodeStore(database);
+    this.fleetDispatchOutbox = new FleetDispatchOutboxStore(database);
     this.engineCredentials = new EngineCredentialStore(database, now);
     this.egressDeliveries = new EgressDeliveryStore(database, this.approvalPolicies, this.evidence);
     this.identity = new IdentityStore(database, now);

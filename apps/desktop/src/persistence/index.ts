@@ -8,6 +8,8 @@ export type {
 } from './database.js';
 export type { DomainEventInput, IntegrityResult, StoredDomainEvent } from './domain-event-store.js';
 export type { EncryptedEngineCredential, EngineCredentialStatus } from './engine-credential-store.js';
+export { FleetDispatchOutboxStore } from './fleet-dispatch-outbox-store.js';
+export type { FleetDispatchOutboxRecord, StageFleetDispatchInput } from './fleet-dispatch-outbox-store.js';
 export type { DigitalEmployeeRecord, HireDigitalEmployeeInput } from './organization-store.js';
 export type { EvidenceIntegrity, EvidenceMetadata, StoredEvidence } from './evidence-store.js';
 export type { ControlledWriteInput, ControlledWriteResult } from './controlled-write-store.js';

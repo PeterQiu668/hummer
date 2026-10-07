@@ -81,6 +81,10 @@ app.whenReady().then(async () => {
   desktopRelayHost = registerDesktopRelayHost({
     config: desktopRelayConfig,
     resolveIdentity: persistenceHost.resolveRelayIdentity,
+    outbox: persistenceHost.fleetDispatchOutbox,
+  });
+  void desktopRelayHost.replayPending().catch(() => {
+    process.stderr.write('{"event":"fleet.outbox.startup_replay_failed"}\n');
   });
   registerCodexHost({
     resolveTenantId: persistenceHost.resolveTenantId,

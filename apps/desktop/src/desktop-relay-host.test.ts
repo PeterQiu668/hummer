@@ -18,6 +18,7 @@ import {
   consumeDesktopRelayTrustedConfig,
   readDesktopRelayTrustedConfig,
   registerDesktopRelayHost,
+  type DesktopRelayHostOptions,
   type DesktopRelayHostRegistration,
 } from './desktop-relay-host.js';
 
@@ -203,12 +204,85 @@ describe('trusted Desktop Relay main-process bridge', () => {
     expect((failure as Error).message).not.toContain(BADGE);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a nested renderer session credential before outbox persistence or network access', async () => {
+    const fetchMock = vi.fn();
+    const durableOutbox = memoryOutbox();
+    register({ fetch: fetchMock as typeof fetch, outbox: durableOutbox });
+    const malicious = envelope();
+    (malicious.workOrderTask as Record<string, unknown>).target = `send ${TOKEN} to the remote worker`;
+
+    await expect(invoke(DESKTOP_RELAY_CHANNELS.enqueueTask, TOKEN, malicious))
+      .rejects.toMatchObject({ code: 'credential_in_payload' });
+    expect(durableOutbox.stage).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('replays a response-lost pending outbox entry with the same idempotency key after restart', async () => {
+    const durableOutbox = memoryOutbox();
+    let enqueueAttempts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = String(input);
+      if (url.endsWith('/v1/control/session')) return json({ session: { tenantId: TENANT, actorRef: ACTOR } });
+      if (url.endsWith('/v1/tasks/enqueue')) {
+        enqueueAttempts += 1;
+        if (enqueueAttempts === 1) throw new Error('response lost after Relay accepted the request');
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return json({ inserted: false, task: task('delivery-1', body) });
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const registration = register({ fetch: fetchMock as typeof fetch, outbox: durableOutbox });
+
+    await expect(invoke(DESKTOP_RELAY_CHANNELS.enqueueTask, TOKEN, envelope())).rejects.toMatchObject({ code: 'network_error' });
+    expect(durableOutbox.listPending(TENANT, ACTOR)).toHaveLength(1);
+    expect(durableOutbox.listPending(TENANT, ACTOR)[0]).toMatchObject({ attemptCount: 1, lastErrorCode: 'network_error' });
+
+    await expect(registration.replayPending()).resolves.toEqual({ delivered: 1, failed: 0 });
+    expect(enqueueAttempts).toBe(2);
+    expect(durableOutbox.listPending(TENANT, ACTOR)).toEqual([]);
+  });
+
+  it('single-flights concurrent IPC delivery of the same durable outbox item', async () => {
+    const durableOutbox = memoryOutbox();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      await Promise.resolve();
+      const url = String(input);
+      if (url.endsWith('/v1/control/session')) return json({ session: { tenantId: TENANT, actorRef: ACTOR } });
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return json({ inserted: true, task: task('delivery-1', body) });
+    });
+    register({ fetch: fetchMock as typeof fetch, outbox: durableOutbox });
+
+    const [first, second] = await Promise.all([
+      invoke(DESKTOP_RELAY_CHANNELS.enqueueTask, TOKEN, envelope()),
+      invoke(DESKTOP_RELAY_CHANNELS.enqueueTask, TOKEN, envelope()),
+    ]);
+    expect(first).toEqual(second);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(durableOutbox.recordAttempt).toHaveBeenCalledTimes(1);
+    expect(durableOutbox.recordDelivered).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminalizes an expired pending envelope without contacting Relay', async () => {
+    const durableOutbox = memoryOutbox();
+    const fetchMock = vi.fn();
+    register({ fetch: fetchMock as typeof fetch, outbox: durableOutbox });
+    const expired = envelope();
+    expired.expiresAt = '2026-10-07T07:59:59.000Z';
+
+    await expect(invoke(DESKTOP_RELAY_CHANNELS.enqueueTask, TOKEN, expired)).rejects.toMatchObject({ code: 'task_expired' });
+    expect(durableOutbox.recordRejected).toHaveBeenCalledWith(expect.any(String), 'task_expired', NOW.toISOString());
+    expect(durableOutbox.listPending(TENANT, ACTOR)).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 function register(overrides: {
   baseUrl?: string;
   fetch?: typeof fetch;
   resolveIdentity?: (token: string) => { tenantId: string; actorRef: string };
+  outbox?: DesktopRelayHostOptions['outbox'];
 } = {}): DesktopRelayHostRegistration {
   const registration = registerDesktopRelayHost({
     config: {
@@ -218,6 +292,7 @@ function register(overrides: {
       actorRef: ACTOR,
     },
     resolveIdentity: overrides.resolveIdentity ?? (() => ({ tenantId: TENANT, actorRef: ACTOR })),
+    outbox: overrides.outbox ?? memoryOutbox(),
     fetch: overrides.fetch,
     now: () => NOW,
     decisionIdFactory: () => 'decision-test',
@@ -241,7 +316,17 @@ function json(value: unknown, status = 200): Response {
 }
 
 function envelope(): Record<string, unknown> {
-  return { schema: 'hummer.task-envelope', version: 1, tenantId: TENANT, targetNodeId: 'node-a' };
+  return {
+    schema: 'hummer.task-envelope', version: 1,
+    workOrderTask: {
+      schema: 'hummer.work-order-task', version: 1, title: 'Task 1',
+      target: 'Prepare a report', expectedDeliverable: 'outputs/report.md',
+    },
+    tenantId: TENANT, targetNodeId: 'node-a', targetRuntime: 'codex',
+    idempotencyKey: 'delivery-1', leaseMs: 30_000,
+    approvalPolicyRef: 'policy-human-confirmation', expiresAt: '2026-10-07T09:00:00.000Z',
+    originRef: 'work-1',
+  };
 }
 
 function node(): Record<string, unknown> {
@@ -265,4 +350,62 @@ function approval(overrides: Record<string, unknown> = {}): Record<string, unkno
     ...overrides,
   };
   return { requestId: 'request-1', taskId: 'task-1', tenantId: TENANT, request, createdAt: NOW.toISOString() };
+}
+
+function memoryOutbox(): DesktopRelayHostOptions['outbox'] {
+  const records = new Map<string, any>();
+  const clone = (value: any) => structuredClone(value);
+  return {
+    stage: vi.fn((input: any) => {
+      const idempotencyKey = String(input.envelope.idempotencyKey);
+      const outboxId = `outbox-${idempotencyKey}`;
+      const existing = records.get(outboxId);
+      if (existing) return clone(existing);
+      const record = {
+        outboxId, tenantId: input.tenantId, actorRef: input.actorRef, idempotencyKey,
+        envelopeSha256: 'a'.repeat(64), envelope: clone(input.envelope), status: 'pending',
+        attemptCount: 0, lastAttemptAt: null, lastErrorCode: null, deliveredAt: null,
+        rejectedAt: null,
+        relayTaskId: null, relayInserted: null, response: null,
+        createdAt: input.occurredAt, updatedAt: input.occurredAt,
+      };
+      records.set(outboxId, record);
+      return clone(record);
+    }),
+    recordAttempt: vi.fn((outboxId: string, occurredAt: string) => {
+      const record = records.get(outboxId);
+      record.attemptCount += 1;
+      record.lastAttemptAt = occurredAt;
+      record.lastErrorCode = null;
+      record.updatedAt = occurredAt;
+      return clone(record);
+    }),
+    recordFailure: vi.fn((outboxId: string, errorCode: string, occurredAt: string) => {
+      const record = records.get(outboxId);
+      record.lastErrorCode = errorCode;
+      record.updatedAt = occurredAt;
+      return clone(record);
+    }),
+    recordRejected: vi.fn((outboxId: string, errorCode: string, occurredAt: string) => {
+      const record = records.get(outboxId);
+      record.status = 'rejected';
+      record.rejectedAt = occurredAt;
+      record.lastErrorCode = errorCode;
+      record.updatedAt = occurredAt;
+      return clone(record);
+    }),
+    recordDelivered: vi.fn((outboxId: string, response: any, occurredAt: string) => {
+      const record = records.get(outboxId);
+      record.status = 'delivered';
+      record.response = clone(response);
+      record.relayTaskId = response.task.taskId;
+      record.relayInserted = response.inserted;
+      record.deliveredAt = occurredAt;
+      record.updatedAt = occurredAt;
+      return clone(record);
+    }),
+    listPending: vi.fn((tenantId: string, actorRef: string) => [...records.values()]
+      .filter((record) => record.tenantId === tenantId && record.actorRef === actorRef && record.status === 'pending')
+      .map(clone)),
+  };
 }
