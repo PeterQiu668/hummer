@@ -12,13 +12,14 @@
 - Node 启动只需 badge，不存在静态任务令牌回退；
 - 唯一开放的真实执行器 `fs.read.attest.v1`：只读一个显式相对路径，输出字节数和 SHA-256，不返回正文；
 - 本机 `run/status/stop` supervisor：临时凭证只在内存，配置和状态不含 secret；
-- 证据链最新 rootHash：`f12897dd70173ea9c2f56f168f792e12696165815ce716aed4f63d9ee692465b`。
+- 首次启动身份自动认领：config v2 不预填 tenant/account，Desktop main 认领后 Relay/Node 才启动；
+- 证据链最新 rootHash：`1230b210d00fcd5026830f6c5d6753fc1eafd12cdbae1731d8fa4a48264b4b11`。
 
-最新封存轮的 6 条命令全部退出 0；真实 stack 门为 30 条断言，Relay 为 209/209，root unit/UI、typecheck/build 全绿。实现 HEAD 为 `ac19793`，未推送、未部署、未修改网络/证书/防火墙、未接支付、未修改 `F:\agent-hub`。
+最新封存轮的 8 条命令全部退出 0；聚焦 Desktop 18/18、真实 stack 64 条、fresh Electron 62 条、Relay 209/209、root unit 746/746、UI 96/96，typecheck/build 全绿。实现 HEAD 为 `4a7c9cb`，未推送、未部署、未修改网络/证书/防火墙、未接支付、未修改 `F:\agent-hub`。
 
 ## 一周内不能诚实承诺的事
 
-- 零配置首次安装：local stack 仍需要精确绑定一个已存在的 Desktop tenant/account；
+- 外部机器零配置安装：本机 Desktop 首次身份已自动认领，但远端 Node 仍需受控安装、badge 配置和 TLS 地址；
 - 真正多机：目前权威证据仍是单 Windows 主机 loopback；
 - 生产安全：没有私有 TLS、外部 IdP、KMS/HSM、issuer key 轮换和代码签名；
 - 通用 Agent 执行：Codex/Claude/Shell、网络、写入、付款、删除和提权仍关闭；
