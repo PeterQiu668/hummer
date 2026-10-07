@@ -1,0 +1,75 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "desktop-read-attestation-dispatch",
+  "mode": "explicit-form-capability-matched-human-review-durable-outbox",
+  "status": "passed",
+  "capturedAt": "2026-10-07T05:47:39.385Z",
+  "commit": "78e85d510c45a5ea7177ae4830f6d47d86a10e9e",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-Div1Uko0.js    187.02 kB │ gzip:  55.22 kB\ndist/assets/index-BLpmO69P.js                          641.73 kB │ gzip: 194.19 kB\n✓ built in 12.23s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm run test:contract",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":65,\"negativeCases\":46,\"maxBytes\":65536}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:p1:desktop-read-dispatch",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:p1:desktop-read-dispatch\n> npm run config:check && vitest run --config vitest.ui.config.ts src/features/home/StartWorkPage.test.tsx src/features/home/StartWorkFlow.test.tsx && vitest run --config vitest.config.ts apps/desktop/src/persistence/fleet-dispatch-outbox-store.test.ts apps/desktop/src/desktop-relay-outbox-integration.test.ts\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  2 passed (2)\n      Tests  20 passed (20)\n   Start at  13:45:25\n   Duration  9.82s (transform 729ms, setup 2.05s, import 2.96s, tests 2.03s, environment 9.00s)\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  2 passed (2)\n      Tests  6 passed (6)\n   Start at  13:45:37\n   Duration  2.38s (transform 1.56s, setup 0ms, import 3.16s, tests 694ms, environment 0ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:desktop:outbox",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:desktop:outbox\n> npm run desktop:build && vitest run --config vitest.config.ts apps/desktop/src/persistence/fleet-dispatch-outbox-store.test.ts apps/desktop/src/desktop-relay-host.test.ts apps/desktop/src/desktop-relay-outbox-integration.test.ts apps/desktop/src/persistence/persistence.test.ts apps/desktop/src/persistence/tenant-governance-store.test.ts && node --test scripts/test-desktop-outbox-process-kill.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 desktop:build\n> npm run build -w @hummer/desktop\n\n\n> @hummer/desktop@0.6.0-internal.1 prebuild\n> node ../../packages/config/scripts/generate.mjs\n\n\n> @hummer/desktop@0.6.0-internal.1 build\n> tsc -b\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  5 passed (5)\n      Tests  37 passed (37)\n   Start at  13:45:45\n   Duration  2.84s (transform 1.91s, setup 0ms, import 4.53s, tests 3.30s, environment 1ms)\n\nTAP version 13\n# Subtest: a committed Desktop fleet outbox item survives an abrupt process kill\nok 1 - a committed Desktop fleet outbox item survives an abrupt process kill\n  ---\n  duration_ms: 656.6603\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 824.8722\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:unit",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.072,\"dispatchP95Ms\":1.942,\"eventWriteP95Ms\":0.283,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.193,\"dispatchP95Ms\":7.469,\"eventWriteP95Ms\":4.429,\"rejectedOverLimit\":true}\n\n Test Files  110 passed (110)\n      Tests  735 passed (735)\n   Start at  13:45:52\n   Duration  58.70s (transform 8.44s, setup 0ms, import 84.88s, tests 89.17s, environment 18ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:ui",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  23 passed (23)\n      Tests  96 passed (96)\n   Start at  13:46:55\n   Duration  43.90s (transform 23.34s, setup 52.51s, import 39.63s, tests 39.13s, environment 284.70s)\n\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "Desktop requires an explicit fs.read.attest.v1 choice and never infers a file path from natural-language work",
+    "the form requires a strict relative path byte ceiling and opaque pre-provisioned one-use grant reference",
+    "a read plan can target only an online node that explicitly advertises fs.read",
+    "the human review screen shows the exact path byte ceiling grant reference and no-content-return promise before confirmation",
+    "zero dispatch occurs before explicit human confirmation and invalid or unknown fields fail closed",
+    "the confirmed TaskEnvelope binds executionPlan and grantRef and passes the shared Fleet contract",
+    "Desktop SQLite outbox accepts only the known plan shape commits it before network and replays identical bytes after restart",
+    "response binding idempotency tenant actor expiry and credential persistence protections remain enforced",
+    "general model CLI shell network write spend delete and privilege execution remain disabled"
+  ],
+  "limitations": [
+    "The one-use task grant must already be provisioned offline; this slice does not add a public issuer or expose a plaintext token.",
+    "The gate uses local React and Desktop SQLite integrations rather than a packaged app on a second physical device.",
+    "A completed read still requires the separately verified Relay Node executor path and human approval.",
+    "Production TLS IdP remote installation and external-user evidence remain pending."
+  ]
+}
