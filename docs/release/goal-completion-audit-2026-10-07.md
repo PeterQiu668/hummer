@@ -87,4 +87,8 @@ The follow-up through `03505e4` plus the later packaged-diagnostic slice closes 
   ZIP from generated summaries, and a compiled-bundle gate scans its exact
   entries and SHA-256 values while proving secret rejection and no partial file.
 
-The new chain head is `evidence/round-p2-runtime-surfaces-2/manifest.json`, root `949ad6e2228d094e5462ba07d40e08b649c8deb1a0a57e5a793a8c1853578d9c`. A preceding 9/10 failed round is retained in the chain. Phase completion remains blocked by the true-machine, real-expert, verified-real-outcome, packaged-installer/native-dialog automation, external-install, retention, and payment requirements listed above.
+The first follow-up chain head was `evidence/round-p2-runtime-surfaces-2/manifest.json`, root `949ad6e2228d094e5462ba07d40e08b649c8deb1a0a57e5a793a8c1853578d9c`. A preceding 9/10 failed round is retained in the chain.
+
+The later trust-closure slice adds the exhaustive seven-risk UI matrix, accepted-outcome and exact-artifact binding for Capability drafts, and atomic compiled Electron diagnostic ZIP export. `evidence/round-p2-runtime-surfaces-3/manifest.json` is now the chain head, root `c1bb895ed234399a431bcb519cc976de52284c8bca893132fc943a0bff8761da`, with 13/13 gates, 100 unit files / 669 tests, 22 UI files / 87 tests, typecheck and build passing.
+
+This proves `AC-P0-10`, `AC-P1-16`, `AC-P2-DIST-10`, and `AC-P2-14` locally. It closes technical gaps under `AC-P1-13`, `AC-P1-15`, `AC-P1-24`, `AC-P2-DIST-01`, and the seven-risk UI portion of `AC-P1-HITL-01`, but their literal real-task, Desktop-shared-Relay, cross-host, real-expert, or true-machine conditions remain incomplete. Phase completion remains blocked by the true-machine, real-expert, packaged-installer/native-dialog automation, external-install, retention, and payment requirements listed above.
