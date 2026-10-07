@@ -29,7 +29,7 @@ emitGate({
   assertions: run.testSummary?.passed ?? 0,
   negativeCases: 10,
   limitations: [
-    'This is a local persistence/domain kernel; no public network endpoint or production marketplace UI is exposed.',
+    'This gate covers the local persistence/domain kernel only; the local Relay and browser surface is covered separately by test:public-market-e2e and is not a production deployment.',
     'Installation means an approved, persisted install-gate decision; remote bundle transport and host materialization are not claimed.',
     'The W10 external threshold of at least ten real third-party installs remains pending.',
     'No price, order, settlement, payment, rating, or ranking behavior exists in this gate.',

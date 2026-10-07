@@ -120,7 +120,65 @@ describe('RemoteRelayClient', () => {
 
     await expect(client.listCapabilities()).rejects.toMatchObject({ status: 502, code: 'invalid_response' });
   });
+
+  it('reads validated public projections without attaching a badge', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).not.toMatchObject({ authorization: expect.anything() });
+      return new Response(JSON.stringify({ listings: [validPublicListing()] }), { status: 200 });
+    });
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => 'private-badge',
+      fetch: fetchMock as typeof fetch,
+    });
+
+    expect((await client.listPublicCapabilities()).map((item) => item.listingId)).toEqual(['listing-public']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [401, 'invalid_token'],
+    [403, 'scope_denied'],
+  ])('does not retry a marketplace report rejected with %s', async (status, code) => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { code, message: 'rejected' } }), { status }));
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => 'private-badge',
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(client.reportPublicCapability('listing-public', 'needs review')).rejects.toMatchObject({ status, code });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a public projection with unknown or sensitive fields', async () => {
+    const client = new RemoteRelayClient({
+      baseUrl: 'https://relay.example.test',
+      getBadge: () => null,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ listings: [{
+        ...validPublicListing(),
+        tenantId: 'tenant-secret',
+      }] }), { status: 200 })) as typeof fetch,
+    });
+
+    await expect(client.listPublicCapabilities()).rejects.toMatchObject({ status: 502, code: 'invalid_response' });
+  });
 });
+
+function validPublicListing() {
+  return {
+    schema: 'hummer.public-capability-listing', version: 1, listingId: 'listing-public', status: 'public',
+    packageId: 'cap-public', packageVersion: 1, packageDigest: 'a'.repeat(64),
+    integrity: { kind: 'package_digest', digest: 'a'.repeat(64) }, title: 'Public research',
+    goal: 'Produce an evidence-grounded brief.', publisherRef: 'publisher:0123456789abcdef',
+    provenance: { capturedAt: '2026-10-07T08:00:00.000Z', runtime: 'codex', runtimeVersion: '0.153.4', agentVersion: '1.0.0', demoSessionCount: 1 },
+    sourceBoundary: { applicationCount: 1, windowPatternCount: 1, includePathCount: 1, excludePathCount: 1 },
+    trialRecord: { shadowRuns: 5, success: 5, failure: 0, lastRunAt: '2026-10-07T08:30:00.000Z', regressionPassed: true, regressionEvidenceDigest: 'b'.repeat(64) },
+    failureNotes: [{ summary: 'Publisher-recorded failure note', digest: 'c'.repeat(64) }],
+    declaredPermissions: [{ capability: 'network.read', access: 'read', paths: [] }], receiptRef: 'receipt-public', evidenceCount: 1,
+    publishedAt: '2026-10-07T09:00:00.000Z',
+  };
+}
 
 function validOwnerCatalogItem() {
   return {

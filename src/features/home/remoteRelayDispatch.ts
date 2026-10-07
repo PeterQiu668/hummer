@@ -10,10 +10,16 @@ import {
   configureRemoteCapabilityCatalog,
   type CapabilityInstallerBoundary,
 } from '../capabilities/capabilityCatalogClient';
+import {
+  configureRemotePublicMarketplace,
+  type PublicCapabilityInstallerBoundary,
+} from '../capabilities/publicMarketClient';
 
 export type RemoteRelayDeploymentConfig = Pick<RemoteRelayClientOptions, 'baseUrl' | 'getBadge'> & {
   /** Optional trusted host/service boundary; omitting it keeps the catalog read-only. */
   capabilityInstaller?: CapabilityInstallerBoundary;
+  /** Optional trusted public-package installer; omitting it keeps the public market read-only. */
+  publicCapabilityInstaller?: PublicCapabilityInstallerBoundary;
 };
 
 declare global {
@@ -27,6 +33,7 @@ let deployment: {
   client: RemoteRelayClient;
   disposeExecutionNodes: () => void;
   disposeCapabilityCatalog: () => void;
+  disposePublicMarketplace: () => void;
 } | null = null;
 
 /**
@@ -37,16 +44,19 @@ export function configureRemoteRelayDeployment(config: RemoteRelayDeploymentConf
   const client = new RemoteRelayClient(config);
   deployment?.disposeExecutionNodes();
   deployment?.disposeCapabilityCatalog();
+  deployment?.disposePublicMarketplace();
   const current = {
     client,
     disposeExecutionNodes: configureRemoteRelayExecutionNodes(client),
     disposeCapabilityCatalog: configureRemoteCapabilityCatalog(client, config.capabilityInstaller),
+    disposePublicMarketplace: configureRemotePublicMarketplace(client, config.publicCapabilityInstaller),
   };
   deployment = current;
   return () => {
     if (deployment !== current) return;
     current.disposeExecutionNodes();
     current.disposeCapabilityCatalog();
+    current.disposePublicMarketplace();
     deployment = null;
   };
 }
