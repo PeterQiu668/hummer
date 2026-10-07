@@ -1,0 +1,85 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "real-web-relay-e2e",
+  "mode": "loopback-fastify-memory-browser-node",
+  "status": "passed",
+  "capturedAt": "2026-10-07T01:00:54.482Z",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64",
+    "browser": "system-chrome"
+  },
+  "assertions": 37,
+  "negativeCases": 7,
+  "checks": [
+    {
+      "id": "real-loopback-relay-browser-node",
+      "status": "passed",
+      "evidence": [
+        "formal createFleetRelayServer + FleetService + MemoryFleetStore listened on 127.0.0.1",
+        "production RelayHttpClient registered the node and claimed a browser-enqueued TaskEnvelope from the same store",
+        "production browser RemoteRelayClient read the real node and persisted 3 distinct TaskEnvelopes",
+        "390x844 start-work and batch actions required explicit confirmation",
+        "real 401 and 403 responses were terminal and each enqueue was attempted once",
+        "unconfigured browser remained read-only and sent zero Relay requests",
+        "opaque Relay badges were absent from localStorage, visible UI, console output, screenshots metadata, and gate output"
+      ],
+      "requestMetrics": {
+        "GET /v1/control/nodes 200": 9,
+        "OPTIONS /v1/control/nodes 204": 6,
+        "OPTIONS /v1/tasks/enqueue 204": 3,
+        "POST /v1/nodes/:nodeId/tasks/claim 200": 1,
+        "POST /v1/nodes/register 200": 1,
+        "POST /v1/tasks/enqueue 200": 3,
+        "POST /v1/tasks/enqueue 401": 1,
+        "POST /v1/tasks/enqueue 403": 1
+      },
+      "screenshots": [
+        {
+          "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/configured-mobile.png",
+          "sha256": "4c65cd58648eaea43d531efd59ed35ac2429686aa50d082f0cef8c21b2321304",
+          "bytes": 32799,
+          "viewport": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/auth-forbidden-mobile.png",
+          "sha256": "a570d10d72498383463cb54e7faad215f3d7cb091a6804c7c2be137f12c48bc6",
+          "bytes": 45002,
+          "viewport": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/auth-unauthorized-mobile.png",
+          "sha256": "331647387a7dc59e9eb238a682513e5be86f566cd9076cf8abd039cddd2b6db3",
+          "bytes": 45146,
+          "viewport": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/unconfigured-mobile.png",
+          "sha256": "0999bcf61d43b487cf4dca4c33d9757bfdf2202a02d1e7dce4ac46e3d86ef15f",
+          "bytes": 52750,
+          "viewport": {
+            "width": 390,
+            "height": 844
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Loopback Fastify with MemoryFleetStore only; this is not an external Relay, TLS termination, production IdP, deployment, or two-machine evidence.",
+    "The test uses synthetic browser identity and static in-memory badges; it does not prove production badge issuance or revocation.",
+    "Node and browser production clients share one local Relay process; no external device delivery is claimed.",
+    "Electron IPC/Desktop host integration remains covered by its separate gates and is not exercised here."
+  ]
+}

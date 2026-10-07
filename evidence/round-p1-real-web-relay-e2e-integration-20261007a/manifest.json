@@ -1,0 +1,36 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-real-web-relay-e2e-integration-20261007a",
+  "generatedAt": "2026-10-07T01:01:07.595Z",
+  "gitCommit": "c71d54f4d6d9ad8b06b3646fc1152ef3441117c7",
+  "prevManifestRootHash": "b4ccd48753f577ab398880dcb0266a75361c2463faf64ac617047098795fe9cc",
+  "files": [
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/gate.json",
+      "sha256": "589d24ab84e559375ae8876003a4a3dc64dbc3be51955d3469fcf529291d160b",
+      "bytes": 3515
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/auth-forbidden-mobile.png",
+      "sha256": "a570d10d72498383463cb54e7faad215f3d7cb091a6804c7c2be137f12c48bc6",
+      "bytes": 45002
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/auth-unauthorized-mobile.png",
+      "sha256": "331647387a7dc59e9eb238a682513e5be86f566cd9076cf8abd039cddd2b6db3",
+      "bytes": 45146
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/configured-mobile.png",
+      "sha256": "4c65cd58648eaea43d531efd59ed35ac2429686aa50d082f0cef8c21b2321304",
+      "bytes": 32799
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-integration-20261007a/screenshots/unconfigured-mobile.png",
+      "sha256": "0999bcf61d43b487cf4dca4c33d9757bfdf2202a02d1e7dce4ac46e3d86ef15f",
+      "bytes": 52750
+    }
+  ],
+  "rootHash": "2a4799d335f3858f9dd081c7136511dd598255833bd4da7f2712e2c03d50479c"
+}
