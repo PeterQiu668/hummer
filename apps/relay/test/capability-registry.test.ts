@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { createVerifiableReceipt, type OutcomeReceipt, type StoredDomainEvent } from '../../desktop/src/persistence/index.js';
 import {
   computeCapabilityPackageDigest,
   computeCapabilityInstallRequestDigest,
@@ -18,6 +20,7 @@ import {
   MemoryFleetStore,
   SqliteFleetStore,
   buildCapabilityInvitation,
+  canonicalJson,
   createFleetRelayServer,
   createSharedFleetValidators,
   createStaticBadgeTokenAuthenticator,
@@ -34,8 +37,48 @@ const TENANT_B = 'tenant-b';
 const TENANT_C = 'tenant-c';
 const NODE = 'node-trial';
 const DIGEST = 'b'.repeat(64);
+const ARTIFACT_BYTES = Buffer.from('verified capability artifact', 'utf8');
+const ARTIFACT_SHA256 = sha256(ARTIFACT_BYTES);
+const OUTCOME_RECEIPT = deterministicOutcomeReceipt();
 const openStores: FleetStore[] = [];
 const openApps: FastifyInstance[] = [];
+
+function deterministicOutcomeReceipt() {
+  const body = {
+    generatedAt: NOW,
+    tenantId: TENANT_A,
+    outcome: {
+      id: 'outcome-capability', tenantId: TENANT_A, outcomeDefinitionId: 'definition-capability',
+      workOrderId: 'work-source', sessionId: 'demo-1', approvalId: null, verdict: 'accepted' as const,
+      acceptedBy: 'human:owner', evidenceRef: `evidence://sha256/${ARTIFACT_SHA256}`, occurredAt: NOW,
+    },
+    definition: {
+      id: 'definition-capability', tenantId: TENANT_A, actionPattern: 'capability.create', title: 'Capability source',
+      acceptanceCriteria: 'Artifact accepted', unitPriceCny: null, riskLevel: 'low' as const, enabled: true,
+      createdAt: NOW, updatedAt: NOW,
+    },
+    costs: [], tools: [], totalCostCny: 0, approval: null,
+    chainIntegrity: { valid: true as const, checked: 1 },
+  };
+  const receipt: OutcomeReceipt = { ...body, receiptJson: canonicalJson(body) };
+  const payload = {
+    outcomeDefinitionId: 'definition-capability', workOrderId: 'work-source', sessionId: 'demo-1',
+    approvalId: null, verdict: 'accepted', evidenceRef: `evidence://sha256/${ARTIFACT_SHA256}`,
+  };
+  const material = {
+    actorRef: 'human:owner', aggregateId: 'outcome-capability', aggregateType: 'outcome_event', aggregateVersion: 1,
+    correlationId: 'outcome-capability', id: 'event-outcome-capability', occurredAt: NOW,
+    payload, previousHash: null, tenantId: TENANT_A, type: 'outcome.accepted',
+  };
+  const event: StoredDomainEvent = {
+    position: 1, ...material, canonicalPayload: canonicalJson(payload), hash: sha256(canonicalJson(material)),
+  };
+  return createVerifiableReceipt(receipt, [event]);
+}
+
+function sha256(value: string | Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
 
 function author(version = 1, previousPackageDigest?: string): CapabilityPackageAuthorInput {
   return {
@@ -58,14 +101,17 @@ function author(version = 1, previousPackageDigest?: string): CapabilityPackageA
       demoSessionIds: ['demo-1'], expertActorRef: 'expert:alice', nodeId: NODE, device: 'laptop-a', runtime: 'codex',
       runtimeVersion: '1.0.0', agentVersion: '1.0.0', capturedAt: NOW,
     },
-    evidenceRefs: ['event-artifact', 'event-completed'], failureNotes: ['Fail closed.'],
+    evidenceRefs: [ARTIFACT_SHA256], failureNotes: ['Fail closed.'],
     declaredPermissions: [{ capability: 'network.read', access: 'read', paths: [] }],
-    regressionSuiteRef: 'suite-1', receiptRef: 'event-completed', status: 'draft', deletionAudit: {},
+    regressionSuiteRef: 'suite-1', receiptRef: OUTCOME_RECEIPT.manifest.rootHash, status: 'draft', deletionAudit: {},
   };
 }
 
 function versionInput(value: CapabilityPackageAuthorInput): CapabilityVersionCreateInput {
-  return { author: value, sourceTaskId: 'task-source', artifactEventId: 'event-artifact', completedEventId: 'event-completed' };
+  return {
+    author: value, sourceTaskId: 'task-source', artifactEventId: 'event-artifact', completedEventId: 'event-completed',
+    outcomeReceipt: OUTCOME_RECEIPT, artifactContentBase64: ARTIFACT_BYTES.toString('base64'),
+  };
 }
 
 function trial(packageDigest: string, index: number): SkillTrialSystemRecordInput {
@@ -104,7 +150,9 @@ async function bootstrap(store: FleetStore) {
       eventId, tenantId: TENANT_A, workOrderId: 'work-source', nodeId: NODE, seq, occurredAt: NOW, type,
       idempotencyKey: `key-${eventId}`,
     };
-    await store.putEvent(TENANT_A, { ...eventClaims, payload: type === 'artifact' ? { artifactId: 'artifact-1' } : {} }, eventClaims, NOW);
+    await store.putEvent(TENANT_A, { ...eventClaims, payload: type === 'artifact'
+      ? { artifactId: 'artifact-1', sha256: ARTIFACT_SHA256, bytes: ARTIFACT_BYTES.byteLength, relPath: 'outputs/result.txt' }
+      : {} }, eventClaims, NOW);
   };
   await event('event-started', 1, 'started');
   await event('event-artifact', 2, 'artifact');
@@ -168,12 +216,12 @@ for (const [name, factory] of [
       unknownEvidence.previousPackageDigest = second.packageDigest;
       unknownEvidence.evidenceRefs.push('foreign-event');
       await expect(store.createCapabilityVersion(TENANT_A, versionInput(unknownEvidence), 'human:owner', NOW))
-        .rejects.toMatchObject({ code: 'capability_not_found' });
+        .rejects.toMatchObject({ code: 'capability_trust_denied' });
       const unknownReceipt = structuredClone(unknownEvidence);
-      unknownReceipt.evidenceRefs = ['event-artifact', 'event-completed'];
+      unknownReceipt.evidenceRefs = [ARTIFACT_SHA256];
       unknownReceipt.receiptRef = 'foreign-receipt';
       await expect(store.createCapabilityVersion(TENANT_A, versionInput(unknownReceipt), 'human:owner', NOW))
-        .rejects.toMatchObject({ code: 'capability_not_found' });
+        .rejects.toMatchObject({ code: 'capability_trust_denied' });
     });
 
     it('binds trusted unique trials, read-only team shares, tenant visibility, and install decisions', async () => {

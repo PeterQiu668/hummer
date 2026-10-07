@@ -16,15 +16,21 @@ import {
   type TrialRecord,
 } from '@hummer/contracts';
 import { canonicalJson } from './canonical-json.js';
+import { verifySuccessfulOutcomeReceipt } from './outcome-receipt-verifier.js';
 import {
   FleetRejectedError,
+  type FleetObject,
+  type FleetTaskRecord,
+  type RunEventClaims,
   type CapabilityRegistryRecord,
   type CapabilityTrialRecordInput,
   type CapabilityVersionCreateInput,
 } from './ports.js';
 
 export function parseCapabilityVersionCreateInput(input: unknown): CapabilityVersionCreateInput {
-  const body = exactRecord(input, ['author', 'sourceTaskId', 'artifactEventId', 'completedEventId'], 'capability version');
+  const body = exactRecord(input, [
+    'author', 'sourceTaskId', 'artifactEventId', 'completedEventId', 'outcomeReceipt', 'artifactContentBase64',
+  ], 'capability version');
   const author = validateCapabilityContract('CapabilityPackageAuthorInput', body.author);
   if (author.issues) invalid(`invalid capability author input: ${author.issues[0]?.message}`);
   return {
@@ -32,7 +38,51 @@ export function parseCapabilityVersionCreateInput(input: unknown): CapabilityVer
     sourceTaskId: identifier(body.sourceTaskId, 'sourceTaskId'),
     artifactEventId: identifier(body.artifactEventId, 'artifactEventId'),
     completedEventId: identifier(body.completedEventId, 'completedEventId'),
+    outcomeReceipt: exactRecord(body.outcomeReceipt, [], 'outcomeReceipt', false),
+    artifactContentBase64: canonicalBase64(body.artifactContentBase64),
   };
+}
+
+export interface CapabilitySourceEvent {
+  claims: RunEventClaims;
+  event: FleetObject;
+}
+
+/**
+ * Verifies the transient receipt and artifact bytes against the persisted task
+ * facts. It returns no customer data and must run before any draft mutation.
+ */
+export function assertCapabilityDraftSource(args: {
+  tenantId: string;
+  input: CapabilityVersionCreateInput;
+  task: FleetTaskRecord;
+  events: readonly CapabilitySourceEvent[];
+}): void {
+  const { tenantId, input, task, events } = args;
+  const receipt = verifySuccessfulOutcomeReceipt(input.outcomeReceipt);
+  const artifact = events.find((entry) => entry.claims.eventId === input.artifactEventId && entry.claims.type === 'artifact');
+  const completed = events.find((entry) => entry.claims.eventId === input.completedEventId && entry.claims.type === 'completed');
+  if (!artifact || !completed || events.some((entry) => entry.claims.type === 'failed' || entry.claims.type === 'cancelled')) trustDenied();
+  if (artifact.claims.seq >= completed.claims.seq
+    || artifact.claims.nodeId !== task.targetNodeId || completed.claims.nodeId !== task.targetNodeId
+    || artifact.claims.tenantId !== tenantId || completed.claims.tenantId !== tenantId
+    || artifact.claims.workOrderId !== task.workOrderId || completed.claims.workOrderId !== task.workOrderId) trustDenied();
+
+  const payload = asRecord(artifact.event.payload);
+  const recordedSha256 = payload?.sha256;
+  const recordedBytes = payload?.bytes;
+  if (!digest(recordedSha256) || !Number.isSafeInteger(recordedBytes) || (recordedBytes as number) < 1) trustDenied();
+  const bytes = decodeCanonicalBase64(input.artifactContentBase64);
+  if (bytes.byteLength !== recordedBytes || sha256Bytes(bytes) !== recordedSha256) trustDenied();
+
+  const provenance = input.author.provenance;
+  if (receipt.tenantId !== tenantId || receipt.workOrderId !== task.workOrderId
+    || receipt.evidenceSha256 !== recordedSha256
+    || input.author.receiptRef !== receipt.rootHash
+    || input.author.evidenceRefs.length !== 1 || input.author.evidenceRefs[0] !== recordedSha256
+    || provenance.nodeId !== task.targetNodeId
+    || provenance.runtime !== task.targetRuntime
+    || !provenance.demoSessionIds.includes(receipt.sessionId)) trustDenied();
 }
 
 export function parseCapabilityTrialRecordInput(input: unknown): CapabilityTrialRecordInput {
@@ -196,11 +246,48 @@ export function capabilityRecordFromShare(source: CapabilityRegistryRecord, shar
   };
 }
 
-function exactRecord(input: unknown, allowed: readonly string[], subject: string): Record<string, unknown> {
+function exactRecord(input: unknown, allowed: readonly string[], subject: string, rejectUnknown = true): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(`${subject} must be an object`);
   const record = input as Record<string, unknown>;
-  if (Object.keys(record).some((key) => !allowed.includes(key))) invalid(`${subject} contains an unknown field`);
+  if (rejectUnknown && Object.keys(record).some((key) => !allowed.includes(key))) invalid(`${subject} contains an unknown field`);
   return record;
+}
+
+function canonicalBase64(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 349_528
+    || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    invalid('artifactContentBase64 must be non-empty canonical base64 up to 256 KiB');
+  }
+  const bytes = Buffer.from(value, 'base64');
+  if (bytes.length === 0 || bytes.length > 262_144 || bytes.toString('base64') !== value) {
+    invalid('artifactContentBase64 must be non-empty canonical base64 up to 256 KiB');
+  }
+  return value;
+}
+
+function decodeCanonicalBase64(value: unknown): Buffer {
+  try {
+    const canonical = canonicalBase64(value);
+    return Buffer.from(canonical, 'base64');
+  } catch {
+    trustDenied();
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function digest(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+
+function sha256Bytes(value: Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function trustDenied(): never {
+  throw new FleetRejectedError('capability_trust_denied', 'outcome receipt or capability source proof is invalid');
 }
 
 function identifier(value: unknown, field: string): string {
