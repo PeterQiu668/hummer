@@ -9,10 +9,11 @@ const modeConfig = {
       'deterministic eight-file Agent Skills export',
       'per-file SHA-256 and deterministic root hash',
       'strict manifest/meta/receipt linkage and tamper rejection',
+      'dependency-free external export and receipt verifier',
       'declared-permission and cross-tenant share install gates',
       'existing target refuses overwrite',
     ],
-    negativeCases: 44,
+    negativeCases: 45,
   },
   permissions: {
     pattern: 'CAP-PERMISSIONS',
@@ -26,8 +27,8 @@ const modeConfig = {
   },
   manifest: {
     pattern: 'CAP-MANIFEST',
-    evidence: ['manifest/meta/receipt bind one package digest', 'tampered file/digest/root/descriptor is rejected'],
-    negativeCases: 21,
+    evidence: ['manifest/meta/receipt bind one package digest', 'dependency-free external verifier accepts the exact bundle', 'tampered file/digest/root/descriptor is rejected'],
+    negativeCases: 22,
   },
   agentskills: {
     pattern: 'CAP-AGENTSKILLS',

@@ -339,6 +339,32 @@ describe('[CAP-MANIFEST] bundle and manifest verification', () => {
     expect(JSON.parse(verified.stdout)).toMatchObject({ valid: true, checkedEvents: 1 });
   });
 
+  it('passes the dependency-free external capability verifier and rejects tampered bytes', async () => {
+    const bundle = exportFixture();
+    const directory = await mkdtemp(join(tmpdir(), 'hummer-capability-external-verifier-'));
+    const validPath = join(directory, 'bundle.json');
+    await writeFile(validPath, `${JSON.stringify(bundle)}\n`, 'utf8');
+    const command = resolve('scripts/verify-capability-export.mjs');
+    const valid = spawnSync(process.execPath, [command, validPath], { encoding: 'utf8', windowsHide: true });
+    expect(valid.status, valid.stdout || valid.stderr).toBe(0);
+    expect(JSON.parse(valid.stdout)).toMatchObject({
+      valid: true,
+      packageId: bundle.package.packageId,
+      packageDigest: bundle.packageDigest,
+      rootHash: bundle.rootHash,
+      files: 8,
+    });
+
+    const tampered = mutableClone(bundle);
+    tampered.files['work.md'] += '\nTampered after export.\n';
+    const tamperedPath = join(directory, 'tampered.json');
+    await writeFile(tamperedPath, `${JSON.stringify(tampered)}\n`, 'utf8');
+    const denied = spawnSync(process.execPath, [command, tamperedPath], { encoding: 'utf8', windowsHide: true });
+    expect(denied.status).toBe(1);
+    expect(JSON.parse(denied.stderr)).toMatchObject({ valid: false, code: 'verification.failed' });
+    expect(denied.stderr).toContain('file.digest_mismatch:work.md');
+  });
+
   it('rejects altered bytes, digests, root hashes, descriptors and extra files', () => {
     const bundle = exportFixture();
     const contentTamper = mutableClone(bundle);
