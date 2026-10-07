@@ -18,6 +18,7 @@ const databasePath = join(scratch, 'fleet.sqlite');
 const taskGrantDatabasePath = join(scratch, 'task-grants.sqlite');
 const journalPath = join(scratch, 'execution.jsonl');
 const receiptRoot = join(scratch, 'receipts');
+const workspaceRoot = join(scratch, 'workspace');
 const relayConfigPath = join(scratch, 'relay.json');
 const nodeConfigPath = join(scratch, 'node.json');
 const evidenceRound = option('--evidence-round');
@@ -32,6 +33,7 @@ if (evidenceDir) {
 }
 
 const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+mkdirSync(workspaceRoot);
 writeJson(relayConfigPath, {
   schema: 'hummer.relay-config',
   version: 2,
@@ -70,7 +72,7 @@ try {
 
   writeJson(nodeConfigPath, {
     schema: 'hummer.node-agent-config',
-    version: 2,
+    version: 3,
     nodeId,
     tenantId,
     relayBaseUrl: `${ready.address}/`,
@@ -80,12 +82,13 @@ try {
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath,
     receiptRoot,
+    workspaceRoot,
     heartbeatIntervalMs: 15_000,
     pollIntervalMs: 100,
     approvalTtlMs: 300_000,
     runtime: { provider: 'codex' },
-    capabilities: ['workspace.exec'],
-    mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read', 'doc_extract', 'workspace_exec'] },
+    capabilities: ['fs.read'],
+    mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read'] },
     approval: { riskClass: 'write' },
   });
   node = startChild(
@@ -93,12 +96,13 @@ try {
     { HUMMER_GATE_NODE_BADGE: nodeToken, HUMMER_GATE_GRANT_TOKEN: grantToken },
   );
   const nodeReady = await waitForJson(node, (entry) => entry?.event === 'daemon.ready', 45_000);
-  check(nodeReady.executionMode === 'unavailable', 'Node daemon must advertise the fail-closed unavailable executor');
+  check(nodeReady.executionMode === 'fs.read.attest.v1', 'Node daemon must advertise only the read attestation executor');
 
   const nodes = await controlRequest(ready.address, '/v1/control/nodes');
   check(nodes.nodes?.some((entry) => entry.nodeId === nodeId), 'Node daemon was not registered in Relay SQLite state');
   const registered = nodes.nodes.find((entry) => entry.nodeId === nodeId);
-  check(registered?.manifest?.mcp?.tools?.join(',') === 'fs_read,doc_extract,workspace_exec', 'Node manifest did not expose exactly the three required MCP tool names');
+  check(registered?.manifest?.capabilities?.join(',') === 'fs.read', 'Node manifest exposed a capability beyond fs.read');
+  check(registered?.manifest?.mcp?.tools?.join(',') === 'fs_read', 'Node manifest did not expose exactly the read-only MCP inventory name');
 
   const enqueued = await controlRequest(ready.address, '/v1/tasks/enqueue', {
     schema: 'hummer.task-envelope',
@@ -162,7 +166,7 @@ try {
     }],
     limitations: [
       'Both child processes ran on one Windows machine over loopback; this is not two-device or external-network evidence.',
-      'The production executor is intentionally unavailable, so this gate proves safe handoff and approval blocking, not task execution.',
+      'This gate proves safe handoff and approval blocking only; read-attestation execution is covered by a separate real HTTP and SQLite integration test.',
       'Static high-entropy badges are bootstrap credentials, not production IdP issuance or revocation.',
       'Windows child termination does not prove JavaScript signal handlers ran; package-level tests separately verify SQLite remains readable.',
     ],

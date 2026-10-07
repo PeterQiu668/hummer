@@ -12,7 +12,7 @@ The daemon config is strict JSON (`additionalProperties: false` semantics):
 ```json
 {
   "schema": "hummer.node-agent-config",
-  "version": 2,
+  "version": 3,
   "nodeId": "node-office-1",
   "tenantId": "tenant-example",
   "relayBaseUrl": "https://relay.example.invalid/",
@@ -22,12 +22,13 @@ The daemon config is strict JSON (`additionalProperties: false` semantics):
   "grantScopes": ["node.heartbeat", "task.claim", "approval.request", "task.execute"],
   "journalPath": "C:\\Hummer\\state\\execution.jsonl",
   "receiptRoot": "C:\\Hummer\\state\\receipts",
+  "workspaceRoot": "C:\\Hummer\\workspace",
   "heartbeatIntervalMs": 20000,
   "pollIntervalMs": 1000,
   "approvalTtlMs": 300000,
   "runtime": { "provider": "codex" },
-  "capabilities": ["fs.read", "doc.extract", "workspace.exec"],
-  "mcp": { "endpoint": "stdio://hummer-local", "tools": ["fs_read", "doc_extract", "workspace_exec"] },
+  "capabilities": ["fs.read"],
+  "mcp": { "endpoint": "stdio://hummer-local", "tools": ["fs_read"] },
   "approval": { "riskClass": "unknown" }
 }
 ```
@@ -37,10 +38,12 @@ written to the config. The process reads each token once and deletes that
 environment entry immediately. Plain HTTP Relay URLs are accepted only on
 loopback.
 
-This daemon intentionally does **not** claim to execute production tasks yet.
-It registers a formal `NodeManifest`, heartbeats, receives work, and creates a
-deterministically bound `ApprovalRequest`. If a request is approved, execution
-fails closed with `executor_unavailable` until a production runtime adapter is
-explicitly injected. Portable OutcomeReceipt verification and node-owned,
-create-only receipt persistence are wired before that adapter. Runtime probes and MCP
-metadata are inventory, not proof that a safe executor exists.
+The only production executor enabled by this daemon is `fs.read.attest.v1`.
+It reads one explicitly planned relative file below `workspaceRoot`, only after
+a human approval and one-use task grant bind both `task.execute` and `fs.read`
+to that exact path. It emits only the relative path, byte count, and SHA-256;
+file content is never returned or logged. Symlinks/reparse points, hard links,
+path traversal, absolute paths, aliases, files over 1 MiB, and changing files
+fail closed. Every other task type still fails with `unsupported_execution_plan`.
+Portable OutcomeReceipt verification and node-owned, create-only receipt
+persistence remain mandatory before a run can become terminally completed.

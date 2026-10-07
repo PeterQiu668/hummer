@@ -44,6 +44,7 @@ const taskEnvelope = {
   tenantId: 'tenant_acme', targetNodeId: 'node-main-win', targetRuntime: 'codex',
   idempotencyKey: 'idem-0001', leaseMs: 30_000, approvalPolicyRef: 'policy-default-deny',
   expiresAt: later, originRef: 'work-order-parent',
+  executionPlan: { kind: 'fs.read.attest.v1', path: 'input/order.docx', maxBytes: 1_048_576 },
 };
 
 function runEvent(seq, type, payload) {
@@ -141,6 +142,17 @@ rejected('TaskEnvelope', pathEscape, 'TaskEnvelope: attachment path escape');
 const absolutePath = structuredClone(taskEnvelope);
 absolutePath.workOrderTask.attachmentNames = ['C:/secret.txt'];
 rejected('TaskEnvelope', absolutePath, 'TaskEnvelope: absolute attachment path');
+for (const path of ['../secret.txt', '/secret.txt', 'C:/secret.txt', 'input\\secret.txt', 'input/secret.txt:stream', './input.txt', 'input//file.txt', 'input/']) {
+  const invalidPlan = structuredClone(taskEnvelope);
+  invalidPlan.executionPlan.path = path;
+  rejected('TaskEnvelope', invalidPlan, `TaskEnvelope: unsafe execution path ${path}`);
+}
+const unknownPlan = structuredClone(taskEnvelope);
+unknownPlan.executionPlan.autoApprove = true;
+rejected('TaskEnvelope', unknownPlan, 'TaskEnvelope: execution plan unknown field');
+const oversizedPlan = structuredClone(taskEnvelope);
+oversizedPlan.executionPlan.maxBytes = 1_048_577;
+rejected('TaskEnvelope', oversizedPlan, 'TaskEnvelope: execution plan byte ceiling');
 rejected('NodeManifest', { ...nodeManifest, agentVersion: 'latest' }, 'NodeManifest: non-semantic agent version');
 rejected('NodeManifest', { ...nodeManifest, load: { ...nodeManifest.load, cpuPct: 100.1 } }, 'NodeManifest: cpu over limit');
 rejected('ApprovalRequest', { ...approvalRequest, requestedBy: 'human:owner' }, 'ApprovalRequest: human requester');

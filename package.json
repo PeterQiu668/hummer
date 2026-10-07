@@ -42,6 +42,8 @@
     "capture:desktop:outbox": "node scripts/capture-desktop-outbox-evidence.mjs",
     "capture:p1:task-grant-receipt": "node scripts/capture-p1-task-grant-receipt-evidence.mjs",
     "capture:p1:durable-grant": "node scripts/capture-p1-durable-grant-evidence.mjs",
+    "capture:p1:fs-read": "node scripts/capture-p1-fs-read-attestation-evidence.mjs",
+    "test:p1:fs-read": "npm run test:contract && npm run typecheck -w @hummer/node-agent && npm test -w @hummer/node-agent && npm run test:fs-read -w @hummer/relay",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",

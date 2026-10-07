@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -11,12 +11,14 @@ import {
   consumeDaemonCredentials,
   validateNodeDaemonConfig,
 } from '../src/daemon.mjs';
+import { createSharedFleetContractValidator } from '../src/contract-validator.mjs';
+import { portableOutcomeReceiptValidator } from '../src/outcome-receipt-validator.mjs';
 
 function config(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hummer-node-daemon-'));
   return {
     schema: 'hummer.node-agent-config',
-    version: 2,
+    version: 3,
     nodeId: 'node-test-1',
     tenantId: 'tenant-test',
     relayBaseUrl: 'http://127.0.0.1:43210/',
@@ -26,11 +28,12 @@ function config(overrides = {}) {
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath: join(root, 'execution.jsonl'),
     receiptRoot: join(root, 'receipts'),
+    workspaceRoot: join(root, 'workspace'),
     heartbeatIntervalMs: 15_000,
     pollIntervalMs: 100,
     approvalTtlMs: 60_000,
     runtime: { provider: 'codex' },
-    capabilities: [],
+    capabilities: ['fs.read'],
     mcp: { endpoint: 'stdio://hummer-local', tools: [] },
     approval: { riskClass: 'unknown' },
     ...overrides,
@@ -64,6 +67,10 @@ test('daemon config is versioned, exact, absolute, and rejects non-loopback HTTP
   assert.throws(() => validateNodeDaemonConfig(config({ version: 1 })), { code: 'unsupported_daemon_config' });
   assert.throws(() => validateNodeDaemonConfig(config({ journalPath: 'relative.jsonl' })), { code: 'invalid_daemon_config' });
   assert.throws(() => validateNodeDaemonConfig(config({ receiptRoot: 'relative-receipts' })), { code: 'invalid_daemon_config' });
+  assert.throws(() => validateNodeDaemonConfig(config({ workspaceRoot: 'relative-workspace' })), { code: 'invalid_daemon_config' });
+  assert.throws(() => validateNodeDaemonConfig(config({ capabilities: ['workspace.exec'] })), { code: 'invalid_daemon_config' });
+  const overlap = config();
+  assert.throws(() => validateNodeDaemonConfig({ ...overlap, receiptRoot: join(overlap.workspaceRoot, 'receipts') }), { code: 'invalid_daemon_config' });
   assert.throws(
     () => validateNodeDaemonConfig(config({ relayBaseUrl: 'http://192.0.2.10:8787/' })),
     { code: 'invalid_daemon_config' },
@@ -96,6 +103,30 @@ test('approval request is deterministic, scoped, redacted, and human-gated', () 
     () => buildDeterministicApprovalRequest({ ...input, envelope: envelope({ tenantId: 'tenant-other' }) }),
     { code: 'task_scope_mismatch' },
   );
+});
+
+test('read attestation approval binds one explicit path and never includes task prose', () => {
+  const parsed = validateNodeDaemonConfig(config());
+  const request = buildDeterministicApprovalRequest({
+    claimId: 'delivery-test-001', config: parsed, now: new Date('2026-10-07T00:00:00.000Z'),
+    envelope: envelope({
+      grantRef: 'grant:read-1',
+      executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/approved.txt', maxBytes: 4096 },
+      workOrderTask: {
+        schema: 'hummer.work-order-task', version: 1, title: 'CANARY-CONTENT',
+        target: 'CANARY-CONTENT', expectedDeliverable: 'CANARY-CONTENT',
+      },
+    }),
+  });
+  assert.equal(request.action, 'fs.read.attest.v1');
+  assert.equal(request.target, 'delivery-test-001');
+  assert.deepEqual(request.requestedScope, {
+    capabilities: ['task.execute', 'fs.read'], paths: ['reports/approved.txt'], maxUses: 1,
+  });
+  assert.deepEqual(createSharedFleetContractValidator(portableOutcomeReceiptValidator).validateApprovalRequest(request), {
+    ok: true, value: request,
+  });
+  assert.equal(JSON.stringify(request).includes('CANARY-CONTENT'), false);
 });
 
 test('real CLI subprocess fails closed for missing env, non-loopback HTTP, and unknown config fields', async () => {
@@ -173,11 +204,13 @@ test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, a
   const address = server.address();
   assert.equal(typeof address, 'object');
   const root = mkdtempSync(join(tmpdir(), 'hummer-node-cli-'));
+  mkdirSync(join(root, 'workspace'));
   const configPath = join(root, 'node.json');
   writeFileSync(configPath, JSON.stringify(config({
     relayBaseUrl: `http://127.0.0.1:${address.port}/`,
     journalPath: join(root, 'execution.jsonl'),
     receiptRoot: join(root, 'receipts'),
+    workspaceRoot: join(root, 'workspace'),
   })), 'utf8');
 
   const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'bin', 'hummer-node.mjs'), 'run', '--config', configPath], {

@@ -358,7 +358,7 @@ export class HummerNodeAgent {
         runId: localRequest.runId,
         capabilities: [...decision.grantedScope.capabilities],
         paths: [...(decision.grantedScope.paths ?? [])],
-        maxUses: 1,
+        maxUses: /** @type {const} */ (1),
       } : undefined,
     };
     this.#executing.set(claimId, execution);

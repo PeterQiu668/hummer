@@ -50,6 +50,10 @@ All serialized fleet contracts are limited to 65,536 UTF-8 bytes. A UTF-8 BOM an
 | NodeManifest | version | integer | yes | 1 |
 | TaskEnvelope | approvalPolicyRef | string | yes | - |
 | TaskEnvelope | capabilityRef | string | no | - |
+| TaskEnvelope | executionPlan | object | no | - |
+| TaskEnvelope | executionPlan.kind | string | yes | fs.read.attest.v1 |
+| TaskEnvelope | executionPlan.maxBytes | integer | yes | - |
+| TaskEnvelope | executionPlan.path | string | yes | - |
 | TaskEnvelope | expiresAt | string | yes | - |
 | TaskEnvelope | grantRef | string | no | - |
 | TaskEnvelope | idempotencyKey | string | yes | - |

@@ -5,6 +5,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { createSharedFleetContractValidator } from './contract-validator.mjs';
 import { NodeAgentError } from './errors.mjs';
 import { FileExecutionJournal, canonicalJson } from './execution-journal.mjs';
+import { FsReadAttestationExecutor } from './fs-read-attestation-executor.mjs';
 import { HummerNodeAgent } from './node-agent.mjs';
 import { portableOutcomeReceiptValidator } from './outcome-receipt-validator.mjs';
 import { FileOutcomeReceiptStore } from './receipt-store.mjs';
@@ -13,7 +14,7 @@ import { probeAllRuntimes } from './runtime-probes.mjs';
 import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
 
 const CONFIG_SCHEMA = 'hummer.node-agent-config';
-const CONFIG_VERSION = 2;
+const CONFIG_VERSION = 3;
 const PROVIDERS = new Set(['codex', 'claude', 'deepseek', 'cli-other']);
 const RISK_CLASSES = new Set(['egress', 'write', 'spend', 'delete', 'privilege', 'network', 'unknown']);
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -21,9 +22,9 @@ const ACTOR_SAFE_ID = /^[A-Za-z0-9_-]+$/u;
 
 /**
  * @typedef {{
- * schema: 'hummer.node-agent-config', version: 2, nodeId: string, tenantId: string,
+ * schema: 'hummer.node-agent-config', version: 3, nodeId: string, tenantId: string,
  * relayBaseUrl: string, badgeTokenEnv: string, grantTokenEnv: string,
- * grantExpiresAt: string, grantScopes: string[], journalPath: string, receiptRoot: string,
+ * grantExpiresAt: string, grantScopes: string[], journalPath: string, receiptRoot: string, workspaceRoot: string,
  * heartbeatIntervalMs: number, pollIntervalMs: number, approvalTtlMs: number,
  * runtime: {provider: 'codex'|'claude'|'deepseek'|'cli-other', executable?: string},
  * capabilities: string[], mcp: {endpoint: string, tools: string[]},
@@ -53,7 +54,7 @@ export async function readNodeDaemonConfig(configPath) {
 export function validateNodeDaemonConfig(value) {
   const input = assertExactRecord(value, [
     'schema', 'version', 'nodeId', 'tenantId', 'relayBaseUrl', 'badgeTokenEnv', 'grantTokenEnv',
-    'grantExpiresAt', 'grantScopes', 'journalPath', 'receiptRoot', 'heartbeatIntervalMs', 'pollIntervalMs',
+    'grantExpiresAt', 'grantScopes', 'journalPath', 'receiptRoot', 'workspaceRoot', 'heartbeatIntervalMs', 'pollIntervalMs',
     'approvalTtlMs', 'runtime', 'capabilities', 'mcp', 'approval',
   ], 'invalid_daemon_config', 'Node Agent daemon config');
   if (input.schema !== CONFIG_SCHEMA || input.version !== CONFIG_VERSION) {
@@ -79,8 +80,12 @@ export function validateNodeDaemonConfig(value) {
   }
   const journalPath = absolutePath(input.journalPath, 'journalPath');
   const receiptRoot = absolutePath(input.receiptRoot, 'receiptRoot');
+  const workspaceRoot = absolutePath(input.workspaceRoot, 'workspaceRoot');
   if (normalizePath(receiptRoot) === normalizePath(journalPath)) {
     throw new NodeAgentError('invalid_daemon_config', 'receiptRoot must be separate from journalPath');
+  }
+  if (pathsOverlap(workspaceRoot, receiptRoot) || pathInside(workspaceRoot, journalPath)) {
+    throw new NodeAgentError('invalid_daemon_config', 'workspaceRoot must be separate from journalPath and receiptRoot');
   }
   const heartbeatIntervalMs = integerInRange(input.heartbeatIntervalMs, 'heartbeatIntervalMs', 15_000, 30_000);
   const pollIntervalMs = integerInRange(input.pollIntervalMs, 'pollIntervalMs', 100, 60_000);
@@ -102,6 +107,9 @@ export function validateNodeDaemonConfig(value) {
     tools: stringList(mcpInput.tools, 'mcp.tools', 0, 128),
   };
   const capabilities = stringList(input.capabilities, 'capabilities', 0, 128);
+  if (capabilities.length !== 1 || capabilities[0] !== 'fs.read') {
+    throw new NodeAgentError('invalid_daemon_config', 'version 3 advertises only the fs.read capability');
+  }
   const approvalInput = assertExactRecord(input.approval, ['riskClass'], 'invalid_daemon_config', 'approval');
   const riskClass = requireNonEmptyString(approvalInput.riskClass, 'invalid_daemon_config', 'approval.riskClass');
   if (!RISK_CLASSES.has(riskClass)) throw new NodeAgentError('invalid_daemon_config', `Unsupported approval riskClass: ${riskClass}`);
@@ -118,6 +126,7 @@ export function validateNodeDaemonConfig(value) {
     grantScopes,
     journalPath,
     receiptRoot,
+    workspaceRoot,
     heartbeatIntervalMs,
     pollIntervalMs,
     approvalTtlMs,
@@ -152,7 +161,7 @@ export function consumeDaemonCredentials(config, environment = process.env) {
 export function buildDeterministicApprovalRequest(input) {
   const envelope = assertExactRecord(input.envelope, [
     'schema', 'version', 'workOrderTask', 'tenantId', 'targetNodeId', 'targetRuntime',
-    'idempotencyKey', 'leaseMs', 'approvalPolicyRef', 'grantRef', 'expiresAt', 'originRef', 'capabilityRef',
+    'idempotencyKey', 'leaseMs', 'approvalPolicyRef', 'grantRef', 'expiresAt', 'originRef', 'capabilityRef', 'executionPlan',
   ], 'invalid_task_envelope', 'TaskEnvelope');
   const claimId = requireNonEmptyString(input.claimId, 'invalid_claim', 'claimId');
   if (envelope.tenantId !== input.config.tenantId || envelope.targetNodeId !== input.config.nodeId) {
@@ -172,6 +181,8 @@ export function buildDeterministicApprovalRequest(input) {
     nodeId: input.config.nodeId,
     idempotencyKey: envelope.idempotencyKey,
   }), 'utf8').digest('hex');
+  const plan = envelope.executionPlan;
+  const readPlan = isFsReadPlan(plan) ? plan : undefined;
   return {
     schema: 'hummer.approval-request',
     version: 1,
@@ -181,10 +192,14 @@ export function buildDeterministicApprovalRequest(input) {
     nodeId: input.config.nodeId,
     runId: `run-${digest.slice(0, 32)}`,
     riskClass: input.config.approval.riskClass,
-    action: 'task.execute',
+    action: readPlan ? 'fs.read.attest.v1' : 'task.execute',
     target: claimId,
-    redactedPreview: 'Task execution is unavailable until a human approves the bound request.',
-    requestedScope: { capabilities: ['task.execute'], maxUses: 1 },
+    redactedPreview: readPlan
+      ? `Read-only attestation of one approved path (maximum ${readPlan.maxBytes} bytes); file content is not returned.`
+      : 'Task execution is unavailable until a human approves the bound request.',
+    requestedScope: readPlan
+      ? { capabilities: ['task.execute', 'fs.read'], paths: [readPlan.path], maxUses: 1 }
+      : { capabilities: ['task.execute'], maxUses: 1 },
     expiresAt: new Date(approvalExpiry).toISOString(),
     requestedBy: `system:${input.config.nodeId}`,
   };
@@ -211,7 +226,7 @@ export function buildNodeManifest(config, probes, running = 0) {
     capabilities: config.capabilities,
     mcp: config.mcp,
     load: { running, queued: 0 },
-    untrustedNotes: 'Production task executor adapter is unavailable; execution remains fail-closed.',
+    untrustedNotes: 'Only fs.read.attest.v1 is executable; runtime probes and MCP metadata are inventory only.',
   };
 }
 
@@ -247,6 +262,7 @@ export class NodeAgentDaemon {
       receiptStore: this.receiptStore,
     });
     this.probeRunner = options.probeRunner;
+    this.executor = new FsReadAttestationExecutor({ workspaceRoot: options.config.workspaceRoot });
     const transport = this.#trackingTransport(this.client);
     this.agent = new HummerNodeAgent({
       nodeId: options.config.nodeId,
@@ -261,11 +277,7 @@ export class NodeAgentDaemon {
       },
       transport,
       contractValidator: /** @type {any} */ (createSharedFleetContractValidator(portableOutcomeReceiptValidator)),
-      executor: {
-        execute: async () => {
-          throw new NodeAgentError('executor_unavailable', 'No production runtime executor adapter is configured');
-        },
-      },
+      executor: this.executor,
       journal: new FileExecutionJournal({ path: options.config.journalPath }),
     });
   }
@@ -276,6 +288,7 @@ export class NodeAgentDaemon {
     if (this.#started) throw new NodeAgentError('daemon_already_started', 'Node Agent daemon is already running');
     if (this.#closed) throw new NodeAgentError('daemon_closed', 'Node Agent daemon cannot restart after closing');
     this.#started = true;
+    await this.executor.initialize();
     await this.receiptStore.initialize();
     const probeOptions = this.config.runtime.provider === 'cli-other'
       ? { cliOtherExecutable: this.config.runtime.executable }
@@ -286,14 +299,21 @@ export class NodeAgentDaemon {
     await this.agent.heartbeatOnce(initialManifest);
     this.agent.startHeartbeat(() => this.#manifest(), (error) => this.#logError('heartbeat.failed', error));
     this.#events = this.client.connectAgent(this.agent, {
-      onState: async (state) => this.#handleAgentState(state),
+      onState: async (state) => {
+        try {
+          await this.#handleAgentState(state);
+        } catch (error) {
+          this.#logError('relay.state.failed', error);
+          throw error;
+        }
+      },
       onError: (error) => this.#logError('relay.events.failed', error),
     });
     void this.#events.done.catch((error) => this.#logError('relay.events.closed', error));
     this.#pollTimer = setInterval(() => { void this.#tick(); }, this.config.pollIntervalMs);
     this.#pollTimer.unref();
     await this.#tick();
-    this.#log({ event: 'daemon.ready', nodeId: this.config.nodeId, tenantId: this.config.tenantId, executionMode: 'unavailable' });
+    this.#log({ event: 'daemon.ready', nodeId: this.config.nodeId, tenantId: this.config.tenantId, executionMode: 'fs.read.attest.v1' });
   }
 
   async close(reason = 'shutdown') {
@@ -445,6 +465,27 @@ function absolutePath(value, label) {
 function normalizePath(value) {
   const normalized = resolve(value).replace(/[\\/]+$/u, '');
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+/** @param {string} parent @param {string} child */
+function pathInside(parent, child) {
+  const parentPath = `${normalizePath(parent)}${sepForPath()}`;
+  return normalizePath(child).startsWith(parentPath);
+}
+
+/** @param {string} first @param {string} second */
+function pathsOverlap(first, second) {
+  return normalizePath(first) === normalizePath(second) || pathInside(first, second) || pathInside(second, first);
+}
+
+function sepForPath() { return process.platform === 'win32' ? '\\' : '/'; }
+
+/** @param {unknown} value @returns {value is {kind: 'fs.read.attest.v1', path: string, maxBytes: number}} */
+function isFsReadPlan(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const plan = /** @type {Record<string, unknown>} */ (value);
+  return plan.kind === 'fs.read.attest.v1' && typeof plan.path === 'string'
+    && Number.isInteger(plan.maxBytes) && Number(plan.maxBytes) >= 1 && Number(plan.maxBytes) <= 1024 * 1024;
 }
 
 /** @param {unknown} value @param {string} label @param {number} minimum @param {number} maximum */

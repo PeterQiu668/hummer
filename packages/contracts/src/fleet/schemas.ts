@@ -16,6 +16,21 @@ const RelativePath = Type.String({
   pattern: '^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$',
 });
 
+const FsReadAttestationPath = Type.String({
+  minLength: 1,
+  maxLength: 1024,
+  pattern: '^(?![A-Za-z]:)(?!/)(?!.*:)(?!.*[\\x00-\\x1F\\x7F])(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\/$).+$',
+});
+
+export const ExecutionPlanSchema = Type.Object(
+  {
+    kind: Type.Literal('fs.read.attest.v1'),
+    path: FsReadAttestationPath,
+    maxBytes: Type.Integer({ minimum: 1, maximum: 1_048_576 }),
+  },
+  { additionalProperties: false },
+);
+
 export const RuntimeKindSchema = Type.Union([
   Type.Literal('codex'),
   Type.Literal('claude'),
@@ -115,6 +130,7 @@ export const TaskEnvelopeSchema = Type.Object(
     expiresAt: IsoUtc,
     originRef: Identifier,
     capabilityRef: Type.Optional(Identifier),
+    executionPlan: Type.Optional(ExecutionPlanSchema),
   },
   { $id: 'hummer.task-envelope.v1', additionalProperties: false },
 );
@@ -336,6 +352,7 @@ export type RuntimeKind = Static<typeof RuntimeKindSchema>;
 export type RuntimeProbe = Static<typeof RuntimeProbeSchema>;
 export type NodeManifest = Static<typeof NodeManifestSchema>;
 export type WorkOrderTask = Static<typeof WorkOrderTaskSchema>;
+export type ExecutionPlan = Static<typeof ExecutionPlanSchema>;
 export type TaskEnvelope = Static<typeof TaskEnvelopeSchema>;
 export type RunEvent = Static<typeof RunEventSchema>;
 export type RiskClass = Static<typeof RiskClassSchema>;
