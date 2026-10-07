@@ -59,6 +59,7 @@
     "test:watch": "vitest --config vitest.ui.config.ts",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:web-e2e": "node scripts/e2e-web-relay.mjs",
+    "test:desktop:hitl-matrix": "npm run desktop:build && node scripts/e2e-desktop-web-relay-hitl.mjs",
     "desktop:build": "npm run build -w @hummer/desktop",
     "desktop:start": "npm run start -w @hummer/desktop",
     "desktop:package:win": "npm run build && npm run desktop:build && npm run package:win -w @hummer/desktop",
