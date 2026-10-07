@@ -7,6 +7,7 @@ export * from './fleet-service.js';
 export * from './governance.js';
 export * from './memory-store.js';
 export * from './ports.js';
+export * from './relay-config.js';
 export * from './sqlite-store.js';
 export * from './trusted-bundle-relay.js';
 export * from './trusted-bundle-sqlite-store.js';

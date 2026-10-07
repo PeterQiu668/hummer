@@ -164,12 +164,16 @@ export class RelayHttpClient {
     return this.#request('POST', `/v1/tasks/${segment(taskId)}/stop`);
   }
 
-  /** Publishes an already approved immutable eight-file bundle through a control badge. */
+  /** @param {unknown} bundle Publishes an already approved immutable eight-file bundle through a control badge. */
   async publishTrustedBundle(bundle) {
     return this.#request('POST', '/v1/trusted-bundles', bundle);
   }
 
-  /** Downloads a node-bound bundle without writing to the filesystem. */
+  /**
+   * Downloads a node-bound bundle without writing to the filesystem.
+   * @param {string} bundleId
+   * @param {TransportContext} context
+   */
   async fetchTrustedBundle(bundleId, context) {
     const response = requireRecord(await this.#request(
       'GET', `/v1/nodes/${segment(context.nodeId)}/trusted-bundles/${segment(bundleId)}`, undefined, context,

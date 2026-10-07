@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-daemon-integration-final2",
+  "generatedAt": "2026-10-07T03:25:13.762Z",
+  "gitCommit": "b7c5f1c629ec16d5a05a9f82f4cdaa1d35e0c75a",
+  "prevManifestRootHash": "2aa6d0578d2110d1cddda9c1c6830f5ee1aca109fc0014d6bce6a72c8ed48283",
+  "files": [
+    {
+      "path": "evidence/round-p1-daemon-integration-final2/gate.json",
+      "sha256": "5d74b8f0c394bb01daf5ff3a940f05a012537415b4d13590bf9c5c8248eaf84a",
+      "bytes": 1469
+    }
+  ],
+  "rootHash": "9fd97e3dd48193a6b19afbe1abd067b89d5d0284aad03898411da9bef61f2ef7"
+}

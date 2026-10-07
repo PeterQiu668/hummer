@@ -1,6 +1,10 @@
-# HUMMER Windows node agent (Phase 0 D2 skeleton)
+# HUMMER Windows node agent (Phase 0 D2 local daemon)
 
-Status: local alpha skeleton with the frozen D1 contract adapter. This document does **not** claim that a network Relay, two-machine display, 60-second offline detection, or cross-machine execution has passed. Those gates still require transport integration and real-device evidence.
+Status: runnable local alpha daemon with the frozen D1 contract adapter and a
+real loopback HTTP/SSE Relay client. This document does **not** claim that an
+external Relay, two-machine display, 60-second offline detection, or
+cross-machine execution has passed. Those gates still require deployment and
+real-device evidence.
 
 ## Boundary
 
@@ -179,6 +183,20 @@ side effect already completed before the checkpoint.
 
 ## Local verification
 
+Build/install tooling creates the Windows `.cmd` shim from package `bin`
+metadata. From a source checkout, start the daemon directly after preparing a
+strict JSON config whose credential fields contain environment-variable names,
+not tokens:
+
+```powershell
+node apps/node-agent/bin/hummer-node.mjs run --config C:\absolute\node-agent.json
+```
+
+The runnable daemon probes runtimes, registers, heartbeats, connects SSE,
+polls, claims, and requests approval. Its production executor is deliberately
+unavailable and returns `executor_unavailable`; runtime availability is not
+execution authority.
+
 ```powershell
 npm.cmd run typecheck -w @hummer/node-agent
 npm.cmd test -w @hummer/node-agent
@@ -188,8 +206,7 @@ The tests include missing runtime, failed version probe, unknown provider, malfo
 
 ## Remaining integration gates
 
-- Construct a real contract-valid `NodeManifest` heartbeat from runtime probes and active-lease load.
-- Bind a D3 Relay adapter and persist pending claims in HUMMER's authoritative task store.
-- Bind existing trusted `fs_read`, `doc_extract`, and sandboxed `workspace_exec` handlers without moving their policy boundary into the node.
+- Bind existing trusted `fs_read`, `doc_extract`, and sandboxed
+  `workspace_exec` handlers without moving their policy boundary into the node.
 - Run two real nodes, prove offline within 60 seconds, and prove offline nodes receive no dispatch (`AC-P0-03`).
 - Run ten cross-machine tasks with zero duplicate execution (`AC-P0-04`).

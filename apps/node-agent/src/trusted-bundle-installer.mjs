@@ -8,25 +8,29 @@ import { NodeAgentError } from './errors.mjs';
 const ROOT_MARKER = '.hummer-synthetic-install-root.json';
 const ROOT_MARKER_BYTES = '{"purpose":"trusted-bundle-e2e-synthetic-only","schema":"hummer.synthetic-install-root","version":1}\n';
 
+/** @param {unknown} value @param {string} label */
 function safeSegment(value, label) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) || /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(value)) {
     throw new NodeAgentError('install_path_invalid', `${label} is not a safe path segment`);
   }
   return value;
 }
+/** @param {string} value */
 function normalized(value) { const result = resolve(value).replaceAll('\\', '/'); return process.platform === 'win32' ? result.toLowerCase() : result; }
+/** @param {string} value @param {string} label */
 async function assertPlainDirectory(value, label) {
   const status = await lstat(value).catch(() => null);
   if (!status || status.isSymbolicLink() || !status.isDirectory()) throw new NodeAgentError('install_root_invalid', `${label} must be an existing plain directory`);
   if (normalized(await realpath(value)) !== normalized(value)) throw new NodeAgentError('install_root_invalid', `${label} must not resolve through a reparse or symlink path`);
 }
+/** @param {string} root */
 async function assertSyntheticRoot(root) {
   await assertPlainDirectory(root, 'installRoot');
   const content = await readFile(resolve(root, ROOT_MARKER), 'utf8').catch(() => '');
   if (content !== ROOT_MARKER_BYTES) throw new NodeAgentError('install_root_invalid', 'install root is not marked synthetic-only');
 }
 
-/** Creates the only root this kernel is authorized to mutate. */
+/** @param {string} installRoot Creates the only root this kernel is authorized to mutate. */
 export async function initializeSyntheticTrustedBundleRoot(installRoot) {
   const root = resolve(installRoot);
   await mkdir(root, { recursive: false, mode: 0o700 });
@@ -34,6 +38,7 @@ export async function initializeSyntheticTrustedBundleRoot(installRoot) {
   await writeFile(resolve(root, ROOT_MARKER), ROOT_MARKER_BYTES, { encoding: 'utf8', flag: 'wx', mode: 0o400 });
   return root;
 }
+/** @param {string} stage */
 async function cleanupStage(stage) {
   await chmod(stage, 0o700).catch(() => undefined);
   for (const name of TRUSTED_BUNDLE_FILES) {
@@ -43,7 +48,11 @@ async function cleanupStage(stage) {
   await rmdir(stage).catch(() => undefined);
 }
 
-/** Revalidates Relay bytes and uses an atomic directory rename after a separate human approval. */
+/**
+ * Revalidates Relay bytes and uses an atomic directory rename after a separate human approval.
+ * @param {any} input
+ * @param {{atomicRename?: typeof rename}} [platform]
+ */
 export async function installTrustedBundleToSyntheticRoot(input, platform = {}) {
   const bundleResult = validateTrustedBundleContract('TrustedBundleEnvelopeV1', input?.bundle);
   if (bundleResult.issues) throw new NodeAgentError('invalid_trusted_bundle', bundleResult.issues[0]?.message ?? 'trusted bundle is invalid');

@@ -13,6 +13,7 @@ These root commands are evidence adapters over the checked-in Relay and Node Age
 | `npm run test:chaos -- --revoke` | old token fails at the next Registry and Fastify authorization checkpoint | an already-running executor still needs a node-side checkpoint hook |
 | `npm run test:chaos -- --process-kill` | forcibly killed Node Agent recovers an `executing` journal as `recovery_required` in a fresh process, with zero executor calls | local supervised process proof; Relay failover and cross-machine recovery remain separate |
 | `npm run test:perf` | runs 10 nodes, 100 tasks, and 10,000 persisted events against Memory and file-backed SQLite; reports heartbeat, dispatch, and event-write p95; rejects an invalid sequence and proves exact event counts | deterministic single-process capacity floor, not remote Relay, multi-process, or two-machine performance |
+| `npm run test:daemons` | starts real Relay and Node child processes, persists SQLite state, registers/heartbeats/claims, submits a bound redacted approval request, and proves zero execution/completion plus no bearer leakage | one Windows host and loopback; no production executor, TLS/IdP, or two-machine evidence |
 
 Every command writes one JSON object using schema `hummer.executable-gate-result` to stdout. Exit code `0` means the selected proof passed, `1` means a test or invocation failed, and `2` means an acceptance condition is still pending. A `--dry-run` prints the selected evidence plan and executes no assertions.
 

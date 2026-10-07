@@ -3,10 +3,15 @@
   "private": true,
   "version": "0.1.0-alpha.0",
   "type": "module",
+  "bin": {
+    "hummer-relay": "./bin/hummer-relay.mjs"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build:cli": "tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs",
+    "start": "node ./bin/hummer-relay.mjs start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:grants": "vitest run --config vitest.config.ts test/badge-auth.test.ts test/fastify-transport.test.ts",

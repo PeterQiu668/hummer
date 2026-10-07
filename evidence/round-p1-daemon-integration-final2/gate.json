@@ -1,0 +1,32 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "relay-node-daemon-integration",
+  "mode": "two-real-loopback-child-processes-sqlite",
+  "status": "passed",
+  "capturedAt": "2026-10-07T03:24:57.627Z",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "assertions": 15,
+  "checks": [
+    {
+      "id": "relay-node-pending-approval",
+      "status": "passed",
+      "evidence": [
+        "real hummer-relay child process listened on an ephemeral loopback port with SQLiteFleetStore",
+        "real hummer-node child process registered, heartbeated, received the formal TaskEnvelope, and submitted a bound redacted ApprovalRequest",
+        "task remained leased and the node journal ended at approval_request_recorded with zero executing/completed records",
+        "bearer values were absent from configs, stdout, stderr, SQLite, journal, and this gate"
+      ]
+    }
+  ],
+  "limitations": [
+    "Both child processes ran on one Windows machine over loopback; this is not two-device or external-network evidence.",
+    "The production executor is intentionally unavailable, so this gate proves safe handoff and approval blocking, not task execution.",
+    "Static high-entropy badges are bootstrap credentials, not production IdP issuance or revocation.",
+    "Windows child termination does not prove JavaScript signal handlers ran; package-level tests separately verify SQLite remains readable."
+  ]
+}

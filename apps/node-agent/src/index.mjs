@@ -1,4 +1,13 @@
 export { NodeAgentError } from './errors.mjs';
+export {
+  NodeAgentDaemon,
+  buildDeterministicApprovalRequest,
+  buildNodeManifest,
+  consumeDaemonCredentials,
+  createNodeAgentDaemonFromFile,
+  readNodeDaemonConfig,
+  validateNodeDaemonConfig,
+} from './daemon.mjs';
 export { FileExecutionJournal, MemoryExecutionJournal } from './execution-journal.mjs';
 export { createSharedFleetContractValidator } from './contract-validator.mjs';
 export { createMcpToolFacade } from './mcp-facade.mjs';

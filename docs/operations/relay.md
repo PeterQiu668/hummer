@@ -137,6 +137,20 @@ stored completion events on one store instance. A separate fault-injection case
 replays the same task and each run-event key 100 times and proves one claim and
 one stored completion.
 
+## Runnable local daemon
+
+`hummer-relay start --config <absolute-json>` starts the same SQLite store,
+service, shared validators, and Fastify transport described above. Its strict
+v1 config accepts only `127.0.0.1`, an absolute database path, and badge
+metadata whose `tokenEnv` fields point to environment variables. Token values
+in config and unknown fields are rejected. npm package `bin` metadata produces
+the Windows `.cmd` shim; a source checkout can run
+`node apps/relay/bin/hummer-relay.mjs start --config ...` after
+`npm run build:cli -w @hummer/relay`.
+
+This bootstrap is intentionally loopback-only. Do not expose it publicly or
+describe it as TLS/IdP deployment evidence.
+
 ## Remaining integration work
 
 1. Add WSS only if measured duplex traffic or deployment constraints require it;

@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=22 <23"
   },
+  "bin": {
+    "hummer-node": "./bin/hummer-node.mjs"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:tenancy": "node --test test/tenancy-boundary.test.mjs",

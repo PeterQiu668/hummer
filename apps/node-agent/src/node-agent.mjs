@@ -451,7 +451,11 @@ export class HummerNodeAgent {
     return { state: 'stopped', claimId: id };
   }
 
-  /** Apply an SSE revocation hint; the next checkpoint still confirms it with Relay. */
+  /**
+   * Apply an SSE revocation hint; the next checkpoint still confirms it with Relay.
+   * @param {string} claimId
+   * @param {string} requestId
+   */
   revokeClaim(claimId, requestId) {
     const id = requireNonEmptyString(claimId, 'invalid_claim', 'claimId');
     const approvalId = requireNonEmptyString(requestId, 'invalid_approval_request', 'requestId');
