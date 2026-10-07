@@ -1,0 +1,79 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "private-alpha-preflight-readiness",
+  "mode": "local-read-only-no-external-action",
+  "status": "failed",
+  "capturedAt": "2026-10-07T08:02:20.690Z",
+  "commit": "cdf8ed9c66e6fff2111bae351fb2f9013b84e1aa",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-BltfyyW6.js    187.02 kB │ gzip:  55.23 kB\ndist/assets/index-B7CirJCT.js                          641.86 kB │ gzip: 194.29 kB\n✓ built in 12.18s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm run test:contract",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":65,\"negativeCases\":46,\"maxBytes\":65536}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:private-alpha:preflight",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:private-alpha:preflight\n> node scripts/test-private-alpha-preflight.mjs\n\n{\"status\":\"passed\",\"assertions\":13,\"negativeCases\":21}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "node scripts/validate-private-alpha-preflight.mjs docs/release/private-alpha-preflight.template.json",
+      "expectedExitCode": 2,
+      "exitCode": 2,
+      "passed": true,
+      "stdout": "{\n  \"schema\": \"hummer.private-alpha-preflight-validation\",\n  \"version\": 1,\n  \"status\": \"blocked\",\n  \"input\": \"F://Users//claude code//.claude//worktrees//phase0-fleet//docs//release//private-alpha-preflight.template.json\",\n  \"errors\": [\n    {\n      \"path\": \"/approval/approvedByRef\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/approval/approvedAt\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/controller/deviceRef\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/controller/osVersion\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/controller/operatorRef\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/node/deviceRef\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/node/osVersion\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/node/operatorRef\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/network/relayUrl\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/network/allowedNodeAddress\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/network/certificateSha256\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/network/certificateNotBefore\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/network/certificateNotAfter\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/badge/badgeId\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/badge/tenantId\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/badge/nodeId\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/badge/issuedAt\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/badge/expiresAt\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/installer/path\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/installer/sha256\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/canary/workspaceRoot\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/canary/path\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/canary/sha256\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/evidenceDirectory\",\n      \"code\": \"placeholder\",\n      \"message\": \"all template placeholders must be replaced\"\n    },\n    {\n      \"path\": \"/approval/approved\",\n      \"code\": \"value\",\n      \"message\": \"explicit owner approval is required\"\n    },\n    {\n      \"path\": \"/approval/approvedAt\",\n      \"code\": \"timestamp\",\n      \"message\": \"must be an ISO timestamp\"\n    },\n    {\n      \"path\": \"/network/certificateSha256\",\n      \"code\": \"sha256\",\n      \"message\": \"must be a lowercase SHA-256 digest\"\n    },\n    {\n      \"path\": \"/network/certificateNotBefore\",\n      \"code\": \"timestamp\",\n      \"message\": \"must be an ISO timestamp\"\n    },\n    {\n      \"path\": \"/network/certificateNotAfter\",\n      \"code\": \"timestamp\",\n      \"message\": \"must be an ISO timestamp\"\n    },\n    {\n      \"path\": \"/badge/nodeId\",\n      \"code\": \"node_mismatch\",\n      \"message\": \"badge nodeId must match the approved node deviceRef\"\n    },\n    {\n      \"path\": \"/badge/issuedAt\",\n      \"code\": \"timestamp\",\n      \"message\": \"must be an ISO timestamp\"\n    },\n    {\n      \"path\": \"/badge/expiresAt\",\n      \"code\": \"timestamp\",\n      \"message\": \"must be an ISO timestamp\"\n    },\n    {\n      \"path\": \"/installer/sha256\",\n      \"code\": \"sha256\",\n      \"message\": \"must be a lowercase SHA-256 digest\"\n    },\n    {\n      \"path\": \"/installer/unsignedApproved\",\n      \"code\": \"value\",\n      \"message\": \"unsigned internal package use requires explicit approval\"\n    },\n    {\n      \"path\": \"/canary/sha256\",\n      \"code\": \"sha256\",\n      \"message\": \"must be a lowercase SHA-256 digest\"\n    },\n    {\n      \"path\": \"/canary/bytes\",\n      \"code\": \"size\",\n      \"message\": \"canary must be between 1 byte and 1 MiB\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:security",
+      "expectedExitCode": 0,
+      "exitCode": 1,
+      "passed": false,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:security\n> node scripts/test-security.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"security\",\"mode\":\"invalid\",\"status\":\"failed\",\"capturedAt\":\"2026-10-07T08:02:20.628Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":0,\"negativeCases\":0,\"checks\":[],\"limitations\":[],\"reason\":\"Select exactly one mode: --grants | --token-leak\"}\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "a complete approved two-device private-alpha preflight document is accepted",
+    "the intentionally incomplete template is blocked with exit code 2",
+    "unknown fields placeholders and credential-bearing keys are rejected",
+    "controller and node must be two distinct Windows devices",
+    "Relay URL must be non-loopback credential-free HTTPS with an active certificate digest",
+    "Node badge scope set exactly matches the production local-stack Node badge and expires within eight hours",
+    "canary is low-sensitivity at most one MiB and strictly inside its dedicated workspace without links",
+    "public exposure production data unsafe executors deletion and real payment all remain disabled"
+  ],
+  "limitations": [
+    "The validator checks a user-supplied local record; it does not authenticate the approver or independently inspect another machine.",
+    "No network connection TLS gateway firewall badge issuance installation or external process is performed by this gate.",
+    "A ready result authorizes nothing by itself; the owner must separately approve the recorded L3 action."
+  ]
+}

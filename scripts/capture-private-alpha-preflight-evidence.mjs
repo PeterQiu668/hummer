@@ -7,10 +7,10 @@ const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('Run this capture through npm so npm_execpath is pinned and explicit');
 
 const repository = resolve(import.meta.dirname, '..');
-const round = 'round-private-alpha-preflight';
+const round = 'round-private-alpha-preflight-rerun-1';
 const directory = resolve(repository, 'evidence', round);
 const path = resolve(directory, 'gate.json');
-if (existsSync(path)) throw new Error('Private Alpha preflight evidence already exists; never overwrite a completed round');
+if (existsSync(path)) throw new Error('Private Alpha preflight rerun evidence already exists; never overwrite a completed round');
 
 const commands = [
   { cmd: 'npm run typecheck', executable: process.execPath, args: [npmCli, 'run', 'typecheck'], expectedExitCode: 0 },
@@ -23,7 +23,8 @@ const commands = [
     args: ['scripts/validate-private-alpha-preflight.mjs', 'docs/release/private-alpha-preflight.template.json'],
     expectedExitCode: 2,
   },
-  { cmd: 'npm run test:security', executable: process.execPath, args: [npmCli, 'run', 'test:security'], expectedExitCode: 0 },
+  { cmd: 'npm run test:security -- --grants', executable: process.execPath, args: [npmCli, 'run', 'test:security', '--', '--grants'], expectedExitCode: 0 },
+  { cmd: 'npm run test:security -- --token-leak', executable: process.execPath, args: [npmCli, 'run', 'test:security', '--', '--token-leak'], expectedExitCode: 0 },
   { cmd: 'npm test -w @hummer/relay', executable: process.execPath, args: [npmCli, 'test', '-w', '@hummer/relay'], expectedExitCode: 0 },
   { cmd: 'npm run test:unit', executable: process.execPath, args: [npmCli, 'run', 'test:unit'], expectedExitCode: 0 },
 ];
