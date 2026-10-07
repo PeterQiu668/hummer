@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-task-grant-receipt-boundary",
+  "generatedAt": "2026-10-07T04:46:50.678Z",
+  "gitCommit": "dd0262556c32873070a5ed0b1c71130338d3a8e1",
+  "prevManifestRootHash": "d8751bdf9980bcac214d115e19fb033bbef092fc1fe7fae4f28c8c19a2f14c21",
+  "files": [
+    {
+      "path": "evidence/round-p1-task-grant-receipt-boundary/gate.json",
+      "sha256": "3bf78529564e217eeb267ab806b05f31fc4201b63aef3dc9861d43a658ecea6d",
+      "bytes": 24106
+    }
+  ],
+  "rootHash": "e1dd1c701ef10d6a5d77fdccc00f0815e47d304d1d64bea11818e255165d5940"
+}
