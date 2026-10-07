@@ -10,16 +10,19 @@ if (process.version !== 'v22.22.2') fail(`Node v22.22.2 is required; got ${proce
 const outputDirectory = resolve(repository, 'evidence', round);
 if (existsSync(outputDirectory)) fail(`Evidence round already exists and will not be overwritten: evidence/${round}`);
 
-const webManifestPath = resolve(repository, 'evidence/round-p1-real-web-relay-e2e-integration-20261007a/manifest.json');
-if (!existsSync(webManifestPath)) fail('The sealed real-Web Relay predecessor manifest is missing.');
-const webManifest = JSON.parse(readFileSync(webManifestPath, 'utf8'));
-if (!/^[a-f0-9]{64}$/.test(webManifest.rootHash ?? '')) fail('The real-Web Relay predecessor manifest is invalid.');
+const predecessorManifestPath = resolve(repository, 'evidence/round-p1-packaged-diagnostic-zip-integration-20261007a/manifest.json');
+if (!existsSync(predecessorManifestPath)) fail('The sealed packaged-diagnostic predecessor manifest is missing.');
+const predecessorManifest = JSON.parse(readFileSync(predecessorManifestPath, 'utf8'));
+if (!/^[a-f0-9]{64}$/.test(predecessorManifest.rootHash ?? '')) fail('The packaged-diagnostic predecessor manifest is invalid.');
 
 const npmCli = findNpmCli();
 const specifications = [
   ['windows-uia-capture', 'run', 'test:windows-uia-capture'],
+  ['seven-risk-approval-matrix', 'run', 'test:risk-approval-matrix'],
   ['trusted-bundle-durable', 'run', 'test:trusted-bundle-bridge'],
+  ['capability-outcome-binding', 'run', 'test:capability-outcome-binding'],
   ['capability-independent-verifier', 'run', 'test:capability', '--', '--manifest'],
+  ['diagnostic-zip', 'run', 'test:diagnostics'],
   ['demo-session-ui', 'run', 'test:demo-session-ui'],
   ['public-market-e2e', 'run', 'test:public-market-e2e'],
   ['privacy-kernel', 'run', 'test:privacy'],
@@ -39,15 +42,18 @@ const evidence = {
   generatedAt: new Date().toISOString(),
   commit: git(['rev-parse', 'HEAD']).trim(), branch: git(['branch', '--show-current']).trim(), node: process.version,
   predecessor: {
-    path: relative(repository, webManifestPath).replaceAll('\\', '/'),
-    rootHash: webManifest.rootHash,
-    proves: 'real loopback Fastify Relay shared by production Web and Node clients, with sealed 390px screenshots',
+    path: relative(repository, predecessorManifestPath).replaceAll('\\', '/'),
+    rootHash: predecessorManifest.rootHash,
+    proves: 'the prior chain includes real loopback Web/Relay/Node screenshots and the compiled Electron diagnostic ZIP with atomic no-overwrite publication',
   },
   commands,
   accepted: {
     windowsUia: 'real local Windows UIAutomation reads bounded role and automationId metadata from a non-sensitive WinForms fixture and fails closed with zero writes',
+    riskApproval: 'all seven controlled risk classes show target, risk and cost; six require a human click and unknown/new risks fail closed with zero preapproval enqueue',
     durableBundles: 'SQLite trusted-bundle persistence preserves immutable bytes and approval evidence across restart and fails without partial rows',
+    outcomeBinding: 'capability drafts require an independently verified accepted HUMMER outcome receipt plus exact artifact bytes and provenance bindings',
     capabilityVerification: 'dependency-free verifier rejects outer and inner receipt forgery and validates the exact eight-file export',
+    diagnosticZip: 'trusted Desktop export emits only allowlisted generated summaries and publishes a verified ZIP without partial or overwrite behavior',
     regression: 'privacy, marketplace, contracts, full unit/UI, typecheck and production build pass together after integration',
   },
   pending: {
@@ -86,7 +92,7 @@ function report(value) {
   const commands = value.commands.map((command) => `- \`${command.id}\`: exit \`${command.exitCode}\`; command \`${command.cmd}\``).join('\n');
   return `# Phase 2 local runtime evidence\n\nSource: \`${value.commit}\` on \`${value.branch}\`; generated ${value.generatedAt}.\n\n` +
     `## Result\n\n${value.counts.pass}/${value.commands.length} executable gates passed; ${value.counts.fail} failed; ${value.counts.skipped} skipped.\n\n## Commands\n\n${commands}\n\n` +
-    `## What this proves\n\n- A real local Windows UIAutomation source can feed the bounded DemoSession path without screenshots, video, raw key capture or upload.\n- Trusted capability bundles survive local SQLite restart without weakening immutable, tenant or node boundaries.\n- The independent capability verifier and the integrated regression/build gates pass.\n- The predecessor hash binds the separately sealed real loopback Web/Relay/Node gate and its 390 px screenshots.\n\n` +
+    `## What this proves\n\n- A real local Windows UIAutomation source can feed the bounded DemoSession path without screenshots, video, raw key capture or upload.\n- All seven controlled risk classes have an explicit UI approval/fail-closed matrix.\n- Capability drafts require verified accepted outcomes and exact artifact bytes; trusted bundles survive local SQLite restart without weakening immutable, tenant or node boundaries.\n- The independent capability verifier, diagnostic ZIP gate and integrated regression/build gates pass.\n- The predecessor hash binds the separately sealed real loopback Web/Relay/Node screenshots and compiled Desktop diagnostic ZIP.\n\n` +
     `## What remains pending\n\n- A real expert demonstration, distillation acceptance and authorized GUI/CUA replay.\n- A second machine, public deployment, clean-machine installs and external capability installs.\n- Real users, real tasks, retention and payment signal.\n\nNo deployment, push, real-user capture, real installation change, payment integration or agent-hub write was performed.\n`;
 }
 
