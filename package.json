@@ -59,6 +59,7 @@
     "capture:p1:local-stack": "node scripts/capture-p1-local-stack-evidence.mjs",
     "capture:p1:first-run-identity": "node scripts/capture-p1-first-run-identity-claim-evidence.mjs",
     "capture:p3:dry-run-commerce": "node scripts/capture-p3-dry-run-commerce-evidence.mjs",
+    "capture:private-alpha:preflight": "node scripts/capture-private-alpha-preflight-evidence.mjs",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",
