@@ -78,8 +78,9 @@ Rollback is configuration-first and reversible:
 
 ## Known limits and unfinished gates
 
-- `test:web-e2e` uses Playwright route interception. It is browser-client
-  integration evidence, not proof of a reachable external Relay.
+- `test:web-e2e` uses a real Fastify Relay with an in-memory store on loopback.
+  It is local browser/Node integration evidence, not proof of a reachable
+  external Relay, TLS termination, production identity, or two-machine delivery.
 - Real two-machine 100-task soak evidence is not complete.
 - External five-person seed-user acceptance is not complete.
 - The 15-minute independent install, 20 real tasks at 70% success, and three
