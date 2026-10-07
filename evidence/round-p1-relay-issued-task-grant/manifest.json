@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-relay-issued-task-grant",
+  "generatedAt": "2026-10-07T06:16:04.454Z",
+  "gitCommit": "5882d1c9d799dd750169a80e347a18ee32180a6f",
+  "prevManifestRootHash": "179dec0d2baba65d38535e53d5374628579546230cb4e0a866f706a498bb8008",
+  "files": [
+    {
+      "path": "evidence/round-p1-relay-issued-task-grant/gate.json",
+      "sha256": "4636aa77ebc7b570c961ede4d89f1e987d14e4ed37a000be00bdfa558c0de070",
+      "bytes": 30510
+    }
+  ],
+  "rootHash": "6255952e82df5338f353cd825fe87ec1482c5816223c84e8a5c0bcb7ce6b82e0"
+}

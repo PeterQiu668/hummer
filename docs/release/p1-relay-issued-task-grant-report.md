@@ -34,3 +34,14 @@ recovery and backward compatibility.
 This is an internal-test loopback implementation. It does not yet prove remote
 TLS, IdP-backed node identity, HSM/KMS custody, safe issuer-key rotation, or a
 packaged two-device run.
+
+## Sealed evidence
+
+- feature commit under test: `5882d1c9d799dd750169a80e347a18ee32180a6f`;
+- evidence round: `evidence/round-p1-relay-issued-task-grant/`;
+- eight commands completed with exit code 0, including full Relay, Node,
+  Desktop outbox, root unit, and UI suites;
+- manifest root:
+  `6255952e82df5338f353cd825fe87ec1482c5816223c84e8a5c0bcb7ce6b82e0`;
+- predecessor root:
+  `179dec0d2baba65d38535e53d5374628579546230cb4e0a866f706a498bb8008`.
