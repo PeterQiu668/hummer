@@ -24,6 +24,15 @@ HTTP task-grant header. Only the Relay-issued task bearer reaches consume and
 checkpoint routes, and existing digest-only persistence and one-use exhaustion
 remain unchanged.
 
+## Sealed evidence
+
+- feature commit: `df23c4a53da914c390a2159827e7abd74a4d6e37`;
+- evidence round: `evidence/round-p1-node-badge-only-bootstrap/`;
+- root hash: `7e1fab5a56d7a7b47948b07c9c6e9cb01ece0f868532c371f9176461886da47a`;
+- predecessor root: `6255952e82df5338f353cd825fe87ec1482c5816223c84e8a5c0bcb7ce6b82e0`;
+- seven captured commands exited `0`; seal verification passed all nine
+  assertions and both negative tamper cases.
+
 ## Remaining limits
 
 The local safety envelope still uses configured `grantExpiresAt` and
