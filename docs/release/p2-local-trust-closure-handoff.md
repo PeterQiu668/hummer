@@ -82,3 +82,39 @@ Technical gaps closed, but literal acceptance still incomplete:
 Nine-layer status remains incomplete: L1/L2/L6 are proven; L8 is now locally proven; L3 remains incomplete, L4 has no second machine, L5/L7 are local-only, and L9 has no authorized real GUI/CUA. The all-nine rule therefore still blocks a completion claim.
 
 No push, deployment, real-user capture, real installation change, payment integration, deletion, or agent-hub write was performed.
+
+## Same-Relay Desktop/Web HITL delta
+
+Follow-up through `13e3b19` closes the local Desktop-shared-Relay portion of
+`AC-P0-05` and `AC-P1-15` without claiming a second machine or production
+deployment:
+
+- Electron main owns the Relay URL and badge; preload exposes only bounded
+  methods and the badge is removed from the process environment after capture;
+- every Desktop operation binds the authenticated local account to the Relay
+  badge tenant/actor through `/v1/control/session` before reading or mutating;
+- Workbench now supports explicit dispatch, approve, deny, and stop without
+  entering settings;
+- denied/expired/revoked decisions atomically terminalize the Relay task, clear
+  its lease, are consumed once by the bound Node, and reach `rejected` with zero
+  executor calls;
+- decided requests are projected with their immutable decision so they do not
+  reappear as actionable after a page remount.
+
+Authoritative gates:
+
+- `npm run test:web-e2e` — exit 0, 37 assertions and 7 negative cases;
+- `npm run test:desktop:hitl-matrix` — exit 0, 21 assertions, real built
+  Electron main/preload + Browser + Fastify Relay + production Node client;
+- full unit 102 files / 693 tests; full UI 23 files / 90 tests; typecheck and
+  production build passed.
+
+New chain head:
+`evidence/round-p1-desktop-web-hitl-final/manifest.json`, root
+`eb4e523dcd5accf8418aaf5c5b16830cbff967c90aa9e042dac19e122a5b7626`.
+Its predecessor is the sealed Web gate root
+`1c9347fa03421a768c0ea7b3b0fc59f05dd1bf29af838f9c425bf453c2f0b05c`.
+
+This proves the local single-host interpretation only. External TLS/IdP,
+two physical machines, a real expert workflow, clean-installed NSIS, and
+authorized real GUI/CUA remain pending.

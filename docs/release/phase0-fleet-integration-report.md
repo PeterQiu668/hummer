@@ -17,6 +17,8 @@
 8. 落实 ADR-021：移除 `@react-three/drei`、`@react-three/fiber`、`three`、`@types/three`，并加入防回归审计。安装图减少 59 个包，既有前端 bundle 字节不变。
 9. Relay 专用 schema 13 持久化 append-only ApprovalRequest、immutable ApprovalDecision 和一次性 consumption；node badge 只能提交绑定当前 lease 的请求，human/account control badge 才能决策，节点只能从认证 Relay 原子消费后执行。SSE 不携带审批权。
 10. Node 新增 append-only、hash-chained、逐次 fsync 的 execution journal。在 executor 副作用前持久化 `executing`；重启遇到 terminal 时保持去重，遇到未完成状态时只返回 `recovery_required`，绝不自动重放。
+11. Electron main 新增受信任 Relay 控制桥；badge 不进入 renderer，桌面本地 account 与 Relay badge tenant/actor 每次调用前双重绑定。
+12. Workbench 不进入设置页即可显式派活、批准、拒绝与停止；拒绝在 Memory/SQLite 中原子终态化并由 Node 一次消费为 `rejected`，执行器保持零调用。
 
 ## 当前机器证据
 
@@ -26,6 +28,8 @@
 - Relay：71 条测试通过，包含真实本地 HTTP/SSE client 和审批持久化集成。
 - Fleet receipt：16 条测试通过，其中 15 条负例；合法 fixture 检查 2 个 child、2 个 artifact、42 个 fleet 字段。
 - 最近一次完整集成证据位于 `evidence/round-p0-integration/gates.json`；最终轮在审批控制面合入后刷新。
+- 同一 Relay 本地 HITL 最终证据位于 `evidence/round-p1-desktop-web-hitl-final/`；21 条断言通过，链根 `eb4e523dcd5accf8418aaf5c5b16830cbff967c90aa9e042dac19e122a5b7626`。
+- Web 权威门禁 `test:web-e2e` 37 条断言和 7 条负例通过；整库 unit 102/693、UI 23/90、typecheck、build 全通过。
 
 ## 尚未达到的验收
 
