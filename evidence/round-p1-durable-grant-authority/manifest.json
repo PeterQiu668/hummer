@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-durable-grant-authority",
+  "generatedAt": "2026-10-07T05:05:12.749Z",
+  "gitCommit": "542dc2ed366fdd98a5f4b56c80d58c96893290f9",
+  "prevManifestRootHash": "e1dd1c701ef10d6a5d77fdccc00f0815e47d304d1d64bea11818e255165d5940",
+  "files": [
+    {
+      "path": "evidence/round-p1-durable-grant-authority/gate.json",
+      "sha256": "7b313a651a7f20d031f94c61786dd7630bb64f6cfd871255d9010a926f6e74c7",
+      "bytes": 6220
+    }
+  ],
+  "rootHash": "0c1ff301e87d0b7aa90f62ec9a2bf57efc6eaea7e4aeb36b4bb2f5a85c787ae9"
+}

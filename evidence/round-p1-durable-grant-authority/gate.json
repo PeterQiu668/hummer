@@ -1,0 +1,71 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "durable-task-grant-authority",
+  "mode": "sqlite-full-sync-import-consume-restart-revoke-restart",
+  "status": "passed",
+  "capturedAt": "2026-10-07T05:05:03.622Z",
+  "commit": "542dc2ed366fdd98a5f4b56c80d58c96893290f9",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build:cli -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 build:cli\n> tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:task-grant-durable -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test:task-grant-durable\n> vitest run --config vitest.config.ts test/sqlite-task-grant-authority.test.ts test/task-grant-restart-integration.test.ts test/relay-config.test.ts test/relay-cli.test.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  4 passed (4)\n      Tests  21 passed (21)\n   Start at  13:03:46\n   Duration  19.80s (transform 3.45s, setup 0ms, import 18.80s, tests 14.54s, environment 0ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:grants -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test:grants\n> vitest run --config vitest.config.ts test/badge-auth.test.ts test/fastify-transport.test.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\n\n Test Files  2 passed (2)\n      Tests  37 passed (37)\n   Start at  13:04:08\n   Duration  4.13s (transform 850ms, setup 0ms, import 4.33s, tests 562ms, environment 0ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm test -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.091,\"dispatchP95Ms\":0.989,\"eventWriteP95Ms\":0.311,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.3,\"dispatchP95Ms\":13.713,\"eventWriteP95Ms\":4.183,\"rejectedOverLimit\":true}\n\n Test Files  20 passed (20)\n      Tests  202 passed (202)\n   Start at  13:04:14\n   Duration  31.47s (transform 17.96s, setup 0ms, import 103.27s, tests 65.42s, environment 4ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:daemons",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:daemons\n> npm run build:cli -w @hummer/relay && node scripts/test-daemon-integration.mjs\n\n\n> @hummer/relay@0.1.0-alpha.0 build:cli\n> tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs\n\n{\"schema\":\"hummer.executable-gate-result\",\"version\":1,\"gate\":\"relay-node-daemon-integration\",\"mode\":\"two-real-loopback-child-processes-sqlite\",\"status\":\"passed\",\"capturedAt\":\"2026-10-07T05:05:02.877Z\",\"toolchain\":{\"node\":\"v22.22.2\",\"platform\":\"win32\",\"arch\":\"x64\"},\"assertions\":15,\"checks\":[{\"id\":\"relay-node-pending-approval\",\"status\":\"passed\",\"evidence\":[\"real hummer-relay child process listened on an ephemeral loopback port with SQLiteFleetStore\",\"real hummer-node child process registered, heartbeated, received the formal TaskEnvelope, and submitted a bound redacted ApprovalRequest\",\"task remained leased and the node journal ended at approval_request_recorded with zero executing/completed records\",\"bearer values were absent from configs, stdout, stderr, SQLite, journal, and this gate\"]}],\"limitations\":[\"Both child processes ran on one Windows machine over loopback; this is not two-device or external-network evidence.\",\"The production executor is intentionally unavailable, so this gate proves safe handoff and approval blocking, not task execution.\",\"Static high-entropy badges are bootstrap credentials, not production IdP issuance or revocation.\",\"Windows child termination does not prove JavaScript signal handlers ran; package-level tests separately verify SQLite remains readable.\"]}\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "Relay config v2 requires a separate absolute task-grant SQLite database",
+    "offline provisioning imports strict digest-only snapshots without reading badge secrets",
+    "identical re-import is idempotent and never rolls usedCount or terminal state backward",
+    "binding or digest conflicts and non-single-use snapshots fail closed",
+    "consume commits exhaustion before success and concurrent attempts produce one winner",
+    "close and reopen preserve exhaustion, checkpoint eligibility, expiry, and revocation",
+    "real persisted Fleet and grant state reject replay after Relay restart",
+    "a second restart after revocation rejects the formerly valid checkpoint",
+    "plaintext task tokens are absent from the SQLite bytes and command outputs under test",
+    "the production executor remains unavailable and the real daemon pair stops at approval"
+  ],
+  "limitations": [
+    "Snapshot import is a local provisioning primitive, not a public issuer, IdP, KMS, or remote control plane.",
+    "Fleet and grant facts use separate SQLite databases; no cross-database distributed transaction is claimed.",
+    "Static high-entropy node badges remain bootstrap credentials rather than production identity.",
+    "The production executor remains intentionally unavailable.",
+    "The daemon gate runs on one Windows host over loopback rather than across two external devices."
+  ]
+}
