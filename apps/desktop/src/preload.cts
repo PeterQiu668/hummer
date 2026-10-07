@@ -174,3 +174,7 @@ contextBridge.exposeInMainWorld('hummerRuntimeConnectors', {
     return () => ipcRenderer.removeListener(CONNECTORS_CHANGED, listener);
   },
 });
+
+contextBridge.exposeInMainWorld('hummerDiagnostics', {
+  exportBundle: (token: string) => ipcRenderer.invoke('hummer:diagnostics:export', token),
+});

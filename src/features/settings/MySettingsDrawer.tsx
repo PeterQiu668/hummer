@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
+  FileArchive,
   Bot,
   BrainCircuit,
   Check,
@@ -12,6 +13,7 @@ import {
 import { useAppStore, type PersonalSettings } from '../../store/useAppStore';
 import { browserEngineProfiles, engineProfileForLabel, listEngineProfiles, type CustomerEngineProfile } from '../engines/engineProfileClient';
 import { configureEngineCredential, hasEngineCredentialBridge, removeEngineCredential } from '../engines/engineCredentialClient';
+import { exportDiagnosticBundle, hasDiagnosticExportBridge } from './diagnosticExportClient';
 
 export default function MySettingsDrawer() {
   const settings = useAppStore((state) => state.personalSettings);
@@ -22,6 +24,7 @@ export default function MySettingsDrawer() {
   const [engineProfiles, setEngineProfiles] = useState<readonly CustomerEngineProfile[]>(browserEngineProfiles);
   const [credentialDrafts, setCredentialDrafts] = useState<Record<string, string>>({});
   const [credentialBusy, setCredentialBusy] = useState<string | null>(null);
+  const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const selectedProfile = engineProfileForLabel(engineProfiles, draft.preferredModel);
 
   useEffect(() => {
@@ -73,6 +76,22 @@ export default function MySettingsDrawer() {
     updateSettings(draft);
     pushToast({ kind: 'success', title: '设置已保存', detail: '后续新任务会使用新的模型与权限偏好。' });
     setOpen(false);
+  };
+
+  const exportDiagnostics = async () => {
+    setDiagnosticBusy(true);
+    try {
+      const receipt = await exportDiagnosticBundle();
+      if (receipt) pushToast({
+        kind: 'success',
+        title: '脱敏诊断包已导出',
+        detail: `${receipt.fileCount} 个允许文件，SHA-256 ${receipt.archiveSha256.slice(0, 12)}…`,
+      });
+    } catch (error) {
+      pushToast({ kind: 'error', title: '诊断包未导出', detail: error instanceof Error ? error.message : '未知错误' });
+    } finally {
+      setDiagnosticBusy(false);
+    }
   };
 
   return (
@@ -155,6 +174,12 @@ export default function MySettingsDrawer() {
           <SettingsSection icon={<Bell size={15} />} title="提醒">
             <ToggleRow label="每日工作简报" detail="工作日 09:00 汇总目标、交办、风险和分身建议。" checked={draft.dailyBriefEnabled} onChange={(value) => patch('dailyBriefEnabled', value)} />
           </SettingsSection>
+          {hasDiagnosticExportBridge() && <SettingsSection icon={<FileArchive size={15} />} title="支持与诊断">
+            <p className="text-[10.5px] leading-4 text-neutral-500">仅导出生成的运行状态、清单和校验摘要；不会遍历工作空间、数据库、密钥或演示录制。</p>
+            <button type="button" aria-label="导出脱敏诊断包" disabled={diagnosticBusy} onClick={() => { void exportDiagnostics(); }} className="hum-btn mt-3">
+              <FileArchive size={13} /> {diagnosticBusy ? '正在校验…' : '导出脱敏诊断包'}
+            </button>
+          </SettingsSection>}
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 bg-neutral-25 px-5 py-3">

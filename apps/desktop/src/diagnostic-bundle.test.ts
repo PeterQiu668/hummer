@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
@@ -80,5 +80,34 @@ describe('W6 independently verifiable diagnostic bundle', () => {
 
     expect(receipt.path).toBe(path);
     await expect(writeDiagnosticBundle(path, fixture())).rejects.toThrow();
+  });
+
+  it('DIAGNOSTIC-05 removes staging and leaves no final path after an interrupted partial write', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hummer-diagnostic-partial-write-'));
+    directories.push(directory);
+    const path = join(directory, 'diagnostic.zip');
+
+    await expect(writeDiagnosticBundle(path, fixture(), {
+      writeStaging: (fileDescriptor, archive) => {
+        writeSync(fileDescriptor, archive.subarray(0, Math.floor(archive.length / 2)));
+        throw new Error('injected partial write failure');
+      },
+    })).rejects.toThrow('injected partial write failure');
+
+    expect(existsSync(path)).toBe(false);
+    expect(readdirSync(directory)).toEqual([]);
+  });
+
+  it('DIAGNOSTIC-06 removes the fully verified staging file after atomic publish failure', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hummer-diagnostic-publish-failure-'));
+    directories.push(directory);
+    const path = join(directory, 'diagnostic.zip');
+
+    await expect(writeDiagnosticBundle(path, fixture(), {
+      publishStaging: () => { throw new Error('injected atomic publish failure'); },
+    })).rejects.toThrow('injected atomic publish failure');
+
+    expect(existsSync(path)).toBe(false);
+    expect(readdirSync(directory)).toEqual([]);
   });
 });

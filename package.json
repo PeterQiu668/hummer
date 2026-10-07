@@ -30,6 +30,7 @@
     "test:distillation": "node scripts/test-distillation.mjs",
     "test:upgrade-rollback": "node scripts/test-upgrade-rollback.mjs",
     "test:diagnostics": "node scripts/test-diagnostics.mjs",
+    "test:desktop:diagnostic-export": "node scripts/e2e-packaged-diagnostic-export.mjs",
     "test:public-market": "node scripts/test-public-market.mjs",
     "test:public-market-e2e": "node scripts/test-public-market-e2e.mjs",
     "test:fleet": "node scripts/test-fleet.mjs",

@@ -1,6 +1,14 @@
-import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  closeSync,
+  fsyncSync,
+  linkSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import JSZip from 'jszip';
 import {
   createDiagnosticPack,
@@ -63,6 +71,13 @@ export interface VerifiedDiagnosticBundle {
   archiveBytes: number;
   fileCount: number;
   totalFileBytes: number;
+}
+
+export interface DiagnosticBundleWriteOptions {
+  /** Test-only fault seam; production uses a complete fd write. */
+  writeStaging?: (fileDescriptor: number, archive: Buffer) => void;
+  /** Test-only fault seam; production uses atomic, no-overwrite hard-link publication. */
+  publishStaging?: (stagingPath: string, destinationPath: string) => void;
 }
 
 function sha256(bytes: string | Buffer): string {
@@ -215,10 +230,54 @@ export async function verifyDiagnosticBundle(archive: Buffer, explicitSecrets: r
   };
 }
 
-export async function writeDiagnosticBundle(path: string, input: DiagnosticBundleInput): Promise<VerifiedDiagnosticBundle & { path: string }> {
+export async function writeDiagnosticBundle(
+  path: string,
+  input: DiagnosticBundleInput,
+  options: DiagnosticBundleWriteOptions = {},
+): Promise<VerifiedDiagnosticBundle & { path: string }> {
   const archive = await createDiagnosticBundle(input);
-  const verified = await verifyDiagnosticBundle(archive, input.explicitSecrets);
+  await verifyDiagnosticBundle(archive, input.explicitSecrets);
   const absolutePath = resolve(path);
-  writeFileSync(absolutePath, archive, { flag: 'wx' });
-  return { ...verified, path: absolutePath };
+  const stagingPath = join(dirname(absolutePath), `.${randomUUID()}.hummer-diagnostic.tmp`);
+  let fileDescriptor: number | undefined;
+  let published = false;
+  try {
+    fileDescriptor = openSync(stagingPath, 'wx');
+    if (options.writeStaging) options.writeStaging(fileDescriptor, archive);
+    else writeAll(fileDescriptor, archive);
+    fsyncSync(fileDescriptor);
+    closeSync(fileDescriptor);
+    fileDescriptor = undefined;
+
+    const stagedArchive = readFileSync(stagingPath);
+    const verified = await verifyDiagnosticBundle(stagedArchive, input.explicitSecrets);
+    if (verified.archiveSha256 !== sha256(archive) || stagedArchive.length !== archive.length) {
+      throw new Error('staged diagnostic bundle differs from the verified in-memory archive');
+    }
+
+    // A same-directory hard link is an atomic no-overwrite publish: the final
+    // name appears only after the fully fsynced bytes exist, and EEXIST keeps an
+    // earlier destination untouched. It is stronger than rename on POSIX,
+    // where rename would replace the destination.
+    (options.publishStaging ?? linkSync)(stagingPath, absolutePath);
+    unlinkSync(stagingPath);
+    published = true;
+    return { ...verified, path: absolutePath };
+  } finally {
+    if (fileDescriptor !== undefined) {
+      try { closeSync(fileDescriptor); } catch { /* Preserve the originating write failure. */ }
+    }
+    if (!published) {
+      try { unlinkSync(stagingPath); } catch { /* The staging name may never have been created. */ }
+    }
+  }
+}
+
+function writeAll(fileDescriptor: number, archive: Buffer): void {
+  let offset = 0;
+  while (offset < archive.length) {
+    const written = writeSync(fileDescriptor, archive, offset, archive.length - offset);
+    if (written <= 0) throw new Error('diagnostic bundle staging write made no progress');
+    offset += written;
+  }
 }

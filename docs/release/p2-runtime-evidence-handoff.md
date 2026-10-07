@@ -61,10 +61,12 @@ The retained failed round exposed a fixture defect: ordinary SSE badge expiry wa
 - A second physical Windows machine and real cross-host delivery.
 - A real expert demonstration, distillation acceptance, and authorized GUI/CUA replay.
 - Capability draft creation from an independently verified successful HUMMER task receipt rather than fixture event identifiers.
-- Packaged Electron diagnostic ZIP export and scan.
+- Installed-app/native save-dialog automation for diagnostic export (the later
+  compiled Electron main/preload gate now covers the production export service
+  and actual ZIP scan without installing NSIS).
 - Clean-machine signed installer/upgrade/rollback proof.
 - External users, real tasks, retention, external capability installs, public takedown, and payment signal.
 
 ## Recommended next local slice
 
-Bind capability draft creation to an independently verified HUMMER outcome receipt without copying customer content. Preserve the current fail-closed rule: an invalid receipt, failed task, missing artifact, tenant mismatch, or provenance mismatch must create no draft. In parallel, wire packaged Electron diagnostic ZIP export and scan the actual archive. External-machine and market gates require user coordination and must remain pending.
+Bind capability draft creation to an independently verified HUMMER outcome receipt without copying customer content. Preserve the current fail-closed rule: an invalid receipt, failed task, missing artifact, tenant mismatch, or provenance mismatch must create no draft. External-machine, installed-app/native-dialog, and market gates require user coordination and must remain pending.
