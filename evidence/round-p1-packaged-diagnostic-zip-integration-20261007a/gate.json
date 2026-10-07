@@ -1,0 +1,54 @@
+{
+  "schema": "hummer.packaged-diagnostic-export-gate",
+  "version": 1,
+  "status": "passed",
+  "capturedAt": "2026-10-07T01:25:23.302Z",
+  "executionBoundary": "compiled Electron main/preload bundle; no installer or real user-data directory",
+  "assertions": 35,
+  "negativeCases": [
+    "secret-bearing-generated-summary-no-output",
+    "partial-staging-write-cleanup",
+    "atomic-publish-failure-cleanup",
+    "existing-target-no-overwrite"
+  ],
+  "requiredEntries": [
+    "SUMMARY.txt",
+    "files/config/runtime-summary.json",
+    "files/receipts/diagnostic-export.json",
+    "manifest.json"
+  ],
+  "inventory": [
+    {
+      "path": "config/runtime-summary.json",
+      "archivePath": "files/config/runtime-summary.json",
+      "category": "config-summary",
+      "bytes": 480,
+      "sha256": "c5ea4561a84cc07ecbdc5234ffe584de4c7c526b9c397e5e26fd88e72cbdecec"
+    },
+    {
+      "path": "receipts/diagnostic-export.json",
+      "archivePath": "files/receipts/diagnostic-export.json",
+      "category": "receipt",
+      "bytes": 222,
+      "sha256": "b05cda764a23235a41d3a24994ba14e4f558e0f89e0df0bd662f68edb776d07c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "packaged-desktop-diagnostic.zip",
+      "sha256": "ec7ffadfb63af5edae7e12fe05d216d4a8b0cc682d6543982ea6dceabf604c63",
+      "bytes": 2035
+    }
+  ],
+  "productionVerifier": {
+    "archiveSha256": "ec7ffadfb63af5edae7e12fe05d216d4a8b0cc682d6543982ea6dceabf604c63",
+    "archiveBytes": 2035,
+    "fileCount": 2,
+    "totalFileBytes": 702
+  },
+  "limitations": [
+    "The gate executes the compiled Electron main/preload modules; it does not install or launch NSIS.",
+    "Native save-dialog interaction is covered by the trusted IPC unit seam, not GUI automation.",
+    "All archive inputs and canaries are synthetic; no real userData, workspace, customer content, or credential store is read."
+  ]
+}
