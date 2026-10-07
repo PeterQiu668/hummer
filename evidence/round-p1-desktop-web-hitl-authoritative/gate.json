@@ -1,0 +1,49 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "desktop-web-same-relay-hitl-matrix",
+  "status": "passed",
+  "mode": "electron-main-ipc-browser-fastify-memory-node-agent",
+  "capturedAt": "2026-10-07T02:27:42.584Z",
+  "assertions": 21,
+  "checks": [
+    "Web explicit confirmation enqueued a production TaskEnvelope into the shared Relay.",
+    "Desktop main-process Relay bridge displayed and approved the Web task; Node executed exactly once.",
+    "Desktop explicit confirmation enqueued through the same Relay; Desktop denial produced Node rejected with zero new execution.",
+    "Desktop explicit stop reached Node over Relay SSE and a later execution attempt remained stopped.",
+    "Stopping a completed task failed closed with 409 and no state mutation.",
+    "Relay badges were absent from renderer-visible text, localStorage, screenshots metadata, and this gate."
+  ],
+  "taskIds": {
+    "approved": "start-work:15mknzs",
+    "denied": "start-work:1pfbw3a",
+    "stopped": "start-work:1wlr9bp"
+  },
+  "screenshots": [
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-approval-pending.png",
+      "sha256": "00b6a4bcb9d3147929297dc38f5de541dcb31ae51a846ccbca626e58bc8cb8fd",
+      "bytes": 104551
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/web-dispatch-same-relay.png",
+      "sha256": "f896d963283729bb1d3255eae427c204830508b6f9cb5a03220c2a5094e9ed98",
+      "bytes": 88681
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-denial-pending.png",
+      "sha256": "6f669dbe5286efd575b32627f150ab263345754d7aaa11cb685b59eac11e3498",
+      "bytes": 98427
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-task-stopped.png",
+      "sha256": "c922ba6d4b06e5a11536540b8ea93aadfff5e92db723499b18d56dc0675795f6",
+      "bytes": 92513
+    }
+  ],
+  "limitations": [
+    "Single Windows host with loopback HTTP, MemoryFleetStore and static test badges; no external TLS, production IdP or two-machine proof.",
+    "The Node executor is deterministic and synthetic; this gate proves dispatch/approval/stop protocol behavior, not a real expert workflow.",
+    "Electron is launched from the built development main process, not a clean-installed NSIS package."
+  ]
+}

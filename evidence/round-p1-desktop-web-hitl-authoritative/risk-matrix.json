@@ -1,0 +1,126 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "strict-seven-risk-ui-relay-approval-matrix",
+  "mode": "production-start-work-ui-and-remote-relay-client",
+  "status": "passed",
+  "riskClasses": [
+    {
+      "risk": "egress",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "write",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "spend",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "delete",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "privilege",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "network",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "explicit-human-confirmation-required"
+    },
+    {
+      "risk": "unknown",
+      "contextBeforeApproval": [
+        "target",
+        "risk",
+        "cost"
+      ],
+      "relayEnqueueBeforeApproval": 0,
+      "runtimeExecutionBeforeApproval": 0,
+      "disposition": "fail-closed-replan-required"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical-taxonomy-exact-match",
+      "status": "passed"
+    },
+    {
+      "id": "seven-ui-context-and-zero-preapproval-side-effects",
+      "status": "passed"
+    },
+    {
+      "id": "six-confirmable-classes-enqueue-once-after-human-click",
+      "status": "passed"
+    },
+    {
+      "id": "unknown-and-new-risk-fail-closed",
+      "status": "passed"
+    }
+  ],
+  "assertions": 9,
+  "negativeCases": 2,
+  "testFile": "src/features/home/StartWorkRiskApprovalMatrix.test.tsx",
+  "limitations": [
+    "The gate exercises the production React StartWorkFlow and production RemoteRelayClient with an in-memory HTTP response stub; the separate real-web-relay-e2e gate covers a real loopback Fastify Relay.",
+    "No Node agent is attached in this gate, so it proves zero runtime execution by absence of any runtime execution surface; it is not two-machine or external Relay evidence.",
+    "Synthetic plans, node metadata, costs, and badge values only; no real user or production data is used."
+  ],
+  "authoritativeCommand": "npm run test:desktop:hitl-matrix -- --risk-matrix",
+  "acceptance": {
+    "exactRiskClasses": [
+      "egress",
+      "write",
+      "spend",
+      "delete",
+      "privilege",
+      "network",
+      "unknown"
+    ],
+    "preApprovalRejected": "7/7",
+    "unknownAndFutureRisk": "fail-closed"
+  }
+}

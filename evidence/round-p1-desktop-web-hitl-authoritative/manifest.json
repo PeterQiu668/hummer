@@ -1,0 +1,41 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-desktop-web-hitl-authoritative",
+  "generatedAt": "2026-10-07T02:28:01.423Z",
+  "gitCommit": "a6fa66d50684fd27cfc346c332451356ff9e48da",
+  "prevManifestRootHash": "eb4e523dcd5accf8418aaf5c5b16830cbff967c90aa9e042dac19e122a5b7626",
+  "files": [
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/gate.json",
+      "sha256": "9982c68b5a6f2fc5b3755ce8a64b75eb6e2bbb3d824b225dcf99fa5d8972142c",
+      "bytes": 2367
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/risk-matrix.json",
+      "sha256": "4a943ed5013f4193cf8123409fd1ee8de939ebda1701c053a9ebe27f8ad214d9",
+      "bytes": 3467
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-approval-pending.png",
+      "sha256": "00b6a4bcb9d3147929297dc38f5de541dcb31ae51a846ccbca626e58bc8cb8fd",
+      "bytes": 104551
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-denial-pending.png",
+      "sha256": "6f669dbe5286efd575b32627f150ab263345754d7aaa11cb685b59eac11e3498",
+      "bytes": 98427
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/desktop-task-stopped.png",
+      "sha256": "c922ba6d4b06e5a11536540b8ea93aadfff5e92db723499b18d56dc0675795f6",
+      "bytes": 92513
+    },
+    {
+      "path": "evidence/round-p1-desktop-web-hitl-authoritative/screenshots/web-dispatch-same-relay.png",
+      "sha256": "f896d963283729bb1d3255eae427c204830508b6f9cb5a03220c2a5094e9ed98",
+      "bytes": 88681
+    }
+  ],
+  "rootHash": "5c72281f4a6b381ef26f86e8d29d527c70a08ddb09ea58360cf3eeb794ed9da5"
+}
