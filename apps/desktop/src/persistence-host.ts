@@ -12,6 +12,8 @@ import {
   type DesktopPersistence,
   type HireDigitalEmployeeInput,
   type DefineOutcomeInput,
+  type DemoCaptureMetadata,
+  type DemoSourceBoundary,
   type RecordCostInput,
   type RecordOutcomeInput,
   type WorkOrderIntakePayload,
@@ -65,6 +67,8 @@ export interface PersistenceHostRegistration {
 }
 export interface PersistenceHostOptions {
   stopAll?: (tenantId: string) => Promise<number>;
+  /** Test-only seam. Never enable this from the packaged Desktop bootstrap. */
+  enableDemoSessionSyntheticInjector?: boolean;
 }
 
 
@@ -115,6 +119,15 @@ const CHANNELS = [
   'hummer:intake:inbox',
   'hummer:intake:choose-inbox',
   'hummer:intake:configure-inbox',
+  'hummer:demo-session:start',
+  'hummer:demo-session:get',
+  'hummer:demo-session:pause',
+  'hummer:demo-session:resume',
+  'hummer:demo-session:end',
+  'hummer:demo-session:delete-segment',
+  'hummer:demo-session:mark-redacted',
+  'hummer:demo-session:export-review',
+  'hummer:demo-session:test-inject-synthetic',
 ] as const;
 
 export function registerPersistenceHost(options: PersistenceHostOptions = {}): PersistenceHostRegistration {
@@ -290,6 +303,72 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
     watchInbox(context.tenant.id, directory);
     return inbox;
   });
+  ipcMain.handle('hummer:demo-session:start', (_event, request: Authenticated<{
+    sourceBoundary: DemoSourceBoundary;
+    captureMode: 'ax-tree+keyframes' | 'events-only';
+  }>) => {
+    const context = persistence.identity.resumeSession(request.token);
+    return persistence.demoSessions.start({
+      sessionId: `demo_${randomUUID().replaceAll('-', '')}`,
+      tenantId: context.tenant.id,
+      expertActorRef: `human:${context.membership.humanUserId}`,
+      nodeId: `node_local_${context.tenant.id.replace(/^tenant_/, '').slice(0, 12)}`,
+      sourceBoundary: request.input.sourceBoundary,
+      captureMode: request.input.captureMode,
+    });
+  });
+  ipcMain.handle('hummer:demo-session:get', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    return requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+  });
+  ipcMain.handle('hummer:demo-session:pause', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.pause(tenantId, request.input.sessionId, actorRef);
+  });
+  ipcMain.handle('hummer:demo-session:resume', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.resume(tenantId, request.input.sessionId, actorRef);
+  });
+  ipcMain.handle('hummer:demo-session:end', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.end(tenantId, request.input.sessionId, actorRef);
+  });
+  ipcMain.handle('hummer:demo-session:delete-segment', (_event, request: Authenticated<{ sessionId: string; segmentId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.deleteSegment(tenantId, request.input.sessionId, request.input.segmentId, actorRef);
+  });
+  ipcMain.handle('hummer:demo-session:mark-redacted', (_event, request: Authenticated<{ sessionId: string; policyRef: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.markRedactionApplied(
+      tenantId,
+      request.input.sessionId,
+      actorRef,
+      request.input.policyRef,
+    );
+  });
+  ipcMain.handle('hummer:demo-session:export-review', (_event, request: Authenticated<{ sessionId: string }>) => {
+    const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+    requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+    return persistence.demoSessions.exportForEgress(tenantId, request.input.sessionId);
+  });
+  if (options.enableDemoSessionSyntheticInjector) {
+    ipcMain.handle('hummer:demo-session:test-inject-synthetic', (_event, request: Authenticated<{
+      sessionId: string;
+      app: string;
+      window: string;
+      metadata: DemoCaptureMetadata;
+      occurredAt?: string;
+    }>) => {
+      const { tenantId, actorRef } = demoSessionContext(persistence, request.token);
+      requireOwnedDemoSession(persistence, tenantId, request.input.sessionId, actorRef);
+      return persistence.demoSessions.ingest({ tenantId, ...request.input });
+    });
+  }
 
   ipcMain.handle('hummer:identity:create-company', (_event, input: CreateCompanyInput) => persistence.identity.createCompany(input));
   ipcMain.handle('hummer:identity:accept-invitation', (_event, input: AcceptInvitationRequest) => persistence.identity.acceptInvitation(input));
@@ -572,6 +651,25 @@ export function registerPersistenceHost(options: PersistenceHostOptions = {}): P
       persistence.close();
     },
   };
+}
+
+function demoSessionContext(persistence: DesktopPersistence, token: string): { tenantId: string; actorRef: string } {
+  const context = persistence.identity.resumeSession(token);
+  return {
+    tenantId: context.tenant.id,
+    actorRef: `human:${context.membership.humanUserId}`,
+  };
+}
+
+function requireOwnedDemoSession(
+  persistence: DesktopPersistence,
+  tenantId: string,
+  sessionId: string,
+  actorRef: string,
+) {
+  const session = persistence.demoSessions.get(tenantId, sessionId);
+  if (session.expertActorRef !== actorRef) throw new Error('Demo session is unavailable in the current tenant');
+  return session;
 }
 
 export async function stopAllForAuthenticatedTenant(

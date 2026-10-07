@@ -11,6 +11,7 @@ import EvidencePage from '../pages/EvidencePage';
 import CommandPalette from '../global/CommandPalette';
 import ToastContainer from '../global/ToastContainer';
 import MySettingsDrawer from '../../features/settings/MySettingsDrawer';
+import DemoSessionPage from '../../features/demo-session/DemoSessionPage';
 
 export default function AppShell() {
   const activePage = useAppStore((state) => state.activePage);
@@ -31,6 +32,7 @@ export default function AppShell() {
         {currentPage === 'employees' && <EmployeesPage />}
         {currentPage === 'connect' && <MCPAppsPage />}
         {currentPage === 'nodes' && <ExecutionNodesPage />}
+        {currentPage === 'teach' && <DemoSessionPage />}
         {currentPage === 'evidence' && <EvidencePage />}
       </div>
 

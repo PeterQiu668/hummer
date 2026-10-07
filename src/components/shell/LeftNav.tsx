@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Blocks, ChartNoAxesCombined, ChevronDown, LayoutPanelTop, MonitorCog, Settings2, UsersRound } from 'lucide-react';
+import { Blocks, ChartNoAxesCombined, ChevronDown, GraduationCap, LayoutPanelTop, MonitorCog, Settings2, UsersRound } from 'lucide-react';
 import { useOptionalIdentity } from '../../features/identity/IdentityProvider';
 import { useAppStore, type PageKey } from '../../store/useAppStore';
 
-const primaryNav: { key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'nodes' | 'evidence'>; label: string; icon: typeof LayoutPanelTop; badge?: string }[] = [
+const primaryNav: { key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'nodes' | 'teach' | 'evidence'>; label: string; icon: typeof LayoutPanelTop; badge?: string }[] = [
   { key: 'office', label: '工作台', icon: LayoutPanelTop },
   { key: 'employees', label: '团队协作', icon: UsersRound, badge: '15' },
   { key: 'connect', label: '能力与连接', icon: Blocks, badge: '7' },
   { key: 'nodes', label: '执行节点', icon: MonitorCog },
+  { key: 'teach', label: '教它做我的活', icon: GraduationCap },
   { key: 'evidence', label: '成长与复盘', icon: ChartNoAxesCombined, badge: '3' },
 ];
 
@@ -20,7 +21,7 @@ export default function LeftNav() {
   const tenant = identityState?.identity.tenant;
   const tenants = identityState?.tenants ?? [];
   const [tenantOpen, setTenantOpen] = useState(false);
-  const go = (key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'nodes' | 'evidence'>) => { setActivePage(key); setLeftNav(key); };
+  const go = (key: Extract<PageKey, 'office' | 'employees' | 'connect' | 'nodes' | 'teach' | 'evidence'>) => { setActivePage(key); setLeftNav(key); };
 
   return (
     <>
@@ -32,7 +33,7 @@ export default function LeftNav() {
         <nav className="flex-1 p-2" aria-label="主导航"><div className="px-2 pb-2 pt-1 text-[10px] font-semibold text-neutral-400">我的组织</div><div className="space-y-1">{primaryNav.map((item) => { const Icon = item.icon; const active = activePage === item.key; return <button type="button" key={item.key} onClick={() => go(item.key)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-[13px] transition ${active ? 'bg-neutral-900 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'}`}><Icon size={15} className={active ? 'text-white' : 'text-neutral-500'} /><span className="flex-1 text-left">{item.label}</span>{item.badge && <span className={`rounded px-1.5 text-[10px] ${active ? 'bg-white/15 text-white' : 'bg-neutral-100 text-neutral-500'}`}>{item.badge}</span>}</button>; })}</div></nav>
         <div className="border-t border-neutral-200 p-3"><button type="button" onClick={() => go('connect')} className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100"><span className="h-1.5 w-1.5 rounded-full bg-neutral-300" /><span className="flex-1">查看工具目录</span><Blocks size={13} className="text-neutral-400" /></button><button type="button" onClick={() => setSettingsOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100"><Settings2 size={13} className="text-neutral-400" /><span>个人偏好</span></button></div>
       </aside>
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid h-12 grid-cols-5 border-t border-neutral-200 bg-white md:hidden" aria-label="移动端主导航">{primaryNav.map((item) => { const Icon = item.icon; const active = activePage === item.key; return <button type="button" key={item.key} onClick={() => go(item.key)} className={`flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-[9.5px] ${active ? 'text-primary-700' : 'text-neutral-500'}`}><Icon size={15} /><span className="max-w-full truncate">{item.label}</span></button>; })}</nav>
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid h-12 grid-cols-6 border-t border-neutral-200 bg-white md:hidden" aria-label="移动端主导航">{primaryNav.map((item) => { const Icon = item.icon; const active = activePage === item.key; return <button type="button" key={item.key} onClick={() => go(item.key)} className={`flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-[9.5px] ${active ? 'text-primary-700' : 'text-neutral-500'}`}><Icon size={15} /><span className="max-w-full truncate">{item.label}</span></button>; })}</nav>
     </>
   );
 }

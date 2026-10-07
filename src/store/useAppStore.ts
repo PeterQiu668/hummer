@@ -37,6 +37,7 @@ export type PageKey =
   | 'lobster'     // 练虾系统（modal）
   | 'connect'     // MCP / 应用
   | 'nodes'       // 本地执行节点
+  | 'teach'       // 本地 DemoSession 控制面
   | 'governance'  // HiClaw 治理舱（modal）
   | 'hermes'      // Hermes 进化（modal）
   | 'audit'       // 审计链
@@ -54,6 +55,7 @@ export function normalizeV3Page(value: unknown): PageKey {
   if (value === 'connect') return 'connect';
   if (value === 'evidence' || value === 'roi' || value === 'evolution' || value === 'audit') return 'evidence';
   if (value === 'nodes') return 'nodes';
+  if (value === 'teach') return 'teach';
   return 'office';
 }
 
