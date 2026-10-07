@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const round = option('round') ?? 'round-p2-surfaces-1';
 if (!/^round-p2-surfaces-[1-9][0-9]*$/.test(round)) fail('Round must match round-p2-surfaces-N.');
-if (process.version !== 'v24.16.0') fail(`Node v24.16.0 is required; got ${process.version}.`);
+if (process.version !== 'v22.22.2') fail(`Node v22.22.2 is required; got ${process.version}.`);
 const outputDirectory = resolve(repository, 'evidence', round);
 if (existsSync(outputDirectory)) fail(`Evidence round already exists and will not be overwritten: evidence/${round}`);
 
