@@ -1,0 +1,21 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p2-surfaces-1",
+  "generatedAt": "2026-10-07T00:27:46.428Z",
+  "gitCommit": "03eed3c9cc573e746dab04b16eec6ce6cf751f6b",
+  "prevManifestRootHash": "3709c6b3de25c440e05eef670789e59f84bf842c098521c80823d95c48789923",
+  "files": [
+    {
+      "path": "evidence/round-p2-surfaces-1/gates.json",
+      "sha256": "f337cd089bb813c17d30eeffc477183c21304d767c963b9974caddf665894cd1",
+      "bytes": 106732
+    },
+    {
+      "path": "evidence/round-p2-surfaces-1/report.md",
+      "sha256": "c590def7ff00ad3ae5d221e18541aad2973b2dd25614b46e216dfdb84c240ea5",
+      "bytes": 2873
+    }
+  ],
+  "rootHash": "b4ccd48753f577ab398880dcb0266a75361c2463faf64ac617047098795fe9cc"
+}
