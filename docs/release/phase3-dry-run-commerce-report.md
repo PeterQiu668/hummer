@@ -21,7 +21,19 @@ HUMMER now supports a narrow, auditable simulation of the marketplace lifecycle 
 
 ## Verification
 
-The targeted domain, persistence, and Relay HTTP suite covers the full simulated lifecycle and negative cases. The formal evidence round records typecheck, build, contract, commerce boundary, Relay, unit, UI, and dead-control checks. Its immutable manifest is the source of truth for exact command output and commit identity.
+The targeted domain, persistence, and Relay HTTP suite covers the full simulated lifecycle and negative cases. The final formal evidence round is `evidence/round-p3-dry-run-commerce-rerun-2/` at commit `cf7ec4a0b13b6bc3c6d02c84451b47a9c8280803`, with root hash `0d035b1fae390ec6b424ef181d2ce407f8249a92f227e47b3d65b9446ad98897`.
+
+All eight commands passed:
+
+- typecheck and production build;
+- 65 contract assertions with 46 negative cases;
+- Phase 3 suite: 3 files and 19 tests, plus 4 static assertions and 21 forbidden-token cases;
+- Relay: 22 files and 210 tests;
+- root unit: 113 files and 749 tests;
+- UI: 23 files and 96 tests;
+- dead-control audit.
+
+Two preceding failed rounds are intentionally retained in the same hash chain. The first exposed a stale v16 migration expectation; the second exposed a Windows CLI prebuild hook whose 20-second timeout was below its observed successful duration. Both were fixed before the passing round. The seal verifier passed 9 assertions and 2 tamper cases.
 
 ## Remaining boundary
 

@@ -1,0 +1,79 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "phase3-dry-run-marketplace-commerce",
+  "mode": "local-claim-verified-no-real-payment",
+  "status": "passed",
+  "capturedAt": "2026-10-07T07:52:20.817Z",
+  "commit": "cf7ec4a0b13b6bc3c6d02c84451b47a9c8280803",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-BltfyyW6.js    187.02 kB │ gzip:  55.23 kB\ndist/assets/index-B7CirJCT.js                          641.86 kB │ gzip: 194.29 kB\n✓ built in 13.64s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm run test:contract",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:contract\n> node scripts/test-contract.mjs\n\n{\"status\":\"passed\",\"assertions\":65,\"negativeCases\":46,\"maxBytes\":65536}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:marketplace:commerce",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:marketplace:commerce\n> vitest run --config vitest.config.ts packages/public-market/src/public-market.test.ts apps/relay/test/public-market-http.test.ts apps/desktop/src/persistence/persistence.test.ts && node scripts/test-marketplace-commerce-boundary.mjs\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  3 passed (3)\n      Tests  19 passed (19)\n   Start at  15:49:15\n   Duration  4.93s (transform 2.11s, setup 0ms, import 7.85s, tests 3.52s, environment 1ms)\n\n{\n  \"schema\": \"hummer.executable-gate-result\",\n  \"version\": 1,\n  \"gate\": \"marketplace-commerce-boundary\",\n  \"mode\": \"local-static-no-real-payment\",\n  \"status\": \"passed\",\n  \"assertions\": [\n    {\n      \"name\": \"no payment-provider dependency is declared\",\n      \"passed\": true,\n      \"detail\": []\n    },\n    {\n      \"name\": \"commerce production files contain no payment credential or provider API token\",\n      \"passed\": true,\n      \"detail\": []\n    },\n    {\n      \"name\": \"schema v17 names the boundary as dry-run marketplace commerce\",\n      \"passed\": true,\n      \"detail\": []\n    },\n    {\n      \"name\": \"offers are integer CNY amounts and settlements expose exact reconciliation\",\n      \"passed\": true,\n      \"detail\": []\n    }\n  ],\n  \"assertionCount\": 4,\n  \"negativeCases\": 21,\n  \"limitations\": [\n    \"This gate proves only repository-level absence of known provider SDKs and credential fields in the scoped implementation.\",\n    \"It does not authorize real payment, custody, payout, tax, invoice, refund, chargeback, or marketplace launch.\"\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm test -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.033,\"dispatchP95Ms\":0.91,\"eventWriteP95Ms\":0.26,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":3.407,\"dispatchP95Ms\":9.094,\"eventWriteP95Ms\":4.495,\"rejectedOverLimit\":true}\n\n Test Files  22 passed (22)\n      Tests  210 passed (210)\n   Start at  15:49:23\n   Duration  37.09s (transform 14.40s, setup 0ms, import 152.51s, tests 84.66s, environment 5ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:unit",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.045,\"dispatchP95Ms\":0.9,\"eventWriteP95Ms\":0.226,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.108,\"dispatchP95Ms\":6.675,\"eventWriteP95Ms\":4.977,\"rejectedOverLimit\":true}\n\n Test Files  113 passed (113)\n      Tests  749 passed (749)\n   Start at  15:50:18\n   Duration  64.06s (transform 8.32s, setup 0ms, import 91.77s, tests 97.37s, environment 25ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:ui",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  23 passed (23)\n      Tests  96 passed (96)\n   Start at  15:51:24\n   Duration  53.10s (transform 36.93s, setup 99.46s, import 55.21s, tests 37.00s, environment 307.47s)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run audit:dead-controls",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 audit:dead-controls\n> node scripts/audit-dead-controls.mjs\n\nDead control audit passed: every native button has onClick or type=\"submit\".\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "a source-tenant human can declare and revoke an exact public-listing author claim",
+    "a separate human marketplace moderator must verify the claim from an evidence digest",
+    "only a verified claim can publish one active positive-integer CNY dry-run offer",
+    "a buyer order requires an approved exact install attempt and rejects payment fields",
+    "settlement persists one equal debit and credit and reconciles to zero",
+    "cross-tenant reconciliation, wrong-role settlement, replay, and unknown fields fail closed",
+    "production commerce files and manifests contain no known payment credential or provider integration",
+    "root typecheck build contract Relay unit UI and dead-control regressions remain green"
+  ],
+  "limitations": [
+    "This evidence is local SQLite and loopback HTTP simulation; no money or provider network is used.",
+    "No external author, real identity verification, customer, tax, legal, privacy, or marketplace launch approval is claimed.",
+    "Real payment, custody, payout, invoice, refund, chargeback, KYC, AML, and production deployment remain prohibited L3 work."
+  ]
+}
