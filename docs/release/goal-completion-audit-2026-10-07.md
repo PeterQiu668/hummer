@@ -1,7 +1,7 @@
 # Goal completion audit — 2026-10-07
 
-Audited baseline: `6490f3a`  
-Current local checkpoint: `6ce9dac`  
+Audited baseline: `6490f3a`
+Implementation checkpoint under audit: `6ce9dac`
 Normative source: `HUMMER×AgentHub_内测底座_Codex目标模式主提示词_v1.1.md`
 
 ## Decision
