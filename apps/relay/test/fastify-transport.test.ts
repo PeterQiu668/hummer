@@ -416,6 +416,98 @@ describe('Fastify fleet relay transport', () => {
     expect(JSON.stringify(replay.json())).not.toContain(token);
   });
 
+  it('requires both the node badge and the bound one-time task grant after human approval', async () => {
+    const taskToken = `hgr_${'t'.repeat(43)}`;
+    const taskGrants = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => taskToken });
+    taskGrants.issue({
+      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-1', issuedToRunId: 'run-1',
+      capabilities: ['task.execute'], paths: ['outputs/report.md'],
+      expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 1,
+    }, {
+      grantId: 'task-grant-1', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-1', issuedToRunId: 'run-1',
+      capabilities: ['task.execute'], paths: ['outputs/report.md'],
+      expiresAt: '2026-10-07T00:30:00.000Z', maxUses: 1,
+    });
+    const store = new MemoryFleetStore();
+    const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
+    const authenticator = createStaticBadgeTokenAuthenticator([
+      badge('node-token', TENANT, NODE, NODE_SCOPES),
+      badge('control-token', TENANT, undefined, ['task.enqueue', 'approval.decide']),
+    ]);
+    const entry = createFleetRelayServer(service, {
+      authenticator, taskGrantAuthenticator: taskGrants, now: () => new Date(NOW),
+    });
+    openApps.push(entry);
+
+    expect((await entry.app.inject({
+      method: 'POST', url: '/v1/nodes/register', headers: authorization('node-token'), payload: manifest(),
+    })).statusCode).toBe(200);
+    expect((await entry.app.inject({
+      method: 'POST', url: '/v1/tasks/enqueue', headers: authorization('control-token'),
+      payload: envelope(1, { grantRef: 'grant:task-grant-1' }),
+    })).statusCode).toBe(200);
+    expect((await entry.app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/claim`, headers: authorization('node-token'),
+    })).statusCode).toBe(200);
+    expect((await entry.app.inject({
+      method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
+      headers: authorization('node-token'), payload: approvalRequest(),
+    })).statusCode).toBe(200);
+    expect((await entry.app.inject({
+      method: 'POST', url: '/v1/approval-requests/request-1/decision',
+      headers: authorization('control-token'), payload: approvalDecision(),
+    })).statusCode).toBe(200);
+
+    const grantHeaders = { ...authorization('node-token'), 'x-hummer-task-grant': taskToken };
+    const route = `/v1/nodes/${NODE}/tasks/delivery-1/task-grant`;
+    expect((await entry.app.inject({
+      method: 'POST', url: `${route}/consume`, headers: authorization('node-token'), payload: { requestId: 'request-1' },
+    })).statusCode).toBe(401);
+    expect((await entry.app.inject({
+      method: 'POST', url: `${route}/consume`,
+      headers: { ...authorization('wrong-node-badge'), 'x-hummer-task-grant': taskToken },
+      payload: { requestId: 'request-1' },
+    })).statusCode).toBe(401);
+    const wrongGrant = await entry.app.inject({
+      method: 'POST', url: `${route}/consume`,
+      headers: { ...authorization('node-token'), 'x-hummer-task-grant': 'wrong-task-grant' },
+      payload: { requestId: 'request-1' },
+    });
+    expect(wrongGrant.statusCode).toBe(401);
+    expect(wrongGrant.body).not.toContain('wrong-task-grant');
+    const beforeConsume = await entry.app.inject({
+      method: 'POST', url: `${route}/checkpoint`, headers: grantHeaders, payload: { requestId: 'request-1' },
+    });
+    expect(beforeConsume.statusCode).toBe(401);
+    expect(beforeConsume.body).not.toContain(taskToken);
+
+    const consumed = await entry.app.inject({
+      method: 'POST', url: `${route}/consume`, headers: grantHeaders, payload: { requestId: 'request-1' },
+    });
+    expect(consumed.statusCode).toBe(200);
+    expect(consumed.json()).toMatchObject({ authorization: {
+      grantRef: 'grant:task-grant-1', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-1', issuedToRunId: 'run-1', usedCount: 1, maxUses: 1,
+    } });
+    expect(consumed.body).not.toContain(taskToken);
+    for (let index = 0; index < 2; index += 1) {
+      expect((await entry.app.inject({
+        method: 'POST', url: `${route}/checkpoint`, headers: grantHeaders, payload: { requestId: 'request-1' },
+      })).statusCode).toBe(200);
+    }
+    expect(taskGrants.get(TENANT, 'task-grant-1')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+    expect((await entry.app.inject({
+      method: 'POST', url: `${route}/consume`, headers: grantHeaders, payload: { requestId: 'request-1' },
+    })).statusCode).toBe(401);
+
+    taskGrants.revoke(TENANT, 'task-grant-1');
+    expect((await entry.app.inject({
+      method: 'POST', url: `${route}/checkpoint`, headers: grantHeaders, payload: { requestId: 'request-1' },
+    })).statusCode).toBe(401);
+  });
+
   it('makes grant revocation effective on the next Fastify authorization checkpoint', async () => {
     const token = `hgr_${'r'.repeat(43)}`;
     const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => token });

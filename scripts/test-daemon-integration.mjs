@@ -16,6 +16,7 @@ const secretValues = [controlToken, nodeToken, grantToken];
 const scratch = mkdtempSync(join(tmpdir(), 'hummer-daemon-gate-'));
 const databasePath = join(scratch, 'fleet.sqlite');
 const journalPath = join(scratch, 'execution.jsonl');
+const receiptRoot = join(scratch, 'receipts');
 const relayConfigPath = join(scratch, 'relay.json');
 const nodeConfigPath = join(scratch, 'node.json');
 const evidenceRound = option('--evidence-round');
@@ -67,7 +68,7 @@ try {
 
   writeJson(nodeConfigPath, {
     schema: 'hummer.node-agent-config',
-    version: 1,
+    version: 2,
     nodeId,
     tenantId,
     relayBaseUrl: `${ready.address}/`,
@@ -76,6 +77,7 @@ try {
     grantExpiresAt: expiresAt,
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath,
+    receiptRoot,
     heartbeatIntervalMs: 15_000,
     pollIntervalMs: 100,
     approvalTtlMs: 300_000,

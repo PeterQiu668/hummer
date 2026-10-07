@@ -6,7 +6,7 @@ import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } fr
 
 /**
  * @typedef {{ok: true, value: unknown}|{ok: false, errors: string[]}} ValidationResult
- * @typedef {{ok: true, value: {requestId: string, tenantId: string, decision: string, deciderActorRef: string, grantedScope?: {capabilities: string[], expiresAt: string}}}|{ok: false, errors: string[]}} ApprovalValidationResult
+ * @typedef {{ok: true, value: {requestId: string, tenantId: string, decision: string, deciderActorRef: string, grantedScope?: {capabilities: string[], paths?: string[], maxUses?: number, expiresAt: string}}}|{ok: false, errors: string[]}} ApprovalValidationResult
  * @typedef {{
  *   sendHeartbeat(input: unknown, context: TransportContext): Promise<void>,
  *   claimTask(context: TransportContext): Promise<unknown|null>,
@@ -15,7 +15,9 @@ import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } fr
  *   submitReceipt(input: unknown, context: TransportContext): Promise<void>,
  *   submitApprovalRequest(claimId: string, input: unknown, context: TransportContext): Promise<unknown>,
  *   consumeApprovalDecision(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
- *   getApprovalAuthorization(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
+ *   getApprovalAuthorization(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
+ *   consumeTaskGrant?(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
+ *   checkpointTaskGrant?(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
  * }} FleetTransport
  * @typedef {{
  *   validateNodeManifest(input: unknown): ValidationResult,
@@ -328,6 +330,10 @@ export class HummerNodeAgent {
     if (!decision.grantedScope?.capabilities.includes('task.execute')) {
       throw new NodeAgentError('approval_scope_denied', 'Approval scope does not grant task.execute');
     }
+    assertGrantedScopeWithinRequest(localRequest, decision.grantedScope);
+    if (claim.binding.grantRef && decision.grantedScope.maxUses !== 1) {
+      throw new NodeAgentError('approval_scope_denied', 'Task-granted execution requires an explicit one-use approval');
+    }
     if (!Number.isFinite(Date.parse(decision.grantedScope.expiresAt)) || Date.parse(decision.grantedScope.expiresAt) <= this.#clock().getTime()) {
       throw new NodeAgentError('approval_expired', 'Approval scope has expired');
     }
@@ -344,11 +350,33 @@ export class HummerNodeAgent {
       requestId: localRequest.requestId,
       expiresAt: decision.grantedScope.expiresAt,
       controller: new AbortController(),
+      taskGrant: claim.binding.grantRef ? {
+        grantRef: claim.binding.grantRef,
+        tenantId: this.tenantId,
+        nodeId: this.nodeId,
+        workOrderId: claim.binding.workOrderId,
+        runId: localRequest.runId,
+        capabilities: [...decision.grantedScope.capabilities],
+        paths: [...(decision.grantedScope.paths ?? [])],
+        maxUses: 1,
+      } : undefined,
     };
     this.#executing.set(claimId, execution);
     let receiptHash;
     try {
       const checkpoint = () => this.#checkpointAuthorization(claimId, execution);
+      if (execution.taskGrant) {
+        if (typeof this.#transport.consumeTaskGrant !== 'function'
+          || typeof this.#transport.checkpointTaskGrant !== 'function') {
+          throw new NodeAgentError('task_grant_unavailable', 'Task grant transport is unavailable');
+        }
+        const authorization = await this.#transport.consumeTaskGrant(
+          claimId,
+          execution.requestId,
+          this.#context(),
+        );
+        assertTaskGrantAuthorization(authorization, execution.taskGrant, this.#clock());
+      }
       await checkpoint();
       const outcome = await this.#executor.execute({
         envelope: claim.envelope,
@@ -373,13 +401,22 @@ export class HummerNodeAgent {
       assertExecutionScope(receiptBinding, this.tenantId, this.nodeId, claim.binding.workOrderId);
       assertNoForeignTenantIds(receiptValidation.value, this.tenantId);
       receiptHash = digest(receiptValidation.value);
-      await checkpoint();
-      for (const event of validatedEvents) {
+      const terminalIndex = validatedEvents.findIndex((event) => isTerminalRunEvent(event));
+      if (terminalIndex >= 0 && terminalIndex !== validatedEvents.length - 1) {
+        throw new NodeAgentError('invalid_run_event', 'A terminal RunEvent must be the final event');
+      }
+      const nonTerminalEvents = terminalIndex < 0 ? validatedEvents : validatedEvents.slice(0, terminalIndex);
+      const terminalEvent = terminalIndex < 0 ? undefined : validatedEvents[terminalIndex];
+      for (const event of nonTerminalEvents) {
         await checkpoint();
         await this.#transport.submitRunEvent(event, this.#context());
       }
       await checkpoint();
       await this.#transport.submitReceipt(receiptValidation.value, this.#context());
+      if (terminalEvent) {
+        await checkpoint();
+        await this.#transport.submitRunEvent(terminalEvent, this.#context());
+      }
     } catch (error) {
       const reasonCode = safeErrorCode(error);
       const terminalState = reasonCode === 'relay_stop' ? 'stopped' :
@@ -398,7 +435,7 @@ export class HummerNodeAgent {
       throw error;
     }
     try {
-      await this.#checkpointAuthorization(claimId, execution);
+      this.#throwIfCancelled(execution);
       this.#recordTerminal(claimId, 'completed', receiptHash, undefined);
     } catch (error) {
       const reasonCode = safeErrorCode(error);
@@ -533,7 +570,7 @@ export class HummerNodeAgent {
     return { nodeId: this.nodeId, tenantId: this.tenantId, grantToken: this.#grantToken };
   }
 
-  /** @param {string} claimId @param {{requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean}} execution */
+  /** @param {string} claimId @param {{requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean, taskGrant?: {grantRef: string, tenantId: string, nodeId: string, workOrderId: string, runId: string, capabilities: string[], paths: string[], maxUses: 1}}} execution */
   async #checkpointAuthorization(claimId, execution) {
     this.#throwIfCancelled(execution);
     if (Date.parse(execution.expiresAt) <= this.#clock().getTime()) {
@@ -551,6 +588,18 @@ export class HummerNodeAgent {
     if (authorization.state === 'revoked') this.#cancelExecution(execution, 'approval_revoked');
     if (authorization.state === 'expired' || Date.parse(authorization.expiresAt) <= this.#clock().getTime()) {
       this.#cancelExecution(execution, 'approval_expired');
+    }
+    this.#throwIfCancelled(execution);
+    if (execution.taskGrant) {
+      if (typeof this.#transport.checkpointTaskGrant !== 'function') {
+        throw new NodeAgentError('task_grant_unavailable', 'Task grant transport is unavailable');
+      }
+      const grantAuthorization = await this.#transport.checkpointTaskGrant(
+        claimId,
+        execution.requestId,
+        this.#context(),
+      );
+      assertTaskGrantAuthorization(grantAuthorization, execution.taskGrant, this.#clock());
     }
     this.#throwIfCancelled(execution);
   }
@@ -886,6 +935,9 @@ function readValidatedEnvelopeBinding(value) {
     targetNodeId: requireNonEmptyString(envelope.targetNodeId, 'invalid_task_envelope', 'TaskEnvelope targetNodeId'),
     expiresAt: requireIsoDate(envelope.expiresAt, 'invalid_task_envelope', 'TaskEnvelope expiresAt'),
     workOrderId: requireNonEmptyString(envelope.originRef, 'invalid_task_envelope', 'TaskEnvelope originRef'),
+    grantRef: envelope.grantRef === undefined
+      ? undefined
+      : requireNonEmptyString(envelope.grantRef, 'invalid_task_envelope', 'TaskEnvelope grantRef'),
   };
 }
 
@@ -903,6 +955,14 @@ function readValidatedApprovalRequest(value) {
   if (!Array.isArray(capabilities) || capabilities.some((capability) => typeof capability !== 'string')) {
     throw new NodeAgentError('invalid_approval_request', 'ApprovalRequest capabilities must be strings');
   }
+  const paths = /** @type {Record<string, unknown>} */ (scope).paths;
+  if (paths !== undefined && (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string'))) {
+    throw new NodeAgentError('invalid_approval_request', 'ApprovalRequest paths must be strings');
+  }
+  const maxUses = /** @type {Record<string, unknown>} */ (scope).maxUses;
+  if (maxUses !== undefined && (!Number.isInteger(maxUses) || /** @type {number} */ (maxUses) < 1)) {
+    throw new NodeAgentError('invalid_approval_request', 'ApprovalRequest maxUses must be a positive integer');
+  }
   return {
     requestId: requireNonEmptyString(request.requestId, 'invalid_approval_request', 'ApprovalRequest requestId'),
     tenantId: requireNonEmptyString(request.tenantId, 'invalid_approval_request', 'ApprovalRequest tenantId'),
@@ -911,8 +971,64 @@ function readValidatedApprovalRequest(value) {
     runId: requireNonEmptyString(request.runId, 'invalid_approval_request', 'ApprovalRequest runId'),
     target: requireNonEmptyString(request.target, 'invalid_approval_request', 'ApprovalRequest target'),
     expiresAt: requireIsoDate(request.expiresAt, 'invalid_approval_request', 'ApprovalRequest expiresAt'),
-    requestedScope: { capabilities: /** @type {string[]} */ (capabilities) },
+    requestedScope: {
+      capabilities: /** @type {string[]} */ (capabilities),
+      paths: /** @type {string[]|undefined} */ (paths),
+      maxUses: /** @type {number|undefined} */ (maxUses),
+    },
   };
+}
+
+/** @param {unknown} value */
+function isTerminalRunEvent(value) {
+  return isRecord(value) && ['completed', 'failed', 'cancelled'].includes(String(value.type));
+}
+
+/**
+ * @param {{expiresAt: string, requestedScope: {capabilities: string[], paths?: string[], maxUses?: number}}} request
+ * @param {{capabilities: string[], paths?: string[], maxUses?: number, expiresAt: string}} granted
+ */
+function assertGrantedScopeWithinRequest(request, granted) {
+  const requestedCapabilities = new Set(request.requestedScope.capabilities);
+  const requestedPaths = new Set(request.requestedScope.paths ?? []);
+  if (granted.capabilities.some((capability) => !requestedCapabilities.has(capability))
+    || (granted.paths ?? []).some((path) => !requestedPaths.has(path))
+    || (granted.maxUses !== undefined
+      && (request.requestedScope.maxUses === undefined || granted.maxUses > request.requestedScope.maxUses))
+    || Date.parse(granted.expiresAt) > Date.parse(request.expiresAt)) {
+    throw new NodeAgentError('approval_scope_expanded', 'Approval decision exceeds the requested scope');
+  }
+}
+
+/**
+ * @param {unknown} value
+ * @param {{grantRef: string, tenantId: string, nodeId: string, workOrderId: string, runId: string, capabilities: string[], paths: string[], maxUses: 1}} expected
+ * @param {Date} now
+ */
+function assertTaskGrantAuthorization(value, expected, now) {
+  const authorization = assertExactRecord(value, [
+    'grantRef', 'tenantId', 'workOrderId', 'nodeId', 'issuedToRunId', 'capabilities',
+    'paths', 'expiresAt', 'maxUses', 'usedCount',
+  ], 'invalid_task_grant', 'task grant authorization');
+  if (!Array.isArray(authorization.capabilities)
+    || authorization.capabilities.some((capability) => typeof capability !== 'string')
+    || !Array.isArray(authorization.paths)
+    || authorization.paths.some((path) => typeof path !== 'string')
+    || authorization.grantRef !== expected.grantRef
+    || authorization.tenantId !== expected.tenantId
+    || authorization.nodeId !== expected.nodeId
+    || authorization.workOrderId !== expected.workOrderId
+    || authorization.issuedToRunId !== expected.runId
+    || !isDeepStrictEqual(authorization.capabilities, expected.capabilities)
+    || !isDeepStrictEqual(authorization.paths, expected.paths)
+    || !Number.isInteger(authorization.maxUses)
+    || authorization.maxUses !== expected.maxUses
+    || !Number.isInteger(authorization.usedCount)
+    || /** @type {number} */ (authorization.usedCount) < 1
+    || /** @type {number} */ (authorization.usedCount) > /** @type {number} */ (authorization.maxUses)
+    || Date.parse(requireIsoDate(authorization.expiresAt, 'invalid_task_grant', 'task grant expiresAt')) <= now.getTime()) {
+    throw new NodeAgentError('invalid_task_grant', 'Task grant authorization is not bound to the active execution');
+  }
 }
 
 /** @param {unknown} value */

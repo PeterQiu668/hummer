@@ -24,6 +24,7 @@ export class RelayHttpClient {
   /** @type {typeof fetch} */ #fetch;
   /** @type {(delayMs: number) => Promise<void>} */ #sleep;
   /** @type {(entry: Readonly<Record<string, unknown>>) => void} */ #logger;
+  /** @type {{put(value: unknown): Promise<unknown>}|undefined} */ #receiptStore;
   /** @type {{initialDelayMs: number, maxDelayMs: number, maxAttempts: number}} */ #reconnect;
 
   /**
@@ -33,7 +34,8 @@ export class RelayHttpClient {
    *   fetch?: typeof fetch,
    *   sleep?: (delayMs: number) => Promise<void>,
    *   logger?: (entry: Readonly<Record<string, unknown>>) => void,
-   *   reconnect?: ReconnectOptions
+   *   reconnect?: ReconnectOptions,
+   *   receiptStore?: {put(value: unknown): Promise<unknown>}
    * }} options
    */
   constructor(options) {
@@ -61,6 +63,10 @@ export class RelayHttpClient {
     if (typeof this.#fetch !== 'function') throw new TypeError('A fetch implementation is required');
     this.#sleep = options.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
     this.#logger = options.logger ?? (() => undefined);
+    if (options.receiptStore !== undefined && typeof options.receiptStore?.put !== 'function') {
+      throw new TypeError('receiptStore must implement put');
+    }
+    this.#receiptStore = options.receiptStore;
     this.#reconnect = { initialDelayMs, maxDelayMs, maxAttempts };
   }
 
@@ -156,8 +162,39 @@ export class RelayHttpClient {
     return requireRecord(response.authorization, 'approval authorization');
   }
 
-  /** Outcome receipts remain owned by HUMMER and are not persisted by Relay. */
-  async submitReceipt() {}
+  /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
+  async consumeTaskGrant(taskId, requestId, context) {
+    const response = requireRecord(await this.#request(
+      'POST',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/task-grant/consume`,
+      { requestId },
+      context,
+      false,
+      true,
+    ), 'task grant consume response');
+    return requireRecord(response.authorization, 'task grant authorization');
+  }
+
+  /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
+  async checkpointTaskGrant(taskId, requestId, context) {
+    const response = requireRecord(await this.#request(
+      'POST',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/task-grant/checkpoint`,
+      { requestId },
+      context,
+      false,
+      true,
+    ), 'task grant checkpoint response');
+    return requireRecord(response.authorization, 'task grant authorization');
+  }
+
+  /** Outcome receipts remain node-owned and must be durably persisted before completion. @param {unknown} receipt */
+  async submitReceipt(receipt) {
+    if (!this.#receiptStore) {
+      throw new RelayClientError('receipt_transport_unavailable', 'Node-owned receipt persistence is unavailable');
+    }
+    return this.#receiptStore.put(receipt);
+  }
 
   /** @param {string} taskId */
   async stopTask(taskId) {
@@ -268,7 +305,7 @@ export class RelayHttpClient {
         const response = await this.#fetch(this.#url(`/v1/nodes/${segment(nodeId)}/events`), {
           method: 'GET', headers: this.#headers(false), signal,
         });
-        if (!response.ok) throw await responseError(response, this.#badgeToken);
+        if (!response.ok) throw await responseError(response, [this.#badgeToken]);
         if (!response.body) throw new RelayClientError('invalid_relay_response', 'Relay event stream has no response body', { retryable: true });
         this.#logger({ event: 'relay.stream.connected', attempt, statusCode: response.status });
         settleReady();
@@ -292,22 +329,26 @@ export class RelayHttpClient {
    * @param {'POST'|'GET'} method
    * @param {string} path
    * @param {unknown} [body]
-   * @param {TransportContext} [_context]
+   * @param {TransportContext} [context]
    * @param {boolean} [allowEmpty]
+   * @param {boolean} [includeTaskGrant]
    */
-  async #request(method, path, body, _context, allowEmpty = false) {
+  async #request(method, path, body, context, allowEmpty = false, includeTaskGrant = false) {
     let response;
     try {
       response = await this.#fetch(this.#url(path), {
         method,
-        headers: this.#headers(body !== undefined),
+        headers: this.#headers(body !== undefined, includeTaskGrant ? context?.grantToken : undefined),
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch (error) {
       throw normalizeNetworkError(error);
     }
     if (allowEmpty && response.status === 204) return null;
-    if (!response.ok) throw await responseError(response, this.#badgeToken);
+    if (!response.ok) throw await responseError(response, [
+      this.#badgeToken,
+      ...(includeTaskGrant && context?.grantToken ? [context.grantToken] : []),
+    ]);
     if (response.status === 204) return null;
     const text = await response.text();
     if (!text) return null;
@@ -323,12 +364,13 @@ export class RelayHttpClient {
     return new URL(path.replace(/^\//, ''), ensureTrailingSlash(this.#baseUrl)).toString();
   }
 
-  /** @param {boolean} json */
-  #headers(json) {
+  /** @param {boolean} json @param {string} [taskGrantToken] */
+  #headers(json, taskGrantToken) {
     return {
       authorization: `Bearer ${this.#badgeToken}`,
       accept: 'application/json, text/event-stream',
       ...(json ? { 'content-type': 'application/json' } : {}),
+      ...(taskGrantToken ? { 'x-hummer-task-grant': taskGrantToken } : {}),
     };
   }
 }
@@ -365,15 +407,19 @@ function segment(value) {
   return encodeURIComponent(requireString(value, 'path identifier'));
 }
 
-/** @param {Response} response @param {string} secret */
-async function responseError(response, secret) {
+/** @param {Response} response @param {string[]} secrets */
+async function responseError(response, secrets) {
   let code = 'relay_request_failed';
   let message = `Relay request failed with status ${response.status}`;
   try {
     const body = requireRecord(await response.json(), 'Relay error');
     const error = requireRecord(body.error, 'Relay error detail');
-    if (typeof error.code === 'string' && error.code.trim() && !error.code.includes(secret)) code = error.code;
-    if (typeof error.message === 'string' && error.message.trim()) message = error.message.replaceAll(secret, '[REDACTED]');
+    const candidateCode = error.code;
+    if (typeof candidateCode === 'string' && candidateCode.trim()
+      && !secrets.some((secret) => candidateCode.includes(secret))) code = candidateCode;
+    if (typeof error.message === 'string' && error.message.trim()) {
+      message = secrets.reduce((value, secret) => value.replaceAll(secret, '[REDACTED]'), error.message);
+    }
   } catch {
     // Keep the status-only safe error. Never include request headers or credentials.
   }

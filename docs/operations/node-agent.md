@@ -77,7 +77,7 @@ Relay claim (unknown bytes)
   -> durable receipt-hash + terminal journal record
 ```
 
-`createSharedFleetContractValidator` now binds `NodeManifest`, `TaskEnvelope`, `ApprovalRequest`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. The existing v1 outcome-receipt verifier remains an injected authority because OutcomeReceipt is not redefined as a sixth Fleet contract.
+`createSharedFleetContractValidator` binds `NodeManifest`, `TaskEnvelope`, `ApprovalRequest`, `ApprovalDecision`, and `RunEvent` directly to `@hummer/contracts`. OutcomeReceipt is not redefined as a sixth Fleet contract; the daemon injects the shared portable verifier from `@hummer/outcome-receipts` and persists verified receipts in a node-owned create-only root.
 
 `confirmAndExecute(claimId)` deliberately has no decision parameter. It accepts
 only the request/decision bundle returned by the authenticated Relay consume
@@ -192,10 +192,12 @@ not tokens:
 node apps/node-agent/bin/hummer-node.mjs run --config C:\absolute\node-agent.json
 ```
 
-The runnable daemon probes runtimes, registers, heartbeats, connects SSE,
-polls, claims, and requests approval. Its production executor is deliberately
-unavailable and returns `executor_unavailable`; runtime availability is not
-execution authority.
+Config version 2 requires both an absolute append-only `journalPath` and a
+separate absolute `receiptRoot`. The runnable daemon probes runtimes, registers,
+heartbeats, connects SSE, polls, claims, requests approval, validates portable
+receipts, and initializes tenant/node-scoped receipt persistence. Its production
+executor is deliberately unavailable and returns `executor_unavailable`;
+runtime availability is not execution authority.
 
 ```powershell
 npm.cmd run typecheck -w @hummer/node-agent

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@hummer/contracts": "*",
+    "@hummer/outcome-receipts": "*",
     "@hummer/capability-runtime": "*"
   }
 }

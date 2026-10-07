@@ -100,6 +100,41 @@ describe('CapabilityGrantRegistry', () => {
     expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 2, maxUses: 2, status: 'exhausted' });
   });
 
+  it('consumes a task grant once and permits non-consuming checkpoints for the bound run', async () => {
+    const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
+    registry.issue(authority({
+      capabilities: ['task.execute', 'fs.read'], paths: ['inputs/report.pdf'], maxUses: 1,
+    }), grant({
+      capabilities: ['task.execute', 'fs.read'], paths: ['inputs/report.pdf'], maxUses: 1,
+    }));
+    const input = {
+      token: TOKEN_A,
+      grantRef: 'grant:grant-1',
+      tenantId: 'tenant-a',
+      workOrderId: 'work-1',
+      nodeId: 'node-main',
+      issuedToRunId: 'run-1',
+      capabilities: ['task.execute', 'fs.read'],
+      paths: ['inputs/report.pdf'],
+      maxUses: 1 as const,
+      now: NOW,
+    };
+
+    expect(await registry.checkpoint(input)).toEqual({ ok: false, reason: 'not_consumed' });
+    expect(await registry.consume(input)).toMatchObject({
+      ok: true,
+      claims: { grantRef: 'grant:grant-1', usedCount: 1, maxUses: 1 },
+    });
+    expect(await registry.checkpoint(input)).toMatchObject({ ok: true, claims: { usedCount: 1 } });
+    expect(await registry.checkpoint(input)).toMatchObject({ ok: true, claims: { usedCount: 1 } });
+    expect(await registry.consume(input)).toEqual({ ok: false, reason: 'uses_exhausted' });
+    expect(await registry.checkpoint({ ...input, issuedToRunId: 'run-other' }))
+      .toEqual({ ok: false, reason: 'binding_mismatch' });
+    expect(await registry.checkpoint({ ...input, maxUses: 2 as 1 }))
+      .toEqual({ ok: false, reason: 'binding_mismatch' });
+    expect(registry.get('tenant-a', 'grant-1')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+  });
+
   it('expires at the exact boundary without spending another use', async () => {
     const registry = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => TOKEN_A });
     registry.issue(authority(), grant({ expiresAt: '2026-10-07T00:00:01.000Z' }));

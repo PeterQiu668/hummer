@@ -12,7 +12,7 @@ The daemon config is strict JSON (`additionalProperties: false` semantics):
 ```json
 {
   "schema": "hummer.node-agent-config",
-  "version": 1,
+  "version": 2,
   "nodeId": "node-office-1",
   "tenantId": "tenant-example",
   "relayBaseUrl": "https://relay.example.invalid/",
@@ -21,6 +21,7 @@ The daemon config is strict JSON (`additionalProperties: false` semantics):
   "grantExpiresAt": "2026-12-31T00:00:00.000Z",
   "grantScopes": ["node.heartbeat", "task.claim", "approval.request", "task.execute"],
   "journalPath": "C:\\Hummer\\state\\execution.jsonl",
+  "receiptRoot": "C:\\Hummer\\state\\receipts",
   "heartbeatIntervalMs": 20000,
   "pollIntervalMs": 1000,
   "approvalTtlMs": 300000,
@@ -39,6 +40,7 @@ loopback.
 This daemon intentionally does **not** claim to execute production tasks yet.
 It registers a formal `NodeManifest`, heartbeats, receives work, and creates a
 deterministically bound `ApprovalRequest`. If a request is approved, execution
-fails closed with `executor_unavailable` until a production runtime adapter and
-OutcomeReceipt validator are explicitly injected. Runtime probes and MCP
+fails closed with `executor_unavailable` until a production runtime adapter is
+explicitly injected. Portable OutcomeReceipt verification and node-owned,
+create-only receipt persistence are wired before that adapter. Runtime probes and MCP
 metadata are inventory, not proof that a safe executor exists.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -16,7 +16,7 @@ function config(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hummer-node-daemon-'));
   return {
     schema: 'hummer.node-agent-config',
-    version: 1,
+    version: 2,
     nodeId: 'node-test-1',
     tenantId: 'tenant-test',
     relayBaseUrl: 'http://127.0.0.1:43210/',
@@ -25,6 +25,7 @@ function config(overrides = {}) {
     grantExpiresAt: '2099-01-01T00:00:00.000Z',
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath: join(root, 'execution.jsonl'),
+    receiptRoot: join(root, 'receipts'),
     heartbeatIntervalMs: 15_000,
     pollIntervalMs: 100,
     approvalTtlMs: 60_000,
@@ -60,8 +61,9 @@ test('daemon config is versioned, exact, absolute, and rejects non-loopback HTTP
   const parsed = validateNodeDaemonConfig(config());
   assert.equal(parsed.schema, 'hummer.node-agent-config');
   assert.throws(() => validateNodeDaemonConfig({ ...config(), surprise: true }), { code: 'invalid_daemon_config' });
-  assert.throws(() => validateNodeDaemonConfig(config({ version: 2 })), { code: 'unsupported_daemon_config' });
+  assert.throws(() => validateNodeDaemonConfig(config({ version: 1 })), { code: 'unsupported_daemon_config' });
   assert.throws(() => validateNodeDaemonConfig(config({ journalPath: 'relative.jsonl' })), { code: 'invalid_daemon_config' });
+  assert.throws(() => validateNodeDaemonConfig(config({ receiptRoot: 'relative-receipts' })), { code: 'invalid_daemon_config' });
   assert.throws(
     () => validateNodeDaemonConfig(config({ relayBaseUrl: 'http://192.0.2.10:8787/' })),
     { code: 'invalid_daemon_config' },
@@ -175,6 +177,7 @@ test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, a
   writeFileSync(configPath, JSON.stringify(config({
     relayBaseUrl: `http://127.0.0.1:${address.port}/`,
     journalPath: join(root, 'execution.jsonl'),
+    receiptRoot: join(root, 'receipts'),
   })), 'utf8');
 
   const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'bin', 'hummer-node.mjs'), 'run', '--config', configPath], {
@@ -191,6 +194,7 @@ test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, a
   child.stderr.on('data', (chunk) => { stderr += chunk; });
   try {
     await waitUntil(() => stdout.includes('"event":"daemon.ready"'), 35_000);
+    assert.equal(existsSync(join(root, 'receipts', '.hummer-node-receipt-root.json')), true);
     assert.ok(requests.some((item) => item.url === '/v1/nodes/register'));
     assert.ok(requests.some((item) => item.url === '/v1/nodes/node-test-1/heartbeat'));
     assert.ok(requests.some((item) => item.url === '/v1/nodes/node-test-1/events'));

@@ -99,6 +99,17 @@ Fastify performs one atomic `authorize` call per request:
 - known grant without the required capability: 403 `scope_denied`, no use spent;
 - successful check: `usedCount` increments before ingress is invoked.
 
+Task execution uses the stricter dual-credential flow from ADR-067. The node
+badge authenticates the HTTP caller. The task grant is accepted only at the
+bound task's `consume` and `checkpoint` routes. Relay derives tenant, node,
+WorkOrder, run, grant reference, approved capabilities, and approved paths from
+the leased task and persisted approval records. Both the approval and task
+grant must explicitly be single-use (`maxUses: 1`). `consume` spends that use;
+later checkpoints spend none and require evidence that the same bound grant
+was already consumed. A missing task-grant authority returns 503 rather than
+falling back to the node badge. This registry is process-atomic; restart-safe
+consume/revoke state still requires the durable control-plane snapshot slice.
+
 SSE is notification-only and never authorizes execution. A reconnect always
 reauthorizes. Grant revocation does not turn an already-open SSE notification
 stream into execution authority.

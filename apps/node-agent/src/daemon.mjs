@@ -6,12 +6,14 @@ import { createSharedFleetContractValidator } from './contract-validator.mjs';
 import { NodeAgentError } from './errors.mjs';
 import { FileExecutionJournal, canonicalJson } from './execution-journal.mjs';
 import { HummerNodeAgent } from './node-agent.mjs';
+import { portableOutcomeReceiptValidator } from './outcome-receipt-validator.mjs';
+import { FileOutcomeReceiptStore } from './receipt-store.mjs';
 import { RelayClientError, RelayHttpClient } from './relay-http-client.mjs';
 import { probeAllRuntimes } from './runtime-probes.mjs';
 import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
 
 const CONFIG_SCHEMA = 'hummer.node-agent-config';
-const CONFIG_VERSION = 1;
+const CONFIG_VERSION = 2;
 const PROVIDERS = new Set(['codex', 'claude', 'deepseek', 'cli-other']);
 const RISK_CLASSES = new Set(['egress', 'write', 'spend', 'delete', 'privilege', 'network', 'unknown']);
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -19,9 +21,9 @@ const ACTOR_SAFE_ID = /^[A-Za-z0-9_-]+$/u;
 
 /**
  * @typedef {{
- * schema: 'hummer.node-agent-config', version: 1, nodeId: string, tenantId: string,
+ * schema: 'hummer.node-agent-config', version: 2, nodeId: string, tenantId: string,
  * relayBaseUrl: string, badgeTokenEnv: string, grantTokenEnv: string,
- * grantExpiresAt: string, grantScopes: string[], journalPath: string,
+ * grantExpiresAt: string, grantScopes: string[], journalPath: string, receiptRoot: string,
  * heartbeatIntervalMs: number, pollIntervalMs: number, approvalTtlMs: number,
  * runtime: {provider: 'codex'|'claude'|'deepseek'|'cli-other', executable?: string},
  * capabilities: string[], mcp: {endpoint: string, tools: string[]},
@@ -51,7 +53,7 @@ export async function readNodeDaemonConfig(configPath) {
 export function validateNodeDaemonConfig(value) {
   const input = assertExactRecord(value, [
     'schema', 'version', 'nodeId', 'tenantId', 'relayBaseUrl', 'badgeTokenEnv', 'grantTokenEnv',
-    'grantExpiresAt', 'grantScopes', 'journalPath', 'heartbeatIntervalMs', 'pollIntervalMs',
+    'grantExpiresAt', 'grantScopes', 'journalPath', 'receiptRoot', 'heartbeatIntervalMs', 'pollIntervalMs',
     'approvalTtlMs', 'runtime', 'capabilities', 'mcp', 'approval',
   ], 'invalid_daemon_config', 'Node Agent daemon config');
   if (input.schema !== CONFIG_SCHEMA || input.version !== CONFIG_VERSION) {
@@ -76,6 +78,10 @@ export function validateNodeDaemonConfig(value) {
     }
   }
   const journalPath = absolutePath(input.journalPath, 'journalPath');
+  const receiptRoot = absolutePath(input.receiptRoot, 'receiptRoot');
+  if (normalizePath(receiptRoot) === normalizePath(journalPath)) {
+    throw new NodeAgentError('invalid_daemon_config', 'receiptRoot must be separate from journalPath');
+  }
   const heartbeatIntervalMs = integerInRange(input.heartbeatIntervalMs, 'heartbeatIntervalMs', 15_000, 30_000);
   const pollIntervalMs = integerInRange(input.pollIntervalMs, 'pollIntervalMs', 100, 60_000);
   const approvalTtlMs = integerInRange(input.approvalTtlMs, 'approvalTtlMs', 1_000, 86_400_000);
@@ -111,6 +117,7 @@ export function validateNodeDaemonConfig(value) {
     grantExpiresAt,
     grantScopes,
     journalPath,
+    receiptRoot,
     heartbeatIntervalMs,
     pollIntervalMs,
     approvalTtlMs,
@@ -209,6 +216,7 @@ export function buildNodeManifest(config, probes, running = 0) {
 }
 
 export class NodeAgentDaemon {
+  /** @type {FileOutcomeReceiptStore} */ receiptStore;
   /** @type {NodeJS.Timeout|null} */ #pollTimer = null;
   /** @type {ReturnType<RelayHttpClient['connectAgent']>|null} */ #events = null;
   /** @type {Set<string>} */ #activeClaims = new Set();
@@ -226,11 +234,17 @@ export class NodeAgentDaemon {
   constructor(options) {
     this.config = options.config;
     this.#logger = options.logger ?? (() => undefined);
+    this.receiptStore = new FileOutcomeReceiptStore({
+      root: options.config.receiptRoot,
+      tenantId: options.config.tenantId,
+      nodeId: options.config.nodeId,
+    });
     this.client = new RelayHttpClient({
       baseUrl: options.config.relayBaseUrl,
       badgeToken: options.badgeToken,
       fetch: options.fetch,
       logger: (entry) => this.#log(entry),
+      receiptStore: this.receiptStore,
     });
     this.probeRunner = options.probeRunner;
     const transport = this.#trackingTransport(this.client);
@@ -246,9 +260,7 @@ export class NodeAgentDaemon {
         scopes: options.config.grantScopes,
       },
       transport,
-      contractValidator: /** @type {any} */ (createSharedFleetContractValidator({
-        validateOutcomeReceipt: () => ({ ok: false, errors: ['production receipt validator unavailable'] }),
-      })),
+      contractValidator: /** @type {any} */ (createSharedFleetContractValidator(portableOutcomeReceiptValidator)),
       executor: {
         execute: async () => {
           throw new NodeAgentError('executor_unavailable', 'No production runtime executor adapter is configured');
@@ -264,6 +276,7 @@ export class NodeAgentDaemon {
     if (this.#started) throw new NodeAgentError('daemon_already_started', 'Node Agent daemon is already running');
     if (this.#closed) throw new NodeAgentError('daemon_closed', 'Node Agent daemon cannot restart after closing');
     this.#started = true;
+    await this.receiptStore.initialize();
     const probeOptions = this.config.runtime.provider === 'cli-other'
       ? { cliOtherExecutable: this.config.runtime.executable }
       : {};
@@ -359,13 +372,18 @@ export class NodeAgentDaemon {
       reportClaimStatus: () => client.reportClaimStatus(),
       /** @param {unknown} input @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       submitRunEvent: (input, context) => client.submitRunEvent(input, context),
-      submitReceipt: () => client.submitReceipt(),
+      /** @param {unknown} input */
+      submitReceipt: async (input) => { await client.submitReceipt(input); },
       /** @param {string} taskId @param {unknown} input @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       submitApprovalRequest: (taskId, input, context) => client.submitApprovalRequest(taskId, input, context),
       /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       consumeApprovalDecision: (taskId, requestId, context) => client.consumeApprovalDecision(taskId, requestId, context),
       /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       getApprovalAuthorization: (taskId, requestId, context) => client.getApprovalAuthorization(taskId, requestId, context),
+      /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
+      consumeTaskGrant: (taskId, requestId, context) => client.consumeTaskGrant(taskId, requestId, context),
+      /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
+      checkpointTaskGrant: (taskId, requestId, context) => client.checkpointTaskGrant(taskId, requestId, context),
     };
   }
 
@@ -421,6 +439,12 @@ function absolutePath(value, label) {
   const path = requireNonEmptyString(value, 'invalid_daemon_config', label);
   if (!isAbsolute(path)) throw new NodeAgentError('invalid_daemon_config', `${label} must be absolute`);
   return resolve(path);
+}
+
+/** @param {string} value */
+function normalizePath(value) {
+  const normalized = resolve(value).replace(/[\\/]+$/u, '');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
 /** @param {unknown} value @param {string} label @param {number} minimum @param {number} maximum */

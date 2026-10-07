@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@hummer/contracts": "*",
+    "@hummer/outcome-receipts": "*",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.6.1"
   },

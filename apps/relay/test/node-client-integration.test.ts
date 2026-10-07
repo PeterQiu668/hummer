@@ -8,7 +8,12 @@ import { MemoryExecutionJournal } from '../../node-agent/src/execution-journal.m
 import { createSharedFleetContractValidator } from '../../node-agent/src/contract-validator.mjs';
 // @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
 import { RelayClientError, RelayHttpClient } from '../../node-agent/src/relay-http-client.mjs';
-import { createStaticBadgeTokenAuthenticator, type BadgeScope } from '../src/badge-auth.js';
+import {
+  CapabilityGrantRegistry,
+  createStaticBadgeTokenAuthenticator,
+  type BadgeScope,
+  type TaskGrantAuthenticator,
+} from '../src/badge-auth.js';
 import { createSharedFleetValidators } from '../src/contract-adapter.js';
 import { FleetService } from '../src/fleet-service.js';
 import { createFleetRelayServer, type FleetSseBroker } from '../src/fastify-transport.js';
@@ -34,7 +39,7 @@ const manifest = {
   load: { running: 0, queued: 0 },
 } as const;
 
-function envelope(index: number) {
+function envelope(index: number, overrides: Record<string, unknown> = {}) {
   return {
     schema: 'hummer.task-envelope', version: 1,
     workOrderTask: {
@@ -45,6 +50,7 @@ function envelope(index: number) {
     idempotencyKey: `delivery-${index}`, leaseMs: 30_000,
     approvalPolicyRef: 'policy-deny-by-default', expiresAt: FUTURE,
     originRef: `work-${index}`,
+    ...overrides,
   } as const;
 }
 
@@ -134,7 +140,7 @@ afterEach(async () => {
   }
 });
 
-async function createHarness(): Promise<Harness> {
+async function createHarness(taskGrantAuthenticator?: TaskGrantAuthenticator): Promise<Harness> {
   const store = new MemoryFleetStore();
   const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
   const authenticator = createStaticBadgeTokenAuthenticator([
@@ -143,21 +149,28 @@ async function createHarness(): Promise<Harness> {
     badge('tenant-b-node-badge', 'tenant-b', NODE, NODE_SCOPES),
     badge('tenant-b-control-badge', 'tenant-b', undefined, ['approval.decide']),
   ]);
-  const { app, events } = createFleetRelayServer(service, { authenticator, now: () => new Date(NOW) });
+  const { app, events } = createFleetRelayServer(service, {
+    authenticator, taskGrantAuthenticator, now: () => new Date(NOW),
+  });
   const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
-  const client = new RelayHttpClient({ baseUrl, badgeToken: NODE_TOKEN, reconnect: { initialDelayMs: 5, maxDelayMs: 20 } });
+  const client = new RelayHttpClient({
+    baseUrl,
+    badgeToken: NODE_TOKEN,
+    reconnect: { initialDelayMs: 5, maxDelayMs: 20 },
+    receiptStore: { put: async () => undefined },
+  });
   const harness = { app, events, store, baseUrl, client };
   openHarnesses.push(harness);
   return harness;
 }
 
-function createAgent(client: RelayHttpClient, executions: unknown[], index: number) {
+function createAgent(client: RelayHttpClient, executions: unknown[], index: number, grantToken = 'local-capability-grant-not-a-relay-badge') {
   return new HummerNodeAgent({
     nodeId: NODE,
     tenantId: TENANT,
     heartbeatIntervalMs: 20_000,
     grant: {
-      token: 'local-capability-grant-not-a-relay-badge', nodeId: NODE, tenantId: TENANT,
+      token: grantToken, nodeId: NODE, tenantId: TENANT,
       expiresAt: FUTURE, scopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     },
     transport: client,
@@ -175,11 +188,11 @@ function createAgent(client: RelayHttpClient, executions: unknown[], index: numb
   });
 }
 
-async function enqueue(baseUrl: string, index: number) {
+async function enqueue(baseUrl: string, index: number, overrides: Record<string, unknown> = {}) {
   const response = await fetch(`${baseUrl}/v1/tasks/enqueue`, {
     method: 'POST',
     headers: { authorization: `Bearer ${CONTROL_TOKEN}`, 'content-type': 'application/json' },
-    body: JSON.stringify(envelope(index)),
+    body: JSON.stringify(envelope(index, overrides)),
   });
   expect(response.status).toBe(200);
 }
@@ -193,6 +206,35 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2_000) {
 }
 
 describe('real Fastify Relay and node HTTP/SSE client', () => {
+  it('executes through the dual node-badge plus one-time task-grant boundary', async () => {
+    const taskGrantToken = `hgr_${'z'.repeat(43)}`;
+    const taskGrants = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => taskGrantToken });
+    taskGrants.issue({
+      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-7', issuedToRunId: 'run-7', capabilities: ['task.execute'],
+      paths: ['outputs/report.md'], expiresAt: FUTURE, maxUses: 1,
+    }, {
+      grantId: 'task-grant-7', tenantId: TENANT, nodeId: NODE,
+      workOrderId: 'work-7', issuedToRunId: 'run-7', capabilities: ['task.execute'],
+      paths: ['outputs/report.md'], expiresAt: FUTURE, maxUses: 1,
+    });
+    const { baseUrl, client, store } = await createHarness(taskGrants);
+    const executions: unknown[] = [];
+    const agent = createAgent(client, executions, 7, taskGrantToken);
+    await client.registerNode(manifest, { nodeId: NODE, tenantId: TENANT });
+    await enqueue(baseUrl, 7, { grantRef: 'grant:task-grant-7' });
+
+    expect(await agent.pollOnce()).toMatchObject({ state: 'pending_confirmation', claimId: 'delivery-7' });
+    expect(await agent.requestApproval('delivery-7', approvalRequest(7))).toMatchObject({ state: 'awaiting_approval' });
+    const controlClient = new RelayHttpClient({ baseUrl, badgeToken: CONTROL_TOKEN });
+    await controlClient.decideApproval('request-7', approval(7));
+
+    expect(await agent.confirmAndExecute('delivery-7')).toEqual({ state: 'completed', claimId: 'delivery-7' });
+    expect(executions).toHaveLength(1);
+    expect(taskGrants.get(TENANT, 'task-grant-7')).toMatchObject({ usedCount: 1, status: 'exhausted' });
+    expect(await store.getTask(TENANT, 'delivery-7', NOW)).toMatchObject({ status: 'completed' });
+  });
+
   it('claims into the pending gate, then executes exactly once after a matching contract-valid human decision', async () => {
     const { baseUrl, client, store } = await createHarness();
     const executions: unknown[] = [];

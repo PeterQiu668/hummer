@@ -33,6 +33,15 @@ export const BADGE_SCOPES = [
 
 export type BadgeScope = (typeof BADGE_SCOPES)[number];
 
+export const TASK_GRANT_CAPABILITIES = [
+  'task.execute',
+  'fs.read',
+  'doc.extract',
+  'workspace.exec',
+] as const;
+
+export type TaskGrantCapability = (typeof TASK_GRANT_CAPABILITIES)[number];
+
 export interface BadgeTokenClaims {
   tokenId: string;
   tenantId: string;
@@ -82,7 +91,7 @@ export interface StaticBadgeToken extends BadgeTokenClaims {
 export interface CapabilityGrantAuthority {
   authorityRef: string;
   tenantId: string;
-  capabilities: readonly BadgeScope[];
+  capabilities: readonly string[];
   paths: readonly string[];
   expiresAt: string;
   maxUses: number;
@@ -95,7 +104,7 @@ export type IssueCapabilityGrantInput = Omit<
   CapabilityGrant,
   'schema' | 'version' | 'capabilities' | 'paths' | 'usedCount' | 'revokedAt'
 > & {
-  capabilities: readonly BadgeScope[];
+  capabilities: readonly string[];
   paths: readonly string[];
 };
 
@@ -156,7 +165,44 @@ export interface CapabilityGrantRegistryOptions {
   initialRecords?: readonly PersistedCapabilityGrant[];
 }
 
-const allowedScopes = new Set<string>(BADGE_SCOPES);
+export interface TaskGrantAuthorizationInput {
+  token: string;
+  grantRef: string;
+  tenantId: string;
+  workOrderId: string;
+  nodeId: string;
+  issuedToRunId: string;
+  capabilities: readonly string[];
+  paths: readonly string[];
+  maxUses: 1;
+  now: string;
+}
+
+export interface TaskGrantAuthorizationClaims {
+  grantRef: string;
+  tenantId: string;
+  workOrderId: string;
+  nodeId: string;
+  issuedToRunId: string;
+  capabilities: readonly string[];
+  paths: readonly string[];
+  expiresAt: string;
+  maxUses: number;
+  usedCount: number;
+}
+
+export type TaskGrantAuthorizationResult =
+  | { ok: true; claims: TaskGrantAuthorizationClaims }
+  | { ok: false; reason: 'unknown' | 'expired' | 'revoked' | 'uses_exhausted' | 'scope_denied' | 'binding_mismatch' | 'not_consumed' };
+
+export interface TaskGrantAuthenticator {
+  consume(input: TaskGrantAuthorizationInput): Promise<TaskGrantAuthorizationResult>;
+  checkpoint(input: TaskGrantAuthorizationInput): Promise<TaskGrantAuthorizationResult>;
+}
+
+const allowedBadgeScopes = new Set<string>(BADGE_SCOPES);
+const allowedGrantCapabilities = new Set<string>([...BADGE_SCOPES, ...TASK_GRANT_CAPABILITIES]);
+function isBadgeScope(value: string): value is BadgeScope { return allowedBadgeScopes.has(value); }
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const persistedGrantFields = new Set([
   'grantId', 'tenantId', 'workOrderId', 'nodeId', 'capabilities', 'paths', 'expiresAt',
@@ -198,8 +244,8 @@ function publicGrant(grant: StoredCapabilityGrant, now: string): CapabilityGrant
   return cloneGrant(record);
 }
 
-function validateScopes(scopes: readonly BadgeScope[], field: string): void {
-  if (scopes.length === 0 || scopes.some((scope) => !allowedScopes.has(scope))) {
+function validateScopes(scopes: readonly string[], field: string): void {
+  if (scopes.length === 0 || scopes.some((scope) => !allowedGrantCapabilities.has(scope))) {
     throw new CapabilityGrantError('invalid_grant', `${field} contains an unsupported or empty capability set`);
   }
   if (new Set(scopes).size !== scopes.length) {
@@ -246,7 +292,7 @@ function validateStaticBadge(input: StaticBadgeToken): void {
     throw new Error('badge token, tokenId, tenantId and actorRef are required');
   }
   if (!Number.isFinite(Date.parse(input.expiresAt))) throw new Error('badge expiry must be an ISO timestamp');
-  if (input.scopes.length === 0 || input.scopes.some((scope) => !allowedScopes.has(scope))) {
+  if (input.scopes.length === 0 || input.scopes.some((scope) => !allowedBadgeScopes.has(scope))) {
     throw new Error('badge contains an unsupported or empty scope set');
   }
   if (input.nodeId !== undefined && !input.nodeId.trim()) throw new Error('badge nodeId cannot be empty');
@@ -405,10 +451,77 @@ export class CapabilityGrantRegistry implements BadgeTokenAuthenticator {
         authorizedTenantIds: [grant.tenantId],
         actorRef: `system:${grant.nodeId}`,
         nodeId: grant.nodeId,
-        scopes: [...grant.capabilities],
+        scopes: grant.capabilities.filter(isBadgeScope),
         expiresAt: grant.expiresAt,
         workOrderId: grant.workOrderId,
         issuedToRunId: grant.issuedToRunId,
+        maxUses: grant.maxUses,
+        usedCount: grant.usedCount,
+      },
+    };
+  }
+
+  async consume(input: TaskGrantAuthorizationInput): Promise<TaskGrantAuthorizationResult> {
+    return this.authorizeTaskGrant(input, true);
+  }
+
+  async checkpoint(input: TaskGrantAuthorizationInput): Promise<TaskGrantAuthorizationResult> {
+    return this.authorizeTaskGrant(input, false);
+  }
+
+  private authorizeTaskGrant(
+    input: TaskGrantAuthorizationInput,
+    consume: boolean,
+  ): TaskGrantAuthorizationResult {
+    const grantKey = this.#grantKeyByDigest.get(fingerprint(input.token));
+    if (!grantKey) return { ok: false, reason: 'unknown' };
+    const grant = this.#byTenantGrant.get(grantKey);
+    if (!grant) return { ok: false, reason: 'unknown' };
+    let now: string;
+    try {
+      now = canonicalTimestamp(input.now, 'authorization time');
+    } catch {
+      return { ok: false, reason: 'unknown' };
+    }
+    if (grant.status === 'revoked' || grant.status === 'rotated') return { ok: false, reason: 'revoked' };
+    if (Date.parse(grant.expiresAt) <= Date.parse(now)) {
+      grant.status = 'expired';
+      return { ok: false, reason: 'expired' };
+    }
+    if (grant.tokenRef !== input.grantRef
+      || grant.tenantId !== input.tenantId
+      || grant.workOrderId !== input.workOrderId
+      || grant.nodeId !== input.nodeId
+      || grant.issuedToRunId !== input.issuedToRunId
+      || grant.maxUses !== input.maxUses) {
+      return { ok: false, reason: 'binding_mismatch' };
+    }
+    if (input.capabilities.length === 0
+      || input.capabilities.some((capability) => !grant.capabilities.includes(capability))
+      || input.paths.some((path) => !grant.paths.includes(path))) {
+      return { ok: false, reason: 'scope_denied' };
+    }
+    if (consume) {
+      if (grant.usedCount >= grant.maxUses || grant.status === 'exhausted') {
+        grant.status = 'exhausted';
+        return { ok: false, reason: 'uses_exhausted' };
+      }
+      grant.usedCount += 1;
+      if (grant.usedCount >= grant.maxUses) grant.status = 'exhausted';
+    } else if (grant.usedCount === 0) {
+      return { ok: false, reason: 'not_consumed' };
+    }
+    return {
+      ok: true,
+      claims: {
+        grantRef: grant.tokenRef,
+        tenantId: grant.tenantId,
+        workOrderId: grant.workOrderId,
+        nodeId: grant.nodeId,
+        issuedToRunId: grant.issuedToRunId,
+        capabilities: [...input.capabilities],
+        paths: [...input.paths],
+        expiresAt: grant.expiresAt,
         maxUses: grant.maxUses,
         usedCount: grant.usedCount,
       },

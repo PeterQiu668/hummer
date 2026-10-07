@@ -10,14 +10,14 @@ import { HummerNodeAgent } from '../src/node-agent.mjs';
 const now = '2026-10-07T00:00:00.000Z';
 
 function createHarness(overrides = {}) {
-  const calls = { heartbeats: [], statuses: [], events: [], receipts: [], executions: [], approvalRequests: [], approvalConsumptions: [], authorizations: [] };
+  const calls = { heartbeats: [], statuses: [], events: [], receipts: [], transmissions: [], executions: [], approvalRequests: [], approvalConsumptions: [], authorizations: [] };
   let submittedApprovalRequest;
   const transport = {
     sendHeartbeat: async (manifest) => { calls.heartbeats.push(manifest); },
     claimTask: async () => ({ claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1' } }),
     reportClaimStatus: async (status) => calls.statuses.push(status),
-    submitRunEvent: async (event) => calls.events.push(event),
-    submitReceipt: async (receipt) => calls.receipts.push(receipt),
+    submitRunEvent: async (event) => { calls.events.push(event); calls.transmissions.push(`event:${event.type}`); },
+    submitReceipt: async (receipt) => { calls.receipts.push(receipt); calls.transmissions.push('receipt'); },
     submitApprovalRequest: async (_claimId, request) => {
       calls.approvalRequests.push(request);
       submittedApprovalRequest = request;
@@ -56,7 +56,7 @@ function createHarness(overrides = {}) {
         tenantId: 'tenant_a',
         decision: 'approved',
         deciderActorRef: 'human:owner',
-        grantedScope: { capabilities: ['task.execute'], expiresAt: '2026-10-07T01:00:00.000Z' },
+        grantedScope: { capabilities: ['task.execute'], maxUses: 1, expiresAt: '2026-10-07T01:00:00.000Z' },
       },
     }),
     validateRunEvent: (value) => ({ ok: true, value }),
@@ -201,6 +201,99 @@ test('fails closed when the Relay returns a decision that is not an approved hum
   assert.equal(calls.executions.length, 0);
 });
 
+test('consumes a TaskEnvelope grant once and checkpoints it without spending another use', async () => {
+  const grantCalls = [];
+  const authorization = {
+    grantRef: 'grant:task-1', tenantId: 'tenant_a', workOrderId: 'work_1', nodeId: 'node_a',
+    issuedToRunId: 'run_1', capabilities: ['task.execute'], paths: [],
+    expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 1, usedCount: 1,
+  };
+  const { agent, calls } = createHarness({
+    transport: {
+      claimTask: async () => ({
+        claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1', grantRef: 'grant:task-1' },
+      }),
+      consumeTaskGrant: async (claimId, requestId, context) => {
+        grantCalls.push({ operation: 'consume', claimId, requestId, token: context.grantToken });
+        return authorization;
+      },
+      checkpointTaskGrant: async (claimId, requestId, context) => {
+        grantCalls.push({ operation: 'checkpoint', claimId, requestId, token: context.grantToken });
+        return authorization;
+      },
+    },
+  });
+  await stageApproval(agent);
+
+  assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'completed', claimId: 'claim_1' });
+  assert.equal(grantCalls.filter((entry) => entry.operation === 'consume').length, 1);
+  assert.ok(grantCalls.filter((entry) => entry.operation === 'checkpoint').length >= 3);
+  assert.ok(grantCalls.every((entry) => entry.token === 'test-grant-value'));
+  assert.equal(calls.executions.length, 1);
+});
+
+test('rejects a foreign task-grant authorization before executor invocation', async () => {
+  const { agent, calls } = createHarness({
+    transport: {
+      claimTask: async () => ({
+        claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1', grantRef: 'grant:task-1' },
+      }),
+      consumeTaskGrant: async () => ({
+        grantRef: 'grant:foreign', tenantId: 'tenant_a', workOrderId: 'work_1', nodeId: 'node_a',
+        issuedToRunId: 'run_1', capabilities: ['task.execute'], paths: [],
+        expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 1, usedCount: 1,
+      }),
+      checkpointTaskGrant: async () => { throw new Error('must not checkpoint'); },
+    },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'), { code: 'invalid_task_grant' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('rejects a multi-use task-grant authorization before executor invocation', async () => {
+  const { agent, calls } = createHarness({
+    transport: {
+      claimTask: async () => ({
+        claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1', grantRef: 'grant:task-1' },
+      }),
+      consumeTaskGrant: async () => ({
+        grantRef: 'grant:task-1', tenantId: 'tenant_a', workOrderId: 'work_1', nodeId: 'node_a',
+        issuedToRunId: 'run_1', capabilities: ['task.execute'], paths: [],
+        expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 2, usedCount: 1,
+      }),
+      checkpointTaskGrant: async () => { throw new Error('must not checkpoint'); },
+    },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'), { code: 'invalid_task_grant' });
+  assert.equal(calls.executions.length, 0);
+});
+
+test('rejects a human decision that expands the requested capability or path scope', async () => {
+  const { agent, calls } = createHarness({
+    contractValidator: {
+      validateApprovalDecision: (value) => ({
+        ok: true,
+        value: {
+          requestId: value.requestId, tenantId: 'tenant_a', decision: 'approved',
+          deciderActorRef: 'human:owner',
+          grantedScope: {
+            capabilities: ['task.execute', 'fs.read'], paths: ['secrets.txt'], maxUses: 1,
+            expiresAt: '2026-10-07T01:00:00.000Z',
+          },
+        },
+      }),
+    },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'), { code: 'approval_scope_expanded' });
+  assert.equal(calls.executions.length, 0);
+});
+
 for (const [decision, reasonCode] of [
   ['denied', 'approval_denied'],
   ['expired', 'approval_expired'],
@@ -308,6 +401,49 @@ test('executes exactly once after a valid human approval and returns events plus
   assert.equal(calls.executions.length, 1);
   assert.equal(calls.events.length, 1);
   assert.equal(calls.receipts.length, 1);
+});
+
+test('persists the receipt before transmitting the terminal completed event', async () => {
+  const outcome = validOutcome();
+  outcome.events.push(
+    {
+      schema: 'hummer.run-event', version: 1, eventId: 'event_2', tenantId: 'tenant_a',
+      workOrderId: 'work_1', nodeId: 'node_a', seq: 2, occurredAt: now,
+      type: 'artifact', actorRef: 'employee:worker',
+      payload: { artifactId: 'artifact_1', sha256: 'a'.repeat(64), bytes: 12, relPath: 'outputs/result.txt' },
+      idempotencyKey: 'event-0002',
+    },
+    {
+      schema: 'hummer.run-event', version: 1, eventId: 'event_3', tenantId: 'tenant_a',
+      workOrderId: 'work_1', nodeId: 'node_a', seq: 3, occurredAt: now,
+      type: 'completed', actorRef: 'employee:worker', payload: { summary: 'done' },
+      idempotencyKey: 'event-0003',
+    },
+  );
+  const { agent, calls } = createHarness({ executor: { execute: async () => outcome } });
+  await stageApproval(agent);
+
+  assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'completed', claimId: 'claim_1' });
+  assert.deepEqual(calls.transmissions, ['event:started', 'event:artifact', 'receipt', 'event:completed']);
+});
+
+test('receipt persistence failure prevents the terminal completed event', async () => {
+  const outcome = validOutcome();
+  outcome.events.push({
+    schema: 'hummer.run-event', version: 1, eventId: 'event_2', tenantId: 'tenant_a',
+    workOrderId: 'work_1', nodeId: 'node_a', seq: 2, occurredAt: now,
+    type: 'completed', actorRef: 'employee:worker', payload: { summary: 'done' },
+    idempotencyKey: 'event-0002',
+  });
+  const { agent, calls } = createHarness({
+    executor: { execute: async () => outcome },
+    transport: { submitReceipt: async () => { throw new Error('simulated durable receipt failure'); } },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'));
+  assert.deepEqual(calls.events.map((event) => event.type), ['started']);
+  assert.equal(calls.events.some((event) => event.type === 'completed'), false);
 });
 
 test('a relay stop makes a pending claim permanently non-executable', async () => {

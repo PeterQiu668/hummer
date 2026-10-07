@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { RelayClientError, RelayHttpClient } from '../src/relay-http-client.mjs';
 
-const context = { nodeId: 'node-a', tenantId: 'tenant-a', grantToken: 'local-grant-not-used-for-http' };
+const context = { nodeId: 'node-a', tenantId: 'tenant-a', grantToken: 'opaque-task-grant-secret' };
 
 test('rejects plaintext non-loopback Relay endpoints before a badge can be sent', () => {
   assert.throws(
@@ -33,6 +33,13 @@ test('uses the injected base URL and opaque badge for Relay operations without e
   const logs = [];
   const fetch = async (url, init) => {
     requests.push({ url: String(url), init });
+    if (String(url).includes('/task-grant/')) {
+      return jsonResponse({ authorization: {
+        grantRef: 'grant:task-1', tenantId: 'tenant-a', workOrderId: 'work-1', nodeId: 'node-a',
+        issuedToRunId: 'run-1', capabilities: ['task.execute'], paths: [],
+        expiresAt: '2026-10-07T01:00:00.000Z', maxUses: 1, usedCount: 1,
+      } });
+    }
     if (String(url).endsWith('/tasks/claim')) {
       return jsonResponse({ task: { taskId: 'delivery-1', envelope: { schema: 'hummer.task-envelope' } } });
     }
@@ -74,6 +81,8 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     state: 'approved', requestId: 'request-1', taskId: 'delivery-1', nodeId: 'node-a',
     expiresAt: '2026-10-07T01:00:00.000Z',
   });
+  await client.consumeTaskGrant('delivery-1', 'request-1', context);
+  await client.checkpointTaskGrant('delivery-1', 'request-1', context);
   await client.stopTask('delivery-2');
 
   assert.deepEqual(claim, {
@@ -91,11 +100,20 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     '/v1/approval-requests/request-1/decision',
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/consume',
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/authorization',
+    '/v1/nodes/node-a/tasks/delivery-1/task-grant/consume',
+    '/v1/nodes/node-a/tasks/delivery-1/task-grant/checkpoint',
     '/v1/tasks/delivery-2/stop',
   ]);
   assert.ok(requests.every((entry) => entry.init.headers.authorization === `Bearer ${badgeToken}`));
+  const grantRequests = requests.filter((entry) => new URL(entry.url).pathname.includes('/task-grant/'));
+  assert.equal(grantRequests.length, 2);
+  assert.ok(grantRequests.every((entry) => entry.init.headers['x-hummer-task-grant'] === context.grantToken));
+  assert.ok(requests.filter((entry) => !grantRequests.includes(entry))
+    .every((entry) => entry.init.headers['x-hummer-task-grant'] === undefined));
   assert.doesNotMatch(JSON.stringify(logs), new RegExp(badgeToken));
   assert.doesNotMatch(JSON.stringify(client), new RegExp(badgeToken));
+  assert.doesNotMatch(JSON.stringify(logs), new RegExp(context.grantToken));
+  assert.doesNotMatch(JSON.stringify(client), new RegExp(context.grantToken));
 });
 
 test('401 and 403 failures are terminal and never leak or retry the badge', async () => {
@@ -119,6 +137,42 @@ test('401 and 403 failures are terminal and never leak or retry the badge', asyn
     });
     assert.equal(attempts, 1);
   }
+});
+
+test('a hostile Relay error cannot reflect the task-grant token into diagnostics', async () => {
+  const client = new RelayHttpClient({
+    baseUrl: 'https://relay.invalid', badgeToken: 'safe-badge',
+    fetch: async () => jsonResponse({
+      error: { code: `bad-${context.grantToken}`, message: `rejected ${context.grantToken}` },
+    }, 401),
+  });
+
+  await assert.rejects(() => client.consumeTaskGrant('delivery-1', 'request-1', context), (error) => {
+    assert.ok(error instanceof RelayClientError);
+    assert.equal(error.code, 'relay_request_failed');
+    assert.doesNotMatch(error.message, new RegExp(context.grantToken));
+    assert.match(error.message, /\[REDACTED\]/);
+    return true;
+  });
+});
+
+test('receipt submission fails closed unless node-owned persistence is injected', async () => {
+  const client = new RelayHttpClient({
+    baseUrl: 'https://relay.invalid', badgeToken: 'safe-badge',
+    fetch: async () => { throw new Error('network must not be used'); },
+  });
+  await assert.rejects(() => client.submitReceipt({ receipt: true }, context), {
+    code: 'receipt_transport_unavailable',
+  });
+
+  const persisted = [];
+  const local = new RelayHttpClient({
+    baseUrl: 'https://relay.invalid', badgeToken: 'safe-badge',
+    fetch: async () => { throw new Error('network must not be used'); },
+    receiptStore: { put: async (value) => { persisted.push(value); } },
+  });
+  await local.submitReceipt({ receipt: true }, context);
+  assert.deepEqual(persisted, [{ receipt: true }]);
 });
 
 test('SSE authorization failures stop after one attempt with no reconnect', async () => {

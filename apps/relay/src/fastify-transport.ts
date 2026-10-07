@@ -9,6 +9,8 @@ import type {
   BadgeScope,
   BadgeTokenAuthenticator,
   BadgeTokenClaims,
+  TaskGrantAuthenticator,
+  TaskGrantAuthorizationInput,
 } from './badge-auth.js';
 import {
   FleetRejectedError,
@@ -106,6 +108,8 @@ export class FleetSseBroker {
 
 export interface FleetRelayServerOptions {
   authenticator: BadgeTokenAuthenticator;
+  /** Optional task-scoped authority. Missing wiring fails closed at the task-grant routes. */
+  taskGrantAuthenticator?: TaskGrantAuthenticator;
   now?: () => Date;
   events?: FleetSseBroker;
   /** Optional W10 public marketplace adapter. Absence is an explicit 503, never sample data. */
@@ -143,6 +147,13 @@ function parseBearer(header: string | undefined): string {
   const match = /^Bearer ([^\s]+)$/.exec(header);
   if (!match) throw new TransportHttpError(401, 'invalid_token', 'Bearer badge token is invalid');
   return match[1]!;
+}
+
+function parseTaskGrant(header: string | string[] | undefined): string {
+  if (typeof header !== 'string' || !header || /\s/.test(header)) {
+    throw new TransportHttpError(401, 'invalid_task_grant', 'Task grant is invalid or expired');
+  }
+  return header;
 }
 
 function pathParam(request: FastifyRequest, name: string): string {
@@ -491,6 +502,54 @@ export function createFleetRelayServer(
       ),
     };
   });
+
+  const taskGrantRoute = (
+    path: '/v1/nodes/:nodeId/tasks/:taskId/task-grant/consume' | '/v1/nodes/:nodeId/tasks/:taskId/task-grant/checkpoint',
+    operation: 'consume' | 'checkpoint',
+  ) => {
+    app.post(path, async (request) => {
+      const nodeId = pathParam(request, 'nodeId');
+      const taskId = pathParam(request, 'taskId');
+      const { session } = await authorize(request, 'approval.consume', nodeId);
+      if (!options.taskGrantAuthenticator) {
+        throw new TransportHttpError(503, 'task_grant_unavailable', 'Task grant authority is unavailable');
+      }
+      const body = exactBody(request.body, ['requestId'], 'task grant authorization');
+      const requestId = requiredText(body.requestId, 'requestId', 128);
+      const task = await ingress.getTask(session, taskId);
+      if (!task || task.targetNodeId !== nodeId || task.leaseOwnerNodeId !== nodeId || task.status !== 'leased') {
+        throw new TransportHttpError(404, 'task_grant_context_not_found', 'Task grant context was not found');
+      }
+      const grantRef = typeof task.envelope.grantRef === 'string' ? task.envelope.grantRef : '';
+      const approval = await ingress.getApprovalRequest(session, requestId);
+      if (!grantRef || !approval || approval.taskId !== taskId || approval.nodeId !== nodeId
+        || approval.workOrderId !== task.workOrderId || approval.authorization?.state !== 'approved'
+        || approval.decision?.decision !== 'approved' || !approval.decision.grantedScope
+        || approval.decision.grantedScope.maxUses !== 1) {
+        throw new TransportHttpError(409, 'task_grant_context_invalid', 'Task grant context is not authorized');
+      }
+      const input: TaskGrantAuthorizationInput = {
+        token: parseTaskGrant(request.headers['x-hummer-task-grant']),
+        grantRef,
+        tenantId: session.tenantId,
+        workOrderId: task.workOrderId,
+        nodeId,
+        issuedToRunId: approval.runId,
+        capabilities: [...approval.decision.grantedScope.capabilities],
+        paths: [...(approval.decision.grantedScope.paths ?? [])],
+        maxUses: 1,
+        now: now().toISOString(),
+      };
+      const result = await options.taskGrantAuthenticator[operation](input);
+      if (!result.ok) {
+        throw new TransportHttpError(401, 'invalid_task_grant', 'Task grant is invalid or expired');
+      }
+      return { authorization: result.claims };
+    });
+  };
+
+  taskGrantRoute('/v1/nodes/:nodeId/tasks/:taskId/task-grant/consume', 'consume');
+  taskGrantRoute('/v1/nodes/:nodeId/tasks/:taskId/task-grant/checkpoint', 'checkpoint');
 
   app.post('/v1/approval-requests/:requestId/revoke', async (request) => {
     const { claims, session } = await authorize(request, 'approval.decide');
