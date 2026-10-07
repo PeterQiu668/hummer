@@ -1,0 +1,67 @@
+{
+  "schema": "hummer.executable-gate-result",
+  "version": 1,
+  "gate": "local-stack-supervisor",
+  "mode": "single-host-loopback-existing-desktop-identity",
+  "status": "passed",
+  "capturedAt": "2026-10-07T06:47:04.613Z",
+  "commit": "cf66aefa0ddcb41aec36b5795e30914c84d3c190",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "commands": [
+    {
+      "cmd": "npm run typecheck",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretypecheck\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 typecheck\n> tsc -b --noEmit\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run build",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 prebuild\n> npm run config:generate\n\n\n> hummer-enterprise-workspace@0.2.0 config:generate\n> node packages/config/scripts/generate.mjs\n\n\n> hummer-enterprise-workspace@0.2.0 build\n> tsc -b && vite build\n\nvite v6.4.3 building for production...\ntransforming...\n✓ 2388 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                          0.44 kB │ gzip:   0.33 kB\ndist/assets/index-BWagOPnQ.css                          50.99 kB │ gzip:   9.95 kB\ndist/assets/publicMarketResponseValidator-CbnUnZyi.js    1.95 kB │ gzip:   0.81 kB\ndist/assets/capabilityResponseValidator-BltfyyW6.js    187.02 kB │ gzip:  55.23 kB\ndist/assets/index-B7CirJCT.js                          641.86 kB │ gzip: 194.29 kB\n✓ built in 11.87s\n",
+      "stderr": "\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    },
+    {
+      "cmd": "npm test -w @hummer/relay",
+      "exitCode": 0,
+      "stdout": "\n> @hummer/relay@0.1.0-alpha.0 test\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet/apps/relay\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.033,\"dispatchP95Ms\":0.986,\"eventWriteP95Ms\":0.394,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.35,\"dispatchP95Ms\":16.876,\"eventWriteP95Ms\":4.178,\"rejectedOverLimit\":true}\n\n Test Files  22 passed (22)\n      Tests  209 passed (209)\n   Start at  14:43:55\n   Duration  31.03s (transform 13.73s, setup 0ms, import 103.27s, tests 72.63s, environment 4ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:local:stack",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:local:stack\n> npm run build:cli -w @hummer/relay && node scripts/test-local-stack.mjs\n\n\n> @hummer/relay@0.1.0-alpha.0 build:cli\n> tsc -p tsconfig.cli.json && node scripts/prepare-cli-dist.mjs\n\n{\"status\":\"passed\",\"assertions\":30,\"checks\":[\"one command starts real Relay and Node with ephemeral in-memory credentials\",\"live named-pipe status and coordinated stop are available without a network admin port\",\"a second supervisor is rejected and the same durable state can restart\",\"configs state SQLite journal and receipts contain no plaintext generated bearer patterns\"]}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:unit",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 pretest:unit\n> npm run config:check\n\n\n> hummer-enterprise-workspace@0.2.0 config:check\n> node packages/config/scripts/generate.mjs --check\n\n\n> hummer-enterprise-workspace@0.2.0 test:unit\n> vitest run --config vitest.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\nHUMMER_PERF_RESULT {\"store\":\"memory\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":0.095,\"dispatchP95Ms\":0.913,\"eventWriteP95Ms\":0.213,\"rejectedOverLimit\":true}\nHUMMER_PERF_RESULT {\"store\":\"sqlite\",\"nodeCount\":10,\"taskCount\":100,\"eventCount\":10000,\"persistedEventCount\":10000,\"heartbeatP95Ms\":1.388,\"dispatchP95Ms\":6.15,\"eventWriteP95Ms\":4.291,\"rejectedOverLimit\":true}\n\n Test Files  112 passed (112)\n      Tests  743 passed (743)\n   Start at  14:45:13\n   Duration  60.78s (transform 9.90s, setup 0ms, import 88.12s, tests 97.25s, environment 19ms)\n\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "npm run test:ui",
+      "exitCode": 0,
+      "stdout": "\n> hummer-enterprise-workspace@0.2.0 test:ui\n> vitest run --config vitest.ui.config.ts\n\n\n RUN  v4.1.11 F:/Users/claude code/.claude/worktrees/phase0-fleet\n\n\n Test Files  23 passed (23)\n      Tests  96 passed (96)\n   Start at  14:46:18\n   Duration  46.14s (transform 18.00s, setup 66.96s, import 33.25s, tests 37.71s, environment 299.39s)\n\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "strict config contains identity and absolute paths but no credential values",
+    "one supervisor starts real Relay and Node with fresh in-memory credentials",
+    "live named-pipe status works and a second supervisor is rejected",
+    "coordinated stop closes Node Relay SQLite and archives a redaction-safe receipt",
+    "the same durable state restarts under a fresh session and fresh credentials",
+    "state configs SQLite journal and receipts contain no generated plaintext bearer pattern",
+    "Desktop parent-lifetime hook is inert by default and quits only on explicit supervisor stdin EOF",
+    "Relay full tests and root unit UI build and typecheck regressions remain green"
+  ],
+  "limitations": [
+    "The gate runs headless Relay and Node on one Windows host; it does not claim packaged Desktop or second-device evidence.",
+    "The config requires an existing Desktop tenant/account identity and does not solve first-run identity provisioning.",
+    "Loopback HTTP and bootstrap secrets are not production TLS IdP or KMS integration."
+  ]
+}

@@ -16,6 +16,15 @@ writes only redaction-safe hashes and process metadata. A second live
 supervisor is rejected, stale ownership is preserved as an archived run, and
 the Node still exposes only `fs.read.attest.v1`.
 
+## Sealed evidence
+
+- feature commit: `cf66aefa0ddcb41aec36b5795e30914c84d3c190`;
+- evidence round: `evidence/round-p1-local-stack-supervisor/`;
+- root hash: `f12897dd70173ea9c2f56f168f792e12696165815ce716aed4f63d9ee692465b`;
+- predecessor root: `7e1fab5a56d7a7b47948b07c9c6e9cb01ece0f868532c371f9176461886da47a`;
+- six captured commands exited `0`; seal verification passed all nine
+  assertions and both negative tamper cases.
+
 ## Honest boundary
 
 The config must name an existing Desktop tenant and account actor. HUMMER does
