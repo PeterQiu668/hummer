@@ -107,6 +107,16 @@ contextBridge.exposeInMainWorld('hummerProjects', {
   growthChain: (request: unknown) => ipcRenderer.invoke('hummer:projects:growth-chain', request),
   recordGrowthReview: (request: unknown) => ipcRenderer.invoke('hummer:projects:record-growth-review', request),
 });
+contextBridge.exposeInMainWorld('hummerDemoSessions', {
+  start: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:start', request),
+  get: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:get', request),
+  pause: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:pause', request),
+  resume: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:resume', request),
+  end: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:end', request),
+  deleteSegment: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:delete-segment', request),
+  markRedacted: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:mark-redacted', request),
+  exportReview: (request: unknown) => ipcRenderer.invoke('hummer:demo-session:export-review', request),
+});
 contextBridge.exposeInMainWorld('hummerEnvironmentDoctor', {
   check: (force = false) => ipcRenderer.invoke('hummer:environment:check', force),
   openInstallGuide: (target: 'codex' | 'container') => ipcRenderer.invoke('hummer:environment:install-guide', target),
