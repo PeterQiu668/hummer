@@ -30,11 +30,7 @@ function pathRef(path: string): string {
   return `sha256:${createHash('sha256').update(path, 'utf8').digest('hex')}`;
 }
 
-async function waitForShutdown(
-  transport: FastifyFleetTransport,
-  store: SqliteFleetStore,
-  taskGrants: SqliteTaskGrantAuthority,
-): Promise<void> {
+async function waitForShutdown(closeDaemon: () => Promise<void>): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let closing = false;
     const close = async () => {
@@ -43,9 +39,7 @@ async function waitForShutdown(
       process.off('SIGINT', close);
       process.off('SIGTERM', close);
       try {
-        await transport.close();
-        store.close();
-        taskGrants.close();
+        await closeDaemon();
         resolve();
       } catch (error) {
         reject(error);
@@ -56,10 +50,56 @@ async function waitForShutdown(
   });
 }
 
+export interface RunningRelayDaemon {
+  readonly address: string;
+  readonly databaseRef: string;
+  readonly taskGrantDatabaseRef: string;
+  close(): Promise<void>;
+}
+
+export async function startRelayDaemon(configPath: string): Promise<RunningRelayDaemon> {
+  const config = await loadRelayConfig(configPath);
+  const authenticator = createConfiguredBadgeAuthenticator(config.badges);
+  const taskGrantIssuerSecret = consumeTaskGrantIssuerSecret(config);
+  const store = new SqliteFleetStore(config.databasePath);
+  const taskGrants = new SqliteTaskGrantAuthority(config.taskGrantDatabasePath);
+  const taskGrantIssuer = new DeterministicTaskGrantIssuer(taskGrantIssuerSecret, taskGrants);
+  const transport = new FastifyFleetTransport({
+    authenticator,
+    taskGrantAuthenticator: taskGrants,
+    taskGrantIssuer,
+    host: config.host,
+    port: config.port,
+  });
+  let closed = false;
+  const close = async () => {
+    if (closed) return;
+    closed = true;
+    await transport.close();
+    store.close();
+    taskGrants.close();
+  };
+  try {
+    const service = new FleetService(store, createSharedFleetValidators());
+    await transport.start(service);
+    const address = transport.address;
+    if (!address) throw new Error('relay did not publish a listening address');
+    return {
+      address,
+      databaseRef: pathRef(config.databasePath),
+      taskGrantDatabaseRef: pathRef(config.taskGrantDatabasePath),
+      close,
+    };
+  } catch (error) {
+    await close().catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function runRelayCli(args: readonly string[]): Promise<void> {
   const parsed = parseArguments(args);
-  const config = await loadRelayConfig(parsed.configPath);
   if (parsed.command === 'grant-import') {
+    const config = await loadRelayConfig(parsed.configPath);
     const taskGrants = new SqliteTaskGrantAuthority(config.taskGrantDatabasePath);
     try {
       const snapshot = await loadTaskGrantSnapshot(parsed.snapshotPath);
@@ -77,36 +117,13 @@ export async function runRelayCli(args: readonly string[]): Promise<void> {
       taskGrants.close();
     }
   }
-  const authenticator = createConfiguredBadgeAuthenticator(config.badges);
-  const taskGrantIssuerSecret = consumeTaskGrantIssuerSecret(config);
-  const store = new SqliteFleetStore(config.databasePath);
-  const taskGrants = new SqliteTaskGrantAuthority(config.taskGrantDatabasePath);
-  const taskGrantIssuer = new DeterministicTaskGrantIssuer(taskGrantIssuerSecret, taskGrants);
-  const transport = new FastifyFleetTransport({
-    authenticator,
-    taskGrantAuthenticator: taskGrants,
-    taskGrantIssuer,
-    host: config.host,
-    port: config.port,
-  });
-  try {
-    const service = new FleetService(store, createSharedFleetValidators());
-    await transport.start(service);
-    const address = transport.address;
-    if (!address) throw new Error('relay did not publish a listening address');
-    const shutdown = waitForShutdown(transport, store, taskGrants);
-    process.stdout.write(`${JSON.stringify({
-      schema: 'hummer.relay-ready',
-      version: 1,
-      address,
-      databaseRef: pathRef(config.databasePath),
-      taskGrantDatabaseRef: pathRef(config.taskGrantDatabasePath),
-    })}\n`);
-    await shutdown;
-  } catch (error) {
-    await transport.close().catch(() => undefined);
-    store.close();
-    taskGrants.close();
-    throw error;
-  }
+  const daemon = await startRelayDaemon(parsed.configPath);
+  process.stdout.write(`${JSON.stringify({
+    schema: 'hummer.relay-ready',
+    version: 1,
+    address: daemon.address,
+    databaseRef: daemon.databaseRef,
+    taskGrantDatabaseRef: daemon.taskGrantDatabaseRef,
+  })}\n`);
+  await waitForShutdown(daemon.close);
 }

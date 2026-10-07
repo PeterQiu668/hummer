@@ -13,6 +13,7 @@ import {
   registerDesktopRelayHost,
   type DesktopRelayHostRegistration,
 } from './desktop-relay-host.js';
+import { bindParentStdinLifetime } from './parent-lifetime.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 let persistenceHost: PersistenceHostRegistration | undefined;
@@ -48,6 +49,7 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 app.whenReady().then(async () => {
+  bindParentStdinLifetime(process.env, process.stdin, () => app.quit());
   const desktopRelayConfig = consumeDesktopRelayTrustedConfig(process.env);
   persistenceHost = registerPersistenceHost({
     stopAll: async (tenantId) => (await stopAllCodexRuns(tenantId)) + stopAllClaudeRuns(tenantId),
