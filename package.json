@@ -40,6 +40,7 @@
     "test:gates": "node scripts/test-gates.mjs",
     "test:evidence:seal": "node scripts/test-evidence-seal.mjs",
     "evidence:seal": "node scripts/evidence-seal.mjs",
+    "evidence:capture:p2-runtime": "node scripts/capture-p2-runtime-evidence.mjs",
     "capture:p1:foundation": "node scripts/capture-p1-foundation.mjs",
     "capture:w6:p2-kernels": "node scripts/capture-w6-p2-kernels.mjs",
     "capture:p2:surfaces": "node scripts/capture-p2-surfaces.mjs",
