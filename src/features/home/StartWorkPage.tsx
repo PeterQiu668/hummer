@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import {
   decideStartWorkPlan,
+  START_WORK_CONTROLLED_RISK_CLASSES,
+  START_WORK_RISK_PRESENTATION,
   totalEstimatedCostCny,
   validateDispatchableStartWorkPlan,
   validatePendingStartWorkPlan,
@@ -19,18 +21,10 @@ import {
 
 const riskLabels: Record<StartWorkRiskClass, string> = {
   none: '无高风险动作',
-  egress: '对外发送',
-  write: '写入或覆盖',
-  spend: '产生费用',
-  delete: '删除',
-  privilege: '权限变更',
-  network: '新网络端点',
-  unknown: '未知 · 最高风险',
+  ...Object.fromEntries(
+    START_WORK_CONTROLLED_RISK_CLASSES.map((riskClass) => [riskClass, START_WORK_RISK_PRESENTATION[riskClass].label]),
+  ) as Record<Exclude<StartWorkRiskClass, 'none'>, string>,
 };
-
-const dispatchRiskClasses: StartWorkRiskClass[] = [
-  'egress', 'write', 'spend', 'delete', 'privilege', 'network', 'unknown',
-];
 
 export interface StartWorkPageProps {
   plan: StartWorkPlan | null;
@@ -176,31 +170,47 @@ export default function StartWorkPage({
 
           <ol className="mt-4 space-y-3">
             {currentPlan.steps.map((step, index) => (
-              <li key={step.id} className="hum-card-soft flex gap-3 p-4">
+              <li key={step.id} className="hum-card-soft flex gap-3 p-4" aria-label={`第 ${index + 1} 步审批上下文`}>
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-soft)] text-xs font-semibold text-[var(--brand)]">
                   {index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-[var(--text-ink)]">{step.title}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <span className="hum-chip"><MonitorCog size={13} aria-hidden="true" />{step.nodeLabel}</span>
+                    <span className="hum-chip"><MonitorCog size={13} aria-hidden="true" />执行目标：{step.nodeLabel} · {step.targetRuntime ?? '运行时待核实'}</span>
                     <span className={`hum-chip ${step.riskClass === 'none' ? 'is-success' : 'is-warning'}`}>
-                      <ShieldAlert size={13} aria-hidden="true" />{riskLabels[step.riskClass]}
+                      <ShieldAlert size={13} aria-hidden="true" />风险：{riskLabels[step.riskClass]}
                     </span>
-                    <span className="hum-chip"><CircleDollarSign size={13} aria-hidden="true" />{formatCost(step.estimatedCostCny)}</span>
+                    <span className="hum-chip"><CircleDollarSign size={13} aria-hidden="true" />成本：{formatCost(step.estimatedCostCny)}</span>
+                    {step.riskClass !== 'none' ? (
+                      <span className={`hum-chip ${step.riskClass === 'unknown' ? 'is-error' : 'is-warning'}`}>
+                        {START_WORK_RISK_PRESENTATION[step.riskClass].approvalLabel}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </li>
             ))}
           </ol>
-          <div className="mt-4 border-t border-[var(--border-soft)] pt-3" aria-label="七类受控风险">
-            <p className="text-xs hum-muted">七类受控风险</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {dispatchRiskClasses.map((riskClass) => (
-                <span key={riskClass} className={`hum-chip ${riskClass === 'unknown' ? 'is-error' : 'is-muted'}`}>
-                  {riskLabels[riskClass]}
-                </span>
-              ))}
+          <div className="mt-4 border-t border-[var(--border-soft)] pt-3" aria-label="七类受控风险审批矩阵">
+            <p className="text-xs hum-muted">七类受控风险审批矩阵</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="hum-faint">
+                  <tr><th className="py-1 pr-3">风险</th><th className="py-1 pr-3">确认前必显</th><th className="py-1">处置</th></tr>
+                </thead>
+                <tbody>
+                  {START_WORK_CONTROLLED_RISK_CLASSES.map((riskClass) => (
+                    <tr key={riskClass} className="border-t border-[var(--border-soft)]" aria-label={`风险策略 ${riskClass}`}>
+                      <td className="py-2 pr-3">{riskLabels[riskClass]}</td>
+                      <td className="py-2 pr-3">执行目标 · 风险 · 成本</td>
+                      <td className={`py-2 ${riskClass === 'unknown' ? 'text-[var(--error)]' : ''}`}>
+                        {START_WORK_RISK_PRESENTATION[riskClass].approvalLabel}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -248,7 +258,7 @@ function Header() {
     <header>
       <p className="hum-eyebrow">开始做</p>
       <h1 id="start-work-title" className="mt-1 hum-h1">先看计划，再决定是否继续</h1>
-      <p className="mt-2 text-sm hum-muted">检查步骤、执行节点、风险和预估成本。默认不会派发。</p>
+      <p className="mt-2 text-sm hum-muted">检查每步执行目标、风险和预估成本。确认前不会联系 Relay 或开始执行。</p>
     </header>
   );
 }
@@ -261,7 +271,7 @@ function DecisionBar({ canConfirm, canReject, onConfirm, onReject }: {
 }) {
   return (
     <div className="hum-card flex flex-wrap items-center justify-between gap-3 p-4" aria-label="计划确认">
-      <p className="text-xs hum-muted">确认后仍需由受控任务入口创建 pending 工单。</p>
+      <p className="text-xs hum-muted">确认前零派发、零执行；确认后仅由受控入口创建 pending 工单。</p>
       <div className="flex gap-2">
         <button type="button" className="hum-btn is-danger" disabled={!canReject} onClick={onReject}>拒绝计划</button>
         <button type="button" className="hum-btn is-primary" disabled={!canConfirm} onClick={onConfirm}>确认计划</button>

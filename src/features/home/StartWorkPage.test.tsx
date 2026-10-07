@@ -34,9 +34,9 @@ describe('StartWorkPage', () => {
 
     expect(screen.getByRole('heading', { name: '先看计划，再决定是否继续' })).toBeInTheDocument();
     expect(screen.getByText('整理两台设备上的客户资料并生成可核验摘要')).toBeInTheDocument();
-    expect(screen.getAllByText('办公室电脑')).toHaveLength(2);
-    expect(screen.getAllByText('写入或覆盖')).toHaveLength(2);
-    expect(screen.getAllByText('预估 ¥0.80')).toHaveLength(2);
+    expect(screen.getAllByText(/执行目标：办公室电脑 · codex/)).toHaveLength(2);
+    expect(screen.getAllByText(/写入或覆盖/)).toHaveLength(2);
+    expect(screen.getAllByText(/预估 ¥0.80/)).toHaveLength(2);
     expect(screen.getByText('等待你的确认')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '确认计划' }));
@@ -108,13 +108,13 @@ describe('StartWorkPage', () => {
       onDecision={onDecision}
     />);
 
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('对外发送');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('写入或覆盖');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('产生费用');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('删除');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('权限变更');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('新网络端点');
-    expect(screen.getByLabelText('七类受控风险')).toHaveTextContent('未知 · 最高风险');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('对外发送');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('写入或覆盖');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('产生费用');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('删除');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('权限变更');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('新网络端点');
+    expect(screen.getByLabelText('七类受控风险审批矩阵')).toHaveTextContent('未知 · 最高风险');
     expect(screen.getByRole('alert')).toHaveTextContent('风险未知，必须先澄清');
     expect(screen.getByRole('button', { name: '确认计划' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '拒绝计划' })).toBeEnabled();

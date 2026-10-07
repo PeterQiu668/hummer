@@ -1,5 +1,6 @@
-export const START_WORK_RISK_CLASSES = [
-  'none',
+import type { RiskClass } from '@hummer/contracts';
+
+export const START_WORK_CONTROLLED_RISK_CLASSES = [
   'egress',
   'write',
   'spend',
@@ -7,9 +8,28 @@ export const START_WORK_RISK_CLASSES = [
   'privilege',
   'network',
   'unknown',
+] as const satisfies readonly RiskClass[];
+
+export const START_WORK_RISK_CLASSES = [
+  'none',
+  ...START_WORK_CONTROLLED_RISK_CLASSES,
 ] as const;
 
-export type StartWorkRiskClass = (typeof START_WORK_RISK_CLASSES)[number];
+export const START_WORK_RISK_PRESENTATION: Record<RiskClass, {
+  label: string;
+  approvalLabel: string;
+  confirmable: boolean;
+}> = {
+  egress: { label: '对外发送', approvalLabel: '人工明确确认', confirmable: true },
+  write: { label: '写入或覆盖', approvalLabel: '人工明确确认', confirmable: true },
+  spend: { label: '产生费用', approvalLabel: '人工明确确认', confirmable: true },
+  delete: { label: '删除', approvalLabel: '人工明确确认', confirmable: true },
+  privilege: { label: '权限变更', approvalLabel: '人工明确确认', confirmable: true },
+  network: { label: '新网络端点', approvalLabel: '人工明确确认', confirmable: true },
+  unknown: { label: '未知 · 最高风险', approvalLabel: '禁止确认 · 先澄清', confirmable: false },
+};
+
+export type StartWorkRiskClass = 'none' | RiskClass;
 export type StartWorkPlanStatus = 'pending' | 'confirmed' | 'rejected';
 export type StartWorkDecision = 'confirm' | 'reject';
 
@@ -67,7 +87,7 @@ export function validatePendingStartWorkPlan(plan: StartWorkPlan): StartWorkPlan
     if (typeof step.id === 'string') ids.add(step.id);
     if (typeof step.title !== 'string' || !step.title.trim()) errors.push(`${prefix}缺少动作`);
     if (typeof step.nodeLabel !== 'string' || !step.nodeLabel.trim()) errors.push(`${prefix}缺少执行节点`);
-    if (!START_WORK_RISK_CLASSES.includes(step.riskClass)) errors.push(`${prefix}风险类型无效`);
+    if (!isStartWorkRiskClass(step.riskClass)) errors.push(`${prefix}风险类型无效`);
     if (step.estimatedCostCny !== null
       && (!Number.isFinite(step.estimatedCostCny) || step.estimatedCostCny < 0)) {
       errors.push(`${prefix}预估成本无效`);
@@ -85,7 +105,9 @@ export function validateDispatchableStartWorkPlan(plan: StartWorkPlan): StartWor
   for (const [index, step] of plan.steps.entries()) {
     const prefix = `第 ${index + 1} 步`;
     if (!step.targetNodeId || !step.targetRuntime) errors.push(`${prefix}没有可用执行节点`);
-    if (step.riskClass === 'unknown') errors.push(`${prefix}风险未知，必须先澄清`);
+    if (step.riskClass !== 'none' && !START_WORK_RISK_PRESENTATION[step.riskClass]?.confirmable) {
+      errors.push(`${prefix}风险未知，必须先澄清`);
+    }
   }
   const nodeIds = new Set(plan.steps.map((step) => step.targetNodeId).filter(Boolean));
   const runtimes = new Set(plan.steps.map((step) => step.targetRuntime).filter(Boolean));
@@ -130,4 +152,8 @@ export function totalEstimatedCostCny(plan: StartWorkPlan): number | null {
 
 function isIsoTimestamp(value: string): boolean {
   return Boolean(value) && Number.isFinite(Date.parse(value));
+}
+
+function isStartWorkRiskClass(value: unknown): value is StartWorkRiskClass {
+  return typeof value === 'string' && (START_WORK_RISK_CLASSES as readonly string[]).includes(value);
 }
