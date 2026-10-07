@@ -26,6 +26,7 @@
     "test:skill-replay": "node scripts/test-skill-replay.mjs",
     "test:privacy": "node scripts/test-privacy.mjs",
     "test:demo-session-ui": "node scripts/test-demo-session-ui.mjs",
+    "test:windows-uia-capture": "node scripts/test-windows-uia-capture.mjs",
     "test:distillation": "node scripts/test-distillation.mjs",
     "test:upgrade-rollback": "node scripts/test-upgrade-rollback.mjs",
     "test:diagnostics": "node scripts/test-diagnostics.mjs",

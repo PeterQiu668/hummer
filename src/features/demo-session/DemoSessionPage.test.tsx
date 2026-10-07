@@ -22,8 +22,8 @@ describe('[DEMO-SESSION-UI] honest local teaching control surface', () => {
   it('states the adapter limitation and starts only with explicit application/window allowlists', async () => {
     const host = installHost();
     render(<DemoSessionPage />);
-    expect(screen.getByText(/采集适配器未连接 · 本地内核/)).toBeInTheDocument();
-    expect(screen.getByText(/不会采集屏幕、键盘原文、视频或真实操作/)).toBeInTheDocument();
+    expect(screen.getByText(/Windows UIAutomation · 仅本机元数据/)).toBeInTheDocument();
+    expect(screen.getByText(/不会采集屏幕、键盘原文或视频/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('允许的应用'), { target: { value: 'Microsoft Excel, ERP' } });
     fireEvent.change(screen.getByLabelText('允许的窗口'), { target: { value: '销售周报\n订单列表' } });
     fireEvent.click(screen.getByRole('button', { name: /启动本地会话/ }));
@@ -36,6 +36,21 @@ describe('[DEMO-SESSION-UI] honest local teaching control surface', () => {
     }));
     expect(await screen.findByText('本地会话进行中')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /伪|模拟|注入/ })).not.toBeInTheDocument();
+  });
+
+  it('requires an explicit process id and exact allowlisted title before a one-shot UIAutomation capture', async () => {
+    const captured = { accepted: true as const, processId: 4242, app: 'Microsoft Excel', window: '销售周报', capturedRecords: 3, session: { ...baseSession, segments: [{ ...baseSession.segments[0]!, recordCount: 3 }] } };
+    const host = installHost({ captureUia: vi.fn().mockResolvedValue(captured) });
+    render(<DemoSessionPage />);
+    startSession();
+    await screen.findByText('本地会话进行中');
+    fireEvent.change(screen.getByLabelText('目标进程 ID'), { target: { value: '4242' } });
+    fireEvent.change(screen.getByLabelText('精确窗口标题'), { target: { value: '销售周报' } });
+    fireEvent.click(screen.getByRole('button', { name: /采集一次可访问性元数据/ }));
+    await waitFor(() => expect(host.captureUia).toHaveBeenCalledWith({
+      token: 'auth-demo', input: { sessionId: 'demo_surface', processId: 4242, windowTitle: '销售周报' },
+    }));
+    expect(await screen.findByText(/已采集 3 条/)).toBeInTheDocument();
   });
 
   it('requires confirmation before segment deletion and renders the re-chained tombstone returned by Desktop', async () => {
@@ -86,7 +101,7 @@ function installHost(overrides: Partial<NonNullable<Window['hummerDemoSessions']
   localStorage.setItem('hummer.auth.session', 'auth-demo');
   const host = {
     start: vi.fn().mockResolvedValue(baseSession), get: vi.fn().mockResolvedValue(baseSession),
-    pause: vi.fn(), resume: vi.fn(), end: vi.fn(), deleteSegment: vi.fn(), markRedacted: vi.fn(), exportReview: vi.fn(),
+    pause: vi.fn(), resume: vi.fn(), end: vi.fn(), deleteSegment: vi.fn(), markRedacted: vi.fn(), exportReview: vi.fn(), captureUia: vi.fn(),
     ...overrides,
   };
   window.hummerDemoSessions = host;

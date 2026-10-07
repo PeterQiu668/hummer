@@ -91,6 +91,15 @@ export interface IngestDemoCaptureInput {
   occurredAt?: string;
 }
 
+export interface IngestDemoCaptureBatchInput {
+  tenantId: string;
+  sessionId: string;
+  app: string;
+  window: string;
+  metadata: DemoCaptureMetadata[];
+  occurredAt?: string;
+}
+
 export type DemoCaptureIngestResult =
   | { accepted: true; segmentId: string; sequence: number; digest: string }
   | { accepted: false; reason: 'paused' | 'ended' | 'outside_source_boundary' };
@@ -197,35 +206,53 @@ export class DemoSessionStore {
   }
 
   ingest(input: IngestDemoCaptureInput): DemoCaptureIngestResult {
+    return this.database.transaction(() => this.ingestInTransaction(input))();
+  }
+
+  ingestBatch(input: IngestDemoCaptureBatchInput): DemoCaptureIngestResult[] {
+    if (!Array.isArray(input.metadata) || input.metadata.length === 0 || input.metadata.length > 128) {
+      throw new TypeError('Capture metadata batch must contain between 1 and 128 records');
+    }
+    const occurredAt = input.occurredAt ?? this.now().toISOString();
+    return this.database.transaction(() => input.metadata.map((metadata) => this.ingestInTransaction({
+      tenantId: input.tenantId,
+      sessionId: input.sessionId,
+      app: input.app,
+      window: input.window,
+      metadata,
+      occurredAt,
+    })))();
+  }
+
+  private ingestInTransaction(input: IngestDemoCaptureInput): DemoCaptureIngestResult {
     const app = required(input.app, 'Capture application');
     const window = required(input.window, 'Capture window');
     const metadata = validateCaptureMetadata(input.metadata);
     const occurredAt = input.occurredAt ?? this.now().toISOString();
-    return this.database.transaction(() => {
-      // Re-read status and boundary inside the write transaction so a concurrent
-      // pause cannot race a capture record into storage.
-      const session = this.require(input.tenantId, input.sessionId);
-      if (session.status === 'paused') return { accepted: false as const, reason: 'paused' as const };
-      if (session.status === 'ended') return { accepted: false as const, reason: 'ended' as const };
-      if (!withinBoundary(session.sourceBoundary, app, window)) {
-        return { accepted: false as const, reason: 'outside_source_boundary' as const };
-      }
-      if (session.captureMode === 'events-only' && metadata.kind === 'keyframe-metadata') {
-        throw new Error('Keyframe metadata is not permitted in events-only capture mode');
-      }
-      const active = this.database.prepare(`
+    // Re-read status and boundary inside the write transaction so a concurrent
+    // pause cannot race a capture record into storage.
+    const session = this.require(input.tenantId, input.sessionId);
+    if (session.status === 'paused') return { accepted: false as const, reason: 'paused' as const };
+    if (session.status === 'ended') return { accepted: false as const, reason: 'ended' as const };
+    if (!withinBoundary(session.sourceBoundary, app, window)) {
+      return { accepted: false as const, reason: 'outside_source_boundary' as const };
+    }
+    if (session.captureMode === 'events-only' && metadata.kind === 'keyframe-metadata') {
+      throw new Error('Keyframe metadata is not permitted in events-only capture mode');
+    }
+    const active = this.database.prepare(`
         SELECT * FROM demo_session_segments
         WHERE tenant_id = ? AND session_id = ? AND ended_at IS NULL AND deleted_at IS NULL
         ORDER BY sequence DESC LIMIT 1
       `).get<DemoSegmentRow>(input.tenantId, input.sessionId);
-      if (!active) throw new Error('Capturing demo session has no active segment');
-      if (occurredAt < active.started_at) throw new TypeError('Capture event precedes the active segment');
-      const sequence = (this.database.prepare(`
+    if (!active) throw new Error('Capturing demo session has no active segment');
+    if (occurredAt < active.started_at) throw new TypeError('Capture event precedes the active segment');
+    const sequence = (this.database.prepare(`
         SELECT COALESCE(MAX(sequence), 0) AS sequence FROM demo_session_records
         WHERE tenant_id = ? AND session_id = ? AND segment_id = ?
       `).get<{ sequence: number }>(input.tenantId, input.sessionId, active.segment_id)?.sequence ?? 0) + 1;
-      const recordDigest = sha256Hex(canonicalJson({ app, metadata, occurredAt, sequence, window }));
-      this.database.prepare(`
+    const recordDigest = sha256Hex(canonicalJson({ app, metadata, occurredAt, sequence, window }));
+    this.database.prepare(`
         INSERT INTO demo_session_records (
           tenant_id, session_id, segment_id, sequence, kind, occurred_at,
           app_name, window_name, metadata_json, digest
@@ -234,17 +261,16 @@ export class DemoSessionStore {
         input.tenantId, input.sessionId, active.segment_id, sequence, metadata.kind,
         occurredAt, app, window, canonicalJson(metadata), recordDigest,
       );
-      this.database.prepare(`
+    this.database.prepare(`
         UPDATE demo_session_segments SET record_count = record_count + 1
         WHERE tenant_id = ? AND session_id = ? AND segment_id = ?
       `).run(input.tenantId, input.sessionId, active.segment_id);
-      const chainHead = this.rechain(input.tenantId, input.sessionId);
-      this.database.prepare(`
+    const chainHead = this.rechain(input.tenantId, input.sessionId);
+    this.database.prepare(`
         UPDATE demo_sessions SET chain_head = ?, updated_at = ?
         WHERE tenant_id = ? AND session_id = ?
       `).run(chainHead, occurredAt, input.tenantId, input.sessionId);
-      return { accepted: true as const, segmentId: active.segment_id, sequence, digest: recordDigest };
-    })();
+    return { accepted: true as const, segmentId: active.segment_id, sequence, digest: recordDigest };
   }
 
   pause(tenantId: string, sessionId: string, actorRef: string): DemoSessionV1 {
