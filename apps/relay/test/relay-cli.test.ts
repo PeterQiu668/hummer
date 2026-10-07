@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { CapabilityGrantRegistry } from '../src/badge-auth.js';
+import { SqliteTaskGrantAuthority } from '../src/sqlite-task-grant-authority.js';
 
 const relayRoot = resolve(import.meta.dirname, '..');
 const bin = resolve(relayRoot, 'bin/hummer-relay.mjs');
@@ -22,7 +24,8 @@ beforeAll(async () => {
 
 function config(databasePath: string, overrides: Record<string, unknown> = {}) {
   return {
-    schema: 'hummer.relay-config', version: 1, host: '127.0.0.1', port: 0, databasePath,
+    schema: 'hummer.relay-config', version: 2, host: '127.0.0.1', port: 0, databasePath,
+    taskGrantDatabasePath: resolve(databasePath, '..', 'task-grants.sqlite'),
     badges: [{
       tokenEnv: 'HUMMER_RELAY_CONTROL_TOKEN', tokenId: 'control-1', tenantId: 'tenant-a',
       actorRef: 'human:operator', scopes: ['node.read'], expiresAt: '2099-01-01T00:00:00.000Z',
@@ -31,13 +34,14 @@ function config(databasePath: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function tempConfig(value: unknown): Promise<{ directory: string; path: string; databasePath: string }> {
+async function tempConfig(value: unknown): Promise<{ directory: string; path: string; databasePath: string; taskGrantDatabasePath: string }> {
   const directory = await mkdtemp(resolve(tmpdir(), 'hummer-relay-cli-'));
   temporaryDirectories.push(directory);
   const path = resolve(directory, 'relay.json');
   const databasePath = resolve(directory, 'fleet.sqlite');
+  const taskGrantDatabasePath = resolve(directory, 'task-grants.sqlite');
   await writeFile(path, `${JSON.stringify(value)}\n`, 'utf8');
-  return { directory, path, databasePath };
+  return { directory, path, databasePath, taskGrantDatabasePath };
 }
 
 function launch(configPath: string, token = 'r'.repeat(32)): ChildProcessWithoutNullStreams {
@@ -81,6 +85,42 @@ afterEach(async () => {
 });
 
 describe('hummer-relay daemon', () => {
+  it('imports a digest-only task grant snapshot without reading badge secrets', async () => {
+    const initial = await tempConfig({});
+    await writeFile(initial.path, `${JSON.stringify(config(initial.databasePath))}\n`, 'utf8');
+    const token = `hgr_${'p'.repeat(43)}`;
+    const registry = new CapabilityGrantRegistry({
+      now: () => new Date('2026-10-07T00:00:00.000Z'),
+      tokenFactory: () => token,
+    });
+    registry.issue({
+      authorityRef: 'authority:operator', tenantId: 'tenant-a', nodeId: 'node-a',
+      workOrderId: 'work-1', issuedToRunId: 'run-1', capabilities: ['task.execute'], paths: [],
+      expiresAt: '2099-01-01T00:00:00.000Z', maxUses: 1,
+    }, {
+      grantId: 'task-1', tenantId: 'tenant-a', nodeId: 'node-a',
+      workOrderId: 'work-1', issuedToRunId: 'run-1', capabilities: ['task.execute'], paths: [],
+      expiresAt: '2099-01-01T00:00:00.000Z', maxUses: 1,
+    });
+    const snapshotPath = resolve(initial.directory, 'snapshot.json');
+    await writeFile(snapshotPath, `${JSON.stringify({
+      schema: 'hummer.task-grant-snapshot', version: 1, tenantId: 'tenant-a',
+      grants: registry.snapshot('tenant-a'),
+    })}\n`, 'utf8');
+
+    const imported = await execFileAsync(process.execPath, [
+      bin, 'grant-import', '--config', initial.path, '--snapshot', snapshotPath,
+    ], { cwd: relayRoot, env: { ...process.env, HUMMER_RELAY_CONTROL_TOKEN: '' } });
+    expect(JSON.parse(imported.stdout)).toMatchObject({
+      schema: 'hummer.task-grant-import-result', version: 1, tenantId: 'tenant-a', inserted: 1, unchanged: 0,
+    });
+    expect(imported.stdout).not.toContain(token);
+
+    const authority = new SqliteTaskGrantAuthority(initial.taskGrantDatabasePath);
+    expect(authority.snapshot('tenant-a')).toHaveLength(1);
+    authority.close();
+  });
+
   it('starts on loopback, serves an authenticated control request, and closes on SIGTERM', async () => {
     const initial = await tempConfig({});
     await writeFile(initial.path, `${JSON.stringify(config(initial.databasePath))}\n`, 'utf8');
@@ -90,6 +130,7 @@ describe('hummer-relay daemon', () => {
     expect(ready).toMatchObject({ schema: 'hummer.relay-ready', version: 1 });
     expect(ready.address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(ready.databaseRef).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(ready.taskGrantDatabaseRef).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(stdoutLine).not.toContain('r'.repeat(32));
     expect(stdoutLine).not.toContain(initial.databasePath);
 
@@ -110,6 +151,7 @@ describe('hummer-relay daemon', () => {
       expect(result).toEqual({ code: 0, signal: null });
     }
     expect(await readFile(initial.databasePath)).not.toHaveLength(0);
+    expect(await readFile(initial.taskGrantDatabasePath)).not.toHaveLength(0);
   }, 20_000);
 
   it.each([

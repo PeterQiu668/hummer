@@ -26,10 +26,11 @@ database or listening. Badge bearer values never appear in this file; each
 ```json
 {
   "schema": "hummer.relay-config",
-  "version": 1,
+  "version": 2,
   "host": "127.0.0.1",
   "port": 4317,
   "databasePath": "C:\\HUMMER\\relay\\fleet.sqlite",
+  "taskGrantDatabasePath": "C:\\HUMMER\\relay\\task-grants.sqlite",
   "badges": [
     {
       "tokenEnv": "HUMMER_RELAY_CONTROL_TOKEN",
@@ -42,6 +43,20 @@ database or listening. Badge bearer values never appear in this file; each
   ]
 }
 ```
+
+The task-grant database is separate from the fleet database and stores only
+digest-bearing, redaction-safe grant records. Provision it offline from a
+strict snapshot before starting Relay:
+
+```powershell
+hummer-relay grant-import --config C:\absolute\relay.json --snapshot C:\absolute\task-grants.json
+```
+
+Re-importing the same immutable grant is idempotent and never rolls durable
+`usedCount`, revocation, expiry, or exhaustion backward. A conflicting digest
+or binding fails closed. Relay opens this database as the production
+task-grant authority, so a successful consume is committed before HTTP 200 and
+survives process restart.
 
 On readiness stdout contains exactly one redaction-safe JSON record with the
 listening address, schema/version, and a one-way reference to the configured

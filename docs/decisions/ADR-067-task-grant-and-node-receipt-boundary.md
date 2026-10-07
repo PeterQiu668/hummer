@@ -56,9 +56,9 @@ approved action finished.
   grant is insufficient without the bound node badge and approved persisted
   context.
 - Checkpoints do not replenish or spend the one-use execution budget.
-- Relay CLI provisioning of durable grant snapshots/rotation remains a
-  separate control-plane slice. Until it is wired, the task-grant routes must
-  receive an injected `TaskGrantAuthenticator` and otherwise return 503.
+- Relay CLI provisioning and restart-safe mutation are defined by ADR-068.
+  Generic Fastify embedding still requires an injected
+  `TaskGrantAuthenticator` and otherwise returns 503.
 - The production runtime executor remains `executor_unavailable`. This ADR
   does not authorize Codex, Claude, shell, container, network, write, spend,
   delete, or privilege actions.

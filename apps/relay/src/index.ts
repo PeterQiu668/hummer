@@ -9,5 +9,6 @@ export * from './memory-store.js';
 export * from './ports.js';
 export * from './relay-config.js';
 export * from './sqlite-store.js';
+export * from './sqlite-task-grant-authority.js';
 export * from './trusted-bundle-relay.js';
 export * from './trusted-bundle-sqlite-store.js';

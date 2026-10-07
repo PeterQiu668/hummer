@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import {
   BADGE_SCOPES,
   createStaticBadgeTokenAuthenticator,
@@ -9,7 +9,7 @@ import {
 } from './badge-auth.js';
 
 export const RELAY_CONFIG_SCHEMA = 'hummer.relay-config' as const;
-export const RELAY_CONFIG_VERSION = 1 as const;
+export const RELAY_CONFIG_VERSION = 2 as const;
 
 export interface RelayBadgeConfig {
   tokenEnv: string;
@@ -23,16 +23,17 @@ export interface RelayBadgeConfig {
   authorizedTenantIds?: readonly string[];
 }
 
-export interface RelayConfigV1 {
+export interface RelayConfigV2 {
   schema: typeof RELAY_CONFIG_SCHEMA;
   version: typeof RELAY_CONFIG_VERSION;
   host: '127.0.0.1';
   port: number;
   databasePath: string;
+  taskGrantDatabasePath: string;
   badges: readonly RelayBadgeConfig[];
 }
 
-const configFields = new Set(['schema', 'version', 'host', 'port', 'databasePath', 'badges']);
+const configFields = new Set(['schema', 'version', 'host', 'port', 'databasePath', 'taskGrantDatabasePath', 'badges']);
 const badgeFields = new Set([
   'tokenEnv', 'tokenId', 'tenantId', 'actorRef', 'scopes', 'expiresAt', 'nodeId', 'grantRef',
   'authorizedTenantIds',
@@ -116,7 +117,7 @@ function parseBadge(input: unknown, index: number): RelayBadgeConfig {
   };
 }
 
-export function parseRelayConfig(input: unknown): RelayConfigV1 {
+export function parseRelayConfig(input: unknown): RelayConfigV2 {
   const value = record(input, 'relay config');
   exactFields(value, configFields, 'relay config');
   if (value.schema !== RELAY_CONFIG_SCHEMA || value.version !== RELAY_CONFIG_VERSION) {
@@ -130,6 +131,12 @@ export function parseRelayConfig(input: unknown): RelayConfigV1 {
   }
   if (typeof value.databasePath !== 'string' || !isAbsolute(value.databasePath)) {
     throw new RelayConfigError('databasePath must be an absolute path');
+  }
+  if (typeof value.taskGrantDatabasePath !== 'string' || !isAbsolute(value.taskGrantDatabasePath)) {
+    throw new RelayConfigError('taskGrantDatabasePath must be an absolute path');
+  }
+  if (normalizePath(value.taskGrantDatabasePath) === normalizePath(value.databasePath)) {
+    throw new RelayConfigError('taskGrantDatabasePath must be separate from databasePath');
   }
   if (!Array.isArray(value.badges) || value.badges.length === 0) {
     throw new RelayConfigError('badges must be a non-empty array');
@@ -147,11 +154,17 @@ export function parseRelayConfig(input: unknown): RelayConfigV1 {
     host: value.host,
     port: value.port as number,
     databasePath: value.databasePath,
+    taskGrantDatabasePath: value.taskGrantDatabasePath,
     badges,
   };
 }
 
-export async function loadRelayConfig(configPath: string): Promise<RelayConfigV1> {
+function normalizePath(value: string): string {
+  const normalized = resolve(value).replace(/[\\/]+$/u, '');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+export async function loadRelayConfig(configPath: string): Promise<RelayConfigV2> {
   if (!isAbsolute(configPath)) throw new RelayConfigError('--config must be an absolute path');
   let text: string;
   try {

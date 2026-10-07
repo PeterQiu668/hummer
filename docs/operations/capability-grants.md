@@ -107,8 +107,11 @@ the leased task and persisted approval records. Both the approval and task
 grant must explicitly be single-use (`maxUses: 1`). `consume` spends that use;
 later checkpoints spend none and require evidence that the same bound grant
 was already consumed. A missing task-grant authority returns 503 rather than
-falling back to the node badge. This registry is process-atomic; restart-safe
-consume/revoke state still requires the durable control-plane snapshot slice.
+falling back to the node badge. The in-memory registry remains a focused test
+and issuer primitive. Runnable Relay config version 2 instead opens the
+SQLite-backed authority from `taskGrantDatabasePath`; consume, expiry,
+exhaustion, and revocation commit before the route returns and survive restart.
+Digest-only snapshots are imported offline with `hummer-relay grant-import`.
 
 SSE is notification-only and never authorizes execution. A reconnect always
 reauthorizes. Grant revocation does not turn an already-open SSE notification

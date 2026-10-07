@@ -41,6 +41,7 @@
     "test:desktop:outbox": "npm run desktop:build && vitest run --config vitest.config.ts apps/desktop/src/persistence/fleet-dispatch-outbox-store.test.ts apps/desktop/src/desktop-relay-host.test.ts apps/desktop/src/desktop-relay-outbox-integration.test.ts apps/desktop/src/persistence/persistence.test.ts apps/desktop/src/persistence/tenant-governance-store.test.ts && node --test scripts/test-desktop-outbox-process-kill.mjs",
     "capture:desktop:outbox": "node scripts/capture-desktop-outbox-evidence.mjs",
     "capture:p1:task-grant-receipt": "node scripts/capture-p1-task-grant-receipt-evidence.mjs",
+    "capture:p1:durable-grant": "node scripts/capture-p1-durable-grant-evidence.mjs",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",

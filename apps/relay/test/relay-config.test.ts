@@ -8,10 +8,11 @@ import {
 
 const baseConfig = () => ({
   schema: 'hummer.relay-config',
-  version: 1,
+  version: 2,
   host: '127.0.0.1',
   port: 0,
   databasePath: resolve('fleet.sqlite'),
+  taskGrantDatabasePath: resolve('task-grants.sqlite'),
   badges: [{
     tokenEnv: 'HUMMER_RELAY_CONTROL_TOKEN',
     tokenId: 'control-1',
@@ -23,7 +24,7 @@ const baseConfig = () => ({
 });
 
 describe('relay daemon config', () => {
-  it('accepts the exact v1 shape and removes badge secrets from the environment immediately', async () => {
+  it('accepts the exact v2 shape and removes badge secrets from the environment immediately', async () => {
     const config = parseRelayConfig(baseConfig());
     const environment = { HUMMER_RELAY_CONTROL_TOKEN: 'a'.repeat(32) };
     const authenticator = createConfiguredBadgeAuthenticator(config.badges, environment);
@@ -39,9 +40,11 @@ describe('relay daemon config', () => {
     ['top-level unknown field', { ...baseConfig(), token: 'plaintext' }],
     ['badge unknown field', { ...baseConfig(), badges: [{ ...baseConfig().badges[0], token: 'plaintext' }] }],
     ['wrong schema', { ...baseConfig(), schema: 'hummer.other' }],
-    ['wrong version', { ...baseConfig(), version: 2 }],
+    ['wrong version', { ...baseConfig(), version: 1 }],
     ['non-loopback host', { ...baseConfig(), host: '0.0.0.0' }],
     ['relative database path', { ...baseConfig(), databasePath: 'fleet.sqlite' }],
+    ['relative task grant database path', { ...baseConfig(), taskGrantDatabasePath: 'task-grants.sqlite' }],
+    ['shared fleet and task grant database', { ...baseConfig(), taskGrantDatabasePath: baseConfig().databasePath }],
     ['unknown scope', { ...baseConfig(), badges: [{ ...baseConfig().badges[0], scopes: ['root'] }] }],
   ])('rejects %s', (_label, value) => {
     expect(() => parseRelayConfig(value)).toThrow(RelayConfigError);
