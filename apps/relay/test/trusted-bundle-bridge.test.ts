@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,6 +23,7 @@ import {
 } from '@hummer/capability-runtime';
 import {
   createStaticBadgeTokenAuthenticator,
+  SqliteTrustedBundleRelayStore,
   createTrustedBundleRelayServer,
   type BadgeScope,
 } from '../src/index.js';
@@ -208,5 +210,172 @@ describe('[TRUSTED-BUNDLE-PROTOCOL] strict bytes and trust binding', () => {
       { atomicRename: async () => { throw new Error('simulated rename failure'); } },
     )).rejects.toThrow('simulated rename failure');
     expect(await readdir(installRoot)).toEqual(['.hummer-synthetic-install-root.json']);
+  });
+});
+
+interface RawSqliteDatabase {
+  close(): void;
+  exec(sql: string): void;
+  prepare(sql: string): { all<T = unknown>(): T[] };
+}
+
+interface RawSqliteConstructor {
+  new(path: string): RawSqliteDatabase;
+}
+
+function openRawSqlite(path: string): RawSqliteDatabase {
+  const require = createRequire(import.meta.url);
+  const loaded = require('better-sqlite3') as RawSqliteConstructor | { default: RawSqliteConstructor };
+  const Constructor = typeof loaded === 'function' ? loaded : loaded.default;
+  return new Constructor(path);
+}
+
+describe('[TRUSTED-BUNDLE-SQLITE] durable immutable Relay storage', () => {
+  it('survives restart and preserves exact replay idempotency plus byte-conflict rejection', async () => {
+    const data = fixture();
+    const directory = await mkdtemp(join(tmpdir(), 'hummer-trusted-sqlite-restart-'));
+    temporaryRoots.push(directory);
+    const databasePath = join(directory, 'trusted-bundles.sqlite3');
+    const authenticator = createStaticBadgeTokenAuthenticator([
+      badge('publisher', TENANT, undefined, ['capability.bundle.publish']),
+      badge('node', TENANT, NODE, ['capability.bundle.consume']),
+    ]);
+    const approvedDecisionLookup = (tenantId: string, gateId: string) => tenantId === TENANT && gateId === data.envelope.gateId
+      ? { decision: data.decision, gateInput: data.gateInput }
+      : null;
+
+    const firstStore = new SqliteTrustedBundleRelayStore(databasePath);
+    const first = createTrustedBundleRelayServer({ authenticator, approvedDecisionLookup, store: firstStore, now: () => new Date(NOW) });
+    const inserted = await first.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope });
+    expect(inserted.statusCode).toBe(200);
+    expect(inserted.json()).toMatchObject({ inserted: true, bundleId: data.envelope.bundleId, envelopeDigest: data.envelope.envelopeDigest });
+    await first.app.close();
+    firstStore.close();
+
+    const inspector = openRawSqlite(databasePath);
+    expect(inspector.prepare('SELECT version FROM trusted_bundle_schema_migrations ORDER BY version').all<{ version: number }>()).toEqual([{ version: 1 }]);
+    expect(() => inspector.exec(`UPDATE trusted_bundle_envelopes SET target_node_id = 'node-other'`)).toThrow('trusted bundle envelopes are append-only');
+    expect(() => inspector.exec('DELETE FROM trusted_bundle_envelopes')).toThrow('trusted bundle envelopes are append-only');
+    inspector.close();
+
+    const reopenedStore = new SqliteTrustedBundleRelayStore(databasePath);
+    const reopened = createTrustedBundleRelayServer({ authenticator, approvedDecisionLookup, store: reopenedStore, now: () => new Date(NOW) });
+    const downloaded = await reopened.app.inject({ method: 'GET', url: `/v1/nodes/${NODE}/trusted-bundles/${data.envelope.bundleId}`, headers: { authorization: 'Bearer node' } });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.json().bundle).toEqual(data.envelope);
+
+    const replay = await reopened.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toMatchObject({ inserted: false, bundleId: data.envelope.bundleId, envelopeDigest: data.envelope.envelopeDigest });
+
+    const conflicting = structuredClone(data.envelope);
+    conflicting.targetNodeId = 'node-other';
+    conflicting.envelopeDigest = computeTrustedBundleEnvelopeDigest(conflicting);
+    const conflict = await reopened.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: conflicting });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('bundle_conflict');
+    await reopened.app.close();
+    reopenedStore.close();
+  });
+
+  it('keeps tenant and target-node reads isolated after restart', async () => {
+    const data = fixture();
+    const directory = await mkdtemp(join(tmpdir(), 'hummer-trusted-sqlite-isolation-'));
+    temporaryRoots.push(directory);
+    const databasePath = join(directory, 'trusted-bundles.sqlite3');
+    const publisherAuthenticator = createStaticBadgeTokenAuthenticator([badge('publisher', TENANT, undefined, ['capability.bundle.publish'])]);
+    const store = new SqliteTrustedBundleRelayStore(databasePath);
+    const publisher = createTrustedBundleRelayServer({
+      authenticator: publisherAuthenticator,
+      approvedDecisionLookup: () => ({ decision: data.decision, gateInput: data.gateInput }),
+      store,
+      now: () => new Date(NOW),
+    });
+    expect((await publisher.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope })).statusCode).toBe(200);
+    await publisher.app.close();
+    store.close();
+
+    const reopenedStore = new SqliteTrustedBundleRelayStore(databasePath);
+    const consumer = createTrustedBundleRelayServer({
+      authenticator: createStaticBadgeTokenAuthenticator([
+        badge('node', TENANT, NODE, ['capability.bundle.consume']),
+        badge('other-node', TENANT, 'node-other', ['capability.bundle.consume']),
+        badge('other-tenant', 'tenant-c', NODE, ['capability.bundle.consume']),
+      ]),
+      approvedDecisionLookup: () => null,
+      store: reopenedStore,
+      now: () => new Date(NOW),
+    });
+    const wrongNode = await consumer.app.inject({ method: 'GET', url: `/v1/nodes/node-other/trusted-bundles/${data.envelope.bundleId}`, headers: { authorization: 'Bearer other-node' } });
+    expect(wrongNode.statusCode).toBe(403);
+    expect(wrongNode.json().error.code).toBe('node_mismatch');
+    const wrongTenant = await consumer.app.inject({ method: 'GET', url: `/v1/nodes/${NODE}/trusted-bundles/${data.envelope.bundleId}`, headers: { authorization: 'Bearer other-tenant' } });
+    expect(wrongTenant.statusCode).toBe(404);
+    expect(wrongTenant.json().error.code).toBe('bundle_not_found');
+    await consumer.app.close();
+    reopenedStore.close();
+  });
+
+  it('fails explicitly under a database write lock and commits no bundle row', async () => {
+    const data = fixture();
+    const directory = await mkdtemp(join(tmpdir(), 'hummer-trusted-sqlite-lock-'));
+    temporaryRoots.push(directory);
+    const databasePath = join(directory, 'trusted-bundles.sqlite3');
+    const store = new SqliteTrustedBundleRelayStore(databasePath, { busyTimeoutMs: 25 });
+    const server = createTrustedBundleRelayServer({
+      authenticator: createStaticBadgeTokenAuthenticator([
+        badge('publisher', TENANT, undefined, ['capability.bundle.publish']),
+        badge('node', TENANT, NODE, ['capability.bundle.consume']),
+      ]),
+      approvedDecisionLookup: () => ({ decision: data.decision, gateInput: data.gateInput }),
+      store,
+      now: () => new Date(NOW),
+    });
+    const lockHolder = openRawSqlite(databasePath);
+    lockHolder.exec('BEGIN IMMEDIATE');
+    try {
+      const blocked = await server.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope });
+      expect(blocked.statusCode).toBe(500);
+      expect(blocked.json().error.code).toBe('internal_error');
+    } finally {
+      lockHolder.exec('ROLLBACK');
+      lockHolder.close();
+    }
+    const missing = await server.app.inject({ method: 'GET', url: `/v1/nodes/${NODE}/trusted-bundles/${data.envelope.bundleId}`, headers: { authorization: 'Bearer node' } });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error.code).toBe('bundle_not_found');
+    await server.app.close();
+    store.close();
+  });
+
+  it('does not report success or leave a row when SQLite rejects the write', async () => {
+    const data = fixture();
+    const directory = await mkdtemp(join(tmpdir(), 'hummer-trusted-sqlite-write-failure-'));
+    temporaryRoots.push(directory);
+    const databasePath = join(directory, 'trusted-bundles.sqlite3');
+    const store = new SqliteTrustedBundleRelayStore(databasePath);
+    const server = createTrustedBundleRelayServer({
+      authenticator: createStaticBadgeTokenAuthenticator([
+        badge('publisher', TENANT, undefined, ['capability.bundle.publish']),
+        badge('node', TENANT, NODE, ['capability.bundle.consume']),
+      ]),
+      approvedDecisionLookup: () => ({ decision: data.decision, gateInput: data.gateInput }),
+      store,
+      now: () => new Date(NOW),
+    });
+    const fault = openRawSqlite(databasePath);
+    fault.exec(`CREATE TRIGGER trusted_bundle_test_write_failure BEFORE INSERT ON trusted_bundle_envelopes BEGIN SELECT RAISE(ABORT, 'simulated trusted bundle write failure'); END`);
+    const failed = await server.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope });
+    expect(failed.statusCode).toBe(500);
+    expect(failed.json().error.code).toBe('internal_error');
+    const missing = await server.app.inject({ method: 'GET', url: `/v1/nodes/${NODE}/trusted-bundles/${data.envelope.bundleId}`, headers: { authorization: 'Bearer node' } });
+    expect(missing.statusCode).toBe(404);
+    fault.exec('DROP TRIGGER trusted_bundle_test_write_failure');
+    fault.close();
+    const recovered = await server.app.inject({ method: 'POST', url: '/v1/trusted-bundles', headers: { authorization: 'Bearer publisher' }, payload: data.envelope });
+    expect(recovered.statusCode).toBe(200);
+    expect(recovered.json()).toMatchObject({ inserted: true });
+    await server.app.close();
+    store.close();
   });
 });
