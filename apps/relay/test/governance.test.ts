@@ -183,7 +183,7 @@ it('[TEN-W4-RELAY-GOVERNANCE] Memory and SQLite produce identical audit hashes f
   expect(await sqlite.getTenantChainHead(TENANT_A)).toEqual(await memory.getTenantChainHead(TENANT_A));
 });
 
-it('[TEN-W4-RELAY-GOVERNANCE] upgrades an existing Relay v13 database through v15 without changing legacy audit rows', async () => {
+it('[TEN-W4-RELAY-GOVERNANCE] upgrades an existing Relay v13 database through v16 without changing legacy audit rows', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'hummer-relay-v13-')), 'relay.sqlite3');
   const require = createRequire(import.meta.url);
   const Database = require('better-sqlite3') as new(path: string) => {
@@ -210,13 +210,13 @@ it('[TEN-W4-RELAY-GOVERNANCE] upgrades an existing Relay v13 database through v1
   upgraded.close();
   const inspected = new Database(path);
   expect(inspected.prepare('SELECT version FROM relay_schema_migrations ORDER BY version').all<{ version: number }>().map((row) => row.version))
-    .toEqual([11, 12, 13, 14, 15]);
-  expect(RELAY_SCHEMA_VERSION).toBe(15);
+    .toEqual([11, 12, 13, 14, 15, 16]);
+  expect(RELAY_SCHEMA_VERSION).toBe(16);
   inspected.close();
 });
 
-it('[TEN-W4-RELAY-GOVERNANCE] reopens SQLite v15 with the same chain head, counters, and export manifest', async () => {
-  const path = join(mkdtempSync(join(tmpdir(), 'hummer-relay-v15-')), 'relay.sqlite3');
+it('[TEN-W4-RELAY-GOVERNANCE] reopens SQLite v16 with the same chain head, counters, and export manifest', async () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'hummer-relay-v16-')), 'relay.sqlite3');
   const first = new SqliteFleetStore(path);
   await register(first, TENANT_A);
   await first.configureQuota(TENANT_A, NODE, DAY, { tasks: 2, tokens: 100 }, 'human:owner', NOW);

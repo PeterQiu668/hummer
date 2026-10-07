@@ -42,6 +42,7 @@ describe('Desktop Relay renderer production ports', () => {
     await port.listTasks();
     await port.listApprovalRequests();
     await port.decideApproval({ requestId: 'request-1', decision: 'approved', rationale: 'reviewed' });
+    await port.revokeApproval('request-1');
     await port.stopTask('task-1');
 
     expect(host.listNodes).toHaveBeenCalledWith(TOKEN);
@@ -51,6 +52,7 @@ describe('Desktop Relay renderer production ports', () => {
     expect(host.decideApproval).toHaveBeenCalledWith({
       token: TOKEN, requestId: 'request-1', decision: 'approved', rationale: 'reviewed',
     });
+    expect(host.revokeApproval).toHaveBeenCalledWith(TOKEN, 'request-1');
     expect(host.stopTask).toHaveBeenCalledWith(TOKEN, 'task-1');
     expect(Object.keys(port)).not.toContain('badge');
     expect(JSON.stringify(port)).not.toContain(TOKEN);
@@ -77,6 +79,7 @@ function bridge(): DesktopRelayRendererHost {
     listTasks: vi.fn(async () => []),
     listApprovalRequests: vi.fn(async () => []),
     decideApproval: vi.fn(async () => ({ decision: 'approved' })),
+    revokeApproval: vi.fn(async () => ({ revocation: { requestId: 'request-1' } })),
     stopTask: vi.fn(async () => ({ task: { status: 'blocked' } })),
   };
 }

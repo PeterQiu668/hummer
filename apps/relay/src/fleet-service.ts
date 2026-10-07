@@ -1,9 +1,12 @@
 import {
   FleetRejectedError,
   type AuthenticatedFleetSession,
+  type ApprovalAuthorization,
   type ApprovalBundle,
   type ApprovalDecisionRecord,
   type ApprovalRequestRecord,
+  type ApprovalRequestProjection,
+  type ApprovalRevocationRecord,
   type EnqueueResult,
   type EventResult,
   type FleetIngress,
@@ -180,6 +183,31 @@ export class FleetService implements FleetIngress {
     return this.store.consumeApprovalDecision(session.tenantId, nodeId, taskId, requestId, this.isoNow());
   }
 
+  async revokeApproval(
+    session: AuthenticatedFleetSession,
+    requestId: string,
+  ): Promise<ApprovalRevocationRecord> {
+    if (!requestId.trim()) throw new FleetRejectedError('approval_not_found', 'approval request id is required');
+    if (session.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(session.actorRef)) {
+      throw new FleetRejectedError('actor_mismatch', 'approval revocation requires a human/account control session');
+    }
+    return this.store.revokeApprovalAuthorization(session.tenantId, requestId, session.actorRef, this.isoNow());
+  }
+
+  async getApprovalAuthorization(
+    session: AuthenticatedFleetSession,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+  ): Promise<ApprovalAuthorization> {
+    if (!taskId.trim() || !requestId.trim()) {
+      throw new FleetRejectedError('approval_not_found', 'task id and approval request id are required');
+    }
+    if (!session.nodeId) throw new FleetRejectedError('actor_mismatch', 'approval authorization requires a node-bound session');
+    assertNode(session, nodeId, 'approval authorization');
+    return this.store.getApprovalAuthorization(session.tenantId, nodeId, taskId, requestId, this.isoNow());
+  }
+
   private async ingestEvent(
     session: AuthenticatedFleetSession,
     input: unknown,
@@ -240,19 +268,34 @@ export class FleetService implements FleetIngress {
   async getApprovalRequest(
     session: AuthenticatedFleetSession,
     requestId: string,
-  ): Promise<ApprovalRequestRecord | null> {
+  ): Promise<ApprovalRequestProjection | null> {
     if (!requestId.trim()) return null;
-    return this.store.getApprovalRequest(session.tenantId, requestId);
+    const request = await this.store.getApprovalRequest(session.tenantId, requestId);
+    return request ? this.projectApprovalRequest(session.tenantId, request) : null;
   }
 
   async listApprovalRequests(
     session: AuthenticatedFleetSession,
-  ): Promise<readonly ApprovalRequestRecord[]> {
+  ): Promise<readonly ApprovalRequestProjection[]> {
     const requests = await this.store.listApprovalRequests(session.tenantId);
-    return Promise.all(requests.map(async (request) => {
-      const decision = await this.store.getApprovalDecision(session.tenantId, request.requestId);
-      return decision ? { ...request, decision } : request;
-    }));
+    return Promise.all(requests.map((request) => this.projectApprovalRequest(session.tenantId, request)));
+  }
+
+  private async projectApprovalRequest(
+    tenantId: string,
+    request: ApprovalRequestRecord,
+  ): Promise<ApprovalRequestProjection> {
+    const decision = await this.store.getApprovalDecision(tenantId, request.requestId);
+    const revocation = await this.store.getApprovalRevocation(tenantId, request.requestId);
+    const authorization = decision?.decision === 'approved'
+      ? await this.store.getApprovalAuthorization(tenantId, request.nodeId, request.taskId, request.requestId, this.isoNow())
+      : undefined;
+    return {
+      ...request,
+      ...(decision ? { decision } : {}),
+      ...(revocation ? { revocation } : {}),
+      ...(authorization ? { authorization } : {}),
+    };
   }
 
   async configureQuota(

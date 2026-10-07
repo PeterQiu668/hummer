@@ -1,0 +1,63 @@
+{
+  "schema": "hummer.evidence-gate-summary",
+  "version": 1,
+  "round": "round-p1-auth-revoke-chaos",
+  "capturedAt": "2026-10-07T03:00:01.727Z",
+  "toolchain": {
+    "node": "v22.22.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "checks": [
+    {
+      "command": "npm run test:chaos -- --approval-timeout",
+      "exitCode": 0,
+      "status": "passed",
+      "assertions": 3,
+      "negativeCases": 4,
+      "claims": [
+        "active two-step executor crosses approval TTL and stops at its next checkpoint",
+        "post-timeout side effect, events, receipt, and completed status remain zero",
+        "Memory and SQLite report expiry without rewriting the approved decision"
+      ]
+    },
+    {
+      "command": "npm run test:chaos -- --revoke",
+      "exitCode": 0,
+      "status": "passed",
+      "assertions": 4,
+      "negativeCases": 8,
+      "claims": [
+        "active two-step executor stops at its next checkpoint after authoritative revocation",
+        "post-revocation side effect, events, receipt, and completed status remain zero",
+        "Memory and SQLite arbitrate revoke versus completion atomically",
+        "real loopback Fastify publishes tenant and node scoped approval.revoked SSE"
+      ]
+    },
+    {
+      "command": "npm run test:chaos",
+      "exitCode": 0,
+      "status": "passed",
+      "assertions": 10,
+      "negativeCases": 10,
+      "claims": [
+        "all seven deterministic local fault classes passed"
+      ]
+    },
+    {
+      "command": "npm run test:desktop:hitl-matrix -- --round=round-p1-auth-revoke-checkpoint-final",
+      "exitCode": 0,
+      "status": "passed",
+      "assertions": 21,
+      "negativeCases": 0,
+      "claims": [
+        "Desktop and Web use the same loopback Relay with explicit human decisions",
+        "Desktop approval, denial, and stop paths remained fail closed"
+      ]
+    }
+  ],
+  "limitations": [
+    "Revocation prevents new work after the next explicit checkpoint and cannot roll back an already completed side effect.",
+    "This is one Windows host with loopback HTTP, static test badges, and a synthetic executor; it is not two-machine or production identity evidence."
+  ]
+}

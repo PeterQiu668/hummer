@@ -55,8 +55,11 @@ Revocation:
 3. Do not publish the token or digest in the audit event; record only
    `grantId`/`tokenRef`, actor, timestamp, and reason in the owning control
    plane.
-4. The next Relay request fails. Long-running execution must also check
-   revocation at node-agent checkpoints; that W3 hook is not implemented here.
+4. The next Relay request fails. Long-running execution also checks authority
+   through the Node Agent `authorization.checkpoint()` port. Runtime adapters
+   must call it immediately before each high-risk side effect; the Node Agent
+   additionally calls it before execution, each returned event, the receipt,
+   and completion.
 
 Repeated revocation is idempotent. Unknown and wrong-tenant identifiers fail
 with the same generic `grant_not_found` error so the registry is not an
@@ -99,6 +102,12 @@ Fastify performs one atomic `authorize` call per request:
 SSE is notification-only and never authorizes execution. A reconnect always
 reauthorizes. Grant revocation does not turn an already-open SSE notification
 stream into execution authority.
+
+Approval withdrawal after an `approved` decision is a separate lifecycle from
+badge/grant revocation. Relay records an append-only approval revocation and
+publishes a tenant/node-scoped `approval.revoked` hint. The node still queries
+the authoritative approval state at its next checkpoint, so a missed SSE frame
+cannot preserve execution authority.
 
 ## Verification and leak check
 

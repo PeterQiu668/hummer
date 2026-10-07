@@ -63,7 +63,7 @@ export class FleetSseBroker {
     response.write(': connected\n\n');
   }
 
-  publish(tenantId: string, nodeId: string, event: 'task.available' | 'task.stop', data: unknown): void {
+  publish(tenantId: string, nodeId: string, event: 'task.available' | 'task.stop' | 'approval.revoked', data: unknown): void {
     const key = streamKey(tenantId, nodeId);
     const subscribers = this.#subscribers.get(key);
     if (!subscribers) return;
@@ -476,6 +476,37 @@ export function createFleetRelayServer(
       pathParam(request, 'taskId'),
       pathParam(request, 'requestId'),
     );
+  });
+
+  app.get('/v1/nodes/:nodeId/tasks/:taskId/approval-requests/:requestId/authorization', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const { session } = await authorize(request, 'approval.consume', nodeId);
+    assertNoQueryFields(request);
+    return {
+      authorization: await ingress.getApprovalAuthorization(
+        session,
+        nodeId,
+        pathParam(request, 'taskId'),
+        pathParam(request, 'requestId'),
+      ),
+    };
+  });
+
+  app.post('/v1/approval-requests/:requestId/revoke', async (request) => {
+    const { claims, session } = await authorize(request, 'approval.decide');
+    if (claims.nodeId || !/^(?:human|account):[A-Za-z0-9_-]+$/.test(claims.actorRef)) {
+      throw new TransportHttpError(403, 'control_badge_required', 'approval revocation requires a human/account control badge');
+    }
+    assertNoFields(request.body);
+    const requestId = pathParam(request, 'requestId');
+    const approvalRequest = await ingress.getApprovalRequest(session, requestId);
+    if (!approvalRequest) throw controlResourceNotFound();
+    const revocation = await ingress.revokeApproval(session, requestId);
+    events.publish(session.tenantId, approvalRequest.nodeId, 'approval.revoked', {
+      taskId: approvalRequest.taskId,
+      requestId,
+    });
+    return { revocation };
   });
 
   app.post('/v1/tasks/:taskId/stop', async (request) => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CircleStop, RefreshCw, ShieldCheck, ShieldX } from 'lucide-react';
+import { CircleStop, RefreshCw, ShieldCheck, ShieldOff, ShieldX } from 'lucide-react';
 import type {
   RemoteRelayApprovalRequest,
   RemoteRelayTask,
@@ -13,6 +13,7 @@ export interface FleetControlPort {
     decision: 'approved' | 'denied';
     rationale?: string;
   }): Promise<unknown>;
+  revokeApproval(requestId: string): Promise<unknown>;
   stopTask(taskId: string): Promise<unknown>;
 }
 
@@ -21,7 +22,7 @@ export interface FleetControlPanelProps {
   refreshMs?: number;
 }
 
-type BusyAction = `approve:${string}` | `deny:${string}` | `stop:${string}`;
+type BusyAction = `approve:${string}` | `deny:${string}` | `revoke:${string}` | `stop:${string}`;
 
 /**
  * Workbench-local Relay control surface. Polling is deliberately read-only:
@@ -31,6 +32,7 @@ export default function FleetControlPanel({ port, refreshMs = 1_000 }: FleetCont
   const [tasks, setTasks] = useState<readonly RemoteRelayTask[]>([]);
   const [approvals, setApprovals] = useState<readonly RemoteRelayApprovalRequest[]>([]);
   const [resolvedRequests, setResolvedRequests] = useState<ReadonlySet<string>>(() => new Set());
+  const [revokedRequests, setRevokedRequests] = useState<ReadonlySet<string>>(() => new Set());
   const [stoppedTasks, setStoppedTasks] = useState<ReadonlySet<string>>(() => new Set());
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,17 @@ export default function FleetControlPanel({ port, refreshMs = 1_000 }: FleetCont
     [approvals, resolvedRequests],
   );
 
+  const revocableApprovals = useMemo(
+    () => approvals.filter((request) => {
+      const task = tasks.find((candidate) => candidate.taskId === request.taskId);
+      return approvalDecisionDisposition(request) === 'approved'
+        && !approvalRevocation(request)
+        && !revokedRequests.has(request.requestId)
+        && Boolean(task && canStop(task));
+    }),
+    [approvals, revokedRequests, tasks],
+  );
+
   const decide = async (request: RemoteRelayApprovalRequest, decision: 'approved' | 'denied') => {
     if (!port || busyAction) return;
     const action: BusyAction = `${decision === 'approved' ? 'approve' : 'deny'}:${request.requestId}`;
@@ -107,6 +120,23 @@ export default function FleetControlPanel({ port, refreshMs = 1_000 }: FleetCont
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Relay 未能停止任务');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const revoke = async (request: RemoteRelayApprovalRequest) => {
+    if (!port || busyAction) return;
+    setBusyAction(`revoke:${request.requestId}`);
+    setError(null);
+    setStatus(null);
+    try {
+      await port.revokeApproval(request.requestId);
+      setRevokedRequests((current) => new Set(current).add(request.requestId));
+      setStatus(`授权 ${request.requestId} 已撤销；节点将在下一个授权检查点停止。`);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Relay 未能撤销本次授权');
     } finally {
       setBusyAction(null);
     }
@@ -172,6 +202,30 @@ export default function FleetControlPanel({ port, refreshMs = 1_000 }: FleetCont
           <p className="mt-4 rounded-md border border-[var(--border-soft)] bg-[var(--bg-canvas)] px-3 py-2 text-xs hum-muted">当前没有待审批动作。</p>
         )}
 
+        {revocableApprovals.length ? (
+          <div className="mt-4 space-y-3" aria-label="生效中的授权">
+            {revocableApprovals.map((request) => {
+              const details = approvalDetails(request);
+              const revoking = busyAction === `revoke:${request.requestId}`;
+              return (
+                <article key={request.requestId} className="rounded-md border border-[var(--border-soft)] bg-[var(--bg-canvas)] p-3" aria-label={`生效中的授权 ${request.requestId}`}>
+                  <div className="text-xs font-semibold text-[var(--text-ink)]">{authorizationSentence(request)}</div>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">已批准：{details.action} → {details.target}</p>
+                  <button
+                    type="button"
+                    className="hum-btn is-sm is-danger mt-3"
+                    disabled={Boolean(busyAction)}
+                    onClick={() => { void revoke(request); }}
+                    aria-label={`撤销本次授权：${details.action} → ${details.target}`}
+                  >
+                    <ShieldOff size={13} />{revoking ? '正在撤销…' : '撤销本次授权'}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-2" aria-label="远程任务列表">
           {tasks.length ? tasks.map((task) => {
             const stopped = stoppedTasks.has(task.taskId);
@@ -220,6 +274,36 @@ function approvalDetails(request: RemoteRelayApprovalRequest) {
 
 function approvalDecision(request: RemoteRelayApprovalRequest): unknown {
   return request.decision ?? request.decisionRecord ?? null;
+}
+
+function approvalDecisionDisposition(request: RemoteRelayApprovalRequest): string | null {
+  const decision = approvalDecision(request);
+  if (!decision || typeof decision !== 'object') return null;
+  const record = decision as Record<string, unknown>;
+  if (typeof record.decision === 'string') return record.decision;
+  if (record.decisionRecord && typeof record.decisionRecord === 'object') {
+    const disposition = (record.decisionRecord as Record<string, unknown>).decision;
+    return typeof disposition === 'string' ? disposition : null;
+  }
+  return null;
+}
+
+function approvalRevocation(request: RemoteRelayApprovalRequest): unknown {
+  return request.revocation ?? null;
+}
+
+function authorizationSentence(request: RemoteRelayApprovalRequest): string {
+  const details = approvalDetails(request);
+  const decision = approvalDecision(request);
+  const decisionRecord = decision && typeof decision === 'object' ? decision as Record<string, unknown> : {};
+  const rawScope = decisionRecord.grantedScope
+    ?? (decisionRecord.decisionRecord && typeof decisionRecord.decisionRecord === 'object'
+      ? (decisionRecord.decisionRecord as Record<string, unknown>).grantedScope
+      : undefined);
+  const scope = rawScope && typeof rawScope === 'object' ? rawScope as Record<string, unknown> : {};
+  const expiresAt = stringValue(scope.expiresAt, details.expiresAt, '未知时间');
+  const maxUses = typeof scope.maxUses === 'number' ? scope.maxUses : 1;
+  return `允许节点 ${stringValue(request.nodeId, undefined, '未知节点')} 执行 ${details.action} ${details.target}，直到 ${expiresAt}，最多 ${maxUses} 次`;
 }
 
 function taskTitle(task: RemoteRelayTask): string {

@@ -1,0 +1,36 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-auth-revoke-checkpoint-final",
+  "generatedAt": "2026-10-07T03:00:22.672Z",
+  "gitCommit": "d48067a4534d4417fac0bf48407767fb3f28b16d",
+  "prevManifestRootHash": "5c72281f4a6b381ef26f86e8d29d527c70a08ddb09ea58360cf3eeb794ed9da5",
+  "files": [
+    {
+      "path": "evidence/round-p1-auth-revoke-checkpoint-final/gate.json",
+      "sha256": "f8b3cb5ba26070bfbd7c1929e592df1a11c16135b118273024a917f36725f0c8",
+      "bytes": 2359
+    },
+    {
+      "path": "evidence/round-p1-auth-revoke-checkpoint-final/screenshots/desktop-approval-pending.png",
+      "sha256": "e22ed85d869545cbd9dab62824955cd575669b4326bbe769de0f84de768fcfd0",
+      "bytes": 104370
+    },
+    {
+      "path": "evidence/round-p1-auth-revoke-checkpoint-final/screenshots/desktop-denial-pending.png",
+      "sha256": "e0001257037a24c52055a96a06e730deda1a720d3d7e2b2edb9ee3fef9ea663b",
+      "bytes": 98338
+    },
+    {
+      "path": "evidence/round-p1-auth-revoke-checkpoint-final/screenshots/desktop-task-stopped.png",
+      "sha256": "da25e95854c4026f8fe19b29f4fa3297329bdfaa1f19d78e05385d9bd71c0253",
+      "bytes": 92528
+    },
+    {
+      "path": "evidence/round-p1-auth-revoke-checkpoint-final/screenshots/web-dispatch-same-relay.png",
+      "sha256": "f896d963283729bb1d3255eae427c204830508b6f9cb5a03220c2a5094e9ed98",
+      "bytes": 88681
+    }
+  ],
+  "rootHash": "9984a2faaf98bcc4ab0408f807456a6f24e9714c81ab4552d11b1ab85aad2c4d"
+}

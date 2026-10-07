@@ -142,6 +142,7 @@ contextBridge.exposeInMainWorld('hummerDesktopRelay', {
   decideApproval: (request: { token: string; requestId: string; decision: 'approved' | 'denied'; rationale?: string }) => (
     ipcRenderer.invoke('hummer:relay:decide-approval', request)
   ),
+  revokeApproval: (token: string, requestId: string) => ipcRenderer.invoke('hummer:relay:revoke-approval', token, requestId),
   stopTask: (token: string, taskId: string) => ipcRenderer.invoke('hummer:relay:stop-task', token, taskId),
 });
 

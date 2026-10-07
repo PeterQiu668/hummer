@@ -75,6 +75,9 @@ describe('trusted Desktop Relay main-process bridge', () => {
       if (url.endsWith('/v1/approval-requests/request-1/decision')) {
         return json({ decision: { ...(body as Record<string, unknown>), createdAt: NOW.toISOString() } });
       }
+      if (url.endsWith('/v1/approval-requests/request-1/revoke')) {
+        return json({ revocation: { tenantId: TENANT, requestId: 'request-1', actorRef: ACTOR, revokedAt: NOW.toISOString() } });
+      }
       if (url.endsWith('/v1/control/tasks/task-1')) return json({ task: task() });
       if (url.endsWith('/v1/tasks/task-1/stop')) return json({ task: { ...task(), status: 'blocked' } });
       throw new Error(`unexpected ${url}`);
@@ -89,6 +92,8 @@ describe('trusted Desktop Relay main-process bridge', () => {
     expect(await invoke(DESKTOP_RELAY_CHANNELS.decideApproval, {
       token: TOKEN, requestId: 'request-1', decision: 'approved', rationale: 'Reviewed by the signed-in account.',
     })).toMatchObject({ decision: { requestId: 'request-1', deciderActorRef: ACTOR, decision: 'approved' } });
+    expect(await invoke(DESKTOP_RELAY_CHANNELS.revokeApproval, TOKEN, 'request-1'))
+      .toMatchObject({ revocation: { requestId: 'request-1', actorRef: ACTOR } });
     expect(await invoke(DESKTOP_RELAY_CHANNELS.stopTask, TOKEN, 'task-1')).toMatchObject({ task: { status: 'blocked' } });
 
     const decisionRequest = requests.find((entry) => entry.url.endsWith('/v1/approval-requests/request-1/decision'));

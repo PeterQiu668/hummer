@@ -54,6 +54,19 @@ describe('FleetControlPanel explicit human controls', () => {
     await waitFor(() => expect(port.stopTask).toHaveBeenCalledWith('task-queued'));
     expect(screen.getByRole('status')).toHaveTextContent('停止命令已由 Relay 记录：task-queued');
   });
+
+  it('revokes an approved authorization only after an explicit click and keeps scope copy contract-derived', async () => {
+    const port = fixturePort({ approvals: [approvedApproval()] });
+    render(<FleetControlPanel port={port} refreshMs={60_000} />);
+
+    const card = await screen.findByLabelText('生效中的授权 request-1');
+    expect(card).toHaveTextContent('允许节点 node-a 执行 workspace.write outputs/report.md，直到 2099-01-01T00:00:00.000Z，最多 1 次');
+    expect(port.revokeApproval).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '撤销本次授权：workspace.write → outputs/report.md' }));
+
+    await waitFor(() => expect(port.revokeApproval).toHaveBeenCalledWith('request-1'));
+    expect(screen.getByRole('status')).toHaveTextContent('下一个授权检查点停止');
+  });
 });
 
 function fixturePort(overrides: {
@@ -64,6 +77,7 @@ function fixturePort(overrides: {
     listTasks: vi.fn(async () => overrides.tasks ?? [task('task-1', 'leased', '写入合成报告')]),
     listApprovalRequests: vi.fn(async () => overrides.approvals ?? [approval()]),
     decideApproval: vi.fn(async () => ({ decision: { decision: 'approved' } })),
+    revokeApproval: vi.fn(async () => ({ revocation: { requestId: 'request-1' } })),
     stopTask: vi.fn(async () => ({ task: { status: 'blocked' } })),
   } satisfies FleetControlPort;
   return port;
@@ -96,6 +110,21 @@ function approval() {
       riskClass: 'write',
       redactedPreview: '写入合成报告',
       expiresAt: '2099-01-01T00:00:00.000Z',
+    },
+  };
+}
+
+function approvedApproval() {
+  return {
+    ...approval(),
+    decision: {
+      decision: 'approved',
+      grantedScope: {
+        capabilities: ['task.execute'],
+        resources: ['workspace://outputs/report.md'],
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        maxUses: 1,
+      },
     },
   };
 }

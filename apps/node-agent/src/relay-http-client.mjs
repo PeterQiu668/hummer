@@ -145,6 +145,17 @@ export class RelayHttpClient {
     );
   }
 
+  /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
+  async getApprovalAuthorization(taskId, requestId, context) {
+    const response = requireRecord(await this.#request(
+      'GET',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/approval-requests/${segment(requestId)}/authorization`,
+      undefined,
+      context,
+    ), 'approval authorization response');
+    return requireRecord(response.authorization, 'approval authorization');
+  }
+
   /** Outcome receipts remain owned by HUMMER and are not persisted by Relay. */
   async submitReceipt() {}
 
@@ -203,7 +214,7 @@ export class RelayHttpClient {
   }
 
   /**
-   * @param {{nodeId: string, pollOnce(): Promise<unknown>, stopClaim(claimId: string): unknown}} agent
+   * @param {{nodeId: string, pollOnce(): Promise<unknown>, stopClaim(claimId: string): unknown, revokeClaim?(claimId: string, requestId: string): unknown}} agent
    * @param {{onState?: (state: unknown) => void|Promise<void>, onError?: (error: unknown) => void}} [options]
    */
   connectAgent(agent, options = {}) {
@@ -219,6 +230,17 @@ export class RelayHttpClient {
         if (event === 'task.stop') {
           const taskId = requireString(requireRecord(data, 'task.stop data').taskId, 'task.stop taskId');
           const state = agent.stopClaim(taskId);
+          await options.onState?.(state);
+          return;
+        }
+        if (event === 'approval.revoked') {
+          const record = requireRecord(data, 'approval.revoked data');
+          const taskId = requireString(record.taskId, 'approval.revoked taskId');
+          const requestId = requireString(record.requestId, 'approval.revoked requestId');
+          if (typeof agent.revokeClaim !== 'function') {
+            throw new RelayClientError('invalid_agent_config', 'Connected agent cannot apply approval revocation');
+          }
+          const state = agent.revokeClaim(taskId, requestId);
           await options.onState?.(state);
         }
       },

@@ -14,7 +14,8 @@ import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } fr
  *   submitRunEvent(input: unknown, context: TransportContext): Promise<void>,
  *   submitReceipt(input: unknown, context: TransportContext): Promise<void>,
  *   submitApprovalRequest(claimId: string, input: unknown, context: TransportContext): Promise<unknown>,
- *   consumeApprovalDecision(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
+ *   consumeApprovalDecision(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
+ *   getApprovalAuthorization(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
  * }} FleetTransport
  * @typedef {{
  *   validateNodeManifest(input: unknown): ValidationResult,
@@ -24,7 +25,7 @@ import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } fr
  *   validateRunEvent(input: unknown): ValidationResult,
  *   validateOutcomeReceipt(input: unknown): ValidationResult
  * }} FleetContractValidator
- * @typedef {{execute(input: {envelope: unknown, approvalRequest: unknown, approval: unknown}): Promise<{events: unknown[], receipt: unknown}>}} NodeTaskExecutor
+ * @typedef {{execute(input: {envelope: unknown, approvalRequest: unknown, approval: unknown, authorization: {signal: AbortSignal, checkpoint(): Promise<void>}}): Promise<{events: unknown[], receipt: unknown}>}} NodeTaskExecutor
  * @typedef {{
  *   initialize(scope: {tenantId: string, nodeId: string}): {claims: Array<Record<string, unknown>>},
  *   append(record: Record<string, unknown>): Record<string, unknown>|undefined
@@ -48,6 +49,8 @@ export class HummerNodeAgent {
   /** @type {Set<string>} */ #issuedRecoveryIdentifiers = new Set();
   /** @type {Set<string>} */ #terminal = new Set();
   /** @type {Set<string>} */ #stopped = new Set();
+  /** @type {Set<string>} */ #confirming = new Set();
+  /** @type {Map<string, {requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean}>} */ #executing = new Map();
   /** @type {NodeJS.Timeout|null} */ #heartbeatTimer = null;
 
   /**
@@ -193,6 +196,7 @@ export class HummerNodeAgent {
     if (resolution) return resolution;
     if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
+    if (this.#executing.has(claimId)) return { state: 'executing', claimId };
     if (this.#recoveryRequired.has(claimId)) return { state: 'recovery_required', claimId };
     const claim = this.#pending.get(claimId);
     if (!claim) throw new NodeAgentError('claim_not_pending', 'Claim is not waiting for confirmation');
@@ -250,10 +254,22 @@ export class HummerNodeAgent {
     if (arguments.length !== 1) {
       throw new NodeAgentError('local_approval_forbidden', 'Approval decisions must be consumed from the authenticated Relay');
     }
+    if (this.#confirming.has(claimId)) return { state: 'confirming', claimId };
+    this.#confirming.add(claimId);
+    try {
+      return await this.#confirmAndExecuteOnce(claimId);
+    } finally {
+      this.#confirming.delete(claimId);
+    }
+  }
+
+  /** @param {string} claimId */
+  async #confirmAndExecuteOnce(claimId) {
     const resolution = this.#resolutionResult(claimId);
     if (resolution) return resolution;
     if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
     if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
+    if (this.#executing.has(claimId)) return { state: 'executing', claimId };
     if (this.#recoveryRequired.has(claimId)) return { state: 'recovery_required', claimId };
     const claim = this.#pending.get(claimId);
     if (!claim) throw new NodeAgentError('claim_not_pending', 'Claim is not waiting for confirmation');
@@ -265,6 +281,8 @@ export class HummerNodeAgent {
       localRequest.requestId,
       this.#context(),
     ));
+    if (this.#stopped.has(claimId)) return { state: 'stopped', claimId };
+    if (this.#terminal.has(claimId)) return { state: 'duplicate', claimId };
     const requestValidation = this.#contractValidator.validateApprovalRequest(bundle.request);
     if (!requestValidation || requestValidation.ok !== true || !isDeepStrictEqual(requestValidation.value, claim.approvalRequest)) {
       throw new NodeAgentError('approval_request_mismatch', 'Relay approval request does not match the pending claim');
@@ -322,13 +340,21 @@ export class HummerNodeAgent {
       throw error;
     }
     this.#pending.delete(claimId);
-    this.#terminal.add(claimId);
+    const execution = {
+      requestId: localRequest.requestId,
+      expiresAt: decision.grantedScope.expiresAt,
+      controller: new AbortController(),
+    };
+    this.#executing.set(claimId, execution);
     let receiptHash;
     try {
+      const checkpoint = () => this.#checkpointAuthorization(claimId, execution);
+      await checkpoint();
       const outcome = await this.#executor.execute({
         envelope: claim.envelope,
         approvalRequest: requestValidation.value,
         approval: validation.value,
+        authorization: { signal: execution.controller.signal, checkpoint },
       });
       if (!outcome || !Array.isArray(outcome.events) || outcome.receipt === undefined) {
         throw new NodeAgentError('invalid_execution_outcome', 'Executor must return events and a receipt');
@@ -347,31 +373,56 @@ export class HummerNodeAgent {
       assertExecutionScope(receiptBinding, this.tenantId, this.nodeId, claim.binding.workOrderId);
       assertNoForeignTenantIds(receiptValidation.value, this.tenantId);
       receiptHash = digest(receiptValidation.value);
-      for (const event of validatedEvents) await this.#transport.submitRunEvent(event, this.#context());
+      await checkpoint();
+      for (const event of validatedEvents) {
+        await checkpoint();
+        await this.#transport.submitRunEvent(event, this.#context());
+      }
+      await checkpoint();
       await this.#transport.submitReceipt(receiptValidation.value, this.#context());
     } catch (error) {
+      const reasonCode = safeErrorCode(error);
+      const terminalState = reasonCode === 'relay_stop' ? 'stopped' :
+        (reasonCode === 'approval_revoked' || reasonCode === 'approval_expired') ? 'rejected' : 'failed';
       try {
-        this.#recordTerminal(claimId, 'failed', undefined, safeErrorCode(error));
+        this.#recordTerminal(claimId, terminalState, undefined, reasonCode);
       } catch (journalError) {
         this.#recoveryRequired.add(claimId);
         throw journalError;
+      } finally {
+        this.#executing.delete(claimId);
       }
-      await this.#transport.reportClaimStatus({ claimId, state: 'failed', reasonCode: safeErrorCode(error) }, this.#context());
+      this.#terminal.add(claimId);
+      if (terminalState === 'stopped') this.#stopped.add(claimId);
+      await this.#transport.reportClaimStatus({ claimId, state: terminalState, reasonCode }, this.#context());
       throw error;
     }
     try {
+      await this.#checkpointAuthorization(claimId, execution);
       this.#recordTerminal(claimId, 'completed', receiptHash, undefined);
     } catch (error) {
-      this.#recoveryRequired.add(claimId);
+      const reasonCode = safeErrorCode(error);
+      if (reasonCode === 'relay_stop' || reasonCode === 'approval_revoked' || reasonCode === 'approval_expired') {
+        const terminalState = reasonCode === 'relay_stop' ? 'stopped' : 'rejected';
+        this.#recordTerminal(claimId, terminalState, undefined, reasonCode);
+        this.#terminal.add(claimId);
+        if (terminalState === 'stopped') this.#stopped.add(claimId);
+        await this.#transport.reportClaimStatus({ claimId, state: terminalState, reasonCode }, this.#context());
+      } else {
+        this.#recoveryRequired.add(claimId);
+      }
       throw error;
+    } finally {
+      this.#executing.delete(claimId);
     }
+    this.#terminal.add(claimId);
     await this.#transport.reportClaimStatus({ claimId, state: 'completed' }, this.#context());
     return { state: 'completed', claimId };
   }
 
   /**
-   * Apply a Relay stop notification to a claim that has not started executing.
-   * Stop is terminal and cannot be reversed by a later ApprovalDecision.
+   * Apply a Relay stop notification. An executing claim is aborted and becomes
+   * terminal at its next authorization checkpoint.
    * @param {string} claimId
    */
   stopClaim(claimId) {
@@ -380,6 +431,11 @@ export class HummerNodeAgent {
     if (resolution) return resolution;
     if (this.#recoveryRequired.has(id)) return { state: 'recovery_required', claimId: id };
     if (this.#terminal.has(id)) return this.#stopped.has(id) ? { state: 'stopped', claimId: id } : { state: 'duplicate', claimId: id };
+    const execution = this.#executing.get(id);
+    if (execution) {
+      this.#cancelExecution(execution, 'relay_stop');
+      return { state: 'stopping', claimId: id };
+    }
     if (this.#knownClaims.has(id)) {
       try {
         this.#recordTerminal(id, 'stopped', undefined, 'relay_stop');
@@ -393,6 +449,18 @@ export class HummerNodeAgent {
     this.#stopped.add(id);
     this.#terminal.add(id);
     return { state: 'stopped', claimId: id };
+  }
+
+  /** Apply an SSE revocation hint; the next checkpoint still confirms it with Relay. */
+  revokeClaim(claimId, requestId) {
+    const id = requireNonEmptyString(claimId, 'invalid_claim', 'claimId');
+    const approvalId = requireNonEmptyString(requestId, 'invalid_approval_request', 'requestId');
+    const execution = this.#executing.get(id);
+    if (!execution || execution.requestId !== approvalId) {
+      return { state: this.#terminal.has(id) ? 'duplicate' : 'not_executing', claimId: id };
+    }
+    execution.revokeHint = true;
+    return { state: 'revoking', claimId: id, requestId: approvalId };
   }
 
   /**
@@ -459,6 +527,44 @@ export class HummerNodeAgent {
   /** @returns {TransportContext} */
   #context() {
     return { nodeId: this.nodeId, tenantId: this.tenantId, grantToken: this.#grantToken };
+  }
+
+  /** @param {string} claimId @param {{requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean}} execution */
+  async #checkpointAuthorization(claimId, execution) {
+    this.#throwIfCancelled(execution);
+    if (Date.parse(execution.expiresAt) <= this.#clock().getTime()) {
+      this.#cancelExecution(execution, 'approval_expired');
+      this.#throwIfCancelled(execution);
+    }
+    const authorization = parseApprovalAuthorization(await this.#transport.getApprovalAuthorization(
+      claimId,
+      execution.requestId,
+      this.#context(),
+    ));
+    if (authorization.taskId !== claimId || authorization.requestId !== execution.requestId || authorization.nodeId !== this.nodeId) {
+      throw new NodeAgentError('approval_not_authorized', 'Relay authorization is not bound to this execution');
+    }
+    if (authorization.state === 'revoked') this.#cancelExecution(execution, 'approval_revoked');
+    if (authorization.state === 'expired' || Date.parse(authorization.expiresAt) <= this.#clock().getTime()) {
+      this.#cancelExecution(execution, 'approval_expired');
+    }
+    this.#throwIfCancelled(execution);
+  }
+
+  /** @param {{controller: AbortController, cancelReason?: string}} execution @param {string} reason */
+  #cancelExecution(execution, reason) {
+    if (execution.cancelReason) return;
+    execution.cancelReason = reason;
+    execution.controller.abort(new NodeAgentError(reason, authorizationFailureMessage(reason)));
+  }
+
+  /** @param {{controller: AbortController, cancelReason?: string}} execution */
+  #throwIfCancelled(execution) {
+    if (!execution.controller.signal.aborted) return;
+    const reason = execution.controller.signal.reason;
+    if (reason instanceof NodeAgentError) throw reason;
+    const code = execution.cancelReason ?? 'relay_stop';
+    throw new NodeAgentError(code, authorizationFailureMessage(code));
   }
 
   /** @param {Record<string, unknown>} record */
@@ -565,6 +671,44 @@ function approvalRejectionReason(decision) {
   if (decision === 'expired') return 'approval_expired';
   if (decision === 'revoked') return 'approval_revoked';
   return undefined;
+}
+
+/** @param {unknown} value */
+function parseApprovalAuthorization(value) {
+  const authorization = assertExactRecord(
+    value,
+    ['state', 'requestId', 'taskId', 'nodeId', 'expiresAt', 'revokedAt'],
+    'invalid_relay_response',
+    'approval authorization',
+  );
+  const state = requireNonEmptyString(authorization.state, 'invalid_relay_response', 'authorization state');
+  if (!['approved', 'revoked', 'expired'].includes(state)) {
+    throw new NodeAgentError('invalid_relay_response', 'Relay returned an unsupported authorization state');
+  }
+  const parsed = {
+    state,
+    requestId: requireNonEmptyString(authorization.requestId, 'invalid_relay_response', 'authorization requestId'),
+    taskId: requireNonEmptyString(authorization.taskId, 'invalid_relay_response', 'authorization taskId'),
+    nodeId: requireNonEmptyString(authorization.nodeId, 'invalid_relay_response', 'authorization nodeId'),
+    expiresAt: requireIsoDate(authorization.expiresAt, 'invalid_relay_response', 'authorization expiresAt'),
+  };
+  if (state === 'revoked') {
+    return {
+      ...parsed,
+      revokedAt: requireIsoDate(authorization.revokedAt, 'invalid_relay_response', 'authorization revokedAt'),
+    };
+  }
+  if (authorization.revokedAt !== undefined) {
+    throw new NodeAgentError('invalid_relay_response', 'Only revoked authorization may include revokedAt');
+  }
+  return parsed;
+}
+
+/** @param {string} reason */
+function authorizationFailureMessage(reason) {
+  if (reason === 'approval_revoked') return 'Approval authorization was revoked';
+  if (reason === 'approval_expired') return 'Approval authorization expired';
+  return 'Relay stopped the executing claim';
 }
 
 /** @param {unknown} value */
@@ -817,6 +961,7 @@ function validatePorts(transport, validator, executor, journal) {
   if (typeof transport?.submitReceipt !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing submitReceipt');
   if (typeof transport?.submitApprovalRequest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing submitApprovalRequest');
   if (typeof transport?.consumeApprovalDecision !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing consumeApprovalDecision');
+  if (typeof transport?.getApprovalAuthorization !== 'function') throw new NodeAgentError('invalid_agent_config', 'Fleet transport is missing getApprovalAuthorization');
   if (typeof validator?.validateNodeManifest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateNodeManifest');
   if (typeof validator?.validateTaskEnvelope !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateTaskEnvelope');
   if (typeof validator?.validateApprovalRequest !== 'function') throw new NodeAgentError('invalid_agent_config', 'Contract validator is missing validateApprovalRequest');

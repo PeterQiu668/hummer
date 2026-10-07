@@ -101,10 +101,12 @@ describe('RemoteRelayClient', () => {
     });
 
     await client.decideApproval('request/one', { decision: 'denied' });
+    await client.revokeApproval('request/one');
     await client.stopTask('task/one');
 
     expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
       ['https://relay.example.test/v1/approval-requests/request%2Fone/decision', 'POST', '{"decision":"denied"}'],
+      ['https://relay.example.test/v1/approval-requests/request%2Fone/revoke', 'POST', '{}'],
       ['https://relay.example.test/v1/tasks/task%2Fone/stop', 'POST', '{}'],
     ]);
     expect(calls.every((call) => new Headers(call.init?.headers).get('authorization') === 'Bearer opaque-badge')).toBe(true);

@@ -117,6 +117,7 @@ export function remoteFleetControlPort(): FleetControlPort | undefined {
       };
       return client.decideApproval(input.requestId, decision);
     },
+    revokeApproval: (requestId) => client.revokeApproval(requestId),
     stopTask: (taskId) => client.stopTask(taskId),
   };
 }

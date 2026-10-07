@@ -169,6 +169,13 @@ export class RemoteRelayClient {
     });
   }
 
+  revokeApproval(requestId: string): Promise<unknown> {
+    return this.request(`/v1/approval-requests/${encodeURIComponent(requestId)}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
   stopTask(taskId: string): Promise<unknown> {
     return this.request(`/v1/tasks/${encodeURIComponent(taskId)}/stop`, {
       method: 'POST',

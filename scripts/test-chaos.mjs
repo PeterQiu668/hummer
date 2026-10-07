@@ -112,42 +112,67 @@ function allFaults(dryRun) {
 }
 
 function approvalTimeout(dryRun) {
-  const evidence = ['expired approval decision is rejected for both Memory and SQLite stores'];
+  const evidence = [
+    'a running two-step executor crosses the approval TTL and is rejected at its next explicit checkpoint',
+    'the post-timeout side effect, events, receipt, and completed status remain at zero',
+    'Relay reports the immutable approved grant as expired without rewriting its decision',
+  ];
   if (dryRun) {
-    emitGate({ gate: 'chaos', mode: 'approval-timeout', status: 'planned', checks: [plannedCheck('approval-expiry', 'vitest fleet-service.test.ts -t <approval expiry case>', evidence)], limitations: ['Dry run: no virtual-clock assertion was executed.'] });
+    emitGate({ gate: 'chaos', mode: 'approval-timeout', status: 'planned', checks: [
+      plannedCheck('active-executor-expiry', 'node --test apps/node-agent/test/node-agent.test.mjs --test-name-pattern=<local approval expiry aborts a long executor>', evidence),
+      plannedCheck('relay-expiry-projection', 'vitest test/approval-revocation.test.ts -t <reports expiry>', evidence),
+    ], limitations: ['Dry run: no virtual-clock assertion was executed.'] });
     return;
   }
-  const run = runVitest({ file: 'test/fleet-service.test.ts', pattern: 'rejects cross-binding, expanded scope, expiry' });
-  const check = finishedCheck('approval-expiry', run, evidence, 2);
+  const node = runNodeTests({
+    file: 'apps/node-agent/test/node-agent.test.mjs',
+    pattern: 'local approval expiry aborts a long executor at its next checkpoint without output',
+  });
+  const relay = runVitest({ file: 'test/approval-revocation.test.ts', pattern: 'reports expiry without rewriting the immutable decision' });
+  const checks = [
+    finishedCheck('active-executor-expiry', node, evidence, 3),
+    finishedCheck('relay-expiry-projection', relay, evidence, 1),
+  ];
   emitGate({
-    gate: 'chaos', mode: 'approval-timeout', status: check.status, checks: [check],
-    assertions: run.testSummary?.passed ?? 0, negativeCases: 2,
-    limitations: ['Uses an injected deterministic Relay clock; no process was killed and no wall-clock wait was hidden.'],
+    gate: 'chaos', mode: 'approval-timeout',
+    status: checks.every((check) => check.status === 'passed') ? 'passed' : 'failed', checks,
+    assertions: checks.reduce((sum, check) => sum + (check.tests?.passed ?? 0), 0), negativeCases: 4,
+    limitations: ['Uses injected deterministic Node and Relay clocks; no wall-clock wait is hidden and no already-finished side effect is claimed to be rolled back.'],
   });
 }
 
 function revoke(dryRun) {
   const evidence = [
-    'Relay grant authorization rejects the old token immediately after revocation',
-    'the next authenticated Fastify request fails without reflecting bearer material',
+    'a running two-step executor is revoked after step one and fails at its next explicit authorization checkpoint',
+    'step two, later events, receipt, and completed status remain at zero',
+    'Memory and SQLite atomically choose revocation over late completion and publish a tenant/node-scoped SSE hint',
   ];
   if (dryRun) {
-    emitGate({ gate: 'chaos', mode: 'revoke', status: 'planned', checks: [plannedCheck('grant-revocation-checkpoint', 'vitest badge-auth.test.ts fastify-transport.test.ts -t <revocation cases>', evidence)], limitations: ['Dry run: no revocation assertion was executed.'] });
+    emitGate({ gate: 'chaos', mode: 'revoke', status: 'planned', checks: [
+      plannedCheck('active-executor-revocation', 'node --test apps/node-agent/test/node-agent.test.mjs --test-name-pattern=<long executor stops at the next checkpoint>', evidence),
+      plannedCheck('relay-revocation-cas-and-sse', 'vitest test/approval-revocation.test.ts -t <revocation cases>', evidence),
+    ], limitations: ['Dry run: no revocation assertion was executed.'] });
     return;
   }
-  const registry = runVitest({ file: 'test/badge-auth.test.ts', pattern: 'revokes immediately' });
-  const transport = runVitest({ file: 'test/fastify-transport.test.ts', pattern: 'grant revocation effective' });
+  const node = runNodeTests({
+    file: 'apps/node-agent/test/node-agent.test.mjs',
+    pattern: 'a long executor stops at the next checkpoint after authoritative approval revocation',
+  });
+  const relay = runVitest({
+    file: 'test/approval-revocation.test.ts',
+    pattern: 'atomically revokes an approved active task|serves authorization query and tenant/node-scoped approval.revoked SSE',
+  });
   const checks = [
-    finishedCheck('registry-revocation', registry, evidence, 1),
-    finishedCheck('transport-revocation-checkpoint', transport, evidence, 1),
+    finishedCheck('active-executor-revocation', node, evidence, 4),
+    finishedCheck('relay-revocation-cas-and-sse', relay, evidence, 4),
   ];
   emitGate({
     gate: 'chaos', mode: 'revoke',
     status: checks.every((check) => check.status === 'passed') ? 'passed' : 'failed',
     checks,
     assertions: checks.reduce((sum, check) => sum + (check.tests?.passed ?? 0), 0),
-    negativeCases: 2,
-    limitations: ['This proves revocation at the next Relay authorization checkpoint; an already-running node executor still needs an in-flight checkpoint hook.'],
+    negativeCases: 8,
+    limitations: ['Revocation prevents new work after the next explicit checkpoint; it does not claim rollback of a side effect that completed before that checkpoint.'],
   });
 }
 

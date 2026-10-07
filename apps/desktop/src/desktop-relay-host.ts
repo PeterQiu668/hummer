@@ -8,6 +8,7 @@ export const DESKTOP_RELAY_CHANNELS = {
   listTasks: 'hummer:relay:list-tasks',
   listApprovalRequests: 'hummer:relay:list-approval-requests',
   decideApproval: 'hummer:relay:decide-approval',
+  revokeApproval: 'hummer:relay:revoke-approval',
   stopTask: 'hummer:relay:stop-task',
 } as const;
 
@@ -150,6 +151,14 @@ export function registerDesktopRelayHost(options: DesktopRelayHostOptions): Desk
     const decision = parseDecisionRequest(input);
     return clientFor(authenticate(decision.token), client).decideApproval(decision);
   });
+  ipcMain.handle(DESKTOP_RELAY_CHANNELS.revokeApproval, async (
+    event: IpcMainInvokeEvent,
+    token: unknown,
+    requestId: unknown,
+  ) => {
+    requireTrustedMainFrame(event);
+    return clientFor(authenticate(token), client).revokeApproval(requireIdentifier(requestId, 'approval request id'));
+  });
   ipcMain.handle(DESKTOP_RELAY_CHANNELS.stopTask, async (
     event: IpcMainInvokeEvent,
     token: unknown,
@@ -287,6 +296,28 @@ class DesktopRelayHttpClient {
     assertTenant(stored, this.#tenantId, 'Approval decision');
     if (stored.requestId !== input.requestId || stored.deciderActorRef !== this.#actorRef || stored.decision !== input.decision) {
       throw new DesktopRelayError(502, 'decision_mismatch', 'Relay returned a mismatched approval decision');
+    }
+    return payload;
+  }
+
+  async revokeApproval(requestId: string): Promise<unknown> {
+    await this.#assertRemoteIdentity();
+    const approval = requireApproval(property(
+      await this.#request(`/v1/control/approval-requests/${segment(requestId)}`),
+      'approvalRequest',
+    ));
+    this.#assertApprovalTenant(approval);
+    if (approval.requestId !== requestId) {
+      throw new DesktopRelayError(502, 'request_mismatch', 'Relay returned a different approval request');
+    }
+    const payload = requireRecord(await this.#request(
+      `/v1/approval-requests/${segment(requestId)}/revoke`,
+      { method: 'POST', body: '{}' },
+    ), 'approval revocation response');
+    const revocation = requireRecord(payload.revocation, 'approval revocation');
+    assertTenant(revocation, this.#tenantId, 'Approval revocation');
+    if (revocation.requestId !== requestId || revocation.actorRef !== this.#actorRef) {
+      throw new DesktopRelayError(502, 'revocation_mismatch', 'Relay returned a mismatched approval revocation');
     }
     return payload;
   }

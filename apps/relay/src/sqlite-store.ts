@@ -5,11 +5,13 @@ import { assertEventWithinLease, canonicalUtcTimestamp } from './relay-time.js';
 import { assertNodeTenantAuthorization } from './tenant-boundary.js';
 import {
   FleetRejectedError,
+  type ApprovalAuthorization,
   type ApprovalBundle,
   type ApprovalDecisionClaims,
   type ApprovalDecisionRecord,
   type ApprovalRequestClaims,
   type ApprovalRequestRecord,
+  type ApprovalRevocationRecord,
   type EnqueueResult,
   type EventResult,
   type FleetNodeRecord,
@@ -138,6 +140,14 @@ interface ApprovalDecisionRow {
   created_at: string;
 }
 
+interface ApprovalRevocationRow {
+  tenant_id: string;
+  request_id: string;
+  actor_ref: string;
+  revoked_at: string;
+  reason_code: ApprovalRevocationRecord['reasonCode'];
+}
+
 interface TenantAuditRow {
   tenant_id: string;
   position: number;
@@ -196,7 +206,7 @@ interface CapabilityPackageRow {
 interface CapabilityTrialRow { trial_json: string }
 interface CapabilityShareRow { share_json: string }
 
-export const RELAY_SCHEMA_VERSION = 15;
+export const RELAY_SCHEMA_VERSION = 16;
 
 function openDatabase(path: string): SqliteDatabase {
   const require = createRequire(import.meta.url);
@@ -294,6 +304,16 @@ function toApprovalDecision(row: ApprovalDecisionRow): ApprovalDecisionRecord {
       : {}),
     decisionRecord: jsonObject(row.decision_json),
     createdAt: row.created_at,
+  };
+}
+
+function toApprovalRevocation(row: ApprovalRevocationRow): ApprovalRevocationRecord {
+  return {
+    tenantId: row.tenant_id,
+    requestId: row.request_id,
+    actorRef: row.actor_ref,
+    revokedAt: row.revoked_at,
+    reasonCode: row.reason_code,
   };
 }
 
@@ -745,6 +765,9 @@ export class SqliteFleetStore implements FleetStore {
       const task = this.requireTask(tenantId, taskId);
       const decision = this.findApprovalDecision(tenantId, requestId);
       if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
+      if (this.findApprovalRevocation(tenantId, requestId)) {
+        throw new FleetRejectedError('approval_replayed', 'approval authorization has been revoked');
+      }
       const consumed = this.#db.prepare(`
         SELECT 1 AS present FROM fleet_approval_consumptions WHERE tenant_id = ? AND request_id = ?
       `).get<{ present: number }>(tenantId, requestId);
@@ -767,6 +790,74 @@ export class SqliteFleetStore implements FleetStore {
     })();
   }
 
+  async revokeApprovalAuthorization(
+    tenantId: string,
+    requestId: string,
+    actorRef: string,
+    now: string,
+  ): Promise<ApprovalRevocationRecord> {
+    this.advanceClock(now);
+    return this.#db.transaction(() => {
+      if (this.findApprovalRevocation(tenantId, requestId)) {
+        throw new FleetRejectedError('approval_replayed', 'approval authorization was already revoked');
+      }
+      const request = this.findApprovalRequest(tenantId, requestId);
+      const decision = this.findApprovalDecision(tenantId, requestId);
+      if (!request || !decision || decision.decision !== 'approved') {
+        throw new FleetRejectedError('approval_not_found', 'approved authorization was not found');
+      }
+      const task = this.requireTask(tenantId, request.taskId);
+      if (task.status !== 'leased' && task.status !== 'blocked') {
+        throw new FleetRejectedError('invalid_transition', 'terminal approval task cannot be revoked');
+      }
+      this.#db.prepare(`
+        INSERT INTO fleet_approval_revocations (tenant_id, request_id, actor_ref, revoked_at, reason_code)
+        VALUES (?, ?, ?, ?, 'operator_revoked')
+      `).run(tenantId, requestId, actorRef, now);
+      this.#db.prepare(`
+        UPDATE fleet_tasks SET status = 'failed', lease_owner_node_id = NULL, lease_expires_at = NULL
+        WHERE tenant_id = ? AND task_id = ? AND status IN ('leased', 'blocked')
+      `).run(tenantId, request.taskId);
+      this.#db.prepare(`
+        UPDATE fleet_task_leases SET state = 'failed', lease_expires_at = NULL, updated_at = ?
+        WHERE tenant_id = ? AND task_id = ?
+      `).run(now, tenantId, request.taskId);
+      const record = this.findApprovalRevocation(tenantId, requestId)!;
+      this.appendTenantAudit(tenantId, 'approval.revoked', requestId, request.nodeId, actorRef, now, {
+        taskId: request.taskId, decisionId: decision.decisionId, reasonCode: record.reasonCode,
+      });
+      return record;
+    })();
+  }
+
+  async getApprovalAuthorization(
+    tenantId: string,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+    now: string,
+  ): Promise<ApprovalAuthorization> {
+    this.advanceClock(now);
+    const request = this.findApprovalRequest(tenantId, requestId);
+    const decision = this.findApprovalDecision(tenantId, requestId);
+    if (!request || request.taskId !== taskId || !decision || decision.decision !== 'approved') {
+      throw new FleetRejectedError('approval_not_found', 'approved authorization is not bound to this claim');
+    }
+    if (request.nodeId !== nodeId) {
+      throw new FleetRejectedError('lease_owner_mismatch', 'approval authorization is not bound to this node');
+    }
+    const expiresAt = decision.grantedScope?.expiresAt ?? request.expiresAt;
+    const revocation = this.findApprovalRevocation(tenantId, requestId);
+    return {
+      state: revocation ? 'revoked' : Date.parse(expiresAt) <= Date.parse(now) ? 'expired' : 'approved',
+      requestId,
+      taskId,
+      nodeId,
+      expiresAt,
+      ...(revocation ? { revokedAt: revocation.revokedAt } : {}),
+    };
+  }
+
   async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
     return this.findApprovalRequest(tenantId, requestId);
   }
@@ -779,6 +870,10 @@ export class SqliteFleetStore implements FleetStore {
 
   async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
     return this.findApprovalDecision(tenantId, requestId);
+  }
+
+  async getApprovalRevocation(tenantId: string, requestId: string): Promise<ApprovalRevocationRecord | null> {
+    return this.findApprovalRevocation(tenantId, requestId);
   }
 
   async listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]> {
@@ -1262,6 +1357,15 @@ export class SqliteFleetStore implements FleetStore {
         FOREIGN KEY (tenant_id, request_id) REFERENCES fleet_approval_requests (tenant_id, request_id),
         FOREIGN KEY (tenant_id, decision_id) REFERENCES fleet_approval_decisions (tenant_id, decision_id)
       );
+      CREATE TABLE IF NOT EXISTS fleet_approval_revocations (
+        tenant_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        actor_ref TEXT NOT NULL,
+        revoked_at TEXT NOT NULL,
+        reason_code TEXT NOT NULL CHECK (reason_code = 'operator_revoked'),
+        PRIMARY KEY (tenant_id, request_id),
+        FOREIGN KEY (tenant_id, request_id) REFERENCES fleet_approval_requests (tenant_id, request_id)
+      );
       CREATE TRIGGER IF NOT EXISTS fleet_approval_requests_no_update
         BEFORE UPDATE ON fleet_approval_requests BEGIN SELECT RAISE(ABORT, 'approval requests are append-only'); END;
       CREATE TRIGGER IF NOT EXISTS fleet_approval_requests_no_delete
@@ -1274,6 +1378,10 @@ export class SqliteFleetStore implements FleetStore {
         BEFORE UPDATE ON fleet_approval_consumptions BEGIN SELECT RAISE(ABORT, 'approval consumptions are append-only'); END;
       CREATE TRIGGER IF NOT EXISTS fleet_approval_consumptions_no_delete
         BEFORE DELETE ON fleet_approval_consumptions BEGIN SELECT RAISE(ABORT, 'approval consumptions are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_revocations_no_update
+        BEFORE UPDATE ON fleet_approval_revocations BEGIN SELECT RAISE(ABORT, 'approval revocations are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS fleet_approval_revocations_no_delete
+        BEFORE DELETE ON fleet_approval_revocations BEGIN SELECT RAISE(ABORT, 'approval revocations are append-only'); END;
       CREATE TABLE IF NOT EXISTS relay_audit (
         tenant_id TEXT NOT NULL,
         action TEXT NOT NULL CHECK (action IN ('stop', 'retry')),
@@ -1420,7 +1528,8 @@ export class SqliteFleetStore implements FleetStore {
     migration.run(12, 'relay_monotonic_clock', new Date(0).toISOString());
     migration.run(13, 'relay_append_only_approval_binding', new Date(0).toISOString());
     migration.run(14, 'relay_tenant_governance', new Date(0).toISOString());
-    migration.run(RELAY_SCHEMA_VERSION, 'relay_capability_registry', new Date(0).toISOString());
+    migration.run(15, 'relay_capability_registry', new Date(0).toISOString());
+    migration.run(RELAY_SCHEMA_VERSION, 'relay_post_approval_revocation', new Date(0).toISOString());
   }
 
   private advanceClock(now: string): void {
@@ -1497,6 +1606,12 @@ export class SqliteFleetStore implements FleetStore {
     const row = this.#db.prepare(`SELECT * FROM fleet_approval_decisions WHERE tenant_id = ? AND request_id = ?`)
       .get<ApprovalDecisionRow>(tenantId, requestId);
     return row ? toApprovalDecision(row) : null;
+  }
+
+  private findApprovalRevocation(tenantId: string, requestId: string): ApprovalRevocationRecord | null {
+    const row = this.#db.prepare(`SELECT * FROM fleet_approval_revocations WHERE tenant_id = ? AND request_id = ?`)
+      .get<ApprovalRevocationRow>(tenantId, requestId);
+    return row ? toApprovalRevocation(row) : null;
   }
 
   private requireApprovalDecision(tenantId: string, requestId: string): ApprovalDecisionRecord {

@@ -90,6 +90,13 @@ function createHarness({
       calls.contexts.push(context);
       return { request: persistedRequest, decision: approvalDecision(tenantId) };
     },
+    getApprovalAuthorization: async (taskId, requestId, context) => {
+      calls.contexts.push(context);
+      return {
+        state: 'approved', requestId, taskId, nodeId,
+        expiresAt: '2026-10-07T01:00:00.000Z',
+      };
+    },
   };
   const contractValidator = {
     validateNodeManifest: (value) => ({ ok: true, value }),

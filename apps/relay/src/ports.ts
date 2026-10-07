@@ -205,6 +205,30 @@ export interface ApprovalDecisionRecord extends ApprovalDecisionClaims {
   createdAt: string;
 }
 
+/** Append-only withdrawal of a previously-approved authorization grant. */
+export interface ApprovalRevocationRecord {
+  tenantId: string;
+  requestId: string;
+  actorRef: string;
+  revokedAt: string;
+  reasonCode: 'operator_revoked';
+}
+
+export interface ApprovalAuthorization {
+  state: 'approved' | 'revoked' | 'expired';
+  requestId: string;
+  taskId: string;
+  nodeId: string;
+  expiresAt: string;
+  revokedAt?: string;
+}
+
+export interface ApprovalRequestProjection extends ApprovalRequestRecord {
+  decision?: ApprovalDecisionRecord;
+  revocation?: ApprovalRevocationRecord;
+  authorization?: ApprovalAuthorization;
+}
+
 export interface ApprovalBundle {
   request: FleetObject;
   decision: FleetObject;
@@ -229,6 +253,7 @@ export type TenantAuditAction =
   | 'approval.requested'
   | 'approval.decided'
   | 'approval.consumed'
+  | 'approval.revoked'
   | 'quota.configured'
   | 'quota.usage'
   | 'quota.warning'
@@ -354,9 +379,12 @@ export interface FleetStore {
   putApprovalRequest(tenantId: string, taskId: string, request: FleetObject, claims: ApprovalRequestClaims, now: string): Promise<ApprovalRequestRecord>;
   putApprovalDecision(tenantId: string, decision: FleetObject, claims: ApprovalDecisionClaims, now: string): Promise<ApprovalDecisionRecord>;
   consumeApprovalDecision(tenantId: string, nodeId: string, taskId: string, requestId: string, now: string): Promise<ApprovalBundle>;
+  revokeApprovalAuthorization(tenantId: string, requestId: string, actorRef: string, now: string): Promise<ApprovalRevocationRecord>;
+  getApprovalAuthorization(tenantId: string, nodeId: string, taskId: string, requestId: string, now: string): Promise<ApprovalAuthorization>;
   getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null>;
   listApprovalRequests(tenantId: string): Promise<readonly ApprovalRequestRecord[]>;
   getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null>;
+  getApprovalRevocation(tenantId: string, requestId: string): Promise<ApprovalRevocationRecord | null>;
   listEvents(tenantId: string, workOrderId: string): Promise<readonly RunEventClaims[]>;
   listAudit(tenantId: string): Promise<readonly RelayAuditEntry[]>;
   configureQuota(tenantId: string, nodeId: string, day: string, limits: TenantQuotaLimits, actorRef: string, now: string): Promise<readonly TenantQuotaCounter[]>;
@@ -388,14 +416,16 @@ export interface FleetIngress {
   requestApproval(session: AuthenticatedFleetSession, taskId: string, input: unknown): Promise<ApprovalRequestRecord>;
   decideApproval(session: AuthenticatedFleetSession, requestId: string, input: unknown): Promise<ApprovalDecisionRecord>;
   consumeApproval(session: AuthenticatedFleetSession, nodeId: string, taskId: string, requestId: string): Promise<ApprovalBundle>;
+  revokeApproval(session: AuthenticatedFleetSession, requestId: string): Promise<ApprovalRevocationRecord>;
+  getApprovalAuthorization(session: AuthenticatedFleetSession, nodeId: string, taskId: string, requestId: string): Promise<ApprovalAuthorization>;
   stop(session: AuthenticatedFleetSession, taskId: string): Promise<FleetTaskRecord>;
   retry(session: AuthenticatedFleetSession, previousTaskId: string, nextEnvelope: unknown): Promise<EnqueueResult>;
   getNode(session: AuthenticatedFleetSession, nodeId: string): Promise<FleetNodeRecord | null>;
   listNodes(session: AuthenticatedFleetSession): Promise<readonly FleetNodeRecord[]>;
   getTask(session: AuthenticatedFleetSession, taskId: string): Promise<FleetTaskRecord | null>;
   listTasks(session: AuthenticatedFleetSession): Promise<readonly FleetTaskRecord[]>;
-  getApprovalRequest(session: AuthenticatedFleetSession, requestId: string): Promise<ApprovalRequestRecord | null>;
-  listApprovalRequests(session: AuthenticatedFleetSession): Promise<readonly ApprovalRequestRecord[]>;
+  getApprovalRequest(session: AuthenticatedFleetSession, requestId: string): Promise<ApprovalRequestProjection | null>;
+  listApprovalRequests(session: AuthenticatedFleetSession): Promise<readonly ApprovalRequestProjection[]>;
   configureQuota(session: AuthenticatedFleetSession, nodeId: string, day: string, input: unknown): Promise<readonly TenantQuotaCounter[]>;
   recordQuotaUsage(session: AuthenticatedFleetSession, nodeId: string, input: unknown): Promise<readonly TenantQuotaCounter[]>;
   listQuotaCounters(session: AuthenticatedFleetSession, nodeId: string, day: string): Promise<readonly TenantQuotaCounter[]>;

@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-auth-revoke-chaos",
+  "generatedAt": "2026-10-07T03:03:18.276Z",
+  "gitCommit": "d48067a4534d4417fac0bf48407767fb3f28b16d",
+  "prevManifestRootHash": "9984a2faaf98bcc4ab0408f807456a6f24e9714c81ab4552d11b1ab85aad2c4d",
+  "files": [
+    {
+      "path": "evidence/round-p1-auth-revoke-chaos/gates.json",
+      "sha256": "e1b14dab304d0bf26dbfc6d214c67da408d180ddeab88407149b3c1394140b78",
+      "bytes": 2177
+    }
+  ],
+  "rootHash": "2aa6d0578d2110d1cddda9c1c6830f5ee1aca109fc0014d6bce6a72c8ed48283"
+}

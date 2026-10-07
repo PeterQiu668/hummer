@@ -1,10 +1,12 @@
 import {
   FleetRejectedError,
   type ApprovalBundle,
+  type ApprovalAuthorization,
   type ApprovalDecisionClaims,
   type ApprovalDecisionRecord,
   type ApprovalRequestClaims,
   type ApprovalRequestRecord,
+  type ApprovalRevocationRecord,
   type EnqueueResult,
   type EventResult,
   type FleetNodeRecord,
@@ -107,6 +109,7 @@ export class MemoryFleetStore implements FleetStore {
   readonly #approvalDecisions = new Map<string, ApprovalDecisionRecord>();
   readonly #approvalDecisionIds = new Set<string>();
   readonly #approvalConsumptions = new Set<string>();
+  readonly #approvalRevocations = new Map<string, ApprovalRevocationRecord>();
   readonly #tenantAudit = new Map<string, TenantAuditEvent[]>();
   readonly #quotaCounters = new Map<string, TenantQuotaCounter>();
   readonly #auditExports = new Map<string, TenantAuditExport>();
@@ -386,6 +389,9 @@ export class MemoryFleetStore implements FleetStore {
     const task = this.#tasks.get(key(tenantId, taskId));
     if (!task) throw new FleetRejectedError('approval_not_found', 'pending claim was not found');
     if (!decision) throw new FleetRejectedError('approval_not_found', 'approval decision is not available');
+    if (this.#approvalRevocations.has(key(tenantId, requestId))) {
+      throw new FleetRejectedError('approval_replayed', 'approval authorization has been revoked');
+    }
     const consumptionKey = key(tenantId, requestId);
     if (this.#approvalConsumptions.has(consumptionKey)) {
       throw new FleetRejectedError('approval_replayed', 'approval decision was already consumed');
@@ -403,6 +409,73 @@ export class MemoryFleetStore implements FleetStore {
     return { request: clone(request.request), decision: clone(decision.decisionRecord) };
   }
 
+  async revokeApprovalAuthorization(
+    tenantId: string,
+    requestId: string,
+    actorRef: string,
+    now: string,
+  ): Promise<ApprovalRevocationRecord> {
+    this.advanceClock(now);
+    const bindingKey = key(tenantId, requestId);
+    if (this.#approvalRevocations.has(bindingKey)) {
+      throw new FleetRejectedError('approval_replayed', 'approval authorization was already revoked');
+    }
+    const request = this.#approvalRequests.get(bindingKey);
+    const decision = this.#approvalDecisions.get(bindingKey);
+    if (!request || !decision || decision.decision !== 'approved') {
+      throw new FleetRejectedError('approval_not_found', 'approved authorization was not found');
+    }
+    const task = this.#tasks.get(key(tenantId, request.taskId));
+    if (!task) throw new FleetRejectedError('approval_not_found', 'approval task was not found');
+    if (task.status !== 'leased' && task.status !== 'blocked') {
+      throw new FleetRejectedError('invalid_transition', 'terminal approval task cannot be revoked');
+    }
+    const record: ApprovalRevocationRecord = {
+      tenantId,
+      requestId,
+      actorRef,
+      revokedAt: now,
+      reasonCode: 'operator_revoked',
+    };
+    this.#approvalRevocations.set(bindingKey, record);
+    task.status = 'failed';
+    task.leaseOwnerNodeId = null;
+    task.leaseExpiresAt = null;
+    this.appendTenantAudit(tenantId, 'approval.revoked', requestId, request.nodeId, actorRef, now, {
+      taskId: request.taskId, decisionId: decision.decisionId, reasonCode: record.reasonCode,
+    });
+    return clone(record);
+  }
+
+  async getApprovalAuthorization(
+    tenantId: string,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+    now: string,
+  ): Promise<ApprovalAuthorization> {
+    this.advanceClock(now);
+    const bindingKey = key(tenantId, requestId);
+    const request = this.#approvalRequests.get(bindingKey);
+    const decision = this.#approvalDecisions.get(bindingKey);
+    if (!request || request.taskId !== taskId || !decision || decision.decision !== 'approved') {
+      throw new FleetRejectedError('approval_not_found', 'approved authorization is not bound to this claim');
+    }
+    if (request.nodeId !== nodeId) {
+      throw new FleetRejectedError('lease_owner_mismatch', 'approval authorization is not bound to this node');
+    }
+    const expiresAt = decision.grantedScope?.expiresAt ?? request.expiresAt;
+    const revocation = this.#approvalRevocations.get(bindingKey);
+    return {
+      state: revocation ? 'revoked' : Date.parse(expiresAt) <= Date.parse(now) ? 'expired' : 'approved',
+      requestId,
+      taskId,
+      nodeId,
+      expiresAt,
+      ...(revocation ? { revokedAt: revocation.revokedAt } : {}),
+    };
+  }
+
   async getApprovalRequest(tenantId: string, requestId: string): Promise<ApprovalRequestRecord | null> {
     const record = this.#approvalRequests.get(key(tenantId, requestId));
     return record ? clone(record) : null;
@@ -417,6 +490,11 @@ export class MemoryFleetStore implements FleetStore {
 
   async getApprovalDecision(tenantId: string, requestId: string): Promise<ApprovalDecisionRecord | null> {
     const record = this.#approvalDecisions.get(key(tenantId, requestId));
+    return record ? clone(record) : null;
+  }
+
+  async getApprovalRevocation(tenantId: string, requestId: string): Promise<ApprovalRevocationRecord | null> {
+    const record = this.#approvalRevocations.get(key(tenantId, requestId));
     return record ? clone(record) : null;
   }
 

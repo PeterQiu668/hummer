@@ -10,7 +10,7 @@ import { HummerNodeAgent } from '../src/node-agent.mjs';
 const now = '2026-10-07T00:00:00.000Z';
 
 function createHarness(overrides = {}) {
-  const calls = { heartbeats: [], statuses: [], events: [], receipts: [], executions: [], approvalRequests: [], approvalConsumptions: [] };
+  const calls = { heartbeats: [], statuses: [], events: [], receipts: [], executions: [], approvalRequests: [], approvalConsumptions: [], authorizations: [] };
   let submittedApprovalRequest;
   const transport = {
     sendHeartbeat: async (manifest) => { calls.heartbeats.push(manifest); },
@@ -26,6 +26,13 @@ function createHarness(overrides = {}) {
     consumeApprovalDecision: async (claimId, requestId) => {
       calls.approvalConsumptions.push({ claimId, requestId });
       return { request: submittedApprovalRequest, decision: { requestId } };
+    },
+    getApprovalAuthorization: async (claimId, requestId) => {
+      calls.authorizations.push({ claimId, requestId });
+      return {
+        state: 'approved', requestId, taskId: claimId, nodeId: 'node_a',
+        expiresAt: '2026-10-07T01:00:00.000Z',
+      };
     },
     ...overrides.transport,
   };
@@ -91,7 +98,7 @@ function createHarness(overrides = {}) {
     contractValidator,
     executor,
     journal: overrides.journal ?? new MemoryExecutionJournal({ clock: () => new Date(now) }),
-    clock: () => new Date(now),
+    clock: overrides.clock ?? (() => new Date(now)),
   });
   return { agent, calls };
 }
@@ -104,6 +111,23 @@ function approvalRequest(overrides = {}) {
     redactedPreview: 'safe preview', requestedScope: { capabilities: ['task.execute'], maxUses: 1 },
     expiresAt: '2026-10-07T01:00:00.000Z', requestedBy: 'system:node_a',
     ...overrides,
+  };
+}
+
+function validOutcome() {
+  return {
+    events: [{
+      schema: 'hummer.run-event', version: 1, eventId: 'event_1', tenantId: 'tenant_a',
+      workOrderId: 'work_1', nodeId: 'node_a', seq: 1, occurredAt: now,
+      type: 'started', actorRef: 'employee:worker', payload: { runId: 'run_1' },
+      idempotencyKey: 'event-0001',
+    }],
+    receipt: {
+      schema: 'hummer.outcome-receipt', version: 1,
+      receipt: { tenantId: 'tenant_a', outcome: { workOrderId: 'work_1' } },
+      domainEvents: [],
+      manifest: { algorithm: 'SHA-256', rootHash: 'a'.repeat(64), fieldHashes: {} },
+    },
   };
 }
 
@@ -296,6 +320,174 @@ test('a relay stop makes a pending claim permanently non-executable', async () =
     { state: 'stopped', claimId: 'claim_1' },
   );
   assert.equal(calls.executions.length, 0);
+});
+
+test('concurrent confirmation attempts consume and execute only once', async () => {
+  let releaseDecision;
+  let decisionRequested;
+  const requested = new Promise((resolve) => { decisionRequested = resolve; });
+  const decisionGate = new Promise((resolve) => { releaseDecision = resolve; });
+  let persistedRequest;
+  const { agent, calls } = createHarness({
+    transport: {
+      submitApprovalRequest: async (_claimId, request) => {
+        persistedRequest = request;
+        calls.approvalRequests.push(request);
+        return request;
+      },
+      consumeApprovalDecision: async (claimId, requestId) => {
+        calls.approvalConsumptions.push({ claimId, requestId });
+        decisionRequested();
+        await decisionGate;
+        return { request: persistedRequest, decision: { requestId } };
+      },
+    },
+  });
+  await stageApproval(agent);
+  const first = agent.confirmAndExecute('claim_1');
+  await requested;
+  const second = await agent.confirmAndExecute('claim_1');
+  releaseDecision();
+
+  assert.deepEqual(second, { state: 'confirming', claimId: 'claim_1' });
+  assert.deepEqual(await first, { state: 'completed', claimId: 'claim_1' });
+  assert.equal(calls.approvalConsumptions.length, 1);
+  assert.equal(calls.executions.length, 1);
+});
+
+test('a long executor stops at the next checkpoint after authoritative approval revocation', async () => {
+  let authorizationState = 'approved';
+  let releaseStepOne;
+  const stepOne = new Promise((resolve) => { releaseStepOne = resolve; });
+  let enteredStepOne;
+  const stepOneEntered = new Promise((resolve) => { enteredStepOne = resolve; });
+  let sideEffects = 0;
+  const { agent, calls } = createHarness({
+    transport: {
+      getApprovalAuthorization: async (claimId, requestId) => ({
+        state: authorizationState,
+        requestId,
+        taskId: claimId,
+        nodeId: 'node_a',
+        expiresAt: '2026-10-07T01:00:00.000Z',
+        ...(authorizationState === 'revoked' ? { revokedAt: '2026-10-07T00:10:00.000Z' } : {}),
+      }),
+    },
+    executor: {
+      execute: async ({ authorization }) => {
+        sideEffects += 1;
+        enteredStepOne();
+        await stepOne;
+        await authorization.checkpoint();
+        sideEffects += 1;
+        return validOutcome();
+      },
+    },
+  });
+  await stageApproval(agent);
+  const execution = agent.confirmAndExecute('claim_1');
+  await stepOneEntered;
+  authorizationState = 'revoked';
+  assert.deepEqual(agent.revokeClaim('claim_1', 'request_1'), {
+    state: 'revoking', claimId: 'claim_1', requestId: 'request_1',
+  });
+  releaseStepOne();
+
+  await assert.rejects(execution, { code: 'approval_revoked' });
+  assert.equal(sideEffects, 1);
+  assert.equal(calls.events.length, 0);
+  assert.equal(calls.receipts.length, 0);
+  assert.deepEqual(calls.statuses.at(-1), {
+    claimId: 'claim_1', state: 'rejected', reasonCode: 'approval_revoked',
+  });
+  assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'duplicate', claimId: 'claim_1' });
+});
+
+test('a misbound authoritative authorization fails closed before executor side effects', async () => {
+  const { agent, calls } = createHarness({
+    transport: {
+      getApprovalAuthorization: async (_claimId, requestId) => ({
+        state: 'approved', requestId, taskId: 'claim_other', nodeId: 'node_a',
+        expiresAt: '2026-10-07T01:00:00.000Z',
+      }),
+    },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(agent.confirmAndExecute('claim_1'), { code: 'approval_not_authorized' });
+  assert.equal(calls.executions.length, 0);
+  assert.equal(calls.events.length, 0);
+  assert.equal(calls.receipts.length, 0);
+});
+
+test('local approval expiry aborts a long executor at its next checkpoint without output', async () => {
+  let currentTime = Date.parse(now);
+  let continueExecution;
+  let checkpointReady;
+  const ready = new Promise((resolve) => { checkpointReady = resolve; });
+  const continuation = new Promise((resolve) => { continueExecution = resolve; });
+  let sideEffects = 0;
+  const { agent, calls } = createHarness({
+    clock: () => new Date(currentTime),
+    executor: {
+      execute: async ({ authorization }) => {
+        sideEffects += 1;
+        checkpointReady();
+        await continuation;
+        await authorization.checkpoint();
+        sideEffects += 1;
+        return validOutcome();
+      },
+    },
+  });
+  await stageApproval(agent);
+  const execution = agent.confirmAndExecute('claim_1');
+  await ready;
+  currentTime = Date.parse('2026-10-07T01:00:00.000Z');
+  continueExecution();
+
+  await assert.rejects(execution, { code: 'approval_expired' });
+  assert.equal(sideEffects, 1);
+  assert.equal(calls.events.length, 0);
+  assert.equal(calls.receipts.length, 0);
+  assert.deepEqual(calls.statuses.at(-1), {
+    claimId: 'claim_1', state: 'rejected', reasonCode: 'approval_expired',
+  });
+});
+
+test('relay stop aborts an executing claim and records exactly one stopped terminal at the next checkpoint', async () => {
+  let continueExecution;
+  let checkpointReady;
+  const ready = new Promise((resolve) => { checkpointReady = resolve; });
+  const continuation = new Promise((resolve) => { continueExecution = resolve; });
+  let sideEffects = 0;
+  const { agent, calls } = createHarness({
+    executor: {
+      execute: async ({ authorization }) => {
+        sideEffects += 1;
+        checkpointReady();
+        await continuation;
+        await authorization.checkpoint();
+        sideEffects += 1;
+        return validOutcome();
+      },
+    },
+  });
+  await stageApproval(agent);
+  const execution = agent.confirmAndExecute('claim_1');
+  await ready;
+  assert.deepEqual(agent.stopClaim('claim_1'), { state: 'stopping', claimId: 'claim_1' });
+  assert.deepEqual(agent.stopClaim('claim_1'), { state: 'stopping', claimId: 'claim_1' });
+  continueExecution();
+
+  await assert.rejects(execution, { code: 'relay_stop' });
+  assert.equal(sideEffects, 1);
+  assert.equal(calls.events.length, 0);
+  assert.equal(calls.receipts.length, 0);
+  assert.deepEqual(calls.statuses.at(-1), {
+    claimId: 'claim_1', state: 'stopped', reasonCode: 'relay_stop',
+  });
+  assert.deepEqual(agent.stopClaim('claim_1'), { state: 'stopped', claimId: 'claim_1' });
 });
 
 test('rejects a shared-contract TaskEnvelope bound to another tenant', async () => {

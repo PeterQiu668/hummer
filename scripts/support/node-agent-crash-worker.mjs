@@ -54,6 +54,10 @@ if (mode === 'prepare') {
       submitReceipt: async () => undefined,
       submitApprovalRequest: async () => ({}),
       consumeApprovalDecision: async () => ({}),
+      getApprovalAuthorization: async () => ({
+        state: 'approved', requestId: 'request-chaos', taskId: identity.claimId,
+        nodeId: scope.nodeId, expiresAt: '2026-10-07T01:00:00.000Z',
+      }),
     },
     contractValidator: {
       validateNodeManifest: (value) => ({ ok: true, value }),

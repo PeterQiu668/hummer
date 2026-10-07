@@ -84,6 +84,10 @@ function createAgent(journal, overrides = {}) {
       calls.approvals += 1;
       return {};
     },
+    getApprovalAuthorization: async () => ({
+      state: 'approved', requestId: 'request_1', taskId: 'claim_1', nodeId: 'node_a',
+      expiresAt: '2026-10-07T01:00:00.000Z',
+    }),
   };
   const contractValidator = {
     validateNodeManifest: (value) => ({ ok: true, value }),

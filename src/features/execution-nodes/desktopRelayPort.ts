@@ -24,6 +24,7 @@ export interface DesktopRelayRendererHost {
   listTasks(token: string): Promise<readonly RemoteRelayTask[]>;
   listApprovalRequests(token: string): Promise<readonly RemoteRelayApprovalRequest[]>;
   decideApproval(input: DesktopRelayDecisionInput & { token: string }): Promise<unknown>;
+  revokeApproval(token: string, requestId: string): Promise<unknown>;
   stopTask(token: string, taskId: string): Promise<unknown>;
 }
 
@@ -33,6 +34,7 @@ export interface DesktopRelayPort {
   listTasks(): Promise<readonly RemoteRelayTask[]>;
   listApprovalRequests(): Promise<readonly RemoteRelayApprovalRequest[]>;
   decideApproval(input: DesktopRelayDecisionInput): Promise<unknown>;
+  revokeApproval(requestId: string): Promise<unknown>;
   stopTask(taskId: string): Promise<unknown>;
 }
 
@@ -58,6 +60,7 @@ export function desktopRelayPort(): DesktopRelayPort | undefined {
     listTasks: () => host.listTasks(requireToken()),
     listApprovalRequests: () => host.listApprovalRequests(requireToken()),
     decideApproval: (input) => host.decideApproval({ token: requireToken(), ...input }),
+    revokeApproval: (requestId) => host.revokeApproval(requireToken(), requestId),
     stopTask: (taskId) => host.stopTask(requireToken(), taskId),
   };
 }

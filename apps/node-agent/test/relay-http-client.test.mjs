@@ -45,6 +45,14 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     if (String(url).endsWith('/consume')) {
       return jsonResponse({ request: { requestId: 'request-1' }, decision: { requestId: 'request-1' } });
     }
+    if (String(url).endsWith('/authorization')) {
+      return jsonResponse({
+        authorization: {
+          state: 'approved', requestId: 'request-1', taskId: 'delivery-1', nodeId: 'node-a',
+          expiresAt: '2026-10-07T01:00:00.000Z',
+        },
+      });
+    }
     return jsonResponse({ ok: true });
   };
   const client = new RelayHttpClient({
@@ -62,6 +70,10 @@ test('uses the injected base URL and opaque badge for Relay operations without e
   await client.submitApprovalRequest('delivery-1', { requestId: 'request-1' }, context);
   await client.decideApproval('request-1', { requestId: 'request-1' });
   await client.consumeApprovalDecision('delivery-1', 'request-1', context);
+  assert.deepEqual(await client.getApprovalAuthorization('delivery-1', 'request-1', context), {
+    state: 'approved', requestId: 'request-1', taskId: 'delivery-1', nodeId: 'node-a',
+    expiresAt: '2026-10-07T01:00:00.000Z',
+  });
   await client.stopTask('delivery-2');
 
   assert.deepEqual(claim, {
@@ -78,6 +90,7 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests',
     '/v1/approval-requests/request-1/decision',
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/consume',
+    '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/authorization',
     '/v1/tasks/delivery-2/stop',
   ]);
   assert.ok(requests.every((entry) => entry.init.headers.authorization === `Bearer ${badgeToken}`));
@@ -155,7 +168,7 @@ test('SSE reconnect uses capped exponential backoff and stops after the configur
   assert.deepEqual(delays, [10, 20]);
 });
 
-test('connectAgent claims task.available but never confirms or executes, and applies task.stop', async () => {
+test('connectAgent claims task.available but never confirms or executes, and applies stop plus revocation hints', async () => {
   let controller;
   const executions = [];
   const states = [];
@@ -163,6 +176,7 @@ test('connectAgent claims task.available but never confirms or executes, and app
     nodeId: 'node-a',
     pollOnce: async () => { states.push('claimed'); return { state: 'pending_confirmation', claimId: 'delivery-1' }; },
     stopClaim: (claimId) => { states.push(`stopped:${claimId}`); },
+    revokeClaim: (claimId, requestId) => { states.push(`revoked:${claimId}:${requestId}`); },
     confirmAndExecute: async () => { executions.push('executed'); },
   };
   const client = new RelayHttpClient({
@@ -179,10 +193,11 @@ test('connectAgent claims task.available but never confirms or executes, and app
   await stream.ready;
   controller.enqueue(new TextEncoder().encode('event: task.available\ndata: {"taskId":"delivery-1"}\n\n'));
   controller.enqueue(new TextEncoder().encode('event: task.stop\ndata: {"taskId":"delivery-1"}\n\n'));
+  controller.enqueue(new TextEncoder().encode('event: approval.revoked\ndata: {"taskId":"delivery-1","requestId":"request-1"}\n\n'));
   await new Promise((resolve) => setImmediate(resolve));
   stream.close();
   await stream.done;
 
-  assert.deepEqual(states, ['claimed', 'stopped:delivery-1']);
+  assert.deepEqual(states, ['claimed', 'stopped:delivery-1', 'revoked:delivery-1:request-1']);
   assert.equal(executions.length, 0);
 });

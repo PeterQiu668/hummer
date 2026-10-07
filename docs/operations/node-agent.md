@@ -161,6 +161,22 @@ The facade exposes exactly the existing `hummer_local` names:
 
 The facade contains no filesystem, document parser, shell, container, or network implementation. `workspace_exec` must remain behind the HUMMER-owned isolated execution boundary in ADR-012/013; a handler must not be wired until its startup isolation probes pass.
 
+## Long-running authorization checkpoints
+
+Every executor receives `authorization.signal` and an asynchronous
+`authorization.checkpoint()`. Call the checkpoint directly before each
+high-risk side effect, including a write, outbound request, spend, deletion,
+privilege change, or new network endpoint. A checkpoint revalidates the exact
+tenant/node/task/request binding with Relay; an SSE revocation is only an early
+hint.
+
+The Node Agent also checkpoints before invoking the executor, before each
+returned RunEvent, before receipt submission, and before recording completion.
+`approval_expired`, `approval_revoked`, and `relay_stop` are terminal for the
+attempt. Do not catch one of these errors and continue, and do not reuse the
+old approval for a retry. A checkpoint prevents later work; it cannot undo a
+side effect already completed before the checkpoint.
+
 ## Local verification
 
 ```powershell
