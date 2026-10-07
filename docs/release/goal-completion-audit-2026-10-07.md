@@ -74,3 +74,14 @@ L1, L2, and L6 are proven. L5 and L7 are proven only for local deterministic inj
 - Real GUI/CUA side effects and signed clean-machine NSIS upgrade/rollback.
 
 These requirements must remain pending until their own external evidence exists; local tests must not be used as substitutes.
+
+## Post-audit delta
+
+The follow-up through `03505e4` closes four local evidence gaps without changing the overall decision:
+
+- a real loopback Fastify Relay is now exercised by the production Web and Node clients against one store, and four 390×844 screenshots are sealed;
+- a bounded production Windows UIAutomation adapter is proven against a non-sensitive local WinForms fixture, with pause/allowlist/window-loss zero-write negatives;
+- the trusted-bundle Relay has a restart-safe immutable SQLite adapter with lock and injected-write-failure negatives;
+- the dependency-free capability-export verifier is included in a sealed evidence round.
+
+The new chain head is `evidence/round-p2-runtime-surfaces-2/manifest.json`, root `949ad6e2228d094e5462ba07d40e08b649c8deb1a0a57e5a793a8c1853578d9c`. A preceding 9/10 failed round is retained in the chain. Phase completion remains blocked by the true-machine, real-expert, verified-real-outcome, packaged-installer, external-install, retention, and payment requirements listed above.
