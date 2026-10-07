@@ -127,7 +127,11 @@ function scopeFromRequest(request: RemoteRelayApprovalRequest): Record<string, u
   if (!scope || typeof scope !== 'object' || Array.isArray(scope)) {
     throw new Error('Relay 审批请求缺少受控授权范围。');
   }
-  return scope as Record<string, unknown>;
+  const expiresAt = typeof request.expiresAt === 'string'
+    ? request.expiresAt
+    : (typeof request.request?.expiresAt === 'string' ? request.request.expiresAt : undefined);
+  if (!expiresAt) throw new Error('Relay 审批请求缺少授权到期时间。');
+  return { ...(scope as Record<string, unknown>), expiresAt };
 }
 
 function toBatchNode(node: RemoteRelayNode): BatchDispatchNode[] {
