@@ -1,0 +1,36 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p1-real-web-relay-e2e-hitl-integration",
+  "generatedAt": "2026-10-07T02:18:21.212Z",
+  "gitCommit": "13e3b1966d6974b18e4074380dbdd5f9ab7aca4d",
+  "prevManifestRootHash": "c1bb895ed234399a431bcb519cc976de52284c8bca893132fc943a0bff8761da",
+  "files": [
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-hitl-integration/gate.json",
+      "sha256": "5da46bda744095d22ba5c3f86dc9473ed4a857a37b4004f73cad994b5846269a",
+      "bytes": 3689
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-hitl-integration/screenshots/auth-forbidden-mobile.png",
+      "sha256": "cbdaae7469e1f2a027183cccea66a9f01a2e24be53f54cf965699bc857a2a99d",
+      "bytes": 50264
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-hitl-integration/screenshots/auth-unauthorized-mobile.png",
+      "sha256": "b3aa3088215694cd1833ffde2831b5c53bde4f4818fe7b4e5e28482acd86ecf3",
+      "bytes": 50399
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-hitl-integration/screenshots/configured-mobile.png",
+      "sha256": "761084fdeec46ea44a9f58144010732a9a892290ad124f70e690d752335d3a18",
+      "bytes": 32113
+    },
+    {
+      "path": "evidence/round-p1-real-web-relay-e2e-hitl-integration/screenshots/unconfigured-mobile.png",
+      "sha256": "1608229b804bf86d4ce3baf917082b37073dce69d3d6f3f6f590600b1834f6e4",
+      "bytes": 51228
+    }
+  ],
+  "rootHash": "1c9347fa03421a768c0ea7b3b0fc59f05dd1bf29af838f9c425bf453c2f0b05c"
+}
