@@ -11,9 +11,8 @@ const nodeId = 'node-daemon-gate';
 const taskId = 'daemon-gate-task-001';
 const controlToken = `control_${randomBytes(32).toString('base64url')}`;
 const nodeToken = `node_${randomBytes(32).toString('base64url')}`;
-const grantToken = `grant_${randomBytes(32).toString('base64url')}`;
 const grantIssuerSecret = `issuer_${randomBytes(32).toString('base64url')}`;
-const secretValues = [controlToken, nodeToken, grantToken, grantIssuerSecret];
+const secretValues = [controlToken, nodeToken, grantIssuerSecret];
 const scratch = mkdtempSync(join(tmpdir(), 'hummer-daemon-gate-'));
 const databasePath = join(scratch, 'fleet.sqlite');
 const taskGrantDatabasePath = join(scratch, 'task-grants.sqlite');
@@ -78,12 +77,11 @@ try {
 
   writeJson(nodeConfigPath, {
     schema: 'hummer.node-agent-config',
-    version: 3,
+    version: 4,
     nodeId,
     tenantId,
     relayBaseUrl: `${ready.address}/`,
     badgeTokenEnv: 'HUMMER_GATE_NODE_BADGE',
-    grantTokenEnv: 'HUMMER_GATE_GRANT_TOKEN',
     grantExpiresAt: expiresAt,
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath,
@@ -99,7 +97,7 @@ try {
   });
   node = startChild(
     [resolve(repository, 'apps/node-agent/bin/hummer-node.mjs'), 'run', '--config', nodeConfigPath],
-    { HUMMER_GATE_NODE_BADGE: nodeToken, HUMMER_GATE_GRANT_TOKEN: grantToken },
+    { HUMMER_GATE_NODE_BADGE: nodeToken },
   );
   const nodeReady = await waitForJson(node, (entry) => entry?.event === 'daemon.ready', 45_000);
   check(nodeReady.executionMode === 'fs.read.attest.v1', 'Node daemon must advertise only the read attestation executor');

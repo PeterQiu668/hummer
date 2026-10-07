@@ -40,9 +40,9 @@ config, logs, journals, receipts, evidence, or SQLite.
 6. The Node keeps the returned token only in the active execution object. It is
    sent only in `x-hummer-task-grant` on consume/checkpoint calls and is neither
    journaled nor included in receipts or diagnostics.
-7. The former Node-side configured token remains a temporary compatibility
-   fallback for transports that do not implement issuance. The shipped Relay
-   HTTP transport implements issuance and therefore does not use that fallback.
+7. The former Node-side configured token was initially retained as a temporary
+   compatibility fallback. ADR-072 removes that fallback and makes issuance a
+   required transport operation for task-grant-bound execution.
 
 ## Consequences
 

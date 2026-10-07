@@ -371,20 +371,19 @@ export class HummerNodeAgent {
           || typeof this.#transport.checkpointTaskGrant !== 'function') {
           throw new NodeAgentError('task_grant_unavailable', 'Task grant transport is unavailable');
         }
-        if (typeof this.#transport.acquireTaskGrantToken === 'function') {
-          const issued = parseIssuedTaskGrant(await this.#transport.acquireTaskGrantToken(
-            claimId,
-            execution.requestId,
-            this.#context(),
-          ));
-          if (issued.grantRef !== execution.taskGrant.grantRef
-            || Date.parse(issued.expiresAt) > Date.parse(execution.expiresAt)) {
-            throw new NodeAgentError('task_grant_binding_mismatch', 'Issued task grant is not bound to the approved execution');
-          }
-          execution.taskGrantToken = issued.token;
-        } else {
-          execution.taskGrantToken = this.#grantToken;
+        if (typeof this.#transport.acquireTaskGrantToken !== 'function') {
+          throw new NodeAgentError('task_grant_issuer_unavailable', 'Task grant issuer transport is unavailable');
         }
+        const issued = parseIssuedTaskGrant(await this.#transport.acquireTaskGrantToken(
+          claimId,
+          execution.requestId,
+          this.#context(),
+        ));
+        if (issued.grantRef !== execution.taskGrant.grantRef
+          || Date.parse(issued.expiresAt) > Date.parse(execution.expiresAt)) {
+          throw new NodeAgentError('task_grant_binding_mismatch', 'Issued task grant is not bound to the approved execution');
+        }
+        execution.taskGrantToken = issued.token;
         const authorization = await this.#transport.consumeTaskGrant(
           claimId,
           execution.requestId,

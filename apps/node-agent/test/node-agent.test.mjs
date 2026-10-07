@@ -34,6 +34,11 @@ function createHarness(overrides = {}) {
         expiresAt: '2026-10-07T01:00:00.000Z',
       };
     },
+    acquireTaskGrantToken: async () => ({
+      token: 'relay-issued-test-grant',
+      grantRef: 'grant:task-1',
+      expiresAt: '2026-10-07T01:00:00.000Z',
+    }),
     ...overrides.transport,
   };
   const contractValidator = {
@@ -240,6 +245,23 @@ test('consumes a TaskEnvelope grant once and checkpoints it without spending ano
   assert.ok(grantCalls.filter((entry) => entry.operation === 'checkpoint').length >= 3);
   assert.ok(grantCalls.filter((entry) => entry.operation !== 'issue').every((entry) => entry.token === issuedToken));
   assert.equal(calls.executions.length, 1);
+});
+
+test('fails closed when a task grant is required but the transport has no issuer route', async () => {
+  const { agent, calls } = createHarness({
+    transport: {
+      claimTask: async () => ({
+        claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1', grantRef: 'grant:task-1' },
+      }),
+      acquireTaskGrantToken: undefined,
+      consumeTaskGrant: async () => { throw new Error('must not consume'); },
+      checkpointTaskGrant: async () => { throw new Error('must not checkpoint'); },
+    },
+  });
+  await stageApproval(agent);
+
+  await assert.rejects(() => agent.confirmAndExecute('claim_1'), { code: 'task_grant_issuer_unavailable' });
+  assert.equal(calls.executions.length, 0);
 });
 
 test('rejects a foreign task-grant authorization before executor invocation', async () => {

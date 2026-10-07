@@ -68,8 +68,8 @@ describe('real HTTP read attestation path', () => {
     const logs: unknown[] = [];
     const daemon = new NodeAgentDaemon({
       config: validateNodeDaemonConfig({
-        schema: 'hummer.node-agent-config', version: 3, nodeId: NODE, tenantId: TENANT,
-        relayBaseUrl: `${baseUrl}/`, badgeTokenEnv: 'UNUSED_BADGE', grantTokenEnv: 'UNUSED_GRANT',
+        schema: 'hummer.node-agent-config', version: 4, nodeId: NODE, tenantId: TENANT,
+        relayBaseUrl: `${baseUrl}/`, badgeTokenEnv: 'UNUSED_BADGE',
         grantExpiresAt: future,
         grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
         journalPath, receiptRoot, workspaceRoot,
@@ -78,7 +78,6 @@ describe('real HTTP read attestation path', () => {
         mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read'] }, approval: { riskClass: 'unknown' },
       }),
       badgeToken: NODE_BADGE,
-      grantToken: 'legacy-fallback-token-that-must-not-be-used',
       probeRunner: { resolve: async () => null, version: async () => ({ exitCode: 1, stdout: '', stderr: '' }) },
       logger: (entry: unknown) => logs.push(entry),
     });

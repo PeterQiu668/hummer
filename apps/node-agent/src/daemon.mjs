@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 
@@ -14,7 +14,7 @@ import { probeAllRuntimes } from './runtime-probes.mjs';
 import { assertExactRecord, requireIsoDate, requireNonEmptyString } from './validation.mjs';
 
 const CONFIG_SCHEMA = 'hummer.node-agent-config';
-const CONFIG_VERSION = 3;
+const CONFIG_VERSION = 4;
 const PROVIDERS = new Set(['codex', 'claude', 'deepseek', 'cli-other']);
 const RISK_CLASSES = new Set(['egress', 'write', 'spend', 'delete', 'privilege', 'network', 'unknown']);
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -22,8 +22,8 @@ const ACTOR_SAFE_ID = /^[A-Za-z0-9_-]+$/u;
 
 /**
  * @typedef {{
- * schema: 'hummer.node-agent-config', version: 3, nodeId: string, tenantId: string,
- * relayBaseUrl: string, badgeTokenEnv: string, grantTokenEnv: string,
+ * schema: 'hummer.node-agent-config', version: 4, nodeId: string, tenantId: string,
+ * relayBaseUrl: string, badgeTokenEnv: string,
  * grantExpiresAt: string, grantScopes: string[], journalPath: string, receiptRoot: string, workspaceRoot: string,
  * heartbeatIntervalMs: number, pollIntervalMs: number, approvalTtlMs: number,
  * runtime: {provider: 'codex'|'claude'|'deepseek'|'cli-other', executable?: string},
@@ -53,7 +53,7 @@ export async function readNodeDaemonConfig(configPath) {
 /** @param {unknown} value @returns {NodeDaemonConfig} */
 export function validateNodeDaemonConfig(value) {
   const input = assertExactRecord(value, [
-    'schema', 'version', 'nodeId', 'tenantId', 'relayBaseUrl', 'badgeTokenEnv', 'grantTokenEnv',
+    'schema', 'version', 'nodeId', 'tenantId', 'relayBaseUrl', 'badgeTokenEnv',
     'grantExpiresAt', 'grantScopes', 'journalPath', 'receiptRoot', 'workspaceRoot', 'heartbeatIntervalMs', 'pollIntervalMs',
     'approvalTtlMs', 'runtime', 'capabilities', 'mcp', 'approval',
   ], 'invalid_daemon_config', 'Node Agent daemon config');
@@ -67,10 +67,6 @@ export function validateNodeDaemonConfig(value) {
   }
   const relayBaseUrl = validateRelayUrl(input.relayBaseUrl);
   const badgeTokenEnv = validateEnvName(input.badgeTokenEnv, 'badgeTokenEnv');
-  const grantTokenEnv = validateEnvName(input.grantTokenEnv, 'grantTokenEnv');
-  if (badgeTokenEnv === grantTokenEnv) {
-    throw new NodeAgentError('invalid_daemon_config', 'badgeTokenEnv and grantTokenEnv must be different');
-  }
   const grantExpiresAt = requireIsoDate(input.grantExpiresAt, 'invalid_daemon_config', 'grantExpiresAt');
   const grantScopes = stringList(input.grantScopes, 'grantScopes', 1, 64);
   for (const required of ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute']) {
@@ -108,7 +104,7 @@ export function validateNodeDaemonConfig(value) {
   };
   const capabilities = stringList(input.capabilities, 'capabilities', 0, 128);
   if (capabilities.length !== 1 || capabilities[0] !== 'fs.read') {
-    throw new NodeAgentError('invalid_daemon_config', 'version 3 advertises only the fs.read capability');
+    throw new NodeAgentError('invalid_daemon_config', 'version 4 advertises only the fs.read capability');
   }
   const approvalInput = assertExactRecord(input.approval, ['riskClass'], 'invalid_daemon_config', 'approval');
   const riskClass = requireNonEmptyString(approvalInput.riskClass, 'invalid_daemon_config', 'approval.riskClass');
@@ -121,7 +117,6 @@ export function validateNodeDaemonConfig(value) {
     tenantId,
     relayBaseUrl,
     badgeTokenEnv,
-    grantTokenEnv,
     grantExpiresAt,
     grantScopes,
     journalPath,
@@ -145,14 +140,7 @@ export function validateNodeDaemonConfig(value) {
  */
 export function consumeDaemonCredentials(config, environment = process.env) {
   const badgeToken = takeSecret(environment, config.badgeTokenEnv, 'Relay badge');
-  let grantToken;
-  try {
-    grantToken = takeSecret(environment, config.grantTokenEnv, 'capability grant');
-  } catch (error) {
-    delete environment[config.badgeTokenEnv];
-    throw error;
-  }
-  return { badgeToken, grantToken };
+  return { badgeToken };
 }
 
 /**
@@ -242,7 +230,7 @@ export class NodeAgentDaemon {
   #closed = false;
 
   /**
-   * @param {{config: NodeDaemonConfig, badgeToken: string, grantToken: string,
+   * @param {{config: NodeDaemonConfig, badgeToken: string,
    * fetch?: typeof fetch, probeRunner?: import('./runtime-probes.mjs').ProbeRunner,
    * logger?: (entry: Readonly<Record<string, unknown>>) => void}} options
    */
@@ -269,7 +257,7 @@ export class NodeAgentDaemon {
       tenantId: options.config.tenantId,
       heartbeatIntervalMs: options.config.heartbeatIntervalMs,
       grant: {
-        token: options.grantToken,
+        token: `local_${randomBytes(32).toString('base64url')}`,
         nodeId: options.config.nodeId,
         tenantId: options.config.tenantId,
         expiresAt: options.config.grantExpiresAt,

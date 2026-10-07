@@ -18,12 +18,11 @@ function config(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hummer-node-daemon-'));
   return {
     schema: 'hummer.node-agent-config',
-    version: 3,
+    version: 4,
     nodeId: 'node-test-1',
     tenantId: 'tenant-test',
     relayBaseUrl: 'http://127.0.0.1:43210/',
     badgeTokenEnv: 'HUMMER_TEST_BADGE',
-    grantTokenEnv: 'HUMMER_TEST_GRANT',
     grantExpiresAt: '2099-01-01T00:00:00.000Z',
     grantScopes: ['node.heartbeat', 'task.claim', 'approval.request', 'task.execute'],
     journalPath: join(root, 'execution.jsonl'),
@@ -77,15 +76,13 @@ test('daemon config is versioned, exact, absolute, and rejects non-loopback HTTP
   );
 });
 
-test('credential env values are consumed and immediately deleted', () => {
+test('the badge credential is consumed and immediately deleted without a configured task token', () => {
   const parsed = validateNodeDaemonConfig(config());
-  const environment = { HUMMER_TEST_BADGE: 'badge-secret-value', HUMMER_TEST_GRANT: 'grant-secret-value' };
+  const environment = { HUMMER_TEST_BADGE: 'badge-secret-value' };
   assert.deepEqual(consumeDaemonCredentials(parsed, environment), {
     badgeToken: 'badge-secret-value',
-    grantToken: 'grant-secret-value',
   });
   assert.equal(environment.HUMMER_TEST_BADGE, undefined);
-  assert.equal(environment.HUMMER_TEST_GRANT, undefined);
   assert.throws(() => consumeDaemonCredentials(parsed, {}), { code: 'daemon_credential_missing' });
 });
 
@@ -142,7 +139,7 @@ test('real CLI subprocess fails closed for missing env, non-loopback HTTP, and u
     journalPath: join(root, 'unsafe-url.jsonl'),
     relayBaseUrl: 'http://192.0.2.10:8787/',
   })), 'utf8');
-  const unsafeUrl = await runCli(unsafeUrlPath, { HUMMER_TEST_BADGE: 'badge-unsafe-secret', HUMMER_TEST_GRANT: 'grant-unsafe-secret' });
+  const unsafeUrl = await runCli(unsafeUrlPath, { HUMMER_TEST_BADGE: 'badge-unsafe-secret' });
   assert.equal(unsafeUrl.code, 1);
   assert.match(unsafeUrl.stderr, /Plain HTTP Relay endpoints are allowed only on loopback/u);
   assert.equal(unsafeUrl.stdout.includes('badge-unsafe-secret') || unsafeUrl.stderr.includes('badge-unsafe-secret'), false);
@@ -150,23 +147,27 @@ test('real CLI subprocess fails closed for missing env, non-loopback HTTP, and u
 
   const unknownPath = join(root, 'unknown.json');
   writeFileSync(unknownPath, JSON.stringify({ ...config({ journalPath: join(root, 'unknown.jsonl') }), unknown: true }), 'utf8');
-  const unknown = await runCli(unknownPath, { HUMMER_TEST_BADGE: 'badge-unknown-secret', HUMMER_TEST_GRANT: 'grant-unknown-secret' });
+  const unknown = await runCli(unknownPath, { HUMMER_TEST_BADGE: 'badge-unknown-secret' });
   assert.equal(unknown.code, 1);
   assert.match(unknown.stderr, /invalid_daemon_config/u);
   assert.equal(unknown.stdout.includes('badge-unknown-secret') || unknown.stderr.includes('badge-unknown-secret'), false);
-  assert.equal(unknown.stdout.includes('grant-unknown-secret') || unknown.stderr.includes('grant-unknown-secret'), false);
 });
 
 test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, and accepts shutdown', { timeout: 45_000 }, async () => {
   const badge = 'badge-never-print-4c177d';
-  const grant = 'grant-never-print-9017ac';
   const requests = [];
   const streams = new Set();
   let taskClaimed = false;
   const server = createServer(async (request, response) => {
     let body = '';
     for await (const chunk of request) body += chunk;
-    requests.push({ method: request.method, url: request.url, authorization: request.headers.authorization, body });
+    requests.push({
+      method: request.method,
+      url: request.url,
+      authorization: request.headers.authorization,
+      taskGrant: request.headers['x-hummer-task-grant'],
+      body,
+    });
     if (request.url?.endsWith('/events')) {
       response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'keep-alive', 'cache-control': 'no-cache' });
       response.write('event: connected\ndata: {}\n\n');
@@ -215,7 +216,7 @@ test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, a
 
   const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'bin', 'hummer-node.mjs'), 'run', '--config', configPath], {
     cwd: join(import.meta.dirname, '..'),
-    env: { ...process.env, HUMMER_TEST_BADGE: badge, HUMMER_TEST_GRANT: grant },
+    env: { ...process.env, HUMMER_TEST_BADGE: badge },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
@@ -240,8 +241,9 @@ test('real CLI subprocess registers, heartbeats, opens SSE/poll, hides tokens, a
     assert.deepEqual(approval.requestedScope, { capabilities: ['task.execute'], maxUses: 1 });
     assert.equal(approval.redactedPreview.includes('Safe test task'), false);
     assert.ok(requests.every((item) => item.authorization === `Bearer ${badge}`));
-    assert.equal(stdout.includes(badge) || stdout.includes(grant), false);
-    assert.equal(stderr.includes(badge) || stderr.includes(grant), false);
+    assert.ok(requests.every((item) => item.taskGrant === undefined));
+    assert.equal(stdout.includes(badge), false);
+    assert.equal(stderr.includes(badge), false);
     child.kill('SIGTERM');
     const exit = await new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
     if (process.platform !== 'win32') {
@@ -270,7 +272,6 @@ async function waitUntil(predicate, timeoutMs) {
 async function runCli(configPath, environment) {
   const childEnvironment = { ...process.env, ...environment };
   if (!Object.hasOwn(environment, 'HUMMER_TEST_BADGE')) delete childEnvironment.HUMMER_TEST_BADGE;
-  if (!Object.hasOwn(environment, 'HUMMER_TEST_GRANT')) delete childEnvironment.HUMMER_TEST_GRANT;
   const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'bin', 'hummer-node.mjs'), 'run', '--config', configPath], {
     cwd: join(import.meta.dirname, '..'),
     env: childEnvironment,
