@@ -24,8 +24,9 @@ beforeAll(async () => {
 
 function config(databasePath: string, overrides: Record<string, unknown> = {}) {
   return {
-    schema: 'hummer.relay-config', version: 2, host: '127.0.0.1', port: 0, databasePath,
+    schema: 'hummer.relay-config', version: 3, host: '127.0.0.1', port: 0, databasePath,
     taskGrantDatabasePath: resolve(databasePath, '..', 'task-grants.sqlite'),
+    taskGrantIssuerSecretEnv: 'HUMMER_TASK_GRANT_ISSUER_SECRET',
     badges: [{
       tokenEnv: 'HUMMER_RELAY_CONTROL_TOKEN', tokenId: 'control-1', tenantId: 'tenant-a',
       actorRef: 'human:operator', scopes: ['node.read'], expiresAt: '2099-01-01T00:00:00.000Z',
@@ -44,10 +45,18 @@ async function tempConfig(value: unknown): Promise<{ directory: string; path: st
   return { directory, path, databasePath, taskGrantDatabasePath };
 }
 
-function launch(configPath: string, token = 'r'.repeat(32)): ChildProcessWithoutNullStreams {
+function launch(
+  configPath: string,
+  token = 'r'.repeat(32),
+  issuerSecret = 'i'.repeat(32),
+): ChildProcessWithoutNullStreams {
   const child = spawn(process.execPath, [bin, 'start', '--config', configPath], {
     cwd: relayRoot,
-    env: { ...process.env, HUMMER_RELAY_CONTROL_TOKEN: token },
+    env: {
+      ...process.env,
+      HUMMER_RELAY_CONTROL_TOKEN: token,
+      HUMMER_TASK_GRANT_ISSUER_SECRET: issuerSecret,
+    },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   children.add(child);
@@ -173,6 +182,16 @@ describe('hummer-relay daemon', () => {
     const child = launch(initial.path, '');
     const stderrLine = await line(child.stderr);
     expect(stderrLine).toContain('HUMMER_RELAY_CONTROL_TOKEN');
+    expect(await exit(child)).toEqual({ code: 1, signal: null });
+  });
+
+  it('fails closed when the configured task grant issuer secret is absent', async () => {
+    const initial = await tempConfig({});
+    await writeFile(initial.path, `${JSON.stringify(config(initial.databasePath))}\n`, 'utf8');
+    const child = launch(initial.path, 'r'.repeat(32), '');
+    const stderrLine = await line(child.stderr);
+    expect(stderrLine).toContain('HUMMER_TASK_GRANT_ISSUER_SECRET');
+    expect(stderrLine).not.toContain('r'.repeat(32));
     expect(await exit(child)).toEqual({ code: 1, signal: null });
   });
 });

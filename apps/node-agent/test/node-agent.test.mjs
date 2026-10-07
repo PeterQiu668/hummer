@@ -203,6 +203,7 @@ test('fails closed when the Relay returns a decision that is not an approved hum
 
 test('consumes a TaskEnvelope grant once and checkpoints it without spending another use', async () => {
   const grantCalls = [];
+  const issuedToken = 'relay-issued-task-grant';
   const authorization = {
     grantRef: 'grant:task-1', tenantId: 'tenant_a', workOrderId: 'work_1', nodeId: 'node_a',
     issuedToRunId: 'run_1', capabilities: ['task.execute'], paths: [],
@@ -213,6 +214,14 @@ test('consumes a TaskEnvelope grant once and checkpoints it without spending ano
       claimTask: async () => ({
         claimId: 'claim_1', deliveryId: 'delivery_1', envelope: { id: 'task_1', grantRef: 'grant:task-1' },
       }),
+      acquireTaskGrantToken: async (claimId, requestId) => {
+        grantCalls.push({ operation: 'issue', claimId, requestId, token: undefined });
+        return {
+          token: issuedToken,
+          grantRef: 'grant:task-1',
+          expiresAt: '2026-10-07T01:00:00.000Z',
+        };
+      },
       consumeTaskGrant: async (claimId, requestId, context) => {
         grantCalls.push({ operation: 'consume', claimId, requestId, token: context.grantToken });
         return authorization;
@@ -226,9 +235,10 @@ test('consumes a TaskEnvelope grant once and checkpoints it without spending ano
   await stageApproval(agent);
 
   assert.deepEqual(await agent.confirmAndExecute('claim_1'), { state: 'completed', claimId: 'claim_1' });
+  assert.equal(grantCalls.filter((entry) => entry.operation === 'issue').length, 1);
   assert.equal(grantCalls.filter((entry) => entry.operation === 'consume').length, 1);
   assert.ok(grantCalls.filter((entry) => entry.operation === 'checkpoint').length >= 3);
-  assert.ok(grantCalls.every((entry) => entry.token === 'test-grant-value'));
+  assert.ok(grantCalls.filter((entry) => entry.operation !== 'issue').every((entry) => entry.token === issuedToken));
   assert.equal(calls.executions.length, 1);
 });
 

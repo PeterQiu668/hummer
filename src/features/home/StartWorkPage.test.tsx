@@ -80,7 +80,7 @@ describe('StartWorkPage', () => {
     expect(onDecision).not.toHaveBeenCalled();
   });
 
-  it('requires an explicit safe path and pre-provisioned one-use grant before drafting a read attestation', () => {
+  it('requires an explicit safe path while leaving post-approval token issuance to Relay', () => {
     const onPlanRequest = vi.fn();
     render(<StartWorkPage plan={null} onPlanRequest={onPlanRequest} />);
 
@@ -92,9 +92,6 @@ describe('StartWorkPage', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: '工作区相对路径' }), {
       target: { value: '../secrets.txt' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: '一次性授权引用' }), {
-      target: { value: 'grant:weekly-1' },
     });
     expect(screen.getByRole('alert')).toHaveTextContent('严格的工作区相对路径');
     expect(screen.getByRole('button', { name: '生成待确认计划' })).toBeDisabled();
@@ -108,8 +105,9 @@ describe('StartWorkPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '生成待确认计划' }));
 
     expect(onPlanRequest).toHaveBeenCalledWith('证明周报文件内容摘要', {
-      kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096, grantRef: 'grant:weekly-1',
+      kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096,
     });
+    expect(screen.queryByRole('textbox', { name: '一次性授权引用' })).not.toBeInTheDocument();
   });
 
   it('shows the exact read-attestation scope before confirmation', () => {
@@ -123,6 +121,7 @@ describe('StartWorkPage', () => {
     expect(scope).toHaveTextContent('reports/weekly.txt');
     expect(scope).toHaveTextContent('4096 字节');
     expect(scope).toHaveTextContent('grant:weekly-1');
+    expect(scope).toHaveTextContent('Relay 批准后签发');
     expect(scope).toHaveTextContent('不会返回正文');
   });
 

@@ -38,6 +38,12 @@ written to the config. The process reads each token once and deletes that
 environment entry immediately. Plain HTTP Relay URLs are accepted only on
 loopback.
 
+With the shipped Relay HTTP transport, the per-task bearer is requested only
+after the bound human approval and kept only in the active execution object.
+`grantTokenEnv` is currently retained as a compatibility fallback for custom
+transports that do not implement Relay issuance; it is not used as the task
+bearer on the normal Relay path.
+
 The only production executor enabled by this daemon is `fs.read.attest.v1`.
 It reads one explicitly planned relative file below `workspaceRoot`, only after
 a human approval and one-use task grant bind both `task.execute` and `fs.read`

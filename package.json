@@ -46,6 +46,8 @@
     "test:p1:fs-read": "npm run test:contract && npm run typecheck -w @hummer/node-agent && npm test -w @hummer/node-agent && npm run test:fs-read -w @hummer/relay",
     "capture:p1:desktop-read-dispatch": "node scripts/capture-p1-desktop-read-dispatch-evidence.mjs",
     "test:p1:desktop-read-dispatch": "npm run config:check && vitest run --config vitest.ui.config.ts src/features/home/StartWorkPage.test.tsx src/features/home/StartWorkFlow.test.tsx && vitest run --config vitest.config.ts apps/desktop/src/persistence/fleet-dispatch-outbox-store.test.ts apps/desktop/src/desktop-relay-outbox-integration.test.ts",
+    "capture:p1:relay-issued-grant": "node scripts/capture-p1-relay-issued-task-grant-evidence.mjs",
+    "test:p1:relay-issued-grant": "npm run config:check && npm run typecheck && npm test -w @hummer/node-agent && npm test -w @hummer/relay && npm run test:p1:desktop-read-dispatch",
     "test:security": "node scripts/test-security.mjs",
     "test:tenancy": "node scripts/test-tenancy.mjs",
     "test:chaos": "node scripts/test-chaos.mjs",

@@ -401,6 +401,8 @@ export class NodeAgentDaemon {
       /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       getApprovalAuthorization: (taskId, requestId, context) => client.getApprovalAuthorization(taskId, requestId, context),
       /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
+      acquireTaskGrantToken: (taskId, requestId, context) => client.acquireTaskGrantToken(taskId, requestId, context),
+      /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       consumeTaskGrant: (taskId, requestId, context) => client.consumeTaskGrant(taskId, requestId, context),
       /** @param {string} taskId @param {string} requestId @param {{nodeId: string, tenantId?: string, grantToken?: string}} context */
       checkpointTaskGrant: (taskId, requestId, context) => client.checkpointTaskGrant(taskId, requestId, context),

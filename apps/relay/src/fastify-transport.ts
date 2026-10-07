@@ -19,6 +19,7 @@ import {
   type FleetTaskRecord,
   type FleetTransport,
 } from './ports.js';
+import type { TaskGrantIssuer } from './task-grant-issuer.js';
 
 interface AuthorizedRequest {
   claims: BadgeTokenClaims;
@@ -110,6 +111,8 @@ export interface FleetRelayServerOptions {
   authenticator: BadgeTokenAuthenticator;
   /** Optional task-scoped authority. Missing wiring fails closed at the task-grant routes. */
   taskGrantAuthenticator?: TaskGrantAuthenticator;
+  /** Optional post-approval issuer. It persists only a token digest before returning the token to the bound node. */
+  taskGrantIssuer?: TaskGrantIssuer;
   now?: () => Date;
   events?: FleetSseBroker;
   /** Optional W10 public marketplace adapter. Absence is an explicit 503, never sample data. */
@@ -288,6 +291,28 @@ export function createFleetRelayServer(
         authExpiresAt: claims.expiresAt,
       },
     };
+  }
+
+  async function taskGrantContext(
+    request: FastifyRequest,
+    nodeId: string,
+    taskId: string,
+    requestId: string,
+  ) {
+    const { session } = await authorize(request, 'approval.consume', nodeId);
+    const task = await ingress.getTask(session, taskId);
+    if (!task || task.targetNodeId !== nodeId || task.leaseOwnerNodeId !== nodeId || task.status !== 'leased') {
+      throw new TransportHttpError(404, 'task_grant_context_not_found', 'Task grant context was not found');
+    }
+    const grantRef = typeof task.envelope.grantRef === 'string' ? task.envelope.grantRef : '';
+    const approval = await ingress.getApprovalRequest(session, requestId);
+    if (!grantRef || !approval || approval.taskId !== taskId || approval.nodeId !== nodeId
+      || approval.workOrderId !== task.workOrderId || approval.authorization?.state !== 'approved'
+      || approval.decision?.decision !== 'approved' || !approval.decision.grantedScope
+      || approval.decision.grantedScope.maxUses !== 1) {
+      throw new TransportHttpError(409, 'task_grant_context_invalid', 'Task grant context is not authorized');
+    }
+    return { session, task, approval, grantRef, grantedScope: approval.decision.grantedScope };
   }
 
   app.setErrorHandler((error, _request, reply) => {
@@ -503,6 +528,36 @@ export function createFleetRelayServer(
     };
   });
 
+  app.post('/v1/nodes/:nodeId/tasks/:taskId/task-grant/token', async (request) => {
+    const nodeId = pathParam(request, 'nodeId');
+    const taskId = pathParam(request, 'taskId');
+    if (!options.taskGrantIssuer) {
+      throw new TransportHttpError(503, 'task_grant_issuer_unavailable', 'Task grant issuer is unavailable');
+    }
+    const body = exactBody(request.body, ['requestId'], 'task grant issuance');
+    const requestId = requiredText(body.requestId, 'requestId', 128);
+    const context = await taskGrantContext(request, nodeId, taskId, requestId);
+    const taskExpiry = typeof context.task.envelope.expiresAt === 'string'
+      ? context.task.envelope.expiresAt
+      : context.grantedScope.expiresAt;
+    const expiresAt = Date.parse(taskExpiry) < Date.parse(context.grantedScope.expiresAt)
+      ? taskExpiry
+      : context.grantedScope.expiresAt;
+    return {
+      taskGrant: options.taskGrantIssuer.issue({
+        grantRef: context.grantRef,
+        tenantId: context.session.tenantId,
+        workOrderId: context.task.workOrderId,
+        nodeId,
+        issuedToRunId: context.approval.runId,
+        capabilities: [...context.grantedScope.capabilities],
+        paths: [...(context.grantedScope.paths ?? [])],
+        expiresAt,
+        issuedAt: context.approval.decision!.decidedAt,
+      }),
+    };
+  });
+
   const taskGrantRoute = (
     path: '/v1/nodes/:nodeId/tasks/:taskId/task-grant/consume' | '/v1/nodes/:nodeId/tasks/:taskId/task-grant/checkpoint',
     operation: 'consume' | 'checkpoint',
@@ -510,33 +565,21 @@ export function createFleetRelayServer(
     app.post(path, async (request) => {
       const nodeId = pathParam(request, 'nodeId');
       const taskId = pathParam(request, 'taskId');
-      const { session } = await authorize(request, 'approval.consume', nodeId);
       if (!options.taskGrantAuthenticator) {
         throw new TransportHttpError(503, 'task_grant_unavailable', 'Task grant authority is unavailable');
       }
       const body = exactBody(request.body, ['requestId'], 'task grant authorization');
       const requestId = requiredText(body.requestId, 'requestId', 128);
-      const task = await ingress.getTask(session, taskId);
-      if (!task || task.targetNodeId !== nodeId || task.leaseOwnerNodeId !== nodeId || task.status !== 'leased') {
-        throw new TransportHttpError(404, 'task_grant_context_not_found', 'Task grant context was not found');
-      }
-      const grantRef = typeof task.envelope.grantRef === 'string' ? task.envelope.grantRef : '';
-      const approval = await ingress.getApprovalRequest(session, requestId);
-      if (!grantRef || !approval || approval.taskId !== taskId || approval.nodeId !== nodeId
-        || approval.workOrderId !== task.workOrderId || approval.authorization?.state !== 'approved'
-        || approval.decision?.decision !== 'approved' || !approval.decision.grantedScope
-        || approval.decision.grantedScope.maxUses !== 1) {
-        throw new TransportHttpError(409, 'task_grant_context_invalid', 'Task grant context is not authorized');
-      }
+      const context = await taskGrantContext(request, nodeId, taskId, requestId);
       const input: TaskGrantAuthorizationInput = {
         token: parseTaskGrant(request.headers['x-hummer-task-grant']),
-        grantRef,
-        tenantId: session.tenantId,
-        workOrderId: task.workOrderId,
+        grantRef: context.grantRef,
+        tenantId: context.session.tenantId,
+        workOrderId: context.task.workOrderId,
         nodeId,
-        issuedToRunId: approval.runId,
-        capabilities: [...approval.decision.grantedScope.capabilities],
-        paths: [...(approval.decision.grantedScope.paths ?? [])],
+        issuedToRunId: context.approval.runId,
+        capabilities: [...context.grantedScope.capabilities],
+        paths: [...(context.grantedScope.paths ?? [])],
         maxUses: 1,
         now: now().toISOString(),
       };

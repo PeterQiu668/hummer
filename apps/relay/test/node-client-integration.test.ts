@@ -18,6 +18,7 @@ import { createSharedFleetValidators } from '../src/contract-adapter.js';
 import { FleetService } from '../src/fleet-service.js';
 import { createFleetRelayServer, type FleetSseBroker } from '../src/fastify-transport.js';
 import { MemoryFleetStore } from '../src/memory-store.js';
+import type { TaskGrantIssuer } from '../src/task-grant-issuer.js';
 
 const NOW = '2026-10-07T00:00:00.000Z';
 const FUTURE = '2099-01-01T00:00:00.000Z';
@@ -140,7 +141,10 @@ afterEach(async () => {
   }
 });
 
-async function createHarness(taskGrantAuthenticator?: TaskGrantAuthenticator): Promise<Harness> {
+async function createHarness(
+  taskGrantAuthenticator?: TaskGrantAuthenticator,
+  taskGrantIssuer?: TaskGrantIssuer,
+): Promise<Harness> {
   const store = new MemoryFleetStore();
   const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
   const authenticator = createStaticBadgeTokenAuthenticator([
@@ -150,7 +154,7 @@ async function createHarness(taskGrantAuthenticator?: TaskGrantAuthenticator): P
     badge('tenant-b-control-badge', 'tenant-b', undefined, ['approval.decide']),
   ]);
   const { app, events } = createFleetRelayServer(service, {
-    authenticator, taskGrantAuthenticator, now: () => new Date(NOW),
+    authenticator, taskGrantAuthenticator, taskGrantIssuer, now: () => new Date(NOW),
   });
   const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
   const client = new RelayHttpClient({
@@ -209,16 +213,21 @@ describe('real Fastify Relay and node HTTP/SSE client', () => {
   it('executes through the dual node-badge plus one-time task-grant boundary', async () => {
     const taskGrantToken = `hgr_${'z'.repeat(43)}`;
     const taskGrants = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => taskGrantToken });
-    taskGrants.issue({
-      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
-      workOrderId: 'work-7', issuedToRunId: 'run-7', capabilities: ['task.execute'],
-      paths: ['outputs/report.md'], expiresAt: FUTURE, maxUses: 1,
-    }, {
-      grantId: 'task-grant-7', tenantId: TENANT, nodeId: NODE,
-      workOrderId: 'work-7', issuedToRunId: 'run-7', capabilities: ['task.execute'],
-      paths: ['outputs/report.md'], expiresAt: FUTURE, maxUses: 1,
-    });
-    const { baseUrl, client, store } = await createHarness(taskGrants);
+    const taskGrantIssuer: TaskGrantIssuer = {
+      issue(input) {
+        const issued = taskGrants.issue({
+          authorityRef: 'authority:relay-issuer', tenantId: input.tenantId, nodeId: input.nodeId,
+          workOrderId: input.workOrderId, issuedToRunId: input.issuedToRunId,
+          capabilities: input.capabilities, paths: input.paths, expiresAt: input.expiresAt, maxUses: 1,
+        }, {
+          grantId: input.grantRef.slice('grant:'.length), tenantId: input.tenantId, nodeId: input.nodeId,
+          workOrderId: input.workOrderId, issuedToRunId: input.issuedToRunId,
+          capabilities: input.capabilities, paths: input.paths, expiresAt: input.expiresAt, maxUses: 1,
+        });
+        return { token: issued.token, grantRef: input.grantRef, expiresAt: input.expiresAt };
+      },
+    };
+    const { baseUrl, client, store } = await createHarness(taskGrants, taskGrantIssuer);
     const executions: unknown[] = [];
     const agent = createAgent(client, executions, 7, taskGrantToken);
     await client.registerNode(manifest, { nodeId: NODE, tenantId: TENANT });

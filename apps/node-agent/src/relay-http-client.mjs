@@ -163,6 +163,22 @@ export class RelayHttpClient {
   }
 
   /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
+  async acquireTaskGrantToken(taskId, requestId, context) {
+    const response = requireRecord(await this.#request(
+      'POST',
+      `/v1/nodes/${segment(context.nodeId)}/tasks/${segment(taskId)}/task-grant/token`,
+      { requestId },
+      context,
+    ), 'task grant token response');
+    const grant = requireRecord(response.taskGrant, 'issued task grant');
+    return {
+      token: requireString(grant.token, 'issued task grant token'),
+      grantRef: requireString(grant.grantRef, 'issued task grant reference'),
+      expiresAt: requireString(grant.expiresAt, 'issued task grant expiry'),
+    };
+  }
+
+  /** @param {string} taskId @param {string} requestId @param {TransportContext} context */
   async consumeTaskGrant(taskId, requestId, context) {
     const response = requireRecord(await this.#request(
       'POST',

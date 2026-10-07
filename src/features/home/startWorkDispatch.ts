@@ -1,7 +1,12 @@
 import type { TaskEnvelope, WorkOrderTask } from '@hummer/contracts';
 import type { ExecutionNodeRecord } from '../execution-nodes/executionNodeClient';
 import type { SessionPlan } from '../sessions/model/session';
-import type { StartWorkPlan, StartWorkReadAttestation, StartWorkRiskClass } from './startWorkPlan';
+import type {
+  StartWorkPlan,
+  StartWorkReadAttestation,
+  StartWorkReadAttestationInput,
+  StartWorkRiskClass,
+} from './startWorkPlan';
 import { validateDispatchableStartWorkPlan } from './startWorkPlan';
 
 export interface StartWorkDispatchIntent {
@@ -21,8 +26,12 @@ export interface StartWorkDispatchIntentPort {
 export function adaptSessionPlanToStartWorkPlan(
   source: SessionPlan,
   nodes: readonly ExecutionNodeRecord[],
-  execution?: StartWorkReadAttestation,
+  execution?: StartWorkReadAttestationInput,
 ): StartWorkPlan {
+  const sealedExecution: StartWorkReadAttestation | undefined = execution ? {
+    ...execution,
+    grantRef: deterministicTaskGrantRef(source.id),
+  } : undefined;
   const eligibleNodes = execution
     ? nodes.filter((candidate) => advertisedCapabilities(candidate).includes('fs.read'))
     : nodes;
@@ -39,7 +48,7 @@ export function adaptSessionPlanToStartWorkPlan(
     status: 'pending',
     decidedBy: null,
     decidedAt: null,
-    ...(execution ? { execution } : {}),
+    ...(sealedExecution ? { execution: sealedExecution } : {}),
     steps: steps.map((title, index) => ({
       id: `${source.id}:step:${index + 1}`,
       title,
@@ -106,6 +115,16 @@ export function createStartWorkDispatchIntent(input: {
     confirmedAt: input.confirmedAt,
     envelope,
   };
+}
+
+export function deterministicTaskGrantRef(planId: string): string {
+  let hash = 0x811c9dc5;
+  for (const character of planId) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  const slug = planId.replace(/[^A-Za-z0-9._:-]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 80) || 'plan';
+  return `grant:start-work-${hash.toString(16).padStart(8, '0')}-${slug}`;
 }
 
 function advertisedCapabilities(node: ExecutionNodeRecord): string[] {

@@ -45,6 +45,8 @@ export interface StartWorkReadAttestation {
   grantRef: string;
 }
 
+export type StartWorkReadAttestationInput = Omit<StartWorkReadAttestation, 'grantRef'>;
+
 export interface StartWorkPlanStep {
   id: string;
   title: string;
@@ -112,13 +114,22 @@ export function validatePendingStartWorkPlan(plan: StartWorkPlan): StartWorkPlan
 }
 
 export function validateStartWorkReadAttestation(value: unknown): StartWorkPlanValidation {
+  return validateReadAttestation(value, true);
+}
+
+export function validateStartWorkReadAttestationInput(value: unknown): StartWorkPlanValidation {
+  return validateReadAttestation(value, false);
+}
+
+function validateReadAttestation(value: unknown, requireGrantRef: boolean): StartWorkPlanValidation {
   const errors: string[] = [];
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ok: false, errors: ['只读证明配置格式无效'] };
   }
   const execution = value as Record<string, unknown>;
   const keys = Object.keys(execution).sort();
-  if (keys.join(',') !== 'grantRef,kind,maxBytes,path') errors.push('只读证明配置包含未知字段');
+  const expectedKeys = requireGrantRef ? 'grantRef,kind,maxBytes,path' : 'kind,maxBytes,path';
+  if (keys.join(',') !== expectedKeys) errors.push('只读证明配置包含未知字段');
   if (execution.kind !== 'fs.read.attest.v1') errors.push('只读证明类型无效');
 
   const path = execution.path;
@@ -135,9 +146,11 @@ export function validateStartWorkReadAttestation(value: unknown): StartWorkPlanV
     errors.push('最大读取字节必须是 1–1048576 的整数');
   }
 
-  const grantRef = execution.grantRef;
-  if (typeof grantRef !== 'string' || grantRef.length < 1 || grantRef.length > 128 || !GRANT_REF.test(grantRef)) {
-    errors.push('一次性授权引用格式无效');
+  if (requireGrantRef) {
+    const grantRef = execution.grantRef;
+    if (typeof grantRef !== 'string' || grantRef.length < 1 || grantRef.length > 128 || !GRANT_REF.test(grantRef)) {
+      errors.push('一次性授权引用格式无效');
+    }
   }
   return { ok: errors.length === 0, errors };
 }

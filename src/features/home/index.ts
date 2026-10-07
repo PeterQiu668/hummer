@@ -20,5 +20,7 @@ export type {
   StartWorkPlan,
   StartWorkPlanStatus,
   StartWorkPlanStep,
+  StartWorkReadAttestation,
+  StartWorkReadAttestationInput,
   StartWorkRiskClass,
 } from './startWorkPlan';

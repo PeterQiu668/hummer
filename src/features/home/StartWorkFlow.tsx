@@ -10,7 +10,7 @@ import {
   type StartWorkDispatchIntentPort,
 } from './startWorkDispatch';
 import type { StartWorkPlan } from './startWorkPlan';
-import type { StartWorkReadAttestation } from './startWorkPlan';
+import type { StartWorkReadAttestationInput } from './startWorkPlan';
 
 export interface StartWorkFlowProps {
   planner: Planner;
@@ -37,7 +37,7 @@ export default function StartWorkFlow({
   const [dispatching, setDispatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requestPlan = async (target: string, execution?: StartWorkReadAttestation) => {
+  const requestPlan = async (target: string, execution?: StartWorkReadAttestationInput) => {
     setError(null);
     setIntent(null);
     try {

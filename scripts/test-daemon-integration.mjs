@@ -12,7 +12,8 @@ const taskId = 'daemon-gate-task-001';
 const controlToken = `control_${randomBytes(32).toString('base64url')}`;
 const nodeToken = `node_${randomBytes(32).toString('base64url')}`;
 const grantToken = `grant_${randomBytes(32).toString('base64url')}`;
-const secretValues = [controlToken, nodeToken, grantToken];
+const grantIssuerSecret = `issuer_${randomBytes(32).toString('base64url')}`;
+const secretValues = [controlToken, nodeToken, grantToken, grantIssuerSecret];
 const scratch = mkdtempSync(join(tmpdir(), 'hummer-daemon-gate-'));
 const databasePath = join(scratch, 'fleet.sqlite');
 const taskGrantDatabasePath = join(scratch, 'task-grants.sqlite');
@@ -36,11 +37,12 @@ const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 mkdirSync(workspaceRoot);
 writeJson(relayConfigPath, {
   schema: 'hummer.relay-config',
-  version: 2,
+  version: 3,
   host: '127.0.0.1',
   port: 0,
   databasePath,
   taskGrantDatabasePath,
+  taskGrantIssuerSecretEnv: 'HUMMER_GATE_GRANT_ISSUER',
   badges: [
     {
       tokenEnv: 'HUMMER_GATE_CONTROL_BADGE',
@@ -65,7 +67,11 @@ writeJson(relayConfigPath, {
 try {
   relay = startChild(
     [resolve(repository, 'apps/relay/bin/hummer-relay.mjs'), 'start', '--config', relayConfigPath],
-    { HUMMER_GATE_CONTROL_BADGE: controlToken, HUMMER_GATE_NODE_BADGE: nodeToken },
+    {
+      HUMMER_GATE_CONTROL_BADGE: controlToken,
+      HUMMER_GATE_NODE_BADGE: nodeToken,
+      HUMMER_GATE_GRANT_ISSUER: grantIssuerSecret,
+    },
   );
   const ready = await waitForJson(relay, (entry) => entry?.schema === 'hummer.relay-ready', 30_000);
   check(typeof ready.address === 'string' && /^http:\/\/127\.0\.0\.1:\d+$/u.test(ready.address), 'Relay did not bind an ephemeral loopback address');

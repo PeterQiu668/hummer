@@ -14,10 +14,10 @@ import {
   totalEstimatedCostCny,
   validateDispatchableStartWorkPlan,
   validatePendingStartWorkPlan,
-  validateStartWorkReadAttestation,
+  validateStartWorkReadAttestationInput,
   type StartWorkDecision,
   type StartWorkPlan,
-  type StartWorkReadAttestation,
+  type StartWorkReadAttestationInput,
   type StartWorkRiskClass,
 } from './startWorkPlan';
 
@@ -32,7 +32,7 @@ export interface StartWorkPageProps {
   plan: StartWorkPlan | null;
   decisionActorRef?: string;
   now?: () => string;
-  onPlanRequest?: (target: string, execution?: StartWorkReadAttestation) => void;
+  onPlanRequest?: (target: string, execution?: StartWorkReadAttestationInput) => void;
   onDecision?: (plan: StartWorkPlan, decision: StartWorkDecision) => void;
   dispatchAvailable?: boolean;
 }
@@ -57,7 +57,6 @@ export default function StartWorkPage({
   const [readAttestationEnabled, setReadAttestationEnabled] = useState(false);
   const [readPath, setReadPath] = useState('');
   const [readMaxBytes, setReadMaxBytes] = useState('1048576');
-  const [grantRef, setGrantRef] = useState('');
   const currentPlan = localDecision?.sourcePlan === plan ? localDecision.plan : plan;
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const validation = useMemo(
@@ -70,14 +69,13 @@ export default function StartWorkPage({
   );
   const actorIsHuman = decisionActorRef.startsWith('human:') && decisionActorRef.length > 'human:'.length;
   const dispatchValidation = currentPlan ? validateDispatchableStartWorkPlan(currentPlan) : { ok: false, errors: [] };
-  const readAttestation = useMemo<StartWorkReadAttestation>(() => ({
+  const readAttestation = useMemo<StartWorkReadAttestationInput>(() => ({
     kind: 'fs.read.attest.v1',
     path: readPath,
     maxBytes: Number(readMaxBytes),
-    grantRef,
-  }), [grantRef, readMaxBytes, readPath]);
+  }), [readMaxBytes, readPath]);
   const readAttestationValidation = useMemo(
-    () => validateStartWorkReadAttestation(readAttestation),
+    () => validateStartWorkReadAttestationInput(readAttestation),
     [readAttestation],
   );
   const canReject = Boolean(currentPlan && validation.ok && actorIsHuman);
@@ -141,7 +139,7 @@ export default function StartWorkPage({
                       placeholder="reports/weekly.txt"
                     />
                   </label>
-                  <label className="text-xs hum-muted">
+                  <label className="text-xs hum-muted sm:col-span-2">
                     最大读取字节
                     <input
                       className="hum-input mt-1"
@@ -151,22 +149,12 @@ export default function StartWorkPage({
                       onChange={(event) => setReadMaxBytes(event.target.value)}
                     />
                   </label>
-                  <label className="text-xs hum-muted">
-                    一次性授权引用
-                    <input
-                      className="hum-input mt-1"
-                      aria-label="一次性授权引用"
-                      value={grantRef}
-                      onChange={(event) => setGrantRef(event.target.value)}
-                      placeholder="grant:task-001"
-                    />
-                  </label>
                   {!readAttestationValidation.ok ? (
                     <ul className="list-disc space-y-1 pl-5 text-xs text-[var(--error)] sm:col-span-2" role="alert">
                       {readAttestationValidation.errors.map((error) => <li key={error}>{error}</li>)}
                     </ul>
                   ) : null}
-                  <p className="text-xs hum-faint sm:col-span-2">授权引用必须已经由运维离线预配置；它不是授权 token，也不会绕过人工确认。</p>
+                  <p className="text-xs hum-faint sm:col-span-2">任务引用由桌面端确定性生成；一次性令牌只会在人工批准后由 Relay 签发给目标节点。</p>
                 </div>
               ) : null}
             </div>
@@ -237,7 +225,7 @@ export default function StartWorkPage({
               <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
                 <div><dt className="hum-faint">精确路径</dt><dd className="mt-1 break-all font-mono">{currentPlan.execution.path}</dd></div>
                 <div><dt className="hum-faint">读取上限</dt><dd className="mt-1">{currentPlan.execution.maxBytes} 字节</dd></div>
-                <div><dt className="hum-faint">单次授权</dt><dd className="mt-1 break-all font-mono">{currentPlan.execution.grantRef}</dd></div>
+                <div><dt className="hum-faint">单次授权</dt><dd className="mt-1 break-all font-mono">{currentPlan.execution.grantRef} · Relay 批准后签发</dd></div>
               </dl>
               <p className="mt-2 text-xs hum-muted">确认后只允许读取这个相对路径并生成字节数与 SHA-256；不会返回正文。</p>
             </div>

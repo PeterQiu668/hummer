@@ -418,6 +418,7 @@ describe('Fastify fleet relay transport', () => {
 
   it('requires both the node badge and the bound one-time task grant after human approval', async () => {
     const taskToken = `hgr_${'t'.repeat(43)}`;
+    const issuedInputs: unknown[] = [];
     const taskGrants = new CapabilityGrantRegistry({ now: () => new Date(NOW), tokenFactory: () => taskToken });
     taskGrants.issue({
       authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE,
@@ -434,10 +435,19 @@ describe('Fastify fleet relay transport', () => {
     const service = new FleetService(store, createSharedFleetValidators(), { now: () => new Date(NOW) });
     const authenticator = createStaticBadgeTokenAuthenticator([
       badge('node-token', TENANT, NODE, NODE_SCOPES),
+      badge('node-b-token', TENANT, 'node-b', NODE_SCOPES),
       badge('control-token', TENANT, undefined, ['task.enqueue', 'approval.decide']),
     ]);
     const entry = createFleetRelayServer(service, {
-      authenticator, taskGrantAuthenticator: taskGrants, now: () => new Date(NOW),
+      authenticator,
+      taskGrantAuthenticator: taskGrants,
+      taskGrantIssuer: {
+        issue: (input) => {
+          issuedInputs.push(input);
+          return { token: taskToken, grantRef: input.grantRef, expiresAt: input.expiresAt };
+        },
+      },
+      now: () => new Date(NOW),
     });
     openApps.push(entry);
 
@@ -455,13 +465,39 @@ describe('Fastify fleet relay transport', () => {
       method: 'POST', url: `/v1/nodes/${NODE}/tasks/delivery-1/approval-requests`,
       headers: authorization('node-token'), payload: approvalRequest(),
     })).statusCode).toBe(200);
+    const route = `/v1/nodes/${NODE}/tasks/delivery-1/task-grant`;
+    const beforeApproval = await entry.app.inject({
+      method: 'POST', url: `${route}/token`, headers: authorization('node-token'),
+      payload: { requestId: 'request-1' },
+    });
+    expect(beforeApproval.statusCode).toBe(409);
+    expect(issuedInputs).toHaveLength(0);
+    expect((await entry.app.inject({
+      method: 'POST', url: `${route}/token`, headers: authorization('node-b-token'),
+      payload: { requestId: 'request-1' },
+    })).statusCode).toBe(403);
     expect((await entry.app.inject({
       method: 'POST', url: '/v1/approval-requests/request-1/decision',
       headers: authorization('control-token'), payload: approvalDecision(),
     })).statusCode).toBe(200);
 
+    const issued = await entry.app.inject({
+      method: 'POST', url: `${route}/token`, headers: authorization('node-token'),
+      payload: { requestId: 'request-1' },
+    });
+    expect(issued.statusCode).toBe(200);
+    expect(issued.json()).toEqual({ taskGrant: {
+      token: taskToken,
+      grantRef: 'grant:task-grant-1',
+      expiresAt: '2026-10-07T00:30:00Z',
+    } });
+    expect(issuedInputs).toEqual([expect.objectContaining({
+      grantRef: 'grant:task-grant-1', tenantId: TENANT, workOrderId: 'work-1', nodeId: NODE,
+      issuedToRunId: 'run-1', capabilities: ['task.execute'], paths: ['outputs/report.md'],
+      expiresAt: '2026-10-07T00:30:00Z', issuedAt: NOW,
+    })]);
+
     const grantHeaders = { ...authorization('node-token'), 'x-hummer-task-grant': taskToken };
-    const route = `/v1/nodes/${NODE}/tasks/delivery-1/task-grant`;
     expect((await entry.app.inject({
       method: 'POST', url: `${route}/consume`, headers: authorization('node-token'), payload: { requestId: 'request-1' },
     })).statusCode).toBe(401);

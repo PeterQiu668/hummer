@@ -29,10 +29,18 @@ function jsonResponse(body, status = 200) {
 
 test('uses the injected base URL and opaque badge for Relay operations without exposing it', async () => {
   const badgeToken = 'opaque-secret-badge';
+  const issuedToken = 'relay-issued-task-grant-secret';
   const requests = [];
   const logs = [];
   const fetch = async (url, init) => {
     requests.push({ url: String(url), init });
+    if (String(url).endsWith('/task-grant/token')) {
+      return jsonResponse({ taskGrant: {
+        token: issuedToken,
+        grantRef: 'grant:task-1',
+        expiresAt: '2026-10-07T01:00:00.000Z',
+      } });
+    }
     if (String(url).includes('/task-grant/')) {
       return jsonResponse({ authorization: {
         grantRef: 'grant:task-1', tenantId: 'tenant-a', workOrderId: 'work-1', nodeId: 'node-a',
@@ -81,6 +89,11 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     state: 'approved', requestId: 'request-1', taskId: 'delivery-1', nodeId: 'node-a',
     expiresAt: '2026-10-07T01:00:00.000Z',
   });
+  assert.deepEqual(await client.acquireTaskGrantToken('delivery-1', 'request-1', context), {
+    token: issuedToken,
+    grantRef: 'grant:task-1',
+    expiresAt: '2026-10-07T01:00:00.000Z',
+  });
   await client.consumeTaskGrant('delivery-1', 'request-1', context);
   await client.checkpointTaskGrant('delivery-1', 'request-1', context);
   await client.stopTask('delivery-2');
@@ -100,20 +113,23 @@ test('uses the injected base URL and opaque badge for Relay operations without e
     '/v1/approval-requests/request-1/decision',
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/consume',
     '/v1/nodes/node-a/tasks/delivery-1/approval-requests/request-1/authorization',
+    '/v1/nodes/node-a/tasks/delivery-1/task-grant/token',
     '/v1/nodes/node-a/tasks/delivery-1/task-grant/consume',
     '/v1/nodes/node-a/tasks/delivery-1/task-grant/checkpoint',
     '/v1/tasks/delivery-2/stop',
   ]);
   assert.ok(requests.every((entry) => entry.init.headers.authorization === `Bearer ${badgeToken}`));
-  const grantRequests = requests.filter((entry) => new URL(entry.url).pathname.includes('/task-grant/'));
-  assert.equal(grantRequests.length, 2);
-  assert.ok(grantRequests.every((entry) => entry.init.headers['x-hummer-task-grant'] === context.grantToken));
-  assert.ok(requests.filter((entry) => !grantRequests.includes(entry))
+  const protectedGrantRequests = requests.filter((entry) => /\/task-grant\/(consume|checkpoint)$/u.test(new URL(entry.url).pathname));
+  assert.equal(protectedGrantRequests.length, 2);
+  assert.ok(protectedGrantRequests.every((entry) => entry.init.headers['x-hummer-task-grant'] === context.grantToken));
+  assert.ok(requests.filter((entry) => !protectedGrantRequests.includes(entry))
     .every((entry) => entry.init.headers['x-hummer-task-grant'] === undefined));
   assert.doesNotMatch(JSON.stringify(logs), new RegExp(badgeToken));
   assert.doesNotMatch(JSON.stringify(client), new RegExp(badgeToken));
   assert.doesNotMatch(JSON.stringify(logs), new RegExp(context.grantToken));
   assert.doesNotMatch(JSON.stringify(client), new RegExp(context.grantToken));
+  assert.doesNotMatch(JSON.stringify(logs), new RegExp(issuedToken));
+  assert.doesNotMatch(JSON.stringify(client), new RegExp(issuedToken));
 });
 
 test('401 and 403 failures are terminal and never leak or retry the badge', async () => {

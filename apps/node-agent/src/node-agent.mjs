@@ -16,6 +16,7 @@ import { assertExactRecord, isRecord, requireIsoDate, requireNonEmptyString } fr
  *   submitApprovalRequest(claimId: string, input: unknown, context: TransportContext): Promise<unknown>,
  *   consumeApprovalDecision(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
  *   getApprovalAuthorization(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
+ *   acquireTaskGrantToken?(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
  *   consumeTaskGrant?(claimId: string, requestId: string, context: TransportContext): Promise<unknown>,
  *   checkpointTaskGrant?(claimId: string, requestId: string, context: TransportContext): Promise<unknown>
  * }} FleetTransport
@@ -52,7 +53,7 @@ export class HummerNodeAgent {
   /** @type {Set<string>} */ #terminal = new Set();
   /** @type {Set<string>} */ #stopped = new Set();
   /** @type {Set<string>} */ #confirming = new Set();
-  /** @type {Map<string, {requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean}>} */ #executing = new Map();
+  /** @type {Map<string, {requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean, taskGrantToken?: string}>} */ #executing = new Map();
   /** @type {NodeJS.Timeout|null} */ #heartbeatTimer = null;
 
   /**
@@ -370,10 +371,24 @@ export class HummerNodeAgent {
           || typeof this.#transport.checkpointTaskGrant !== 'function') {
           throw new NodeAgentError('task_grant_unavailable', 'Task grant transport is unavailable');
         }
+        if (typeof this.#transport.acquireTaskGrantToken === 'function') {
+          const issued = parseIssuedTaskGrant(await this.#transport.acquireTaskGrantToken(
+            claimId,
+            execution.requestId,
+            this.#context(),
+          ));
+          if (issued.grantRef !== execution.taskGrant.grantRef
+            || Date.parse(issued.expiresAt) > Date.parse(execution.expiresAt)) {
+            throw new NodeAgentError('task_grant_binding_mismatch', 'Issued task grant is not bound to the approved execution');
+          }
+          execution.taskGrantToken = issued.token;
+        } else {
+          execution.taskGrantToken = this.#grantToken;
+        }
         const authorization = await this.#transport.consumeTaskGrant(
           claimId,
           execution.requestId,
-          this.#context(),
+          this.#context(execution.taskGrantToken),
         );
         assertTaskGrantAuthorization(authorization, execution.taskGrant, this.#clock());
       }
@@ -566,8 +581,8 @@ export class HummerNodeAgent {
   }
 
   /** @returns {TransportContext} */
-  #context() {
-    return { nodeId: this.nodeId, tenantId: this.tenantId, grantToken: this.#grantToken };
+  #context(grantToken = this.#grantToken) {
+    return { nodeId: this.nodeId, tenantId: this.tenantId, grantToken };
   }
 
   /** @param {string} claimId @param {{requestId: string, expiresAt: string, controller: AbortController, cancelReason?: string, revokeHint?: boolean, taskGrant?: {grantRef: string, tenantId: string, nodeId: string, workOrderId: string, runId: string, capabilities: string[], paths: string[], maxUses: 1}}} execution */
@@ -597,7 +612,7 @@ export class HummerNodeAgent {
       const grantAuthorization = await this.#transport.checkpointTaskGrant(
         claimId,
         execution.requestId,
-        this.#context(),
+        this.#context(execution.taskGrantToken),
       );
       assertTaskGrantAuthorization(grantAuthorization, execution.taskGrant, this.#clock());
     }
@@ -724,6 +739,21 @@ function approvalRejectionReason(decision) {
   if (decision === 'expired') return 'approval_expired';
   if (decision === 'revoked') return 'approval_revoked';
   return undefined;
+}
+
+/** @param {unknown} value */
+function parseIssuedTaskGrant(value) {
+  const grant = assertExactRecord(
+    value,
+    ['token', 'grantRef', 'expiresAt'],
+    'invalid_task_grant',
+    'issued task grant',
+  );
+  return {
+    token: requireNonEmptyString(grant.token, 'invalid_task_grant', 'issued task grant token'),
+    grantRef: requireNonEmptyString(grant.grantRef, 'invalid_task_grant', 'issued task grant reference'),
+    expiresAt: requireIsoDate(grant.expiresAt, 'invalid_task_grant', 'issued task grant expiresAt'),
+  };
 }
 
 /** @param {unknown} value */

@@ -108,10 +108,16 @@ grant must explicitly be single-use (`maxUses: 1`). `consume` spends that use;
 later checkpoints spend none and require evidence that the same bound grant
 was already consumed. A missing task-grant authority returns 503 rather than
 falling back to the node badge. The in-memory registry remains a focused test
-and issuer primitive. Runnable Relay config version 2 instead opens the
-SQLite-backed authority from `taskGrantDatabasePath`; consume, expiry,
-exhaustion, and revocation commit before the route returns and survive restart.
-Digest-only snapshots are imported offline with `hummer-relay grant-import`.
+and issuer primitive. Runnable Relay config version 3 opens the SQLite-backed
+authority from `taskGrantDatabasePath` and reads a separate high-entropy issuer
+secret from `taskGrantIssuerSecretEnv`, deleting that environment entry
+immediately. Only after the persisted decision is an approved human decision
+may the exact target node call the task-token route. Relay deterministically
+derives the bound one-use token, commits only its digest, and returns the
+plaintext token to that node. Consume, expiry, exhaustion, and revocation
+commit before the route returns and survive restart; deterministic reissuance
+cannot reset them. Digest-only `grant-import` remains a recovery/compatibility
+path rather than a prerequisite for Desktop dispatch.
 
 SSE is notification-only and never authorizes execution. A reconnect always
 reauthorizes. Grant revocation does not turn an already-open SSE notification

@@ -9,7 +9,7 @@ import {
 } from './badge-auth.js';
 
 export const RELAY_CONFIG_SCHEMA = 'hummer.relay-config' as const;
-export const RELAY_CONFIG_VERSION = 2 as const;
+export const RELAY_CONFIG_VERSION = 3 as const;
 
 export interface RelayBadgeConfig {
   tokenEnv: string;
@@ -23,17 +23,21 @@ export interface RelayBadgeConfig {
   authorizedTenantIds?: readonly string[];
 }
 
-export interface RelayConfigV2 {
+export interface RelayConfigV3 {
   schema: typeof RELAY_CONFIG_SCHEMA;
   version: typeof RELAY_CONFIG_VERSION;
   host: '127.0.0.1';
   port: number;
   databasePath: string;
   taskGrantDatabasePath: string;
+  taskGrantIssuerSecretEnv: string;
   badges: readonly RelayBadgeConfig[];
 }
 
-const configFields = new Set(['schema', 'version', 'host', 'port', 'databasePath', 'taskGrantDatabasePath', 'badges']);
+const configFields = new Set([
+  'schema', 'version', 'host', 'port', 'databasePath', 'taskGrantDatabasePath',
+  'taskGrantIssuerSecretEnv', 'badges',
+]);
 const badgeFields = new Set([
   'tokenEnv', 'tokenId', 'tenantId', 'actorRef', 'scopes', 'expiresAt', 'nodeId', 'grantRef',
   'authorizedTenantIds',
@@ -117,7 +121,7 @@ function parseBadge(input: unknown, index: number): RelayBadgeConfig {
   };
 }
 
-export function parseRelayConfig(input: unknown): RelayConfigV2 {
+export function parseRelayConfig(input: unknown): RelayConfigV3 {
   const value = record(input, 'relay config');
   exactFields(value, configFields, 'relay config');
   if (value.schema !== RELAY_CONFIG_SCHEMA || value.version !== RELAY_CONFIG_VERSION) {
@@ -138,6 +142,11 @@ export function parseRelayConfig(input: unknown): RelayConfigV2 {
   if (normalizePath(value.taskGrantDatabasePath) === normalizePath(value.databasePath)) {
     throw new RelayConfigError('taskGrantDatabasePath must be separate from databasePath');
   }
+  const taskGrantIssuerSecretEnv = requiredText(
+    value.taskGrantIssuerSecretEnv,
+    'taskGrantIssuerSecretEnv',
+    tokenEnvPattern,
+  );
   if (!Array.isArray(value.badges) || value.badges.length === 0) {
     throw new RelayConfigError('badges must be a non-empty array');
   }
@@ -148,6 +157,9 @@ export function parseRelayConfig(input: unknown): RelayConfigV2 {
   if (new Set(badges.map((badge) => badge.tokenId)).size !== badges.length) {
     throw new RelayConfigError('badge tokenId values must be unique');
   }
+  if (badges.some((badge) => badge.tokenEnv === taskGrantIssuerSecretEnv)) {
+    throw new RelayConfigError('taskGrantIssuerSecretEnv must be separate from badge tokenEnv values');
+  }
   return {
     schema: RELAY_CONFIG_SCHEMA,
     version: RELAY_CONFIG_VERSION,
@@ -155,6 +167,7 @@ export function parseRelayConfig(input: unknown): RelayConfigV2 {
     port: value.port as number,
     databasePath: value.databasePath,
     taskGrantDatabasePath: value.taskGrantDatabasePath,
+    taskGrantIssuerSecretEnv,
     badges,
   };
 }
@@ -164,7 +177,7 @@ function normalizePath(value: string): string {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
-export async function loadRelayConfig(configPath: string): Promise<RelayConfigV2> {
+export async function loadRelayConfig(configPath: string): Promise<RelayConfigV3> {
   if (!isAbsolute(configPath)) throw new RelayConfigError('--config must be an absolute path');
   let text: string;
   try {
@@ -179,6 +192,20 @@ export async function loadRelayConfig(configPath: string): Promise<RelayConfigV2
     throw new RelayConfigError('relay config is not valid JSON');
   }
   return parseRelayConfig(input);
+}
+
+export function consumeTaskGrantIssuerSecret(
+  config: Pick<RelayConfigV3, 'taskGrantIssuerSecretEnv'>,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const secret = environment[config.taskGrantIssuerSecretEnv];
+  Reflect.deleteProperty(environment, config.taskGrantIssuerSecretEnv);
+  if (typeof secret !== 'string' || secret.length < 32 || /\s/u.test(secret)) {
+    throw new RelayConfigError(
+      `task grant issuer environment variable ${config.taskGrantIssuerSecretEnv} is missing or invalid`,
+    );
+  }
+  return secret;
 }
 
 export function createConfiguredBadgeAuthenticator(

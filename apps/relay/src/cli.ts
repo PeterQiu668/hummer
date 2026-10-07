@@ -2,9 +2,14 @@ import { createHash } from 'node:crypto';
 import { createSharedFleetValidators } from './contract-adapter.js';
 import { FastifyFleetTransport } from './fastify-transport.js';
 import { FleetService } from './fleet-service.js';
-import { createConfiguredBadgeAuthenticator, loadRelayConfig, type RelayConfigV2 } from './relay-config.js';
+import {
+  consumeTaskGrantIssuerSecret,
+  createConfiguredBadgeAuthenticator,
+  loadRelayConfig,
+} from './relay-config.js';
 import { SqliteFleetStore } from './sqlite-store.js';
 import { loadTaskGrantSnapshot, SqliteTaskGrantAuthority } from './sqlite-task-grant-authority.js';
+import { DeterministicTaskGrantIssuer } from './task-grant-issuer.js';
 
 type RelayCliArguments =
   | { command: 'start'; configPath: string }
@@ -73,11 +78,14 @@ export async function runRelayCli(args: readonly string[]): Promise<void> {
     }
   }
   const authenticator = createConfiguredBadgeAuthenticator(config.badges);
+  const taskGrantIssuerSecret = consumeTaskGrantIssuerSecret(config);
   const store = new SqliteFleetStore(config.databasePath);
   const taskGrants = new SqliteTaskGrantAuthority(config.taskGrantDatabasePath);
+  const taskGrantIssuer = new DeterministicTaskGrantIssuer(taskGrantIssuerSecret, taskGrants);
   const transport = new FastifyFleetTransport({
     authenticator,
     taskGrantAuthenticator: taskGrants,
+    taskGrantIssuer,
     host: config.host,
     port: config.port,
   });

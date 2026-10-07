@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 // @ts-expect-error node-agent is strict checkJs ESM and does not publish declarations in this alpha slice.
 import { NodeAgentDaemon, validateNodeDaemonConfig } from '../../node-agent/src/daemon.mjs';
-import { CapabilityGrantRegistry, createStaticBadgeTokenAuthenticator } from '../src/badge-auth.js';
+import { createStaticBadgeTokenAuthenticator } from '../src/badge-auth.js';
 import { createSharedFleetValidators } from '../src/contract-adapter.js';
 import { FleetService } from '../src/fleet-service.js';
 import { createFleetRelayServer } from '../src/fastify-transport.js';
 import { SqliteFleetStore } from '../src/sqlite-store.js';
 import { SqliteTaskGrantAuthority } from '../src/sqlite-task-grant-authority.js';
+import { DeterministicTaskGrantIssuer } from '../src/task-grant-issuer.js';
 
 const TENANT = 'tenant-read-e2e';
 const NODE = 'node-read-e2e';
@@ -20,7 +21,7 @@ const PATH = 'inputs/report.txt';
 const CANARY = 'PRIVATE-FILE-BODY-40a377';
 const NODE_BADGE = 'node-badge-read-e2e';
 const CONTROL_BADGE = 'control-badge-read-e2e';
-const GRANT_TOKEN = `hgr_${'r'.repeat(43)}`;
+const ISSUER_SECRET = 'read-e2e-issuer-secret-that-stays-in-relay';
 
 const cleanup: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -42,6 +43,7 @@ describe('real HTTP read attestation path', () => {
     cleanup.push(() => store.close());
     const authority = new SqliteTaskGrantAuthority(grantDatabase);
     cleanup.push(() => authority.close());
+    const issuer = new DeterministicTaskGrantIssuer(ISSUER_SECRET, authority);
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const authenticator = createStaticBadgeTokenAuthenticator([
       {
@@ -55,7 +57,11 @@ describe('real HTTP read attestation path', () => {
       },
     ]);
     const service = new FleetService(store, createSharedFleetValidators());
-    const relay = createFleetRelayServer(service, { authenticator, taskGrantAuthenticator: authority });
+    const relay = createFleetRelayServer(service, {
+      authenticator,
+      taskGrantAuthenticator: authority,
+      taskGrantIssuer: issuer,
+    });
     cleanup.push(async () => { relay.events.close(); await relay.app.close(); });
     const baseUrl = await relay.app.listen({ host: '127.0.0.1', port: 0 });
 
@@ -72,7 +78,7 @@ describe('real HTTP read attestation path', () => {
         mcp: { endpoint: 'stdio://hummer-local', tools: ['fs_read'] }, approval: { riskClass: 'unknown' },
       }),
       badgeToken: NODE_BADGE,
-      grantToken: GRANT_TOKEN,
+      grantToken: 'legacy-fallback-token-that-must-not-be-used',
       probeRunner: { resolve: async () => null, version: async () => ({ exitCode: 1, stdout: '', stderr: '' }) },
       logger: (entry: unknown) => logs.push(entry),
     });
@@ -102,30 +108,24 @@ describe('real HTTP read attestation path', () => {
     expect(JSON.stringify(approval)).not.toContain(CANARY);
     const approvalExpiry = approval.expiresAt as string;
 
-    const registry = new CapabilityGrantRegistry({ tokenFactory: () => GRANT_TOKEN });
-    registry.issue({
-      authorityRef: 'authority:operator', tenantId: TENANT, nodeId: NODE, workOrderId: WORK,
-      issuedToRunId: approval.runId, capabilities: ['task.execute', 'fs.read'], paths: [PATH],
-      expiresAt: approvalExpiry, maxUses: 1,
-    }, {
-      grantId: TASK, tenantId: TENANT, nodeId: NODE, workOrderId: WORK,
-      issuedToRunId: approval.runId, capabilities: ['task.execute', 'fs.read'], paths: [PATH],
-      expiresAt: approvalExpiry, maxUses: 1,
-    });
-    authority.importSnapshot({ schema: 'hummer.task-grant-snapshot', version: 1, tenantId: TENANT, grants: registry.snapshot(TENANT) });
-
+    const decidedAt = new Date().toISOString();
     await request(baseUrl, `/v1/approval-requests/${approval.requestId}/decision`, CONTROL_BADGE, {
       schema: 'hummer.approval-decision', version: 1, decisionId: 'decision-read-e2e',
       requestId: approval.requestId, tenantId: TENANT, decision: 'approved',
-      deciderActorRef: 'human:operator', decidedAt: new Date().toISOString(),
+      deciderActorRef: 'human:operator', decidedAt,
       grantedScope: { capabilities: ['task.execute', 'fs.read'], paths: [PATH], expiresAt: approvalExpiry, maxUses: 1 },
     });
 
     const completed = await waitForTask(baseUrl, 'completed', 20_000);
     expect(completed.status).toBe('completed');
     expect(authority.snapshot(TENANT)[0]).toMatchObject({ usedCount: 1, status: 'exhausted' });
+    const reissued = issuer.issue({
+      grantRef: `grant:${TASK}`, tenantId: TENANT, workOrderId: WORK, nodeId: NODE,
+      issuedToRunId: approval.runId, capabilities: ['task.execute', 'fs.read'], paths: [PATH],
+      expiresAt: approvalExpiry, issuedAt: decidedAt,
+    });
     await expect(authority.consume({
-      token: GRANT_TOKEN, grantRef: `grant:${TASK}`, tenantId: TENANT, workOrderId: WORK,
+      token: reissued.token, grantRef: `grant:${TASK}`, tenantId: TENANT, workOrderId: WORK,
       nodeId: NODE, issuedToRunId: approval.runId,
       capabilities: ['task.execute', 'fs.read'], paths: [PATH], maxUses: 1, now: new Date().toISOString(),
     })).resolves.toEqual({ ok: false, reason: 'uses_exhausted' });
@@ -134,15 +134,18 @@ describe('real HTTP read attestation path', () => {
     const receipt = await readFile(join(receiptRoot, receiptFiles[0]!), 'utf8');
     const digest = createHash('sha256').update(CANARY, 'utf8').digest('hex');
     expect(JSON.stringify(logs)).not.toContain(CANARY);
-    expect(JSON.stringify(logs)).not.toContain(GRANT_TOKEN);
+    expect(JSON.stringify(logs)).not.toContain(reissued.token);
+    expect(JSON.stringify(logs)).not.toContain(ISSUER_SECRET);
     for (const name of await readdir(root)) {
       if (name === 'workspace' || name === 'receipts') continue;
       const bytes = await readFile(join(root, name));
       expect(bytes.includes(Buffer.from(CANARY))).toBe(false);
-      expect(bytes.includes(Buffer.from(GRANT_TOKEN))).toBe(false);
+      expect(bytes.includes(Buffer.from(reissued.token))).toBe(false);
+      expect(bytes.includes(Buffer.from(ISSUER_SECRET))).toBe(false);
     }
     expect(receipt).not.toContain(CANARY);
-    expect(receipt).not.toContain(GRANT_TOKEN);
+    expect(receipt).not.toContain(reissued.token);
+    expect(receipt).not.toContain(ISSUER_SECRET);
     expect(receipt).toContain(digest);
     expect(receipt).toContain(`\"evidenceRef\":\"evidence://sha256/${digest}\"`);
     expect(receipt).toContain(`\"relativePath\":\"${PATH}\"`);

@@ -3,7 +3,7 @@ import { validateFleetContract } from '@hummer/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { draftPlanFromPrompt, type SessionPlan } from '../sessions/model/session';
 import StartWorkFlow from './StartWorkFlow';
-import type { StartWorkDispatchIntentPort } from './startWorkDispatch';
+import { deterministicTaskGrantRef, type StartWorkDispatchIntentPort } from './startWorkDispatch';
 
 const onlineNode = {
   id: 'node_office',
@@ -117,7 +117,7 @@ describe('StartWorkFlow relay seam', () => {
     expect(record).not.toHaveBeenCalled();
   });
 
-  it('freezes an explicit read-attestation plan and one-use grant into the confirmed envelope', async () => {
+  it('freezes an explicit read-attestation plan and deterministic grant reference into the confirmed envelope', async () => {
     const record = vi.fn<StartWorkDispatchIntentPort['record']>();
     render(<StartWorkFlow
       planner={{ draft: vi.fn().mockResolvedValue(draftPlanFromPrompt('证明周报文件摘要')) }}
@@ -131,7 +131,6 @@ describe('StartWorkFlow relay seam', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /只读文件证明/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '工作区相对路径' }), { target: { value: 'reports/weekly.txt' } });
     fireEvent.change(screen.getByRole('textbox', { name: '最大读取字节' }), { target: { value: '4096' } });
-    fireEvent.change(screen.getByRole('textbox', { name: '一次性授权引用' }), { target: { value: 'grant:weekly-1' } });
     fireEvent.click(screen.getByRole('button', { name: '生成待确认计划' }));
 
     const scope = await screen.findByLabelText('只读证明批准范围');
@@ -143,7 +142,7 @@ describe('StartWorkFlow relay seam', () => {
     const intent = record.mock.calls[0][0];
     expect(intent.envelope).toMatchObject({
       targetNodeId: 'node_office',
-      grantRef: 'grant:weekly-1',
+      grantRef: deterministicTaskGrantRef(intent.planId),
       executionPlan: { kind: 'fs.read.attest.v1', path: 'reports/weekly.txt', maxBytes: 4096 },
     });
     expect(validateFleetContract('TaskEnvelope', intent.envelope).issues).toBeUndefined();
@@ -161,7 +160,6 @@ describe('StartWorkFlow relay seam', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '你想完成什么' }), { target: { value: '证明周报文件摘要' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /只读文件证明/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '工作区相对路径' }), { target: { value: 'reports/weekly.txt' } });
-    fireEvent.change(screen.getByRole('textbox', { name: '一次性授权引用' }), { target: { value: 'grant:weekly-1' } });
     fireEvent.click(screen.getByRole('button', { name: '生成待确认计划' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('没有可用执行节点');
