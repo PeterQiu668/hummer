@@ -1,0 +1,16 @@
+{
+  "schema": "hummer.evidence-manifest",
+  "version": 1,
+  "round": "round-p3-dry-run-commerce",
+  "generatedAt": "2026-10-07T07:42:50.741Z",
+  "gitCommit": "1bafc8d25a7ec692089ba4c18787be9dc61321ac",
+  "prevManifestRootHash": "1230b210d00fcd5026830f6c5d6753fc1eafd12cdbae1731d8fa4a48264b4b11",
+  "files": [
+    {
+      "path": "evidence/round-p3-dry-run-commerce/gate.json",
+      "sha256": "2130dfa4065d73732bb1c74050d02bd9459992a2197461506a09bd088619a5f2",
+      "bytes": 9139
+    }
+  ],
+  "rootHash": "998c1696d96c230bf6b3a25e4cb021ad102006798c7ab6fed70b7d997cea12d9"
+}

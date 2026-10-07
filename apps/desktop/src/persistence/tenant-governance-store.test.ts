@@ -26,14 +26,14 @@ describe('[TEN-W4-GOVERNANCE] additive migrations and tenant dual chain', () => 
     expect(fingerprint).toBe(MIGRATIONS_V1_TO_V11_SHA256);
   });
 
-  it('upgrades a real v11 database through v12-v16 and backfills its legacy event into the tenant chain', () => {
+  it('upgrades a real v11 database through v12-v17 and backfills its legacy event into the tenant chain', () => {
     const directory = temporaryDirectory();
     const databasePath = join(directory, 'hummer.sqlite3');
     seedV11Database(databasePath);
 
     const persistence = openPersistence({ dataDirectory: directory });
 
-    expect(persistence.schemaVersion()).toBe(16);
+    expect(persistence.schemaVersion()).toBe(17);
     expect(persistence.listTables()).toEqual(expect.arrayContaining([
       'tenant_settings',
       'tenant_event_chain',
@@ -42,12 +42,13 @@ describe('[TEN-W4-GOVERNANCE] additive migrations and tenant dual chain', () => 
       'quota_counters',
       'quota_admissions',
     ]));
-    expect(persistence.appliedMigrations().slice(-5)).toEqual([
+    expect(persistence.appliedMigrations().slice(-6)).toEqual([
       expect.objectContaining({ version: 12, name: 'w4_tenant_governance_and_dual_chain' }),
       expect.objectContaining({ version: 13, name: 'w4_audit_exports_and_quota_counters' }),
       expect.objectContaining({ version: 14, name: 'p2_w7_demo_session_privacy_kernel' }),
       expect.objectContaining({ version: 15, name: 'p2_w10_public_marketplace_kernel' }),
       expect.objectContaining({ version: 16, name: 'p1_fleet_dispatch_outbox' }),
+      expect.objectContaining({ version: 17, name: 'p3_dry_run_marketplace_commerce' }),
     ]);
     expect(persistence.verifyDomainEventIntegrity()).toEqual({ valid: true, checked: 1 });
     expect(persistence.verifyTenantDomainEventIntegrity('tenant_v11')).toEqual({ valid: true, checked: 1 });
